@@ -1,0 +1,13 @@
+node_modules/
+.next/
+*.log
+npm-out.txt
+npm-err.txt
+dev-out.txt
+dev-err.txt
+npm2-out.txt
+npm2-err.txt
+.env
+app/.env
+app/tsconfig.tsbuildinfo
+app/.next/

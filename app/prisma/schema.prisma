@@ -1,0 +1,426 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// KULLANICI & ABONELİK
+// ─────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  companyName   String?
+  role          UserRole @default(USER)
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscription  Subscription?
+  entities      Entity[]
+  groups        Group[]
+  analyses      Analysis[]
+  tenzilatEntries TenzilatEntry[]
+  auditLogs     TenzilatAuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Subscription {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  plan            SubscriptionPlan   @default(DEMO)
+  billingCycle    BillingCycle       @default(MONTHLY)
+  status          SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean         @default(false)
+  iyzicoSubKey    String?            // iyzico subscription key
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  DEMO
+  STANDART
+  PRO
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  subscriptionId  String
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("TRY")
+  status          String   // success | failed | refunded
+  iyzicoPaymentId String?
+  createdAt       DateTime @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────
+// ŞİRKET (ENTITY) & GRUP
+// ─────────────────────────────────────────────
+
+model Entity {
+  id                  String      @id @default(uuid())
+  userId              String
+  name                String
+  taxNumber           String?     // Vergi numarası
+  sector              String?
+  entityType          EntityType  @default(STANDALONE)
+  groupId             String?
+  ownershipPct        Decimal?    @db.Decimal(5, 4) // 0.0 - 1.0
+  consolidationInclude Boolean    @default(true)
+  weightBasis         WeightBasis @default(REVENUE)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group               Group?      @relation(fields: [groupId], references: [id])
+  financialData       FinancialData[]
+  analyses            Analysis[]
+  tenzilatEntries     TenzilatEntry[]
+  icTransactionsSell  IcTransaction[] @relation("SellerEntity")
+  icTransactionsBuy   IcTransaction[] @relation("BuyerEntity")
+
+  @@map("entities")
+}
+
+enum EntityType {
+  STANDALONE
+  PARENT
+  SUBSIDIARY
+  JV
+}
+
+enum WeightBasis {
+  REVENUE
+  ASSETS
+  EQUAL
+}
+
+model Group {
+  id               String   @id @default(uuid())
+  userId           String
+  name             String
+  baseCurrency     String   @default("TRY")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entities         Entity[]
+  analyses         Analysis[]
+  icTransactions   IcTransaction[]
+  eliminationLogs  EliminationLog[]
+  tenzilatEntries  TenzilatEntry[]
+
+  @@map("groups")
+}
+
+// ─────────────────────────────────────────────
+// FİNANSAL VERİ
+// ─────────────────────────────────────────────
+
+model FinancialData {
+  id          String      @id @default(uuid())
+  entityId    String
+  year        Int
+  period      Period      @default(ANNUAL)
+  source      DataSource  @default(MANUAL)
+  fileName    String?     // Yüklenen dosya adı
+  fileUrl     String?     // Storage URL
+
+  // AKTİF — Dönen Varlıklar
+  cash                Decimal? @db.Decimal(18, 2) // Nakit ve nakit benzerleri
+  shortTermInvestments Decimal? @db.Decimal(18, 2)
+  tradeReceivables    Decimal? @db.Decimal(18, 2) // Ticari alacaklar
+  inventory           Decimal? @db.Decimal(18, 2) // Stoklar
+  otherCurrentAssets  Decimal? @db.Decimal(18, 2)
+  totalCurrentAssets  Decimal? @db.Decimal(18, 2) // Dönen varlıklar toplamı
+
+  // AKTİF — Duran Varlıklar
+  tangibleAssets      Decimal? @db.Decimal(18, 2) // Maddi duran varlıklar
+  intangibleAssets    Decimal? @db.Decimal(18, 2)
+  longTermInvestments Decimal? @db.Decimal(18, 2)
+  otherNonCurrentAssets Decimal? @db.Decimal(18, 2)
+  totalNonCurrentAssets Decimal? @db.Decimal(18, 2)
+  totalAssets         Decimal? @db.Decimal(18, 2) // Toplam aktif
+
+  // PASİF — Kısa Vadeli Borçlar
+  shortTermFinancialDebt Decimal? @db.Decimal(18, 2) // KV finansal borç
+  tradePayables       Decimal? @db.Decimal(18, 2) // Ticari borçlar
+  otherCurrentLiabilities Decimal? @db.Decimal(18, 2)
+  totalCurrentLiabilities Decimal? @db.Decimal(18, 2) // KV borçlar toplamı
+
+  // PASİF — Uzun Vadeli Borçlar
+  longTermFinancialDebt Decimal? @db.Decimal(18, 2) // UV finansal borç
+  otherNonCurrentLiabilities Decimal? @db.Decimal(18, 2)
+  totalNonCurrentLiabilities Decimal? @db.Decimal(18, 2)
+
+  // PASİF — Öz Kaynak
+  paidInCapital       Decimal? @db.Decimal(18, 2) // Ödenmiş sermaye
+  retainedEarnings    Decimal? @db.Decimal(18, 2) // Geçmiş yıl karları
+  netProfitCurrentYear Decimal? @db.Decimal(18, 2)
+  totalEquity         Decimal? @db.Decimal(18, 2) // Toplam öz kaynak
+  totalLiabilitiesAndEquity Decimal? @db.Decimal(18, 2)
+
+  // GELİR TABLOSU
+  revenue             Decimal? @db.Decimal(18, 2) // Net satışlar / ciro
+  cogs                Decimal? @db.Decimal(18, 2) // SMM
+  grossProfit         Decimal? @db.Decimal(18, 2) // Brüt kar
+  operatingExpenses   Decimal? @db.Decimal(18, 2) // Faaliyet giderleri
+  ebit                Decimal? @db.Decimal(18, 2) // Faaliyet karı (EBIT)
+  depreciation        Decimal? @db.Decimal(18, 2) // Amortisman
+  ebitda              Decimal? @db.Decimal(18, 2) // FAVÖK
+  interestExpense     Decimal? @db.Decimal(18, 2) // Finansman gideri
+  otherIncome         Decimal? @db.Decimal(18, 2) // Diğer gelirler
+  otherExpense        Decimal? @db.Decimal(18, 2) // Diğer giderler
+  ebt                 Decimal? @db.Decimal(18, 2) // Vergi öncesi kar
+  taxExpense          Decimal? @db.Decimal(18, 2)
+  netProfit           Decimal? @db.Decimal(18, 2) // Net kar
+
+  // Satın alımlar (DPO hesabı için)
+  purchases           Decimal? @db.Decimal(18, 2)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  entity              Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  analysis            Analysis?
+
+  @@unique([entityId, year, period])
+  @@map("financial_data")
+}
+
+enum Period {
+  ANNUAL
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+enum DataSource {
+  EXCEL
+  CSV
+  PDF
+  MANUAL
+}
+
+// ─────────────────────────────────────────────
+// ANALİZ & SKOR
+// ─────────────────────────────────────────────
+
+model Analysis {
+  id                  String       @id @default(uuid())
+  userId              String
+  entityId            String?      // Solo analiz için
+  groupId             String?      // Grup analizi için
+  financialDataId     String?      @unique
+  year                Int
+  period              Period       @default(ANNUAL)
+  mode                AnalysisMode @default(SOLO)
+
+  // Skor sonuçları
+  finalScore          Decimal?     @db.Decimal(6, 2)  // 0-100
+  finalRating         String?      // AAA, AA, A, BBB...
+  liquidityScore      Decimal?     @db.Decimal(6, 2)
+  profitabilityScore  Decimal?     @db.Decimal(6, 2)
+  leverageScore       Decimal?     @db.Decimal(6, 2)
+  activityScore       Decimal?     @db.Decimal(6, 2)
+
+  // Grup modu için
+  weightedScore       Decimal?     @db.Decimal(6, 2)  // SAF öncesi
+  safFactor           Decimal?     @db.Decimal(4, 3)  // 0.0-1.0
+  icDependencyRatio   Decimal?     @db.Decimal(6, 4)
+  hasCrossGuarantee   Boolean      @default(false)
+
+  // Hesaplanan 25 oran (JSON)
+  ratios              Json?
+
+  // Konsolide finansallar (grup modu için — eliminasyon sonrası)
+  consolidatedFinancials Json?
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  user                User         @relation(fields: [userId], references: [id])
+  entity              Entity?      @relation(fields: [entityId], references: [id])
+  group               Group?       @relation(fields: [groupId], references: [id])
+  financialData       FinancialData? @relation(fields: [financialDataId], references: [id])
+  tenzilatEntries     TenzilatEntry[]
+
+  @@map("analyses")
+}
+
+enum AnalysisMode {
+  SOLO
+  CONSOLIDATED
+}
+
+// ─────────────────────────────────────────────
+// GRUP İÇİ İŞLEM & ELİMİNASYON
+// ─────────────────────────────────────────────
+
+model IcTransaction {
+  id              String          @id @default(uuid())
+  groupId         String
+  year            Int
+  sellerEntityId  String
+  buyerEntityId   String
+  type            IcTransactionType
+  amount          Decimal         @db.Decimal(18, 2)
+  isMatched       Boolean         @default(false)
+  eliminationApplied Boolean      @default(false)
+  materialityPct  Decimal?        @db.Decimal(8, 6)  // IC tutar / grup geliri
+  createdAt       DateTime        @default(now())
+
+  group           Group           @relation(fields: [groupId], references: [id])
+  seller          Entity          @relation("SellerEntity", fields: [sellerEntityId], references: [id])
+  buyer           Entity          @relation("BuyerEntity", fields: [buyerEntityId], references: [id])
+  eliminationLog  EliminationLog?
+
+  @@map("ic_transactions")
+}
+
+enum IcTransactionType {
+  REVENUE
+  LOAN
+  INTEREST
+  MANAGEMENT_FEE
+  DIVIDEND
+  ASSET_SALE
+}
+
+model EliminationLog {
+  id                String        @id @default(uuid())
+  groupId           String
+  icTransactionId   String        @unique
+  year              Int
+  amountEliminated  Decimal       @db.Decimal(18, 2)
+  ruleApplied       EliminationRule
+  materialityPct    Decimal?      @db.Decimal(8, 6)
+  createdAt         DateTime      @default(now())
+
+  group             Group         @relation(fields: [groupId], references: [id])
+  icTransaction     IcTransaction @relation(fields: [icTransactionId], references: [id])
+
+  @@map("elimination_logs")
+}
+
+enum EliminationRule {
+  FULL_ELIMINATION
+  PARTIAL_80
+  PARTIAL_50
+  SKIPPED_IMMATERIAL
+  RECONCILIATION_GAP
+}
+
+// ─────────────────────────────────────────────
+// MANUEL TENZİLAT
+// ─────────────────────────────────────────────
+
+model TenzilatEntry {
+  id               String          @id @default(uuid())
+  userId           String
+  entityId         String?         // Null = grup geneli
+  groupId          String?         // Null = solo analiz
+  analysisId       String?
+  year             Int
+  period           Period          @default(ANNUAL)
+  adjustmentType   AdjustmentType
+  adjustmentAmount Decimal         @db.Decimal(18, 2) // Pozitif = artış, negatif = azalış
+  description      String          @db.Text           // Min 10 karakter
+  scope            AdjustmentScope
+  isActive         Boolean         @default(true)
+  deletedAt        DateTime?       // Soft delete
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user             User            @relation(fields: [userId], references: [id])
+  entity           Entity?         @relation(fields: [entityId], references: [id])
+  group            Group?          @relation(fields: [groupId], references: [id])
+  analysis         Analysis?       @relation(fields: [analysisId], references: [id])
+  auditLogs        TenzilatAuditLog[]
+
+  // Kısıt: scope=GROUP ise entityId null olmalı
+  @@map("tenzilat_entries")
+}
+
+enum AdjustmentType {
+  REVENUE
+  COGS
+  EBITDA
+  NET_PROFIT
+  DEBT_SHORT
+  DEBT_LONG
+  EQUITY
+  CASH
+  RECEIVABLES
+  PAYABLES
+  OTHER_INCOME
+  OTHER_EXPENSE
+}
+
+enum AdjustmentScope {
+  ENTITY
+  GROUP
+}
+
+// Append-only denetim kaydı
+model TenzilatAuditLog {
+  id             String   @id @default(uuid())
+  entryId        String
+  userId         String
+  action         AuditAction
+  fieldChanged   String?
+  oldValue       String?  @db.Text
+  newValue       String?  @db.Text
+  timestamp      DateTime @default(now())
+  ipAddress      String?
+
+  entry          TenzilatEntry @relation(fields: [entryId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+
+  @@map("tenzilat_audit_logs")
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  DELETED
+  ACTIVATED
+  DEACTIVATED
+}
