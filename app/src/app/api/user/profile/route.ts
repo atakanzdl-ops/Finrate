@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/auth'
 
 export async function PATCH(req: NextRequest) {
   try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    const { userId } = verifyToken(token)
+    const userId = getUserIdFromRequest(req)
+    if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
     const { fullName, companyName } = await req.json()
 

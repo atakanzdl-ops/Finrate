@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
-
-function getUserId(req: NextRequest): string | null {
-  try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) return null
-    return verifyToken(token).userId
-  } catch {
-    return null
-  }
-}
+import { getUserIdFromRequest } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
-  const userId = getUserId(req)
+  const userId = getUserIdFromRequest(req)
   if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
-  const analyses = await prisma.analysis.findMany({
-    where: { userId, mode: 'SOLO' },
+  const raw = await prisma.analysis.findMany({
+    where: { userId, mode: 'SOLO', entity: { isActive: true } },
     orderBy: [{ year: 'desc' }, { createdAt: 'desc' }],
     select: {
       id: true,
@@ -31,9 +21,28 @@ export async function GET(req: NextRequest) {
       activityScore: true,
       ratios: true,
       entity: { select: { id: true, name: true } },
+      financialData: {
+        select: {
+          revenue: true, cogs: true, grossProfit: true,
+          operatingExpenses: true, ebit: true, ebitda: true,
+          interestExpense: true, ebt: true, netProfit: true, depreciation: true,
+          cash: true, tradeReceivables: true, inventory: true,
+          totalCurrentAssets: true, tangibleAssets: true,
+          totalNonCurrentAssets: true, totalAssets: true,
+          shortTermFinancialDebt: true, tradePayables: true,
+          totalCurrentLiabilities: true, longTermFinancialDebt: true,
+          totalNonCurrentLiabilities: true,
+          totalEquity: true, totalLiabilitiesAndEquity: true,
+        },
+      },
     },
-    take: 50,
+    take: 100,
   })
+
+  const analyses = raw.map((a) => ({
+    ...a,
+    ratios: a.ratios ? JSON.parse(a.ratios as string) : null,
+  }))
 
   return NextResponse.json({ analyses })
 }

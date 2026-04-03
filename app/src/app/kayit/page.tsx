@@ -50,7 +50,7 @@ export default function KayitPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Kayıt başarısız.'); return }
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } finally {
       setLoading(false)
     }
@@ -200,13 +200,15 @@ export default function KayitPage() {
                   </span>
                 </label>
 
+                {/* Hata */}
+                {error && (
+                  <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                    {error}
+                  </div>
+                )}
+
                 {/* Butonlar */}
                 <div className="flex gap-3 mt-1">
-                  {error && (
-                    <div className="col-span-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
-                      {error}
-                    </div>
-                  )}
                   <button
                     type="button" onClick={() => setStep(1)}
                     className="flex-1 glass border border-white/10 text-white/60 font-medium py-3.5 rounded-xl text-sm hover:text-white transition-all"
@@ -214,7 +216,7 @@ export default function KayitPage() {
                     ← Geri
                   </button>
                   <button
-                    type="submit" disabled={loading || !form.kvkk}
+                    type="submit" disabled={loading}
                     className="flex-[2] btn-gradient text-white font-semibold py-3.5 rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {loading ? (

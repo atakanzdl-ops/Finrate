@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) {
+    const userId = getUserIdFromRequest(req)
+    if (!userId) {
       return NextResponse.json({ error: 'Oturum açılmamış.' }, { status: 401 })
     }
 
-    const payload = verifyToken(token)
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,

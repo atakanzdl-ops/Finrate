@@ -11,27 +11,46 @@ interface Props {
   baseScore: number
 }
 
-// 10 finansal kaldıraç
+// Lever → etkilen birincil oran (gösterim için)
 const LEVERS = [
-  // Aktif tarafı (3)
-  { key: 'cash',              label: 'Nakit Artışı',            category: 'Aktif',   affects: ['cashRatio', 'currentRatio'] },
-  { key: 'tradeReceivables',  label: 'Alacak Tahsilatı',        category: 'Aktif',   affects: ['receivablesTurnoverDays'] },
-  { key: 'inventory',         label: 'Stok Optimizasyonu',      category: 'Aktif',   affects: ['inventoryTurnoverDays', 'currentRatio'] },
-  // Pasif tarafı (4)
-  { key: 'shortTermFinancialDebt', label: 'KV Borç Azaltma',   category: 'Pasif',   affects: ['debtToEquity', 'currentRatio'] },
-  { key: 'longTermFinancialDebt',  label: 'UV Borç Azaltma',   category: 'Pasif',   affects: ['debtToEquity', 'debtToEbitda'] },
-  { key: 'tradePayables',     label: 'Tedarikçi Borçları',      category: 'Pasif',   affects: ['payablesTurnoverDays'] },
-  { key: 'totalEquity',       label: 'Sermaye Artırımı',        category: 'Pasif',   affects: ['equityRatio', 'debtToEquity'] },
-  // Gelir tablosu (3)
-  { key: 'revenue',           label: 'Ciro Artışı',             category: 'Gelir',   affects: ['netProfitMargin', 'assetTurnover'] },
-  { key: 'ebitda',            label: 'FAVÖK İyileştirme',       category: 'Gelir',   affects: ['ebitdaMargin', 'debtToEbitda'] },
-  { key: 'netProfit',         label: 'Net Kar İyileştirme',     category: 'Gelir',   affects: ['netProfitMargin', 'roe', 'roa'] },
+  // Aktif tarafı
+  { key: 'cash',                   label: 'Nakit Artışı',         category: 'Aktif',  primaryRatio: 'cashRatio',              primaryLabel: 'Nakit Oranı' },
+  { key: 'tradeReceivables',       label: 'Alacak Tahsilatı',     category: 'Aktif',  primaryRatio: 'receivablesTurnoverDays', primaryLabel: 'Alacak Devir (gün)' },
+  { key: 'inventory',              label: 'Stok Optimizasyonu',   category: 'Aktif',  primaryRatio: 'inventoryTurnoverDays',   primaryLabel: 'Stok Devir (gün)' },
+  // Pasif tarafı
+  { key: 'shortTermFinancialDebt', label: 'KV Borç Azaltma',      category: 'Pasif',  primaryRatio: 'debtToEquity',            primaryLabel: 'Borç/Özkaynak' },
+  { key: 'longTermFinancialDebt',  label: 'UV Borç Azaltma',      category: 'Pasif',  primaryRatio: 'debtToAssets',            primaryLabel: 'Borç/Aktif' },
+  { key: 'tradePayables',          label: 'Tedarikçi Borçları',   category: 'Pasif',  primaryRatio: 'payablesTurnoverDays',    primaryLabel: 'Borç Devir (gün)' },
+  { key: 'totalEquity',            label: 'Sermaye Artırımı',     category: 'Pasif',  primaryRatio: 'equityRatio',             primaryLabel: 'Özkaynak Oranı' },
+  // Gelir Tablosu
+  { key: 'revenue',                label: 'Ciro Artışı',          category: 'Gelir',  primaryRatio: 'assetTurnover',           primaryLabel: 'Aktif Devir' },
+  { key: 'ebitda',                 label: 'FAVÖK İyileştirme',    category: 'Gelir',  primaryRatio: 'ebitdaMargin',            primaryLabel: 'FAVÖK Marjı' },
+  { key: 'netProfit',              label: 'Net Kar İyileştirme',  category: 'Gelir',  primaryRatio: 'netProfitMargin',         primaryLabel: 'Net Kâr Marjı' },
 ]
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Aktif: 'text-cyan-400 bg-cyan-500/10',
-  Pasif: 'text-purple-400 bg-purple-500/10',
-  Gelir: 'text-emerald-400 bg-emerald-500/10',
+// Kategori renk tanımları — kategori skor halkaları ile uyumlu
+const CATEGORY_STYLES: Record<string, { header: string; badge: string; slider: string }> = {
+  Aktif: {
+    header: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/5',
+    badge:  'bg-cyan-500/15 text-cyan-400',
+    slider: 'accent-cyan-500',
+  },
+  Pasif: {
+    header: 'text-purple-400 border-purple-500/30 bg-purple-500/5',
+    badge:  'bg-purple-500/15 text-purple-400',
+    slider: 'accent-purple-500',
+  },
+  Gelir: {
+    header: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5',
+    badge:  'bg-emerald-500/15 text-emerald-400',
+    slider: 'accent-emerald-500',
+  },
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  Aktif: 'Aktif Tarafı',
+  Pasif: 'Pasif Tarafı',
+  Gelir: 'Gelir Tablosu Tarafı',
 }
 
 const RATING_COLOR: Record<string, string> = {
@@ -40,24 +59,110 @@ const RATING_COLOR: Record<string, string> = {
   CCC: 'text-orange-500',  CC: 'text-red-400',     C: 'text-red-500', D: 'text-red-600',
 }
 
-// Oran değişimi yüzdeden simüle et
 function applyLevers(
   base: Record<string, number | null>,
-  changes: Record<string, number>, // key -> % change (-50..+100)
+  changes: Record<string, number>,
 ): RatioResult {
-  const modified = { ...base }
+  const m: Record<string, number | null> = { ...base }
+
+  function adj(k: string, mult: number) {
+    const v = m[k]
+    if (v != null) m[k] = v * mult
+  }
+
   for (const [key, pct] of Object.entries(changes)) {
     if (pct === 0) continue
-    const current = base[key]
-    if (current != null) {
-      modified[key] = current * (1 + pct / 100)
+    const up = 1 + pct / 100   // büyüme katsayısı
+    const dn = 1 - pct / 100   // azalma katsayısı (borç/alacak azaltma)
+
+    switch (key) {
+      case 'cash':
+        // Nakit artışı → nakit oranı + likit oranlar iyileşir
+        adj('cashRatio',    up)
+        adj('currentRatio', 1 + pct / 100 * 0.25)
+        adj('quickRatio',   1 + pct / 100 * 0.25)
+        break
+      case 'tradeReceivables':
+        // Alacak tahsilatı → devir günü azalır (iyileşme)
+        adj('receivablesTurnoverDays', dn)
+        adj('cashConversionCycle',     1 - pct / 100 * 0.4)
+        adj('cashRatio',               1 + pct / 100 * 0.2)
+        adj('currentRatio',            1 + pct / 100 * 0.1)
+        break
+      case 'inventory':
+        // Stok optimizasyonu → stok devir günü azalır
+        adj('inventoryTurnoverDays', dn)
+        adj('cashConversionCycle',   1 - pct / 100 * 0.4)
+        break
+      case 'shortTermFinancialDebt':
+        // KV borç azaltma → D/E, D/A, KV oran azalır; cari oran iyileşir
+        adj('debtToEquity',       dn)
+        adj('debtToAssets',       1 - pct / 100 * 0.6)
+        adj('shortTermDebtRatio', dn)
+        adj('currentRatio',       1 + pct / 100 * 0.4)
+        adj('quickRatio',         1 + pct / 100 * 0.3)
+        adj('interestCoverage',   1 + pct / 100 * 0.4)
+        break
+      case 'longTermFinancialDebt':
+        // UV borç azaltma → D/A, D/FAVÖK azalır; faiz karşılama iyileşir
+        adj('debtToAssets',     1 - pct / 100 * 0.4)
+        adj('debtToEbitda',     dn)
+        adj('interestCoverage', 1 + pct / 100 * 0.5)
+        adj('equityRatio',      1 + pct / 100 * 0.2)
+        break
+      case 'tradePayables':
+        // Tedarikçi borç değişimi → borç devir günü
+        adj('payablesTurnoverDays', up)
+        adj('cashConversionCycle',  1 - pct / 100 * 0.2)
+        break
+      case 'totalEquity':
+        // Sermaye artırımı → özkaynak oranı artar; D/E azalır
+        adj('equityRatio',  up)
+        adj('debtToEquity', dn)
+        adj('debtToAssets', 1 - pct / 100 * 0.3)
+        adj('roa',          1 + pct / 100 * 0.1)
+        break
+      case 'revenue':
+        // Ciro artışı → aktif devir, marjlar, D/FAVÖK iyileşir
+        adj('assetTurnover',   up)
+        adj('grossMargin',     1 + pct / 100 * 0.15)
+        adj('ebitdaMargin',    1 + pct / 100 * 0.15)
+        adj('netProfitMargin', 1 + pct / 100 * 0.1)
+        adj('roa',             1 + pct / 100 * 0.15)
+        adj('roe',             1 + pct / 100 * 0.15)
+        adj('debtToEbitda',    1 - pct / 100 * 0.5)
+        break
+      case 'ebitda':
+        // FAVÖK artışı → tüm kârlılık ve faiz karşılama iyileşir
+        adj('ebitdaMargin',    up)
+        adj('ebitMargin',      1 + pct / 100 * 0.8)
+        adj('debtToEbitda',    dn)
+        adj('interestCoverage', up)
+        adj('roa',              1 + pct / 100 * 0.6)
+        adj('roe',              1 + pct / 100 * 0.6)
+        adj('roic',             1 + pct / 100 * 0.6)
+        break
+      case 'netProfit':
+        // Net kâr artışı → kârlılık oranları
+        adj('netProfitMargin', up)
+        adj('roa',             up)
+        adj('roe',             up)
+        adj('roic',            1 + pct / 100 * 0.7)
+        break
     }
   }
-  // Türetilmiş oranları yeniden hesapla
-  // (calculateScore doğrudan ratio objesi bekliyor — base zaten ratio sonuçları)
-  // Ama biz burada finansal girdi değil, ratio sonuçlarını değiştiriyoruz
-  // Bu simülasyonda ratioları doğrudan modifiye ediyoruz
-  return modified as unknown as RatioResult
+  return m as unknown as RatioResult
+}
+
+/** Oran değerini okunabilir göster */
+function fmtRatio(val: number | null | undefined, key: string): string {
+  if (val == null) return '—'
+  // Gün bazlı oranlar tam sayı
+  if (key.includes('Days')) return Math.round(val).toString() + ' gün'
+  // 0–1 arası → % göster
+  if (Math.abs(val) <= 2) return (val * 100).toFixed(1) + '%'
+  // Büyük sayı (oran > 2) → ondalık
+  return val.toFixed(2)
 }
 
 export function WhatIfSimulator({ baseData, baseScore }: Props) {
@@ -141,42 +246,81 @@ export function WhatIfSimulator({ baseData, baseScore }: Props) {
             </div>
           </div>
 
-          {/* Kaldıraçlar */}
-          <div className="space-y-3">
-            {(['Aktif', 'Pasif', 'Gelir'] as const).map((cat) => (
-              <div key={cat}>
-                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">{cat} Tarafı</p>
-                <div className="space-y-2.5">
-                  {LEVERS.filter((l) => l.category === cat).map((lever) => (
-                    <div key={lever.key} className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs text-white/70">{lever.label}</p>
-                          <div className="flex items-center gap-1">
-                            <span className={clsx(
-                              'text-xs font-bold',
-                              changes[lever.key] > 0 ? 'text-emerald-400' :
-                              changes[lever.key] < 0 ? 'text-red-400' : 'text-white/30'
-                            )}>
-                              {changes[lever.key] > 0 ? '+' : ''}{changes[lever.key]}%
-                            </span>
+          {/* Kaldıraçlar — kategoriye göre renkli */}
+          <div className="space-y-4">
+            {(['Aktif', 'Pasif', 'Gelir'] as const).map((cat) => {
+              const style = CATEGORY_STYLES[cat]
+              return (
+                <div key={cat}>
+                  {/* Renkli kategori başlığı */}
+                  <div className={clsx(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-lg border mb-2.5',
+                    style.header,
+                  )}>
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      {CATEGORY_LABELS[cat]}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {LEVERS.filter((l) => l.category === cat).map((lever) => {
+                      const pct    = changes[lever.key]
+                      const before = baseData[lever.primaryRatio]
+                      const after  = before != null && pct !== 0
+                        ? before * (1 + (lever.key.includes('Debt') || lever.key.includes('Payables') ? -pct : pct) / 100)
+                        : null
+
+                      return (
+                        <div key={lever.key} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-white/70">{lever.label}</p>
+                            {/* Oran değeri — % yerine gerçek rakam */}
+                            <div className="flex items-center gap-1.5 text-xs">
+                              {before != null ? (
+                                <>
+                                  <span className="text-white/30">{lever.primaryLabel}:</span>
+                                  <span className="text-white/60">{fmtRatio(before, lever.primaryRatio)}</span>
+                                  {after !== null && pct !== 0 && (
+                                    <>
+                                      <span className="text-white/20">→</span>
+                                      <span className={clsx(
+                                        'font-bold',
+                                        after > before ? 'text-emerald-400' : 'text-red-400'
+                                      )}>
+                                        {fmtRatio(after, lever.primaryRatio)}
+                                      </span>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <span className={clsx(
+                                  'font-semibold',
+                                  pct > 0 ? 'text-emerald-400' : pct < 0 ? 'text-red-400' : 'text-white/20'
+                                )}>
+                                  {pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}%` : '—'}
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={100}
+                            step={5}
+                            value={pct}
+                            onChange={(e) => setChange(lever.key, Number(e.target.value))}
+                            className={clsx(
+                              'w-full h-1.5 rounded-full appearance-none bg-white/10 cursor-pointer',
+                              style.slider,
+                            )}
+                          />
                         </div>
-                        <input
-                          type="range"
-                          min={-50}
-                          max={100}
-                          step={5}
-                          value={changes[lever.key]}
-                          onChange={(e) => setChange(lever.key, Number(e.target.value))}
-                          className="w-full h-1.5 rounded-full appearance-none bg-white/10 accent-cyan-500 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {hasChanges && (

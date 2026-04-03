@@ -24,7 +24,7 @@ export default function GirisPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Giriş başarısız.'); return }
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } finally {
       setLoading(false)
     }

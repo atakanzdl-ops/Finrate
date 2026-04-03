@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, comparePassword, hashPassword } from '@/lib/auth'
+import { getUserIdFromRequest, comparePassword, hashPassword } from '@/lib/auth'
 
 export async function PATCH(req: NextRequest) {
   try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
-    const { userId } = verifyToken(token)
+    const userId = getUserIdFromRequest(req)
+    if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
     const { currentPassword, newPassword } = await req.json()
     if (!currentPassword || !newPassword)   return NextResponse.json({ error: 'Zorunlu alanlar eksik.' }, { status: 400 })

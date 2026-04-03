@@ -2,16 +2,12 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  devIndicators: false,
   images: {
     remotePatterns: [],
   },
-  // xlsx için server-side webpack ayarı
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = [...(config.externals ?? []), 'xlsx']
-    }
-    return config
-  },
+  // pdf-parse ve xlsx'i webpack'ten çıkar — Node.js native olarak yüklesin
+  serverExternalPackages: ['pdf-parse', 'xlsx'],
 }
 
 export default nextConfig

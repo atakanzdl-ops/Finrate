@@ -2,134 +2,130 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Building2, Plus, Search, ChevronRight, Loader2 } from 'lucide-react'
-import clsx from 'clsx'
+import { Building2, Plus, Search, ChevronRight, Loader2, Trash2 } from 'lucide-react'
 
 interface Entity {
-  id: string
-  name: string
-  taxNumber: string | null
-  sector: string | null
-  entityType: string
-  createdAt: string
-  group: { name: string } | null
-  _count: { financialData: number }
+  id: string; name: string; taxNumber: string | null; sector: string | null
+  entityType: string; createdAt: string
+  group: { name: string } | null; _count: { financialData: number }
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  STANDALONE: 'Bağımsız',
-  PARENT:     'Ana Şirket',
-  SUBSIDIARY: 'Bağlı Ortaklık',
-  JV:         'Ortak Girişim',
+  STANDALONE: 'Bağımsız', PARENT: 'Ana Şirket', SUBSIDIARY: 'Bağlı Ortaklık', JV: 'Ortak Girişim',
 }
 
 export default function SirketlerPage() {
-  const [entities, setEntities] = useState<Entity[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [search, setSearch]     = useState('')
+  const [entities, setEntities]   = useState<Entity[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [search, setSearch]       = useState('')
+  const [deleting, setDeleting]   = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/entities')
-      .then((r) => r.json())
-      .then((d) => setEntities(d.entities ?? []))
-      .finally(() => setLoading(false))
+    fetch('/api/entities').then(r => r.json()).then(d => setEntities(d.entities ?? [])).finally(() => setLoading(false))
   }, [])
 
-  const filtered = entities.filter((e) =>
+  async function deleteEntity(id: string) {
+    setDeleting(id)
+    try {
+      await fetch(`/api/entities/${id}`, { method: 'DELETE' })
+      setEntities(prev => prev.filter(e => e.id !== id))
+    } finally { setDeleting(null); setConfirmId(null) }
+  }
+
+  const filtered = entities.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     (e.taxNumber ?? '').includes(search) ||
-    (e.sector ?? '').toLowerCase().includes(search.toLowerCase()),
-  )
+    (e.sector ?? '').toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="space-y-5">
-      {/* Başlık */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 max-w-5xl mx-auto p-4">
+      <div className="flex items-center justify-between gap-6 pb-6 border-b border-white/5">
         <div>
-          <h1 className="text-2xl font-bold text-white">Şirketler</h1>
-          <p className="text-white/50 text-sm mt-0.5">{entities.length} kayıtlı şirket</p>
+          <h1 className="text-4xl font-black text-white tracking-tight font-display mb-2">Şirketler</h1>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{entities.length} KAYITLI KURUMSAL VARLIK</p>
         </div>
-        <Link
-          href="/dashboard/sirketler/yeni"
-          className="flex items-center gap-2 px-4 py-2 btn-gradient rounded-lg text-sm font-semibold text-white"
-        >
-          <Plus size={16} />
-          Yeni Şirket
+        <Link href="/dashboard/sirketler/yeni"
+          className="flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-black btn-gradient shadow-lg">
+          <Plus size={16} /> Yeni Şirket
         </Link>
       </div>
 
-      {/* Arama */}
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-        <input
-          type="text"
-          placeholder="Şirket adı, vergi no veya sektör..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50"
-        />
+      <div className="relative group max-w-xl">
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+        <input type="text" placeholder="Şirket adı, vergi no veya sektör ara..." value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-12 pr-6 py-4 rounded-2xl text-sm bg-white/5 border border-white/5 focus:border-cyan-500/30 focus:outline-none focus:ring-1 focus:ring-cyan-500/10 text-white transition-all placeholder:text-slate-600" />
       </div>
 
-      {/* Liste */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-cyan-400" />
+        <div className="flex justify-center py-24">
+          <Loader2 size={32} className="animate-spin text-cyan-500" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="glass-card rounded-xl p-10 text-center">
-          <Building2 size={32} className="text-white/20 mx-auto mb-3" />
-          <p className="text-white/40 text-sm">
-            {search ? 'Eşleşen şirket bulunamadı.' : 'Henüz şirket eklenmedi.'}
+        <div className="glass-card p-16 text-center border-white/10">
+          <Building2 size={48} className="mx-auto mb-6 text-slate-700" />
+          <h3 className="text-lg font-bold text-white mb-2">{search ? 'Sonuç Bulunamadı' : 'Henüz Şirket Yok'}</h3>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto mb-8">
+            {search ? 'Aramanızla eşleşen bir şirket bulunamadı. Lütfen farklı bir terim deneyin.' : 'Veri havuzuna henüz bir şirket eklenmemiş görünüyor.'}
           </p>
           {!search && (
-            <Link
-              href="/dashboard/sirketler/yeni"
-              className="inline-block mt-4 px-4 py-2 btn-gradient rounded-lg text-sm font-semibold text-white"
-            >
-              İlk Şirketi Ekle
+            <Link href="/dashboard/sirketler/yeni"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+              <Plus size={16} /> İlk Şirketi Ekle
             </Link>
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((entity) => (
-            <Link
-              key={entity.id}
-              href={`/dashboard/sirketler/${entity.id}`}
-              className="glass-card flex items-center gap-4 p-4 rounded-xl hover:border-cyan-500/30 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                <Building2 size={18} className="text-cyan-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-white truncate">{entity.name}</p>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50 flex-shrink-0">
-                    {ENTITY_TYPE_LABELS[entity.entityType] ?? entity.entityType}
-                  </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map(entity => (
+            <div key={entity.id} className="relative group">
+              <Link href={`/dashboard/sirketler/${entity.id}`}
+                className="glass-card flex items-center gap-5 p-6 pr-24 transition-all border-white/10 hover:border-cyan-500/30 hover:-translate-y-1 block shadow-xl">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/5 border border-white/10 group-hover:bg-cyan-500/10 group-hover:border-cyan-500/20 transition-all">
+                  <Building2 size={24} className="text-slate-400 group-hover:text-cyan-400 transition-colors" />
                 </div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  {entity.sector && (
-                    <p className="text-xs text-white/40 truncate">{entity.sector}</p>
-                  )}
-                  {entity.taxNumber && (
-                    <p className="text-xs text-white/30">VKN: {entity.taxNumber}</p>
-                  )}
-                  <p className="text-xs text-white/30">
-                    {entity._count.financialData} dönem veri
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                       <p className="text-base font-black text-white truncate font-display tracking-tight leading-tight">{entity.name}</p>
+                       <span className="text-[9px] px-2 py-0.5 rounded-md font-black uppercase tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-400/20">
+                         {ENTITY_TYPE_LABELS[entity.entityType] ?? entity.entityType}
+                       </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1">
+                      {entity.sector && <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">{entity.sector}</p>}
+                      <div className="w-1 h-1 rounded-full bg-slate-800"></div>
+                      <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{entity._count.financialData} DÖNEM</p>
+                    </div>
+                  </div>
                 </div>
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                   {entity.group && (
+                     <span className="hidden xl:inline-block text-[9px] font-black px-3 py-1 rounded-md bg-white/5 text-slate-500 border border-white/10 group-hover:border-white/20 transition-all uppercase tracking-widest">
+                       {entity.group.name}
+                     </span>
+                   )}
+                   <ChevronRight size={20} className="text-slate-700 group-hover:text-cyan-400 transition-all group-hover:translate-x-1" />
+                </div>
+              </Link>
+              <div className="absolute right-16 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                {confirmId === entity.id ? (
+                  <div className="flex gap-1">
+                    <button onClick={() => deleteEntity(entity.id)} disabled={deleting === entity.id}
+                      className="text-[9px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-500 hover:bg-red-500/30 transition-all">
+                      {deleting === entity.id ? '...' : 'SİL'}
+                    </button>
+                    <button onClick={() => setConfirmId(null)} className="text-[9px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest bg-white/5 text-slate-500 hover:text-white transition-all">İPTAL</button>
+                  </div>
+                ) : (
+                  <button onClick={e => { e.preventDefault(); setConfirmId(entity.id) }}
+                    className="p-2 rounded-xl hover:bg-red-500/10 text-slate-700 hover:text-red-500 transition-all">
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
-              {entity.group && (
-                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 flex-shrink-0">
-                  {entity.group.name}
-                </span>
-              )}
-              <ChevronRight
-                size={16}
-                className={clsx('text-white/20 flex-shrink-0 transition-colors', 'group-hover:text-cyan-400')}
-              />
-            </Link>
+            </div>
           ))}
         </div>
       )}

@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
 
-// Giriş gerektiren route'lar
-const PROTECTED = ['/dashboard', '/analiz', '/sirketler', '/gruplar', '/ayarlar']
-// Giriş yapmış kullanıcının görmemesi gereken sayfalar
+// Edge Runtime'da jsonwebtoken çalışmaz — JWT'yi elle decode ediyoruz
+function isTokenValid(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return false
+    const payload = JSON.parse(atob(parts[1]))
+    // exp kontrolü (saniye cinsinden)
+    if (payload.exp && payload.exp < Date.now() / 1000) return false
+    return !!payload.userId
+  } catch {
+    return false
+  }
+}
+
+const PROTECTED = ['/dashboard']
 const AUTH_PAGES = ['/giris', '/kayit']
 
 export function middleware(req: NextRequest) {
@@ -13,31 +24,26 @@ export function middleware(req: NextRequest) {
   const isProtected = PROTECTED.some((p) => pathname.startsWith(p))
   const isAuthPage  = AUTH_PAGES.some((p) => pathname.startsWith(p))
 
-  if (isProtected) {
-    if (!token) {
-      return NextResponse.redirect(new URL('/giris', req.url))
-    }
-    try {
-      verifyToken(token)
-    } catch {
-      const res = NextResponse.redirect(new URL('/giris', req.url))
-      res.cookies.set('finrate_token', '', { maxAge: 0, path: '/' })
-      return res
-    }
+  // Korumalı sayfa + geçersiz token → giriş sayfasına
+  if (isProtected && token && !isTokenValid(token)) {
+    const res = NextResponse.redirect(new URL('/giris', req.url))
+    res.cookies.set('finrate_token', '', { maxAge: 0, path: '/' })
+    return res
   }
 
-  if (isAuthPage && token) {
-    try {
-      verifyToken(token)
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    } catch {
-      // Token geçersiz — auth sayfasına izin ver
-    }
+  // Korumalı sayfa + token yok → giriş sayfasına
+  if (isProtected && !token) {
+    return NextResponse.redirect(new URL('/giris', req.url))
+  }
+
+  // Auth sayfası + geçerli token → dashboard'a
+  if (isAuthPage && token && isTokenValid(token)) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/analiz/:path*', '/sirketler/:path*', '/gruplar/:path*', '/ayarlar/:path*', '/giris', '/kayit'],
+  matcher: ['/dashboard/:path*', '/giris', '/kayit'],
 }

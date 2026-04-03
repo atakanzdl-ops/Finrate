@@ -9,45 +9,53 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Finrate Design System
-        navy: {
-          950: '#020b18',
-          900: '#040D1E',
-          800: '#071428',
-          700: '#0a1c35',
-          600: '#0d2444',
+        // Finrate Design System — Prussian Blue + Turquoise
+        prussian: {
+          950: '#001829',
+          900: '#003153',
+          800: '#004070',
+          700: '#005080',
         },
-        cyan: {
-          400: '#22d3ee',
-          500: '#0ECEAD',
-          600: '#0EA5E9',
+        turquoise: {
+          300: '#7aeee6',
+          400: '#40E0D0',
+          500: '#2dd4bf',
         },
-        glass: 'rgba(255,255,255,0.07)',
+        // Dashboard light surface
+        surface: {
+          100: 'rgba(255,255,255,0.85)',
+          50:  'rgba(255,255,255,0.72)',
+        },
       },
       backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'cyan-gradient': 'linear-gradient(135deg, #0ECEAD 0%, #0EA5E9 100%)',
-        'hero-gradient': 'linear-gradient(135deg, #040D1E 0%, #071428 60%, #0a1c35 100%)',
+        // Diagonal hero gradient (index.html'den)
+        'hero-diagonal': 'linear-gradient(118deg, #003153 0%, #003153 38%, #40E0D0 58%, #ffffff 75%, #ffffff 100%)',
+        // Turquoise accent gradient
+        'tq-gradient': 'linear-gradient(135deg, #40E0D0 0%, #2dd4bf 100%)',
+        // Dark sidebar gradient
+        'dark-gradient': 'linear-gradient(135deg, #003153 0%, #001829 100%)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
-      backdropBlur: {
-        xs: '2px',
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glass: '0 8px 32px rgba(0,0,0,0.37)',
-        cyan: '0 0 30px rgba(14,206,173,0.3)',
-        'cyan-lg': '0 0 60px rgba(14,206,173,0.2)',
+        'glass-light': '0 2px 0 rgba(255,255,255,0.9) inset, 0 24px 60px rgba(0,49,83,0.18)',
+        'glass-dark':  '0 8px 32px rgba(0,0,0,0.4)',
+        'tq':          '0 0 24px rgba(64,224,208,0.55)',
+        'tq-lg':       '0 0 40px rgba(64,224,208,0.4)',
+        'card':        '0 2px 8px rgba(0,49,83,0.08)',
+      },
+      backdropBlur: {
+        glass: '20px',
       },
       animation: {
+        float:        'float 6s ease-in-out infinite',
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        float: 'float 6s ease-in-out infinite',
       },
       keyframes: {
         float: {
           '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-12px)' },
+          '50%':      { transform: 'translateY(-10px)' },
         },
       },
     },

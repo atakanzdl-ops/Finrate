@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
     })
 
     return response
-  } catch {
-    return NextResponse.json({ error: 'Sunucu hatası. Lütfen tekrar deneyin.' }, { status: 500 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: msg, DATABASE_URL: process.env.DATABASE_URL }, { status: 500 })
   }
 }

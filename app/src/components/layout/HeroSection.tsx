@@ -1,230 +1,217 @@
 'use client'
 
-const RATING_SCALE = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C', 'D']
+import React from 'react'
 
-const BAR_HEIGHTS = [30, 45, 38, 60, 55, 72, 65, 90]
+const C = {
+  card: 'rgba(255,255,255,0.72)',
+  cardBorder: 'rgba(180,210,235,0.45)',
+  label: '#7a9ab8',
+  value: '#0f2137',
+  grid: 'rgba(0,49,83,0.07)',
+  sep: 'rgba(0,49,83,0.09)',
+  track: 'rgba(0,49,83,0.1)',
+  teal: '#10c9b0',
+  tealBg: 'rgba(16,201,176,0.12)',
+  red: '#f05070',
+  redBg: 'rgba(240,80,112,0.12)',
+}
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen dot-pattern overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-cyan-500/8 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-blue-600/8 rounded-full blur-[100px]" />
-      </div>
+    <div className="crystal-nexus-shell">
+      <section className="hero">
+        <div className="hero-grid">
 
-      <div className="relative max-w-7xl mx-auto px-6 pt-28 pb-8 grid lg:grid-cols-2 gap-16 items-center min-h-screen">
-
-        {/* ── SOL: Metin ── */}
-        <div className="flex flex-col gap-7">
-
-          {/* Badge */}
-          <div className="inline-flex w-fit items-center gap-2 glass rounded-full px-4 py-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-            <span className="text-xs text-white/60 font-medium tracking-wide">
-              Yapay Zeka Destekli Finansal Analiz
-            </span>
-          </div>
-
-          {/* Başlık */}
-          <div className="flex flex-col gap-1">
-            <h1 className="text-5xl xl:text-6xl font-black leading-[1.1] tracking-tight text-white">
-              Finansal gücünüzü
-            </h1>
-            <h1 className="text-5xl xl:text-6xl font-black leading-[1.1] tracking-tight text-gradient">
+          {/* ── Sol: Metin ── */}
+          <div className="left-content">
+            <h1 className="headline-crystal">
+              Finansal<br />
+              gücünüzü<br />
               veriye dökün
             </h1>
+            <p className="description-crystal">
+              Kurumsal finansal analiz ve kredi derecelendirme platformu.
+              Şirketinizin finansal sağlığını anında görün ve bankaların baktığı gibi bakın.
+            </p>
+            <button className="btn-main-stark">Ücretsiz Başla</button>
           </div>
 
-          {/* Alt yazı */}
-          <p className="text-white/55 text-lg leading-relaxed max-w-[440px]">
-            25 finansal oran, grup konsolide analiz ve gerçek zamanlı senaryo
-            simülasyonuyla kredi gücünüzü anında öğrenin.
-            <span className="text-white/80"> Bankaların baktığı gibi bakın.</span>
-          </p>
+          {/* ── Sağ: Şirket Skor Kartı ── */}
+          <div className="scorecard-wrapper">
+            <div className="card-perspective-wrapper">
+              <div style={{
+                background: 'rgba(235,245,255,0.90)',
+                backdropFilter: 'blur(28px) saturate(200%)',
+                WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+                border: '1px solid rgba(255,255,255,0.95)',
+                borderRadius: 20,
+                padding: 14,
+                width: 490,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}>
 
-          {/* CTA Butonlar */}
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="/kayit"
-              className="btn-gradient text-white font-semibold px-7 py-3.5 rounded-xl text-sm"
-            >
-              Hemen Başla — Ücretsiz
-            </a>
-            <a
-              href="#platform"
-              className="glass border border-white/10 hover:border-cyan-500/40 text-white/80 hover:text-white font-medium px-7 py-3.5 rounded-xl text-sm transition-all"
-            >
-              Nasıl Çalışır?
-            </a>
-          </div>
+                {/* ── Üst 4 Metrik Kart ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
 
-          {/* Rating Skalası */}
-          <div className="flex items-center gap-2 flex-wrap pt-1">
-            <span className="text-white/35 text-xs font-medium mr-1">Tam Skala:</span>
-            {RATING_SCALE.map((r, i) => (
-              <span
-                key={r}
-                className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                  i === 0
-                    ? 'btn-gradient text-white shadow-cyan'
-                    : i < 3
-                    ? 'text-cyan-400/80 glass'
-                    : i < 6
-                    ? 'text-white/50 glass'
-                    : 'text-white/25 glass'
-                }`}
-              >
-                {r}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* ── SAĞ: Dashboard Mockup ── */}
-        <div className="hidden lg:flex items-center justify-end">
-          <div className="relative w-[460px] h-[420px]">
-
-            {/* Ana Dashboard Kartı */}
-            <div className="glass-card rounded-2xl p-5 glow-cyan absolute inset-0 top-10 left-4 right-4">
-              {/* Üst satır */}
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-white/45 text-xs font-medium tracking-wide uppercase">
-                  Kredi Analizi
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                  <span className="text-white/40 text-xs">Canlı</span>
-                </div>
-              </div>
-
-              {/* Rating skalası — küçük */}
-              <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
-                {RATING_SCALE.map((r, i) => (
-                  <div key={r} className={`flex-shrink-0 transition-all ${i === 0 ? '' : 'opacity-25'}`}>
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-md block ${
-                      i === 0 ? 'btn-gradient text-white' : 'glass text-white'
-                    }`}>
-                      {r}
-                    </span>
-                    {i === 0 && (
-                      <div className="flex justify-center mt-0.5">
-                        <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-0 border-t-[5px] border-l-transparent border-r-transparent border-t-cyan-400" />
+                  {/* Finrate Skoru */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 9px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label, letterSpacing: '0.06em', marginBottom: 7 }}>FİNRATE SKORU</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <svg width="42" height="42" viewBox="0 0 42 42" style={{ flexShrink: 0 }}>
+                        <circle cx="21" cy="21" r="16" fill="none" stroke={C.track} strokeWidth="5"/>
+                        <circle cx="21" cy="21" r="16" fill="none" stroke={C.teal} strokeWidth="5"
+                          strokeDasharray={`${2 * Math.PI * 16 * 0.742} ${2 * Math.PI * 16 * 0.258}`}
+                          strokeLinecap="round"
+                          transform="rotate(-90 21 21)"/>
+                        <text x="21" y="21" textAnchor="middle" dominantBaseline="central" fill={C.value} fontSize="7.5" fontWeight="800">742</text>
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: C.teal, lineHeight: 1 }}>AA+</div>
+                        <div style={{ fontSize: '0.38rem', color: C.label, marginTop: 2, lineHeight: 1.3 }}>Yüksek Kredi Notu</div>
+                        <div style={{ marginTop: 4, fontSize: '0.38rem', fontWeight: 700, color: C.teal, background: C.tealBg, padding: '2px 5px', borderRadius: 4, display: 'inline-block' }}>+12 puan</div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              {/* Skor + Bar Chart */}
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-white/40 text-xs mb-1 uppercase tracking-wide">Finansal Skor</p>
-                  <p className="text-[52px] font-black text-gradient leading-none">892</p>
-                  <p className="text-cyan-400/70 text-xs mt-1.5 font-medium">↑ 12 puan — son 3 ay</p>
+                  {/* Aktif Toplam */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 9px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label, letterSpacing: '0.06em' }}>AKTİF TOPLAM</span>
+                      <span style={{ fontSize: '0.38rem', fontWeight: 700, color: C.teal, background: C.tealBg, padding: '1px 4px', borderRadius: 4 }}>+18.2%</span>
+                    </div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: C.value, lineHeight: 1.1, marginBottom: 5 }}>₺14.8M</div>
+                    <svg width="100%" height="22" viewBox="0 0 80 22" preserveAspectRatio="none">
+                      <path d="M2,20 C15,17 25,13 40,9 C55,5 65,6 78,2"
+                        fill="none" stroke={C.teal} strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                    <div style={{ fontSize: '0.37rem', color: C.label, marginTop: 3 }}>Önceki dönem: ₺12.5M</div>
+                  </div>
+
+                  {/* Cari Oran */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 9px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label, letterSpacing: '0.06em' }}>CARİ ORAN</span>
+                      <span style={{ fontSize: '0.38rem', fontWeight: 700, color: C.teal, background: C.tealBg, padding: '1px 4px', borderRadius: 4 }}>+0.3</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: C.value, lineHeight: 1.1, marginBottom: 7 }}>1.85</div>
+                    <div style={{ position: 'relative', height: 5, background: C.track, borderRadius: 3, marginBottom: 3 }}>
+                      <div style={{ position: 'absolute', left: 0, width: '61%', height: '100%', background: `linear-gradient(90deg,${C.teal},#0ea5e9)`, borderRadius: 3 }}/>
+                      <div style={{ position: 'absolute', left: 'calc(61% - 1px)', top: -3, width: 2, height: 11, background: C.value, borderRadius: 1, opacity: 0.4 }}/>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.32rem', color: C.label, marginBottom: 3 }}>
+                      <span>Düşük</span><span>Hedef</span><span>Yüksek</span>
+                    </div>
+                    <div style={{ fontSize: '0.37rem', color: C.label }}>Sektör ort: 1.42</div>
+                  </div>
+
+                  {/* Borç / Özkaynak */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 9px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.4rem', fontWeight: 700, color: C.label, letterSpacing: '0.04em' }}>BORÇ/ÖZKAYNAK</span>
+                      <span style={{ fontSize: '0.38rem', fontWeight: 700, color: C.red, background: C.redBg, padding: '1px 4px', borderRadius: 4 }}>-0.15</span>
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: C.value, lineHeight: 1.1, marginBottom: 5 }}>0.62</div>
+                    <svg width="100%" height="22" viewBox="0 0 80 22" preserveAspectRatio="none">
+                      <path d="M2,5 C10,7 22,10 35,14 C48,18 60,17 75,20"
+                        fill="none" stroke={C.red} strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                    <div style={{ fontSize: '0.37rem', color: C.label, marginTop: 3 }}>Sektör ort: 0.95</div>
+                  </div>
                 </div>
 
-                {/* Bar Chart */}
-                <div className="flex items-end gap-1.5 h-20">
-                  {BAR_HEIGHTS.map((h, i) => (
-                    <div
-                      key={i}
-                      className="w-3.5 rounded-t-sm transition-all"
-                      style={{
-                        height: `${h}%`,
-                        background: i === BAR_HEIGHTS.length - 1
-                          ? 'linear-gradient(180deg, #0ECEAD, #0EA5E9)'
-                          : 'rgba(255,255,255,0.08)',
-                      }}
-                    />
-                  ))}
+                {/* ── Alt 2 Kart ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.65fr 1fr', gap: 8 }}>
+
+                  {/* Gelir & Performans Analizi */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 12px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ fontSize: '0.52rem', fontWeight: 700, color: C.value, marginBottom: 1 }}>Gelir & Performans Analizi</div>
+                    <div style={{ fontSize: '0.38rem', color: C.label, marginBottom: 8 }}>4 Dönemlik mukayeseli trend</div>
+                    <svg width="100%" height="76" viewBox="0 0 248 76" preserveAspectRatio="none">
+                      {[0, 25.3, 50.6, 76].map((y, i) => (
+                        <line key={i} x1="0" y1={y} x2="248" y2={y} stroke={C.grid} strokeWidth="0.5"/>
+                      ))}
+                      <text x="0" y="6" fill={C.label} fontSize="5">₺15M</text>
+                      <text x="0" y="30" fill={C.label} fontSize="5">₺12M</text>
+                      <text x="0" y="56" fill={C.label} fontSize="5">₺9M</text>
+                      <rect x="28"  y="62" width="14" height="14" rx="2.5" fill="#003153" opacity="0.75"/>
+                      <rect x="44"  y="55" width="14" height="21" rx="2.5" fill={C.teal} opacity="0.35"/>
+                      <rect x="88"  y="46" width="14" height="30" rx="2.5" fill="#003153" opacity="0.75"/>
+                      <rect x="104" y="38" width="14" height="38" rx="2.5" fill={C.teal} opacity="0.35"/>
+                      <rect x="148" y="32" width="14" height="44" rx="2.5" fill="#003153" opacity="0.75"/>
+                      <rect x="164" y="22" width="14" height="54" rx="2.5" fill={C.teal} opacity="0.35"/>
+                      <rect x="208" y="14" width="14" height="62" rx="2.5" fill="#003153" opacity="0.75"/>
+                      <rect x="224" y="6"  width="14" height="70" rx="2.5" fill={C.teal} opacity="0.35"/>
+                      <path d="M35,68 C70,58 105,50 119,42 C148,32 172,24 215,14"
+                        fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="215" cy="14" r="3" fill={C.teal}/>
+                      <circle cx="215" cy="14" r="6" fill={C.teal} opacity="0.2"/>
+                    </svg>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', paddingLeft: 24, marginTop: 4 }}>
+                      {['2022','2023','2024','2025'].map(y => (
+                        <span key={y} style={{ fontSize: '0.38rem', color: C.label }}>{y}</span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, background: '#003153', opacity: 0.75 }}/>
+                        <span style={{ fontSize: '0.37rem', color: C.label }}>Gelir</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, background: C.teal, opacity: 0.4 }}/>
+                        <span style={{ fontSize: '0.37rem', color: C.label }}>EBITDA</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: 16, height: 2, background: C.teal, borderRadius: 1 }}/>
+                        <span style={{ fontSize: '0.37rem', color: C.label }}>Trend</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Kredi Derecelendirme */}
+                  <div style={{ background: C.card, borderRadius: 12, padding: '10px 12px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
+                    <div style={{ fontSize: '0.52rem', fontWeight: 700, color: C.value, marginBottom: 10 }}>Kredi Derecelendirme</div>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 10 }}>
+                      {['AAA','AA+','A','BBB','BB','B','CCC'].map(r => (
+                        <div key={r} style={{
+                          fontSize: '0.38rem', fontWeight: 700, padding: '3px 5px', borderRadius: 5,
+                          background: r === 'AA+' ? `linear-gradient(135deg,${C.teal},#0ea5e9)` : 'rgba(0,49,83,0.06)',
+                          color: r === 'AA+' ? 'white' : C.label,
+                          border: r === 'AA+' ? 'none' : `1px solid ${C.cardBorder}`,
+                        }}>
+                          {r}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ height: 1, background: C.sep, marginBottom: 8 }}/>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.42rem', color: C.label }}>Risk Seviyesi</span>
+                        <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.teal }}>Düşük</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.42rem', color: C.label }}>EBITDA Marjı</span>
+                        <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.value }}>%22.4</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.42rem', color: C.label }}>Sektör Sıralaması</span>
+                        <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.value }}>Top %15</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.42rem', color: C.label }}>Önceki Dönem</span>
+                        <span style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label }}>AA</span>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
-
-            {/* Floating Kart — Sol üst */}
-            <div
-              className="glass-card rounded-xl p-3.5 absolute -top-2 -left-2 w-[140px] animate-float"
-              style={{ animationDelay: '0s' }}
-            >
-              <p className="text-white/40 text-[11px] mb-1">Cari Oran</p>
-              <p className="text-white font-bold text-xl">2.34</p>
-              <div className="flex items-center gap-1 mt-1.5">
-                <svg className="w-3 h-3 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-cyan-400 text-[11px] font-semibold">+0.12</span>
-              </div>
-            </div>
-
-            {/* Floating Kart — Sağ üst */}
-            <div
-              className="glass-card rounded-xl p-3.5 absolute -top-4 -right-4 w-[148px] animate-float"
-              style={{ animationDelay: '1.5s' }}
-            >
-              <p className="text-white/40 text-[11px] mb-1">Borç/FAVÖK</p>
-              <p className="text-white font-bold text-xl">2.1x</p>
-              <p className="text-cyan-400 text-[11px] mt-1.5 font-medium">✓ Sağlıklı</p>
-            </div>
-
-            {/* Floating Kart — Sağ alt */}
-            <div
-              className="glass-card rounded-xl p-3.5 absolute -bottom-4 -right-6 w-[160px] animate-float"
-              style={{ animationDelay: '3s' }}
-            >
-              <p className="text-white/40 text-[11px] mb-1.5">FAVÖK Marjı</p>
-              <p className="text-white font-bold text-xl">%18.5</p>
-              <div className="w-full bg-white/10 rounded-full h-1.5 mt-2">
-                <div
-                  className="h-1.5 rounded-full"
-                  style={{ width: '65%', background: 'linear-gradient(90deg, #0ECEAD, #0EA5E9)' }}
-                />
-              </div>
-            </div>
-
-            {/* Floating Kart — Sol alt */}
-            <div
-              className="glass-card rounded-xl p-3.5 absolute -bottom-2 left-0 w-[136px] animate-float"
-              style={{ animationDelay: '2s' }}
-            >
-              <p className="text-white/40 text-[11px] mb-1">Net Kâr Marjı</p>
-              <p className="text-white font-bold text-xl">%11.2</p>
-              <p className="text-white/40 text-[11px] mt-1">ROE: %24.8</p>
-            </div>
-
           </div>
+
         </div>
-      </div>
-
-      {/* ── STAT BAR ── */}
-      <div className="relative max-w-7xl mx-auto px-6 pb-16">
-        <div className="glass border border-white/8 rounded-2xl px-8 py-6 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/8">
-          <div className="flex items-center gap-4 py-4 sm:py-0 sm:px-10 first:pl-0">
-            <span className="text-4xl font-black text-gradient">25+</span>
-            <div>
-              <p className="text-white font-semibold text-sm">Finansal Oran</p>
-              <p className="text-white/40 text-xs">4 kategoride tam analiz</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 py-4 sm:py-0 sm:px-10">
-            <span className="text-4xl font-black text-gradient">10</span>
-            <div>
-              <p className="text-white font-semibold text-sm">Kademe Rating</p>
-              <p className="text-white/40 text-xs">AAA'dan D'ye tam skala</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 py-4 sm:py-0 sm:px-10">
-            <span className="text-3xl font-black text-white tracking-tight">
-              AAA <span className="text-white/30 text-2xl">→</span> <span className="text-gradient">D</span>
-            </span>
-            <div>
-              <p className="text-white font-semibold text-sm">Tam Skala</p>
-              <p className="text-white/40 text-xs">Banka standardı analiz</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
+      </section>
+    </div>
   )
 }

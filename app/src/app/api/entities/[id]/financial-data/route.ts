@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
 import { calculateRatios } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 
-function getUserId(req: NextRequest): string | null {
-  try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) return null
-    return verifyToken(token).userId
-  } catch {
-    return null
-  }
-}
-
 // POST /api/entities/[id]/financial-data — finansal veri kaydet + skor hesapla
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = getUserId(req)
+  const userId = getUserIdFromRequest(req)
   if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id: entityId } = await params
@@ -52,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         profitabilityScore: scoreResult.profitabilityScore,
         leverageScore:      scoreResult.leverageScore,
         activityScore:      scoreResult.activityScore,
-        ratios:             ratios as object,
+        ratios:             JSON.stringify(ratios),
         updatedAt:          new Date(),
       },
       create: {
@@ -68,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         profitabilityScore: scoreResult.profitabilityScore,
         leverageScore:      scoreResult.leverageScore,
         activityScore:      scoreResult.activityScore,
-        ratios:             ratios as object,
+        ratios:             JSON.stringify(ratios),
       },
     })
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, BarChart3, Loader2, ChevronDown, ChevronUp, Upload } from 'lucide-react'
+import { ArrowLeft, Plus, BarChart3, Loader2, ChevronDown, ChevronUp, Upload, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { FileUpload } from '@/components/analysis/FileUpload'
 
@@ -27,7 +27,7 @@ interface Entity {
 }
 
 const PERIOD_LABELS: Record<string, string> = {
-  ANNUAL: 'Yıllık', Q1: '1. Çeyrek', Q2: '2. Çeyrek', Q3: '3. Çeyrek', Q4: '4. Çeyrek',
+  ANNUAL: 'Kesin Beyan', Q1: '1. Geçici', Q2: '2. Geçici', Q3: '3. Geçici', Q4: '4. Geçici',
 }
 
 function fmt(v: number | null): string {
@@ -37,10 +37,27 @@ function fmt(v: number | null): string {
 
 export default function SirketDetayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [entity, setEntity]     = useState<Entity | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  const [entity, setEntity]       = useState<Entity | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [showForm, setShowForm]   = useState(false)
   const [showUpload, setShowUpload] = useState(false)
+  const [deletingFd, setDeletingFd] = useState<string | null>(null)
+  const [confirmFd, setConfirmFd]   = useState<string | null>(null)
+
+  async function deleteFd(fdId: string) {
+    if (!entity) return
+    setDeletingFd(fdId)
+    try {
+      await fetch(`/api/entities/${id}/financial-data/${fdId}`, { method: 'DELETE' })
+      setEntity((prev) => prev
+        ? { ...prev, financialData: prev.financialData.filter((f) => f.id !== fdId) }
+        : prev
+      )
+    } finally {
+      setDeletingFd(null)
+      setConfirmFd(null)
+    }
+  }
 
   function reload() {
     fetch(`/api/entities/${id}`)
@@ -83,7 +100,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
             className="flex items-center gap-2 px-3 py-2 glass border border-white/10 hover:border-cyan-500/30 rounded-lg text-xs font-semibold text-white/70 hover:text-white transition-all"
           >
             <Upload size={14} />
-            Excel / CSV
+            Excel / PDF
           </button>
           <button
             onClick={() => { setShowForm(!showForm); setShowUpload(false) }}
@@ -156,12 +173,39 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
                     <td className="px-4 py-3 text-right text-white/80">{fmt(fd.totalAssets)}</td>
                     <td className="px-4 py-3 text-right text-white/80">{fmt(fd.totalEquity)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/dashboard/analiz?entityId=${entity.id}&year=${fd.year}&period=${fd.period}`}
-                        className="text-xs text-cyan-400 hover:underline"
-                      >
-                        Analiz
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/dashboard/analiz?entityId=${entity.id}&year=${fd.year}&period=${fd.period}`}
+                          className="text-xs text-cyan-400 hover:underline"
+                        >
+                          Analiz
+                        </Link>
+                        {confirmFd === fd.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => deleteFd(fd.id)}
+                              disabled={deletingFd === fd.id}
+                              className="text-xs px-2 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 rounded hover:bg-red-500/30 transition-all disabled:opacity-50"
+                            >
+                              {deletingFd === fd.id ? '...' : 'Sil'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmFd(null)}
+                              className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                            >
+                              İptal
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmFd(fd.id)}
+                            className="text-white/20 hover:text-red-400 transition-colors"
+                            title="Bu dönemi sil"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -182,25 +226,7 @@ interface FormProps {
 
 const FORM_SECTIONS = [
   {
-    title: 'Gelir Tablosu',
-    fields: [
-      { key: 'revenue',          label: 'Net Satışlar / Ciro' },
-      { key: 'cogs',             label: 'Satışların Maliyeti (SMM)' },
-      { key: 'grossProfit',      label: 'Brüt Kar' },
-      { key: 'operatingExpenses',label: 'Faaliyet Giderleri' },
-      { key: 'ebit',             label: 'FVÖK / EBIT' },
-      { key: 'depreciation',     label: 'Amortisman' },
-      { key: 'ebitda',           label: 'FAVÖK / EBITDA' },
-      { key: 'interestExpense',  label: 'Finansman Gideri' },
-      { key: 'otherIncome',      label: 'Diğer Gelirler' },
-      { key: 'otherExpense',     label: 'Diğer Giderler' },
-      { key: 'ebt',              label: 'Vergi Öncesi Kar' },
-      { key: 'taxExpense',       label: 'Vergi Gideri' },
-      { key: 'netProfit',        label: 'Net Kar' },
-    ],
-  },
-  {
-    title: 'Dönen Varlıklar',
+    title: 'Dönen Varlıklar (Aktif)',
     fields: [
       { key: 'cash',                  label: 'Nakit ve Nakit Benzerleri' },
       { key: 'shortTermInvestments',  label: 'Kısa Vadeli Yatırımlar' },
@@ -231,7 +257,7 @@ const FORM_SECTIONS = [
     ],
   },
   {
-    title: 'Uzun Vadeli Borçlar & Öz Kaynak',
+    title: 'Uzun Vadeli Borçlar & Öz Kaynak (Pasif)',
     fields: [
       { key: 'longTermFinancialDebt',         label: 'UV Finansal Borçlar' },
       { key: 'otherNonCurrentLiabilities',    label: 'Diğer UV Borçlar' },
@@ -242,6 +268,24 @@ const FORM_SECTIONS = [
       { key: 'totalEquity',                   label: 'Toplam Öz Kaynak' },
       { key: 'totalLiabilitiesAndEquity',     label: 'Pasif Toplamı' },
       { key: 'purchases',                     label: 'Satın Alımlar (DPO için)' },
+    ],
+  },
+  {
+    title: 'Gelir Tablosu',
+    fields: [
+      { key: 'revenue',          label: 'Net Satışlar / Ciro' },
+      { key: 'cogs',             label: 'Satışların Maliyeti (SMM)' },
+      { key: 'grossProfit',      label: 'Brüt Kar' },
+      { key: 'operatingExpenses',label: 'Faaliyet Giderleri' },
+      { key: 'ebit',             label: 'FVÖK / EBIT' },
+      { key: 'depreciation',     label: 'Amortisman' },
+      { key: 'ebitda',           label: 'FAVÖK / EBITDA' },
+      { key: 'interestExpense',  label: 'Finansman Gideri' },
+      { key: 'otherIncome',      label: 'Diğer Gelirler' },
+      { key: 'otherExpense',     label: 'Diğer Giderler' },
+      { key: 'ebt',              label: 'Vergi Öncesi Kar' },
+      { key: 'taxExpense',       label: 'Vergi Gideri' },
+      { key: 'netProfit',        label: 'Net Kar' },
     ],
   },
 ]

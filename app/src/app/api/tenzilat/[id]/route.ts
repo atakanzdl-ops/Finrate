@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken } from '@/lib/auth'
-
-function getUserId(req: NextRequest): string | null {
-  try {
-    const token = req.cookies.get('finrate_token')?.value
-    if (!token) return null
-    return verifyToken(token).userId
-  } catch {
-    return null
-  }
-}
+import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
 
 // PATCH /api/tenzilat/[id] — aktif/pasif toggle
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = getUserId(req)
+  const userId = getUserIdFromRequest(req)
   if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
@@ -44,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE /api/tenzilat/[id] — soft delete
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = getUserId(req)
+  const userId = getUserIdFromRequest(req)
   if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
