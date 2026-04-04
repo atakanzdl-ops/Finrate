@@ -334,7 +334,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             isCalc   ? 'bg-[#0d1b2e]' : 'bg-[#0a1727]',
             hasField ? 'text-white/40' : 'text-white/15',
           )}
-          style={{ left: LABEL_W, width: CODE_W }}
+          style={{ left: LABEL_W, width: CODE_W, minWidth: CODE_W, maxWidth: CODE_W }}
         >
           {row.code ?? ''}
         </td>
@@ -425,7 +425,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
               </th>
               <th
                 className="text-center py-2.5 text-white/50 font-medium sticky bg-[#0a1727] z-10"
-                style={{ left: LABEL_W, width: CODE_W }}
+                style={{ left: LABEL_W, width: CODE_W, minWidth: CODE_W, maxWidth: CODE_W }}
               >
                 KOD
               </th>

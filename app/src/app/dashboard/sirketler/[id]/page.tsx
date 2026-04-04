@@ -162,29 +162,29 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* Dönem Özet Tablosu */}
-      {entity.financialData.length === 0 ? (
-        <div className="glass-card rounded-xl p-10 text-center">
-          <BarChart3 size={32} className="text-white/20 mx-auto mb-3" />
-          <p className="text-white/40 text-sm">Henüz finansal veri girilmedi.</p>
-        </div>
-      ) : (
-        <div className="glass-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left px-4 py-3 text-white/50 font-medium text-xs">Dönem</th>
-                  <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Ciro</th>
-                  <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">FAVÖK / FVÖK</th>
-                  <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Net Kar</th>
-                  <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Toplam Varlık</th>
-                  <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Öz Kaynak</th>
-                  <th className="px-4 py-3" />
+      {/* Dönem Özet Tablosu — veri yoksa başlık + boş satır, yapı değişmez */}
+      <div className="glass-card rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left px-4 py-3 text-white/50 font-medium text-xs">Dönem</th>
+                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Ciro</th>
+                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">FAVÖK / FVÖK</th>
+                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Net Kar</th>
+                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Toplam Varlık</th>
+                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Öz Kaynak</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {entity.financialData.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-white/30 text-xs">
+                    Henüz finansal veri girilmedi. Excel veya PDF yükleyin.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {entity.financialData.map((fd) => (
+              ) : entity.financialData.map((fd) => (
                   <tr key={fd.id} className="hover:bg-white/3 transition-colors">
                     <td className="px-4 py-3">
                       <span className="font-semibold text-white">{fd.year}</span>
@@ -234,12 +234,11 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {/* Analize Başla */}
       {entity.financialData.length > 0 && (
