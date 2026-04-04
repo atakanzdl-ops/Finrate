@@ -262,6 +262,146 @@ function parseVerticalExcel(rows: unknown[][]): ParsedRow[] {
   return Object.values(resultMap).filter(r => Object.keys(r.fields).length > 0)
 }
 
+// ─── Mizan (Tek Düzen Hesap Planı) Parser ────────────────────────────────────
+
+export const MIZAN_ACCOUNT_MAP: Record<string, { field: string; src: 'bakBorç' | 'bakAlacak' | 'anyBorç' | 'anyAlacak' }> = {
+  '1':   { field: 'totalCurrentAssets',          src: 'bakBorç' },
+  '10':  { field: 'cash',                         src: 'bakBorç' },
+  '12':  { field: 'tradeReceivables',             src: 'bakBorç' },
+  '15':  { field: 'inventory',                    src: 'bakBorç' },
+  '2':   { field: 'totalNonCurrentAssets',        src: 'bakBorç' },
+  '25':  { field: 'tangibleAssets',               src: 'bakBorç' },
+  '26':  { field: 'intangibleAssets',             src: 'bakBorç' },
+  '3':   { field: 'totalCurrentLiabilities',     src: 'bakAlacak' },
+  '30':  { field: 'shortTermFinancialDebt',       src: 'bakAlacak' },
+  '32':  { field: 'tradePayables',               src: 'bakAlacak' },
+  '4':   { field: 'totalNonCurrentLiabilities',  src: 'bakAlacak' },
+  '40':  { field: 'longTermFinancialDebt',        src: 'bakAlacak' },
+  '5':   { field: 'totalEquity',                 src: 'bakAlacak' },
+  '50':  { field: 'paidInCapital',               src: 'bakAlacak' },
+  '590': { field: 'netProfitCurrentYear',         src: 'bakAlacak' },
+  '591': { field: '_netLoss',                     src: 'bakBorç' },
+  '60':  { field: 'revenue',                     src: 'anyAlacak' },
+  '61':  { field: '_salesDeductions',            src: 'anyBorç' },
+  '62':  { field: 'cogs',                        src: 'anyBorç' },
+  '63':  { field: 'operatingExpenses',           src: 'anyBorç' },
+  '66':  { field: 'interestExpense',             src: 'anyBorç' },
+  '691': { field: 'taxExpense',                  src: 'anyBorç' },
+}
+
+function detectMizanFormat(rows: unknown[][]): boolean {
+  for (let i = 0; i < Math.min(8, rows.length); i++) {
+    const row = rows[i] as (string | null)[]
+    for (const cell of row) {
+      if (!cell) continue
+      const s = String(cell)
+      if (/miz[ae]n/i.test(s) || /hesap\s*kodu/i.test(s)) return true
+    }
+  }
+  return false
+}
+
+function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<string, number> } | null {
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const row = rows[i] as (string | null)[]
+    if (!row.some(c => c && /hesap\s*kodu/i.test(String(c)))) continue
+    const cols: Record<string, number> = {}
+    row.forEach((cell, idx) => {
+      const s = String(cell || '').toLowerCase().trim()
+      if (/hesap\s*kod/.test(s)) cols['code'] = idx
+      if (s === 'borç' || s === 'borc') cols['borç'] = idx
+      if (s === 'alacak') cols['alacak'] = idx
+      if (/bak.*borç|borç.*bak|borç\s*baki/i.test(String(cell || ''))) cols['bakBorç'] = idx
+      if (/bak.*alacak|alacak.*bak|alacak\s*baki/i.test(String(cell || ''))) cols['bakAlacak'] = idx
+    })
+    if ('borç' in cols) return { headerIdx: i, cols }
+  }
+  return null
+}
+
+function extractMizanYear(rows: unknown[][]): { year: number | null; period: string } {
+  for (let i = 0; i < Math.min(6, rows.length); i++) {
+    for (const cell of rows[i] as (string | null)[]) {
+      if (!cell) continue
+      const s = String(cell)
+      const m = s.match(/(\d{2})[.\/-](\d{2})[.\/-](20\d{2})\s*[-–]\s*(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/)
+      if (m) {
+        const endMonth = parseInt(m[5])
+        const endYear  = parseInt(m[6])
+        const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
+        return { year: endYear, period }
+      }
+    }
+  }
+  return { year: null, period: 'ANNUAL' }
+}
+
+export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
+  const header = findMizanHeader(rows)
+  if (!header) return []
+  const { headerIdx, cols } = header
+  const { year, period } = extractMizanYear(rows)
+  if (!year) return []
+
+  const fields: Record<string, number | null> = {}
+  let salesDeductions = 0
+  let netLoss = 0
+
+  const n = (v: unknown): number | null => {
+    if (v == null) return null
+    const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/[.,\s]/g, m => m === ',' ? '.' : ''))
+    return isNaN(num) || num === 0 ? null : num
+  }
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i] as (string | number | null)[]
+    const rawCode = row[cols['code'] ?? 0]
+    if (!rawCode) continue
+    const code = String(rawCode).trim()
+    if (!/^\d+$/.test(code)) continue  // sadece tam sayı kodlar (alt hesap noktaları yok)
+
+    const mapping = MIZAN_ACCOUNT_MAP[code]
+    if (!mapping) continue
+
+    const borç    = n(cols['borç']    !== undefined ? row[cols['borç']]    : null)
+    const alacak  = n(cols['alacak']  !== undefined ? row[cols['alacak']]  : null)
+    const bakBorç  = n(cols['bakBorç']  !== undefined ? row[cols['bakBorç']]  : null)
+    const bakAlacak = n(cols['bakAlacak'] !== undefined ? row[cols['bakAlacak']] : null)
+
+    let val: number | null = null
+    switch (mapping.src) {
+      case 'bakBorç':   val = bakBorç ?? borç; break
+      case 'bakAlacak': val = bakAlacak ?? alacak; break
+      case 'anyBorç':   val = bakBorç ?? borç ?? alacak; break
+      case 'anyAlacak': val = bakAlacak ?? alacak ?? borç; break
+    }
+    if (!val) continue
+
+    if (mapping.field === '_salesDeductions') salesDeductions = val
+    else if (mapping.field === '_netLoss') netLoss = val
+    else fields[mapping.field] = val
+  }
+
+  // Post-processing
+  if (salesDeductions && fields['revenue']) {
+    fields['revenue'] = (fields['revenue'] as number) - salesDeductions
+  }
+  if (netLoss && !fields['netProfitCurrentYear']) {
+    fields['netProfitCurrentYear'] = -netLoss
+  }
+  if (fields['netProfitCurrentYear'] && !fields['netProfit']) {
+    fields['netProfit'] = fields['netProfitCurrentYear']
+  }
+  if (!fields['totalAssets'] && fields['totalCurrentAssets'] && fields['totalNonCurrentAssets']) {
+    fields['totalAssets'] = (fields['totalCurrentAssets'] as number) + (fields['totalNonCurrentAssets'] as number)
+  }
+
+  if (Object.keys(fields).length < 3) return []
+  return [{ year, period, fields, unmapped: [] }]
+}
+
+// ─── parseExcelBuffer ─────────────────────────────────────────────────────────
+
 export function parseExcelBuffer(buffer: Buffer): ParsedRow[] {
   const workbook = XLSX.read(buffer, { type: 'buffer' })
   const sheetName = workbook.SheetNames[0]
@@ -270,7 +410,12 @@ export function parseExcelBuffer(buffer: Buffer): ParsedRow[] {
 
   if (rows.length < 2) return []
 
-  // Dikey format tespiti (mizan / özet finansal tablo)
+  // Mizan tespiti (Tek Düzen Hesap Planı)
+  if (detectMizanFormat(rows)) {
+    return parseMizanRows(rows)
+  }
+
+  // Dikey format tespiti (özet finansal tablo — sütun = yıl)
   if (detectVerticalFormat(rows)) {
     return parseVerticalExcel(rows)
   }

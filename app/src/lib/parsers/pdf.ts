@@ -1,265 +1,435 @@
 /**
- * PDF → FinancialInput dönüştürücü
- * Geçici vergi beyanı, bilanço ve gelir tablosu PDF'lerini okur.
+ * GİB Vergi Beyannamesi PDF Parser
+ *
+ * Desteklenen formatlar:
+ *  - 1001A  Yıllık Gelir Vergisi Beyannamesi  → Tam Bilanço + Gelir Tablosu (2 yıl)
+ *  - 1032   Geçici Vergi (Gelir Vergisi)       → Gelir Tablosu (cari dönem)
+ *  - 1010   Kurumlar Vergisi Beyannamesi       → Ticari Bilanço Karı + vergi rakamları
+ *  - 1032   Geçici Vergi (Kurumlar Vergisi)    → Ticari Bilanço Karı + vergi rakamları
+ *  - Dikey Mizan / Bilanço PDF                 → Satır bazlı fallback
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PDFParse } = require('pdf-parse') as { PDFParse: new (opts: { data: Uint8Array }) => { getText: () => Promise<{ text: string }> } }
+const { PDFParse } = require('pdf-parse') as {
+  PDFParse: new (opts: { data: Uint8Array }) => { getText: () => Promise<{ text: string }> }
+}
 import type { ParsedRow } from './excel'
+import { MIZAN_ACCOUNT_MAP } from './excel'
 
-// PDF'de aranan anahtar kelimeler → alan eşlemesi
-// 3. eleman true ise: eşleşen satır bir zarar (kayıp) ifadesidir → değer negatife çevrilmeli
-const PDF_FIELD_MAP: [RegExp, string, boolean?][] = [
-  // Gelir tablosu
-  // "C.Net Satışlar" veya "Net Satışlar" → revenue (öncelikli)
+// ─── Türk sayı formatı parser ────────────────────────────────────────────────
+const TR_NUM = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g
+
+function parseTR(s: string): number | null {
+  if (!s) return null
+  const t = s.trim().replace(/\./g, '').replace(',', '.')
+  const n = parseFloat(t)
+  return isNaN(n) ? null : n
+}
+
+function firstNum(line: string): number | null {
+  const m = line.match(TR_NUM)
+  return m ? parseTR(m[0]) : null
+}
+
+function twoNums(line: string): [number | null, number | null] {
+  const m = line.match(TR_NUM)
+  if (!m) return [null, null]
+  return [parseTR(m[0]), m[1] ? parseTR(m[1]) : null]
+}
+
+// ─── Beyanname tipi tespiti ──────────────────────────────────────────────────
+type BType = 'gelir_yillik' | 'gelir_gecici' | 'kurumlar_yillik' | 'kurumlar_gecici' | 'unknown'
+
+function detectType(text: string): BType {
+  const top = text.slice(0, 600)
+  if (/KURUMLAR VERGİSİ BEYANNAMESİ/i.test(top)) return 'kurumlar_yillik'
+  if (/GEÇİCİ VERGİ BEYANNAMESİ[\s\S]{0,300}Kurumlar Vergisi Mükellefleri/i.test(text.slice(0, 800))) return 'kurumlar_gecici'
+  if (/YILLIK GELİR VERGİSİ BEYANNAMESİ/i.test(top)) return 'gelir_yillik'
+  if (/GEÇİCİ VERGİ BEYANNAMESİ[\s\S]{0,300}Gelir Vergisi Mükellefleri/i.test(text.slice(0, 800))) return 'gelir_gecici'
+  return 'unknown'
+}
+
+// ─── Yıl / Dönem tespiti ─────────────────────────────────────────────────────
+function extractYearPeriod(text: string): { year: number | null; period: string } {
+  let year: number | null = null
+  // "Yıl 2024" veya "Yılı\n...\n2025" (s flag olmadan satır satır ara)
+  const yMatch = text.match(/Yıl[ıi]?\s+(20[12]\d)/)
+  if (yMatch) year = parseInt(yMatch[1])
+  if (!year) {
+    // Çok satırlı "Yılı\nDönem\n2025" formatı
+    const lines = text.split('\n')
+    for (let i = 0; i < Math.min(30, lines.length); i++) {
+      if (/Yıl[ıi]?/i.test(lines[i])) {
+        for (let j = i; j < Math.min(i + 5, lines.length); j++) {
+          const m = lines[j].match(/\b(20[12]\d)\b/)
+          if (m) { year = parseInt(m[1]); break }
+        }
+        if (year) break
+      }
+    }
+  }
+  if (!year) {
+    const m2 = text.match(/\b(20[12]\d)\b/)
+    if (m2) year = parseInt(m2[1])
+  }
+
+  let period = 'ANNUAL'
+  const top500 = text.slice(0, 500)
+  if (/Yıllık/i.test(top500)) period = 'ANNUAL'
+  else if (/4\.\s*Dönem/i.test(text.slice(0, 800))) period = 'Q4'
+  else if (/3\.\s*Dönem/i.test(text.slice(0, 800))) period = 'Q3'
+  else if (/2\.\s*Dönem/i.test(text.slice(0, 800))) period = 'Q2'
+  else if (/1\.\s*Dönem/i.test(text.slice(0, 800))) period = 'Q1'
+
+  return { year, period }
+}
+
+// ─── Bilanço/Gelir Tablosu satır → alan eşlemesi ────────────────────────────
+const ROW_MAP: [RegExp, string, boolean?][] = [
+  // Gelir Tablosu
   [/c\.?\s*net\s*sat[iıİ][sşŞ]lar/i,               'revenue'],
   [/net\s*sat[iıİ][sşŞ]lar/i,                      'revenue'],
-  [/toplam\s*net\s*sat[iıİ][sşŞ]/i,                'revenue'],
-  [/br[uüÜ]t\s*sat[iıİ][sşŞ]\s*has[iıİ]lat/i,     'revenue'],  // "Brüt Satış Hasılatı"
-  [/sat[iıİ][sşŞ]\s*has[iıİ]lat[iıİ]/i,            'revenue'],
-  // NOT: "A. Brüt Satışlar" kasıtlı olarak haritalanmadı — Net Satışlar daha doğru revenue göstergesi
-  [/sat[iıİ][sşŞ]lar[iıİ]n\s*maliyeti/i,           'cogs'],
-  [/br[uüÜ]t\s*k[aâÂ]r/i,                          'grossProfit'],
-  [/faaliyet\s*gider/i,                              'operatingExpenses'],
-  [/faaliyet\s*k[aâÂ]r/i,                           'ebit'],
-  [/fv[oöÖ]k/i,                                     'ebit'],
-  [/amortisman/i,                                    'depreciation'],
-  [/fav[oöÖ]k/i,                                    'ebitda'],
-  [/finansman\s*gider/i,                             'interestExpense'],
-  [/faiz\s*gider/i,                                  'interestExpense'],
-  [/vergi\s*[oöÖ]ncesi\s*k[aâÂ]r/i,                'ebt'],
-  [/net\s*d[oöÖ]nem\s*k[aâÂ]r/i,                             'netProfit'],
-  [/net\s*k[aâÂ]r/i,                                         'netProfit'],
-  [/d[oöÖ]nem\s*net\s*k[aâÂ]r[iıİ]?(\s*[\/\-]\s*zarar[iıİ]?)?/i, 'netProfit'],
-  [/d[oöÖ]nem\s*net\s*zarar[iıİ]?(\s*[\/\-]\s*k[aâÂ]r[iıİ]?)?/i, 'netProfit', true],
-  [/vergi\s*sonras[iıİ]\s*k[aâÂ]r/i,                         'netProfit'],
-  [/vergi\s*sonras[iıİ]\s*zarar/i,                            'netProfit', true],
-  // Bilanço — dönen varlıklar
-  // "A. Hazır Değerler" = Kasa + Banka (Nakit ve Nakit Benzerleri karşılığı)
-  [/haz[iıİ]r\s*de[gğĞ]erler/i,                    'cash'],
-  [/nakit\s*ve\s*nakit\s*benz/i,                    'cash'],
-  [/nakit\s*de[gğĞ]erler/i,                         'cash'],
-  [/ticari\s*alacak/i,                               'tradeReceivables'],
-  [/stoklar/i,                                       'inventory'],
-  [/d[oöÖ]nen\s*varl[iıİ]k\s*toplam/i,              'totalCurrentAssets'],
-  [/d[oöÖ]nen\s*varl[iıİ]klar/i,                    'totalCurrentAssets'],  // "I. Dönen Varlıklar 1.234"
-  // Bilanço — duran varlıklar
-  [/maddi\s*duran\s*varl/i,                          'tangibleAssets'],
-  [/duran\s*varl[iıİ]k\s*toplam/i,                   'totalNonCurrentAssets'],
-  [/duran\s*varl[iıİ]klar\b/i,                       'totalNonCurrentAssets'],  // "II. DURAN VARLIKLAR 1.234"
-  [/akt[iıİ]f\s*toplam/i,                              'totalAssets'],             // "AKTİF TOPLAMI"
-  [/toplam\s*akt[iıİ]f/i,                             'totalAssets'],
-  [/varl[iıİ]k\s*toplam/i,                            'totalAssets'],
-  // Borçlar
-  // "A. Mali Borçlar" = KV finansal borç toplamı (banka kredileri + leasing)
-  [/mali\s*bor[cçÇ]/i,                               'shortTermFinancialDebt'],
-  [/k[iıİ]sa\s*vadeli\s*finansal\s*bor[cçÇ]/i,      'shortTermFinancialDebt'],
-  // "III. Kısa Vadeli Yabancı Kaynaklar" = toplam KV yükümlülükler
-  [/k[iıİ]sa\s*vadeli\s*yabanc[iıİ]\s*kaynak/i,     'totalCurrentLiabilities'],
-  [/k[iıİ]sa\s*vadeli\s*bor[cçÇ]\s*toplam/i,        'totalCurrentLiabilities'],
-  [/k[iıİ]sa\s*vadeli\s*y[uüÜ]k[uüÜ]ml/i,          'totalCurrentLiabilities'],
-  [/ticari\s*bor[cçÇ]/i,                             'tradePayables'],
-  [/uzun\s*vadeli\s*finansal\s*bor[cçÇ]/i,           'longTermFinancialDebt'],
-  [/uzun\s*vadeli\s*bor[cçÇ]\s*toplam/i,             'totalNonCurrentLiabilities'],
-  [/uzun\s*vadeli\s*y[uüÜ]k[uüÜ]ml/i,               'totalNonCurrentLiabilities'],
-  // Öz kaynak
-  [/[oöÖ]denmi[sşŞ]\s*sermaye/i,                     'paidInCapital'],
-  [/toplam\s*[oöÖ]z\s*kaynak/i,                      'totalEquity'],
-  [/[oöÖ]z\s*kaynak\s*toplam/i,                      'totalEquity'],
-  [/[oöÖ]z\s*kaynaklar/i,                            'totalEquity'],             // "V. Öz Kaynaklar 1.234" ($ removed)
-  [/pas[iıİ]f\s*toplam/i,                              'totalLiabilitiesAndEquity'],
+  [/toplam\s*net\s*sat/i,                           'revenue'],
+  [/sat[iıİ][sşŞ]\s*has[iıİ]lat[iıİ]/i,           'revenue'],
+  [/brüt\s*sat[iıİ][sşŞ]\s*has[iıİ]lat/i,         'revenue'],
+  [/sat[iıİ][sşŞ]lar[iıİ]n\s*maliyeti/i,          'cogs',   true],
+  [/brüt\s*sat[iıİ][sşŞ]\s*kar[iıİ].*veya/i,      'grossProfit'],
+  [/faaliyet\s*gider/i,                             'operatingExpenses', true],
+  [/faaliyet\s*kar[iıİ].*veya/i,                   'ebit'],
+  [/faaliyet\s*kar[iıİ]/i,                          'ebit'],
+  [/fv[oöÖ]k/i,                                    'ebit'],
+  [/amortisman/i,                                   'depreciation'],
+  [/fav[oöÖ]k/i,                                   'ebitda'],
+  [/finansman\s*gider/i,                            'interestExpense', true],
+  [/faiz\s*gider/i,                                 'interestExpense', true],
+  [/vergi\s*[oöÖ]ncesi\s*kar/i,                    'ebt'],
+  [/d[oöÖ]nem\s*net\s*kar[iıİ]/i,                 'netProfit'],
+  [/d[oöÖ]nem\s*kar[iıİ]\s*veya\s*zarar/i,        'netProfit'],
+  [/net\s*kar/i,                                    'netProfit'],
+  [/vergi\s*sonras[iıİ]\s*kar/i,                   'netProfit'],
+  // Bilanço — Dönen Varlıklar
+  [/^i\.\s*d[oöÖ]nen\s*varl/i,                    'totalCurrentAssets'],
+  [/d[oöÖ]nen\s*varl[iıİ]k\s*toplam/i,            'totalCurrentAssets'],
+  [/toplam\s*d[oöÖ]nen\s*varl/i,                  'totalCurrentAssets'],
+  [/toplam\s*cari\s*aktif/i,                       'totalCurrentAssets'],
+  [/a\.\s*haz[iıİ]r\s*de[gğĞ]erler/i,            'cash'],
+  [/nakit\s*ve\s*nakit/i,                          'cash'],
+  [/para\s*mevcudu/i,                              'cash'],
+  [/c\.\s*ticari\s*alacak/i,                       'tradeReceivables'],
+  [/ticari\s*alacak/i,                             'tradeReceivables'],
+  [/e\.\s*stoklar/i,                               'inventory'],
+  [/^stoklar/i,                                    'inventory'],
+  // Bilanço — Duran Varlıklar
+  [/^ii\.\s*duran\s*varl/i,                       'totalNonCurrentAssets'],
+  [/duran\s*varl[iıİ]k\s*toplam/i,                'totalNonCurrentAssets'],
+  [/toplam\s*ba[gğĞ]l[iıİ]\s*varl/i,             'totalNonCurrentAssets'],
+  [/d\.\s*maddi\s*duran\s*varl/i,                 'tangibleAssets'],
+  [/maddi\s*duran\s*varl/i,                        'tangibleAssets'],
+  [/akt[iıİ]f\s*toplam/i,                         'totalAssets'],
+  // Bilanço — Kısa Vadeli Borçlar
+  [/^iii\.\s*k[iıİ]sa\s*vadeli/i,                'totalCurrentLiabilities'],
+  [/k[iıİ]sa\s*vadeli\s*yabanc[iıİ]/i,           'totalCurrentLiabilities'],
+  [/toplam\s*k[iıİ]sa\s*vadeli\s*bor/i,          'totalCurrentLiabilities'],
+  [/b\.\s*ticari\s*bor[cçÇ]/i,                   'tradePayables'],
+  [/ticari\s*bor[cçÇ]/i,                          'tradePayables'],
+  // Bilanço — Uzun Vadeli Borçlar
+  [/^iv\.\s*uzun\s*vadeli/i,                      'totalNonCurrentLiabilities'],
+  [/uzun\s*vadeli\s*yabanc[iıİ]/i,               'totalNonCurrentLiabilities'],
+  [/toplam\s*uzun\s*vadeli\s*bor/i,              'totalNonCurrentLiabilities'],
+  // Öz Kaynaklar
+  [/^v\.\s*[oöÖ]z\s*(kaynak|serma)/i,            'totalEquity'],
+  [/[oöÖ]z\s*(kaynak|serma).*toplam/i,           'totalEquity'],
+  [/toplam\s*[oöÖ]z\s*serma/i,                   'totalEquity'],
+  [/pas[iıİ]f\s*toplam/i,                         'totalLiabilitiesAndEquity'],
 ]
 
-/**
- * Sayı çıkarma: "1.234.567,89" veya "1234567.89" → number
- */
-function parseNumber(raw: string): number | null {
-  // Parantez = negatif: (1.234) → -1234
-  const negative = raw.includes('(') || raw.includes(')')
-  let cleaned = raw.replace(/[()]/g, '').trim()
-
-  // Türk formatı: 1.234.567,89
-  if (cleaned.includes(',') && cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.')
-  } else {
-    // İngiliz formatı veya noktalı: 1,234,567.89
-    cleaned = cleaned.replace(/,/g, '')
+function matchRow(label: string): string | null {
+  const l = label.trim()
+  for (const [pat, field] of ROW_MAP) {
+    if (pat.test(l)) return field
   }
-
-  const num = parseFloat(cleaned)
-  if (isNaN(num)) return null
-  return negative ? -num : num
+  return null
 }
 
-/**
- * PDF metninden yıl bilgisini çıkar
- */
-function extractYear(text: string): number | undefined {
-  const lines = text.split('\n').map(l => l.trim())
+// ─── EK Bilanço/Gelir Tablosu bölüm parser ───────────────────────────────────
+function parseEkSection(section: string): { cari: Record<string, number>; onceki: Record<string, number> } {
+  const cari: Record<string, number> = {}
+  const onceki: Record<string, number> = {}
 
-  // GIB beyanname: "Yılı" satırının ardından 1-4 satır içinde "2025" gibi tek başına yıl
-  // Örnek: "Yılı\nDönem\n2025\n4. Dönem"
-  for (let i = 0; i < lines.length; i++) {
-    if (/^Y[iıİ]l[ıi]?[:\s]*$/.test(lines[i])) {
-      for (let j = i + 1; j <= Math.min(i + 4, lines.length - 1); j++) {
-        if (/^(20[12]\d)$/.test(lines[j])) return parseInt(lines[j])
-      }
+  for (const rawLine of section.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.length < 4) continue
+    const nums = line.match(TR_NUM)
+    if (!nums) continue
+
+    // Etiketi sayılardan temizle
+    const label = line.replace(TR_NUM, '').replace(/\(-\)/g, '').replace(/\s+/g, ' ').trim()
+    if (!label || label.length < 3) continue
+
+    const field = matchRow(label)
+    if (!field) continue
+
+    const [v1, v2] = twoNums(line)
+    if (v1 !== null && !(field in cari)) cari[field] = v1
+    if (v2 !== null && !(field in onceki)) onceki[field] = v2
+  }
+
+  return { cari, onceki }
+}
+
+// ─── Kurumlar/Geçici beyanname — temel alanları çek ─────────────────────────
+function parseTaxForm(text: string): Record<string, number | null> {
+  const fields: Record<string, number | null> = {}
+
+  for (const line of text.split('\n')) {
+    const t = line.trim()
+    if (!t) continue
+
+    if (/ticari\s*bilan[çÇ]o\s*kar[iıİ]/i.test(t) && !('ebt' in fields)) {
+      const v = firstNum(t); if (v !== null && v > 0) fields['ebt'] = v
+    }
+    if (/dönem\s*safi\s*kurum\s*kazanc/i.test(t) && !('ebt' in fields)) {
+      const v = firstNum(t); if (v !== null) fields['ebt'] = v
+    }
+    if (/kurumlar\s*vergisi\s*matrah/i.test(t) && !('ebt' in fields)) {
+      const v = firstNum(t); if (v !== null) fields['ebt'] = v
+    }
+    if (/geçici\s*vergi\s*matrah/i.test(t) && !('ebt' in fields)) {
+      const v = firstNum(t); if (v !== null) fields['ebt'] = v
+    }
+    if (/hesaplanan\s*(kurumlar|geçici)\s*vergi/i.test(t) && !('taxExpense' in fields)) {
+      const v = firstNum(t); if (v !== null) fields['taxExpense'] = v
+    }
+    if (/ticari\s*kazanç/i.test(t) && !('ebt' in fields)) {
+      const v = firstNum(t); if (v !== null && v > 0) fields['ebt'] = v
+    }
+    if (/brüt\s*(satış|kazanç)\s*tutar/i.test(t) && !('revenue' in fields)) {
+      const v = firstNum(t); if (v !== null) fields['revenue'] = v
     }
   }
 
-  // "Yıl  2025" veya "Yılı: 2025" aynı satırda
-  const yilSatir = text.match(/\bY[iıİ]l[ıi]?\s*:?\s*(20[12]\d)\b/)
-  if (yilSatir) return parseInt(yilSatir[1])
-
-  // "Cari Dönem: 2025" veya "Dönem Bitişi: 2025"
-  const cariMatch = text.match(/(?:cari\s*d[oöÖ]nem|d[oöÖ]nem\s*biti[sşŞ]i?)[\s:–\-]*(?:\d{2}[.\/]\d{2}[.\/])?(20[12]\d)/i)
-  if (cariMatch) return parseInt(cariMatch[1])
-
-  // "01.01.2025 - 30.09.2025" → bitiş yılı al
-  const dateRange = text.match(/01[.\-]01[.\-](20[12]\d)\s*[-–]\s*\d{2}[.\-]\d{2}[.\-](20[12]\d)/)
-  if (dateRange) return parseInt(dateRange[2])
-
-  // Fallback: "Onay Zamanı" ve "Düzenleme Tarihi" satırlarını hariç tut, en sık geçeni al
-  const cleaned = text
-    .replace(/onay\s*zaman[iıİ][^\n]*/gi, '')
-    .replace(/düzenleme\s*tarihi[^\n]*/gi, '')
-    .replace(/kabul\s*tarihi[^\n]*/gi, '')
-  const yearMatch = cleaned.match(/20[12]\d/g)
-  if (yearMatch) {
-    const counts: Record<string, number> = {}
-    yearMatch.forEach(y => { counts[y] = (counts[y] || 0) + 1 })
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
-    return parseInt(sorted[0][0])
+  // Fallback: bazı PDF'lerde etiket ve değer ayrı satırlarda olabilir
+  // (ör. Kurumlar Vergisi beyannamesi tablo düzeni)
+  if (!('ebt' in fields)) {
+    const m = text.match(/ticari\s*bilan[çÇ]o\s*kar[iıİ][^\d]{0,200}?(\d{1,3}(?:\.\d{3})*,\d{2})/)
+    if (m) { const v = parseTR(m[1]); if (v !== null && v > 0) fields['ebt'] = v }
   }
-  return undefined
+  if (!('taxExpense' in fields)) {
+    const m = text.match(/hesaplanan\s*(?:kurumlar|geçici)\s*vergi[^\d]{0,150}?(\d{1,3}(?:\.\d{3})*,\d{2})/)
+    if (m) { const v = parseTR(m[1]); if (v !== null) fields['taxExpense'] = v }
+  }
+
+  return fields
 }
 
-/**
- * PDF metninden dönem bilgisini çıkar
- */
-function extractPeriod(text: string): string {
-  const t = text.toLowerCase()
-
-  // Tarih aralığı tespiti (en güvenilir yöntem)
-  if (/01[\.\-]01[\.\-]20\d\d\s*[-–]\s*31[\.\-]03[\.\-]20\d\d/.test(t)) return 'Q1'
-  if (/01[\.\-]01[\.\-]20\d\d\s*[-–]\s*30[\.\-]06[\.\-]20\d\d/.test(t)) return 'Q2'
-  if (/01[\.\-]01[\.\-]20\d\d\s*[-–]\s*30[\.\-]09[\.\-]20\d\d/.test(t)) return 'Q3'
-  if (/01[\.\-]01[\.\-]20\d\d\s*[-–]\s*31[\.\-]12[\.\-]20\d\d/.test(t)) {
-    // 01.01-31.12 → 4. geçici vergi mi yoksa kesin beyan mı?
-    if (t.includes('geçici') || t.includes('4. dönem') || t.includes('dördüncü')) return 'Q4'
-    return 'ANNUAL'
-  }
-
-  // GIB formu: "Dönem  4. Dönem" veya sadece "4. Dönem" satırı
-  if (/\b1\.?\s*d[oö]nem\b|birinci\s*d[oö]nem|1\.\s*çeyrek/.test(t)) return 'Q1'
-  if (/\b2\.?\s*d[oö]nem\b|ikinci\s*d[oö]nem|2\.\s*çeyrek/.test(t))  return 'Q2'
-  if (/\b3\.?\s*d[oö]nem\b|üçüncü\s*d[oö]nem|3\.\s*çeyrek/.test(t)) return 'Q3'
-  if (/\b4\.?\s*d[oö]nem\b|dördüncü\s*d[oö]nem|4\.\s*çeyrek/.test(t)) return 'Q4'
-
-  // Geçici vergi ifadesi varsa + ay/tarih aralığından çıkar
-  if (t.includes('geçici vergi')) {
-    if (/mart|31[\.\-]03/.test(t))       return 'Q1'
-    if (/haziran|30[\.\-]06/.test(t))    return 'Q2'
-    if (/eylül|30[\.\-]09/.test(t))      return 'Q3'
-    if (/aral[ıi]k|31[\.\-]12/.test(t)) return 'Q4'
-    // Dönem numarası rakamla belirtilmişse (ör. "4. dönem" zaten yukarıda yakalandı)
-  }
-
-  return 'ANNUAL'
+// ─── PDF Mizan Parser ────────────────────────────────────────────────────────
+function detectPdfMizan(text: string): boolean {
+  return /miz[ae]n/i.test(text.slice(0, 500)) && /hesap\s*kodu/i.test(text.slice(0, 500))
 }
 
-export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) })
-  const result = await parser.getText()
-  const text = result.text
-
-  const year = extractYear(text)
-  const period = extractPeriod(text)
-
-  // Kurumlar Vergisi YILLIK beyannamesi: sütun sırası [Önceki] [Cari] (cari = son sayı)
-  // Geçici vergi beyannamesi (GV veya KV mükellefleri için): sütun sırası [Cari] [Önceki] (cari = ilk sayı)
-  // "GEÇİCİ VERGİ BEYANNAMESİ" → her zaman GV formatı (Cari = ilk sayı), KV mükellef olsa bile
-  // "KURUMLAR VERGİSİ BEYANNAMESİ" (yıllık, geçici değil) → KV formatı (Cari = son sayı)
-  // Türkçe İ (U+0130) JS /i flag ile eşleşmez → karakter sınıfları kullan
-  const isGecici   = /ge[çÇ][iıİ][cC][iıİ]\s*verg[iıİ]\s*beyanname/i.test(text)
-  const isKVYillik = /kurumlar\s*verg[iıİ][sS][iıİ]\s*beyanname/i.test(text) && !isGecici
-  const isKV = isKVYillik
+function parsePdfMizan(text: string): ParsedRow[] {
+  // Yıl/dönem
+  const dateMatch = text.match(/(\d{2})[.\/-](\d{2})[.\/-](20\d{2})\s*[-–]\s*(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/)
+  if (!dateMatch) return []
+  const endMonth = parseInt(dateMatch[5])
+  const year     = parseInt(dateMatch[6])
+  const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
 
   const fields: Record<string, number | null> = {}
-  const unmapped: string[] = []
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  let salesDeductions = 0
+  let netLoss = 0
 
-  for (const line of lines) {
-    let matched = false
+  // "HESAP KODU AÇIKLAMA BORÇ ALACAK BAK. BORÇ BAK. ALACAK" satırından sonraki satırları işle
+  const dataStart = text.indexOf('HESAP KODU')
+  const lines = text.slice(dataStart > 0 ? dataStart : 0).split('\n')
 
-    for (const [pattern, fieldName, negateIfPositive] of PDF_FIELD_MAP) {
-      if (pattern.test(line)) {
-        // Satırdaki tüm sayıları bul
-        const numbers = line.match(/-?[\d.,()]+(?:\s*[\d.,()]+)*/g)
-          ?.map(n => n.trim()).filter(n => /\d/.test(n)) ?? []
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
 
-        if (numbers.length > 0) {
-          let val: number | null = null
+    // Satır başındaki hesap kodu (1-3 haneli tam sayı)
+    const codeMatch = line.match(/^(\d{1,3})\s+/)
+    if (!codeMatch) continue
+    const code = codeMatch[1]
 
-          if (isKV && numbers.length >= 2) {
-            // KV formatı: [Önceki] [Cari] — cari = son geçerli sayı
-            for (const n of [...numbers].reverse()) {
-              const candidate = parseNumber(n)
-              if (candidate !== null && Math.abs(candidate) > 1) {
-                val = candidate
-                break
-              }
-            }
-          } else {
-            // GV / diğer: [Cari] [Önceki] — cari = ilk geçerli sayı
-            for (const n of numbers) {
-              const candidate = parseNumber(n)
-              if (candidate !== null && Math.abs(candidate) > 1) {
-                val = candidate
-                break
-              }
-            }
-          }
+    const mapping = MIZAN_ACCOUNT_MAP[code]
+    if (!mapping) continue
 
-          // "Dönem Net Zararı" gibi kayıp satırlarında pozitif değer → negatife çevir
-          if (val !== null && negateIfPositive && val > 0) {
-            val = -val
-          }
+    // Satırdaki tüm sayıları bul
+    const nums = (line.match(TR_NUM) || []).map(s => parseTR(s)).filter((v): v is number => v !== null)
+    if (nums.length === 0) continue
 
-          if (val !== null && !fields[fieldName]) {
-            fields[fieldName] = val
-            matched = true
-          }
-        }
-        break
+    let val: number | null = null
+
+    if (nums.length === 1) {
+      // Tek sayı: bakiye
+      val = nums[0]
+    } else if (nums.length === 2) {
+      const [n1, n2] = nums
+      if (Math.abs(n1 - n2) < 1) {
+        // Eşit → kapatılmış gelir tablosu hesabı; gelir için n1, gider için n1
+        val = n1
+      } else {
+        // İkisi farklı: büyük olanı bakiye olarak al
+        val = Math.abs(n1) > Math.abs(n2) ? n1 : n2
+      }
+    } else {
+      // 3+ sayı: borç=n1, alacak=n2, bakiye=n3
+      const [n1, n2, n3] = nums
+      // Bakiye = n3; borç-alacak tipini account map'e göre belirle
+      if (mapping.src === 'bakBorç' || mapping.src === 'anyBorç') {
+        val = n1 > n2 ? n3 : n1  // borç bakiyesi → n3 veya borç tutarı
+      } else {
+        val = n2 > n1 ? n3 : n2  // alacak bakiyesi → n3 veya alacak tutarı
       }
     }
 
-    // Eşlenemeyen ama sayı içeren satırlar
-    if (!matched && /\d/.test(line) && line.length > 3 && line.length < 200) {
-      const label = line.replace(/-?[\d.,()]+/g, '').trim()
-      if (label.length > 2 && label.length < 60) {
-        unmapped.push(label)
+    if (!val) continue
+
+    if (mapping.field === '_salesDeductions') salesDeductions = val
+    else if (mapping.field === '_netLoss') netLoss = val
+    else if (!(mapping.field in fields)) fields[mapping.field] = val
+  }
+
+  if (salesDeductions && fields['revenue']) fields['revenue'] = (fields['revenue'] as number) - salesDeductions
+  if (netLoss && !fields['netProfitCurrentYear']) fields['netProfitCurrentYear'] = -netLoss
+  if (fields['netProfitCurrentYear'] && !fields['netProfit']) fields['netProfit'] = fields['netProfitCurrentYear']
+  if (!fields['totalAssets'] && fields['totalCurrentAssets'] && fields['totalNonCurrentAssets']) {
+    fields['totalAssets'] = (fields['totalCurrentAssets'] as number) + (fields['totalNonCurrentAssets'] as number)
+  }
+
+  if (Object.keys(fields).length < 3) return []
+  return [{ year, period, fields, unmapped: [] }]
+}
+
+// ─── Ana export ──────────────────────────────────────────────────────────────
+export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
+  const parser = new PDFParse({ data: new Uint8Array(buffer) })
+  const { text } = await parser.getText()
+
+  // Mizan formatı tespiti (beyanname kontrolünden önce)
+  if (detectPdfMizan(text)) {
+    return parsePdfMizan(text)
+  }
+
+  const type = detectType(text)
+  const { year, period } = extractYearPeriod(text)
+
+  if (!year) return []
+
+  // ── 1001A: Yıllık Gelir Vergisi ──────────────────────────────────────────
+  if (type === 'gelir_yillik') {
+    const results: ParsedRow[] = []
+    const bilIdx = text.indexOf('AYRINTILI BİLANÇO')
+    const gelIdx = text.indexOf('AYRINTILI GELİR TABLOSU')
+
+    let bilFields = { cari: {} as Record<string, number>, onceki: {} as Record<string, number> }
+    let gelFields = { cari: {} as Record<string, number>, onceki: {} as Record<string, number> }
+
+    if (bilIdx !== -1) {
+      const end = gelIdx !== -1 ? gelIdx : bilIdx + 5000
+      bilFields = parseEkSection(text.slice(bilIdx, end))
+    }
+    if (gelIdx !== -1) {
+      gelFields = parseEkSection(text.slice(gelIdx, gelIdx + 4000))
+    }
+
+    const cariFields = { ...bilFields.cari, ...gelFields.cari }
+    if (Object.keys(cariFields).length > 0) {
+      results.push({ year, period: 'ANNUAL', fields: cariFields, unmapped: [] })
+    }
+
+    const oncekiFields = { ...bilFields.onceki, ...gelFields.onceki }
+    const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
+    if (hasOnceki) {
+      results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [] })
+    }
+
+    return results
+  }
+
+  // ── 1032-GV: Geçici Vergi (Gelir Vergisi) ────────────────────────────────
+  if (type === 'gelir_gecici') {
+    const gelIdx = text.indexOf('GELİR TABLOSU')
+    if (gelIdx !== -1) {
+      const { cari } = parseEkSection(text.slice(gelIdx, gelIdx + 4000))
+      return [{ year, period, fields: cari, unmapped: [] }]
+    }
+    // EK yoksa ana formdan kâr rakamını al
+    return [{ year, period, fields: parseTaxForm(text), unmapped: [] }]
+  }
+
+  // ── 1010: Kurumlar Vergisi Yıllık ────────────────────────────────────────
+  if (type === 'kurumlar_yillik') {
+    const taxFields = parseTaxForm(text)
+
+    // Kurumlar beyannamesi "TEK DÜZEN HESAP PLANI AYRINTILI BİLANÇO VE GELİR TABLOSU" EK'i içerir
+    // Sütun sırası: Önceki Dönem (year-1) | Cari Dönem (year) → parseEkSection'da swap gerekli
+    const ekIdx = text.indexOf('TEK DÜZEN HESAP PLANI')
+    if (ekIdx !== -1) {
+      const { cari: prevData, onceki: currData } = parseEkSection(text.slice(ekIdx, ekIdx + 20000))
+      // prevData = 1. sütun = önceki dönem, currData = 2. sütun = cari dönem
+      const cariFields  = { ...currData, ...taxFields }          // cari dönem + vergi satırları
+      const oncekiFields = { ...prevData }
+
+      const results: ParsedRow[] = [{ year, period: 'ANNUAL', fields: cariFields, unmapped: [] }]
+      const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
+      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [] })
+      return results
+    }
+
+    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [] }]
+  }
+
+  // ── 1032-KV: Kurumlar Geçici Vergi ───────────────────────────────────────
+  if (type === 'kurumlar_gecici') {
+    const taxFields = parseTaxForm(text)
+
+    // Geçici beyanname "TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU" EK'i içerebilir (tek dönem)
+    const gelirIdx = text.indexOf('TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU')
+    if (gelirIdx !== -1) {
+      const { cari: gelirFields } = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
+      return [{ year, period, fields: { ...gelirFields, ...taxFields }, unmapped: [] }]
+    }
+
+    return [{ year, period, fields: taxFields, unmapped: [] }]
+  }
+
+  // ── Bilinmeyen: satır bazlı fallback ─────────────────────────────────────
+  return parseFallback(text, year, period)
+}
+
+function parseFallback(text: string, year: number, period: string): ParsedRow[] {
+  const fields: Record<string, number | null> = {}
+
+  const SIMPLE: [RegExp, string][] = [
+    [/net\s*sat[iıİ][sşŞ]lar/i, 'revenue'],
+    [/sat[iıİ][sşŞ]lar[iıİ]n\s*maliyeti/i, 'cogs'],
+    [/brüt\s*kar/i, 'grossProfit'],
+    [/faaliyet\s*kar[iıİ]/i, 'ebit'],
+    [/fav[oöÖ]k/i, 'ebitda'],
+    [/net\s*kar/i, 'netProfit'],
+    [/d[oöÖ]nen\s*varl[iıİ]k/i, 'totalCurrentAssets'],
+    [/duran\s*varl[iıİ]k/i, 'totalNonCurrentAssets'],
+    [/akt[iıİ]f\s*toplam/i, 'totalAssets'],
+    [/k[iıİ]sa\s*vadeli.*bor/i, 'totalCurrentLiabilities'],
+    [/uzun\s*vadeli.*bor/i, 'totalNonCurrentLiabilities'],
+    [/[oöÖ]z\s*(kaynak|serma)/i, 'totalEquity'],
+    [/ticari\s*alacak/i, 'tradeReceivables'],
+    [/stoklar/i, 'inventory'],
+    [/nakit/i, 'cash'],
+  ]
+
+  for (const line of text.split('\n')) {
+    const t = line.trim()
+    for (const [pat, field] of SIMPLE) {
+      if (pat.test(t) && !(field in fields)) {
+        const v = firstNum(t)
+        if (v !== null) fields[field] = v
       }
     }
   }
 
-  // Hesaplanabilir alanları türet
-  if (!fields.totalAssets && fields.totalCurrentAssets && fields.totalNonCurrentAssets) {
-    fields.totalAssets = fields.totalCurrentAssets + fields.totalNonCurrentAssets
-  }
-  if (!fields.grossProfit && fields.revenue && fields.cogs) {
-    fields.grossProfit = fields.revenue - Math.abs(fields.cogs)
-  }
-  if (!fields.ebitda && fields.ebit && fields.depreciation) {
-    fields.ebitda = fields.ebit + Math.abs(fields.depreciation)
-  }
-
-  // En az birkaç alan eşlendi mi?
-  const mappedCount = Object.values(fields).filter(v => v !== null).length
-  if (mappedCount === 0) {
-    return []
-  }
-
-  return [{ year, period, fields, unmapped: unmapped.slice(0, 20) }]
+  if (Object.keys(fields).length === 0) return []
+  return [{ year, period, fields, unmapped: [] }]
 }
