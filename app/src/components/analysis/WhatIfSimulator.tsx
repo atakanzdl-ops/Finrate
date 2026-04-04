@@ -28,7 +28,7 @@ const LEVERS = [
 ]
 
 // ─── Hızlı Senaryo tanımları ──────────────────────────────
-const PRESET_SCENARIOS = [
+const PRESET_SCENARIOS: Array<{ id: string; label: string; desc: string; color: string; changes: Record<string, number> }> = [
   {
     id: 'conservative',
     label: 'Muhafazakar',

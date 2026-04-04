@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import DashboardShell from '@/components/layout/DashboardShell'
+import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
+import SubjectiveForm from '@/components/analysis/SubjectiveForm'
 
 /* ─── Types ───────────────────────────────────── */
 
@@ -360,6 +362,28 @@ export default function AnalizPage() {
                 </table>
               </div>
             </div>
+
+            {/* WhatIf Simülatör */}
+            <div>
+              <div className="mb-4">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Senaryo Simülatörü</h3>
+              </div>
+              <WhatIfSimulator
+                baseData={selected.ratios ?? {}}
+                baseScore={selected.finalScore}
+                rawFinancialData={selected.financialData as Record<string, number | null> | undefined}
+              />
+            </div>
+
+            {/* Subjektif Değerlendirme */}
+            {selected.entity?.id && (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Subjektif Değerlendirme</h3>
+                </div>
+                <SubjectiveForm entityId={selected.entity.id} />
+              </div>
+            )}
 
             </div>
           </div>
