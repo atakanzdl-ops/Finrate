@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
 import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
-import { calculateRatios } from '@/lib/scoring/ratios'
+import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -103,6 +103,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (f.ebitda == null && f.ebit != null) {
         f.ebitda = n(f.ebit) // depreciation yoksa ebit = ebitda yaklaşımı
       }
+      // netProfit: önce netProfitCurrentYear (590 hesabı / mizan), sonra ebt-taxExpense
+      if (f.netProfit == null) {
+        if (f.netProfitCurrentYear != null) {
+          f.netProfit = n(f.netProfitCurrentYear)
+        } else if (f.ebt != null && f.taxExpense != null) {
+          f.netProfit = n(f.ebt)! - n(f.taxExpense)!
+        } else if (f.ebt != null) {
+          f.netProfit = n(f.ebt) // vergi bilinmiyorsa ebt ≈ netProfit
+        }
+      }
 
       // Mevcut kaydı bul: varsa yeni verilerle merge et (null olan alanları koru)
       const existing = await prisma.financialData.findUnique({
@@ -126,7 +136,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         create: { entityId, year: row.year, period, source, fileName: file.name, ...row.fields },
       })
 
-      const ratios = calculateRatios(row.fields)
+      // Önceki yıl cirosunu sorgula (reel büyüme hesabı için)
+      const prevYearData = await prisma.financialData.findFirst({
+        where: { entityId, year: row.year - 1, period },
+        select: { revenue: true },
+      })
+      const ppiRate = TURKEY_PPI[row.year] ?? TURKEY_PPI[2024]
+      const enrichedFields = {
+        ...row.fields,
+        prevRevenue: prevYearData?.revenue ?? null,
+        ppiRate,
+      }
+
+      const ratios = calculateRatios(enrichedFields)
       const score  = calculateScore(ratios)
 
       await prisma.analysis.upsert({

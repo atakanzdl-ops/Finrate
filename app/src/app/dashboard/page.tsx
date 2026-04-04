@@ -142,7 +142,8 @@ export default function DashboardPage() {
     // ─── Nav link active state ──────────────────
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
-            e.preventDefault();
+            const href = (link as HTMLAnchorElement).getAttribute('href')
+            if (!href || href === '#') e.preventDefault()
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
             link.classList.add('active');
         });
@@ -197,7 +198,8 @@ export default function DashboardPage() {
                     <span className="brand-name">Finrate</span>
                 </div>
                 <nav className="topnav" id="topnav">
-                    <a href="#" className="nav-link active" id="nav-dashboard">Dashboard</a>
+                    <a href="/dashboard" className="nav-link active" id="nav-dashboard">Dashboard</a>
+                    <a href="/dashboard/sirketler" className="nav-link" id="nav-companies">Şirketler</a>
                     <a href="#" className="nav-link" id="nav-reports">Raporlar</a>
                     <a href="#" className="nav-link" id="nav-analysis">Analiz</a>
                     <a href="#" className="nav-link" id="nav-settings">Ayarlar</a>
@@ -392,7 +394,7 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="bar bar-secondary" style={{ height: '42%' }} data-tooltip="₺6.3M"></div>
                                     </div>
-                                    <span class="bar-label">2023/Q4</span>
+                                    <span className="bar-label">2023/Q4</span>
                                 </div>
                                 <div className="bar-group">
                                     <div className="bar-pair">

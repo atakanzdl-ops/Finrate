@@ -6,8 +6,16 @@ import {
   Building2, Filter, Download, MousePointer2, Loader2
 } from 'lucide-react'
 import clsx from 'clsx'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 /* ─── Types ───────────────────────────────────── */
+
+interface FinData {
+  revenue: number | null; cogs: number | null; grossProfit: number | null
+  ebit: number | null; ebitda: number | null; netProfit: number | null
+  totalAssets: number | null; totalEquity: number | null
+  totalCurrentAssets: number | null; totalCurrentLiabilities: number | null
+}
 
 interface Analysis {
   id: string
@@ -21,6 +29,7 @@ interface Analysis {
   activityScore: number
   ratios: Record<string, number | null>
   entity?: { id: string; name: string }
+  financialData?: FinData
 }
 
 const RATING_LABEL: Record<string, string> = {
@@ -120,29 +129,64 @@ export default function AnalizPage() {
   }, [])
 
   if (loading) return (
-    <div className="flex justify-center py-20">
-      <Loader2 size={24} className="animate-spin text-cyan-400" />
-    </div>
+    <DashboardShell>
+      <div className="flex justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-cyan-400" />
+      </div>
+    </DashboardShell>
   )
 
   if (analyses.length === 0) return (
-    <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-white">Analizler</h1>
-      <div className="glass-card rounded-xl p-10 text-center">
-        <p className="text-white/40 text-sm">Henüz analiz yok. Bir şirkete finansal veri girerek başlayın.</p>
+    <DashboardShell>
+      <div className="space-y-5">
+        <h1 className="text-2xl font-bold text-white">Analizler</h1>
+        <div className="glass-card rounded-xl p-10 text-center">
+          <p className="text-white/40 text-sm">Henüz analiz yok. Bir şirkete finansal veri girerek başlayın.</p>
+        </div>
       </div>
-    </div>
+    </DashboardShell>
   )
 
+  function fmtN(v: number | null | undefined, dec = 2) {
+    if (v == null) return '—'
+    return v.toFixed(dec)
+  }
+  function fmtTL(v: number | null | undefined) {
+    if (v == null) return '—'
+    if (Math.abs(v) >= 1_000_000) return `₺${(v / 1_000_000).toFixed(1)}M`
+    if (Math.abs(v) >= 1_000)    return `₺${(v / 1_000).toFixed(0)}K`
+    return `₺${v.toFixed(0)}`
+  }
+  function fmtPct(v: number | null | undefined) {
+    if (v == null) return '—'
+    return `%${(v * 100).toFixed(1)}`
+  }
+
   const ratioRows = selected ? [
-    { id: "Cari Oran",        val: selected.ratios?.currentRatio?.toFixed(2) ?? "—",    avg: "1.42", st: "İyi",    c: "status-good" },
-    { id: "Likidite Oranı",   val: selected.ratios?.quickRatio?.toFixed(2) ?? "—",      avg: "0.95", st: "Yeterli", c: "status-good" },
-    { id: "Borç / Özkaynak",  val: selected.ratios?.debtToEquity?.toFixed(2) ?? "—",    avg: "0.95", st: "İyi",    c: "status-great" },
-    { id: "Net Borç / FAVÖK", val: selected.ratios?.netDebtToEbitda?.toFixed(1) + "x" ?? "—", avg: "2.5x", st: "Makul", c: "status-warn" },
+    // Likidite
+    { id: "Cari Oran",           val: fmtN(selected.ratios?.currentRatio),           avg: "1.42",  st: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= 1.2 ? "İyi" : "Zayıf",    c: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= 1.2 ? "status-good" : "status-bad" },
+    { id: "Likidite Oranı (Hızlı)", val: fmtN(selected.ratios?.quickRatio),          avg: "0.95",  st: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= 0.8 ? "Yeterli" : "Zayıf", c: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= 0.8 ? "status-good" : "status-bad" },
+    // Karlılık
+    { id: "Brüt Kar Marjı",      val: fmtPct(selected.ratios?.grossMargin),          avg: "%25",   st: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= 0.2 ? "İyi" : "Zayıf",    c: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= 0.2 ? "status-good" : "status-warn" },
+    { id: "FAVÖK Marjı",         val: fmtPct(selected.ratios?.ebitdaMargin),          avg: "%12",   st: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= 0.1 ? "İyi" : "Zayıf",  c: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= 0.1 ? "status-good" : "status-warn" },
+    { id: "Net Kar Marjı",       val: fmtPct(selected.ratios?.netProfitMargin),       avg: "%5",    st: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= 0.03 ? "Yeterli" : "Zayıf", c: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= 0.03 ? "status-good" : "status-bad" },
+    { id: "Öz Kaynak Karlılığı (ROE)", val: fmtPct(selected.ratios?.roe),             avg: "%15",   st: selected.ratios?.roe != null && selected.ratios.roe >= 0.1 ? "İyi" : "Zayıf",      c: selected.ratios?.roe != null && selected.ratios.roe >= 0.1 ? "status-good" : "status-warn" },
+    { id: "Aktif Karlılığı (ROA)", val: fmtPct(selected.ratios?.roa),                 avg: "%8",    st: selected.ratios?.roa != null && selected.ratios.roa >= 0.05 ? "İyi" : "Zayıf",     c: selected.ratios?.roa != null && selected.ratios.roa >= 0.05 ? "status-good" : "status-warn" },
+    // Kaldıraç
+    { id: "Borç / Özkaynak",    val: fmtN(selected.ratios?.debtToEquity),             avg: "0.95",  st: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= 1.5 ? "İyi" : "Riskli",  c: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= 1.5 ? "status-great" : "status-bad" },
+    { id: "Borç / Aktif",       val: fmtN(selected.ratios?.debtToAssets),             avg: "0.50",  st: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= 0.6 ? "İyi" : "Riskli",  c: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= 0.6 ? "status-great" : "status-bad" },
+    { id: "Net Borç / FAVÖK",   val: selected.ratios?.debtToEbitda != null ? fmtN(selected.ratios.debtToEbitda, 1) + "x" : "—", avg: "2.5x", st: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "Makul" : "Yüksek", c: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "status-warn" : "status-bad" },
+    { id: "Faiz Karşılama",     val: selected.ratios?.interestCoverage != null ? fmtN(selected.ratios.interestCoverage, 1) + "x" : "—", avg: "3x", st: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= 2 ? "İyi" : "Zayıf", c: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= 2 ? "status-good" : "status-bad" },
+    // Faaliyet
+    { id: "Aktif Devir Hızı",   val: fmtN(selected.ratios?.assetTurnover),            avg: "0.8",   st: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= 0.5 ? "İyi" : "Düşük",  c: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= 0.5 ? "status-good" : "status-warn" },
   ] : []
 
+  // KPI kartları için
+  const fd = selected?.financialData
+
   return (
-    <div className="p-8 space-y-6 max-w-[1440px] mx-auto min-h-screen">
+    <DashboardShell>
+    <div className="space-y-6 max-w-[1440px] mx-auto">
 
       {/* Üst Bar */}
       <div className="flex items-center justify-between gap-4 mb-4">
@@ -206,7 +250,26 @@ export default function AnalizPage() {
 
         {/* Sağ: Detay */}
         {selected && (
-          <div className="lg:col-span-9 space-y-8">
+          <div className="lg:col-span-9 space-y-6">
+
+            {/* KPI Kartları */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { label: "FİNRATE SKORU", value: `${Math.round(selected.finalScore)} / 1000`, sub: selected.finalRating, color: "#2dd4bf" },
+                { label: "AKTİF TOPLAM",  value: fmtTL(fd?.totalAssets), sub: fd?.totalCurrentAssets != null ? `Dönen: ${fmtTL(fd.totalCurrentAssets)}` : undefined, color: "#0ea5e9" },
+                { label: "CARİ ORAN",     value: fmtN(selected.ratios?.currentRatio), sub: `Sektör ort: 1.42`, color: "#2dd4bf" },
+                { label: "BORÇ / ÖZKAYNAK", value: fmtN(selected.ratios?.debtToEquity), sub: `Sektör ort: 0.95`, color: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity > 2 ? "#f87171" : "#2dd4bf" },
+              ].map(kpi => (
+                <div key={kpi.label} className="bg-white/72 backdrop-blur-[30px] border border-white/65 rounded-[20px] p-5 relative overflow-hidden shadow-[0_8px_32px_rgba(10,30,60,0.08)]" style={{ boxShadow: '0 8px 32px rgba(10, 30, 60, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)' }}>
+                  <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#3d5a80] mb-2">{kpi.label}</div>
+                  <div className="text-2xl font-black text-[#0a1727] font-display tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>{kpi.value}</div>
+                  {kpi.sub && <div className="text-[10px] font-bold mt-1" style={{ color: kpi.color }}>{kpi.sub}</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* Skor + Kategoriler */}
+            <div className="space-y-8">
 
             {/* Skor Kartı - 1:1 Prestige Glass */}
             <div className="bg-white/72 backdrop-blur-[30px] border border-white/65 rounded-[20px] p-12 shadow-[0_8px_32px_rgba(10,30,60,0.08)] grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative" style={{ boxShadow: '0 8px 32px rgba(10, 30, 60, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)' }}>
@@ -298,9 +361,11 @@ export default function AnalizPage() {
               </div>
             </div>
 
+            </div>
           </div>
         )}
       </div>
     </div>
+    </DashboardShell>
   )
 }

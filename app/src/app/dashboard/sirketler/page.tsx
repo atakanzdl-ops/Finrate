@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Building2, Plus, Search, ChevronRight, Loader2, Trash2 } from 'lucide-react'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface Entity {
   id: string; name: string; taxNumber: string | null; sector: string | null
@@ -39,7 +40,8 @@ export default function SirketlerPage() {
     (e.sector ?? '').toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto p-4">
+    <DashboardShell>
+    <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-6 pb-6 border-b border-white/5">
         <div>
           <h1 className="text-4xl font-black text-white tracking-tight font-display mb-2">Şirketler</h1>
@@ -70,10 +72,7 @@ export default function SirketlerPage() {
             {search ? 'Aramanızla eşleşen bir şirket bulunamadı. Lütfen farklı bir terim deneyin.' : 'Veri havuzuna henüz bir şirket eklenmemiş görünüyor.'}
           </p>
           {!search && (
-            <Link href="/dashboard/sirketler/yeni"
-              className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-              <Plus size={16} /> İlk Şirketi Ekle
-            </Link>
+            <p className="text-xs text-slate-600">Sağ üstteki <span className="text-cyan-400 font-bold">+ Yeni Şirket</span> butonunu kullanın.</p>
           )}
         </div>
       ) : (
@@ -130,5 +129,6 @@ export default function SirketlerPage() {
         </div>
       )}
     </div>
+    </DashboardShell>
   )
 }

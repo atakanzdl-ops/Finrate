@@ -37,8 +37,8 @@ const PERIOD_LABELS: Record<string, string> = {
 
 function fileIcon(name: string) {
   const n = name.toLowerCase()
-  if (n.endsWith('.pdf')) return <FileText size={14} className="text-[#40E0D0] flex-shrink-0" />
-  return <FileSpreadsheet size={14} className="text-[#003153] flex-shrink-0" />
+  if (n.endsWith('.pdf')) return <FileText size={14} className="text-cyan-400 flex-shrink-0" />
+  return <FileSpreadsheet size={14} className="text-emerald-400 flex-shrink-0" />
 }
 
 export function FileUpload({ entityId, onImported }: Props) {

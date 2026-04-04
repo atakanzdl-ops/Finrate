@@ -4,6 +4,10 @@
  */
 
 export interface FinancialInput {
+  // Büyüme hesabı için
+  prevRevenue?: number | null   // Önceki yıl cirosu (reel büyüme için)
+  ppiRate?: number | null       // ÜFE oranı (0.43 = %43)
+
   // Dönen Varlıklar
   cash?: number | null
   shortTermInvestments?: number | null
@@ -64,7 +68,7 @@ export interface RatioResult {
   netWorkingCapitalRatio: number | null // NÇS / Toplam Varlık
   cashConversionCycle: number | null   // Nakit Dönüşüm Süresi (gün)
 
-  // KARLILIK (7)
+  // KARLILIK (9)
   grossMargin: number | null           // Brüt Kar Marjı
   ebitdaMargin: number | null          // FAVÖK Marjı
   ebitMargin: number | null            // FVÖK Marjı (EBIT Marjı)
@@ -72,6 +76,8 @@ export interface RatioResult {
   roa: number | null                   // Aktif Karlılığı (ROA)
   roe: number | null                   // Öz Kaynak Karlılığı (ROE)
   roic: number | null                  // Yatırım Getirisi (ROIC)
+  revenueGrowth: number | null         // Nominal Gelir Büyümesi
+  realGrowth: number | null            // Reel Büyüme (ÜFE Arındırılmış)
 
   // KALDIRAC (6)
   debtToEquity: number | null          // Borç / Öz Kaynak
@@ -97,6 +103,18 @@ function safe(a: number | null | undefined, b: number | null | undefined): numbe
 
 function n(v: number | null | undefined): number | null {
   return v == null ? null : Number(v)
+}
+
+// Türkiye ÜFE (Üretici Fiyat Endeksi) yıllık oranları — TCMB verisine dayalı
+export const TURKEY_PPI: Record<number, number> = {
+  2025: 0.30,
+  2024: 0.43,
+  2023: 0.74,
+  2022: 1.30,
+  2021: 0.44,
+  2020: 0.25,
+  2019: 0.10,
+  2018: 0.33,
 }
 
 export function calculateRatios(d: FinancialInput): RatioResult {
@@ -188,6 +206,19 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const nopat = ebit != null ? ebit * (1 - 0.22) : null
   const roic = safe(nopat, investedCapital)
 
+  // Büyüme rasyoları
+  const prevRevenue = n(d.prevRevenue)
+  const revenueGrowth =
+    prevRevenue != null && prevRevenue !== 0 && revenue != null
+      ? (revenue - prevRevenue) / prevRevenue
+      : null
+
+  const ppiRate = n(d.ppiRate)
+  const realGrowth =
+    revenueGrowth != null && ppiRate != null
+      ? (1 + revenueGrowth) / (1 + ppiRate) - 1
+      : null
+
   // ─── KALDIRAC ─────────────────────────────────────────────
   const debtToEquity = safe(totalDebt || null, totalEquity)
   const debtToAssets = safe(totalDebt || null, totalAssets)
@@ -223,6 +254,8 @@ export function calculateRatios(d: FinancialInput): RatioResult {
     roa,
     roe,
     roic,
+    revenueGrowth,
+    realGrowth,
 
     debtToEquity,
     debtToAssets,

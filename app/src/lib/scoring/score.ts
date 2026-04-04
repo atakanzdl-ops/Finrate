@@ -86,7 +86,7 @@ function calcLiquidity(r: RatioResult): number {
 
 // ─── KARLILIK ─────────────────────────────────────────────
 function calcProfitability(r: RatioResult): number {
-  return average([
+  const base = [
     linearScore(r.grossMargin,      0,     0.50),
     linearScore(r.ebitdaMargin,     0,     0.25),
     linearScore(r.ebitMargin,       -0.05, 0.20),
@@ -94,7 +94,13 @@ function calcProfitability(r: RatioResult): number {
     linearScore(r.roa,              -0.02, 0.15),
     linearScore(r.roe,              -0.05, 0.25),
     linearScore(r.roic,             -0.02, 0.20),
-  ])
+  ]
+  // Reel büyüme varsa karlılık skoruna ekle (ÜFE arındırılmış)
+  // bad = -0.20 (reel küçülme), good = +0.15 (reel büyüme)
+  if (r.realGrowth != null) {
+    base.push(linearScore(r.realGrowth, -0.20, 0.15))
+  }
+  return average(base)
 }
 
 // ─── KALDIRAC ─────────────────────────────────────────────

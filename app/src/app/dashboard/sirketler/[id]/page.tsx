@@ -5,16 +5,56 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, BarChart3, Loader2, ChevronDown, ChevronUp, Upload, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { FileUpload } from '@/components/analysis/FileUpload'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface FinancialData {
   id: string
   year: number
   period: string
+  // Özet
   revenue: number | null
   ebitda: number | null
   netProfit: number | null
   totalAssets: number | null
   totalEquity: number | null
+  // Dönen Varlıklar
+  cash: number | null
+  shortTermInvestments: number | null
+  tradeReceivables: number | null
+  inventory: number | null
+  otherCurrentAssets: number | null
+  totalCurrentAssets: number | null
+  // Duran Varlıklar
+  tangibleAssets: number | null
+  intangibleAssets: number | null
+  longTermInvestments: number | null
+  otherNonCurrentAssets: number | null
+  totalNonCurrentAssets: number | null
+  // Kısa Vadeli Borçlar
+  shortTermFinancialDebt: number | null
+  tradePayables: number | null
+  otherCurrentLiabilities: number | null
+  totalCurrentLiabilities: number | null
+  // Uzun Vadeli Borçlar
+  longTermFinancialDebt: number | null
+  otherNonCurrentLiabilities: number | null
+  totalNonCurrentLiabilities: number | null
+  // Öz Kaynak
+  paidInCapital: number | null
+  retainedEarnings: number | null
+  netProfitCurrentYear: number | null
+  totalLiabilitiesAndEquity: number | null
+  // Gelir Tablosu
+  cogs: number | null
+  grossProfit: number | null
+  operatingExpenses: number | null
+  ebit: number | null
+  depreciation: number | null
+  interestExpense: number | null
+  otherIncome: number | null
+  otherExpense: number | null
+  ebt: number | null
+  taxExpense: number | null
 }
 
 interface Entity {
@@ -73,13 +113,20 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
   }, [id])
 
   if (loading) return (
-    <div className="flex justify-center py-16">
-      <Loader2 size={24} className="animate-spin text-cyan-400" />
-    </div>
+    <DashboardShell>
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-cyan-400" />
+      </div>
+    </DashboardShell>
   )
-  if (!entity) return <p className="text-white/50">Şirket bulunamadı.</p>
+  if (!entity) return (
+    <DashboardShell>
+      <p className="text-white/50">Şirket bulunamadı.</p>
+    </DashboardShell>
+  )
 
   return (
+    <DashboardShell>
     <div className="space-y-6">
       {/* Başlık */}
       <div className="flex items-center gap-3">
@@ -214,6 +261,137 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       )}
+
+      {/* TDHP Bilanço & Gelir Tablosu Detay Paneli */}
+      {entity.financialData.length > 0 && (
+        <TdhpPanel data={entity.financialData} />
+      )}
+    </div>
+    </DashboardShell>
+  )
+}
+
+// ─── TDHP Bilanço ve Gelir Tablosu Paneli ─────────────────
+function TdhpPanel({ data }: { data: FinancialData[] }) {
+  const [selectedId, setSelectedId] = useState(data[0]?.id ?? '')
+  const fd = data.find(d => d.id === selectedId) ?? data[0]
+  if (!fd) return null
+
+  const PERIOD_LABELS: Record<string, string> = {
+    ANNUAL: 'Kesin Beyan', Q1: '1. Geçici', Q2: '2. Geçici', Q3: '3. Geçici', Q4: '4. Geçici',
+  }
+
+  function r(v: number | null | undefined) {
+    if (v == null) return '—'
+    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(v)
+  }
+
+  const AKTIF = [
+    { label: 'A — DÖNEN VARLIKLAR', value: fd.totalCurrentAssets, bold: true },
+    { label: '  Nakit ve Nakit Benzerleri', value: fd.cash },
+    { label: '  Kısa Vadeli Yatırımlar', value: fd.shortTermInvestments },
+    { label: '  Ticari Alacaklar', value: fd.tradeReceivables },
+    { label: '  Stoklar', value: fd.inventory },
+    { label: '  Diğer Dönen Varlıklar', value: fd.otherCurrentAssets },
+    { label: 'B — DURAN VARLIKLAR', value: fd.totalNonCurrentAssets, bold: true },
+    { label: '  Maddi Duran Varlıklar', value: fd.tangibleAssets },
+    { label: '  Maddi Olmayan Duran Varlıklar', value: fd.intangibleAssets },
+    { label: '  Uzun Vadeli Yatırımlar', value: fd.longTermInvestments },
+    { label: '  Diğer Duran Varlıklar', value: fd.otherNonCurrentAssets },
+    { label: 'AKTİF TOPLAM', value: fd.totalAssets, bold: true, total: true },
+  ]
+
+  const PASIF = [
+    { label: 'A — KISA VADELİ BORÇLAR', value: fd.totalCurrentLiabilities, bold: true },
+    { label: '  KV Finansal Borçlar', value: fd.shortTermFinancialDebt },
+    { label: '  Ticari Borçlar', value: fd.tradePayables },
+    { label: '  Diğer KV Borçlar', value: fd.otherCurrentLiabilities },
+    { label: 'B — UZUN VADELİ BORÇLAR', value: fd.totalNonCurrentLiabilities, bold: true },
+    { label: '  UV Finansal Borçlar', value: fd.longTermFinancialDebt },
+    { label: '  Diğer UV Borçlar', value: fd.otherNonCurrentLiabilities },
+    { label: 'C — ÖZ KAYNAKLAR', value: fd.totalEquity, bold: true },
+    { label: '  Ödenmiş Sermaye', value: fd.paidInCapital },
+    { label: '  Geçmiş Yıl Karları', value: fd.retainedEarnings },
+    { label: '  Dönem Net Karı', value: fd.netProfitCurrentYear ?? fd.netProfit },
+    { label: 'PASİF TOPLAM', value: fd.totalLiabilitiesAndEquity ?? fd.totalAssets, bold: true, total: true },
+  ]
+
+  const GELIR = [
+    { label: 'Net Satışlar / Ciro', value: fd.revenue, bold: true },
+    { label: 'Satışların Maliyeti (−)', value: fd.cogs },
+    { label: 'Brüt Kar', value: fd.grossProfit, bold: true },
+    { label: 'Faaliyet Giderleri (−)', value: fd.operatingExpenses },
+    { label: 'Faaliyet Karı (FVÖK)', value: fd.ebit, bold: true },
+    { label: '  Amortisman (+)', value: fd.depreciation },
+    { label: 'FAVÖK', value: fd.ebitda, bold: true },
+    { label: 'Finansman Gideri (−)', value: fd.interestExpense },
+    { label: 'Diğer Gelirler', value: fd.otherIncome },
+    { label: 'Diğer Giderler (−)', value: fd.otherExpense },
+    { label: 'Vergi Öncesi Kar (EBT)', value: fd.ebt, bold: true },
+    { label: 'Vergi Gideri (−)', value: fd.taxExpense },
+    { label: 'Net Kar', value: fd.netProfit, bold: true, total: true },
+  ]
+
+  // Hiç veri yoksa paneli gösterme
+  const hasData = AKTIF.some(r => r.value != null) || GELIR.some(r => r.value != null)
+  if (!hasData) return null
+
+  function TdhpRow({ label, value, bold, total }: { label: string; value: number | null | undefined; bold?: boolean; total?: boolean }) {
+    return (
+      <div className={clsx(
+        'flex justify-between px-4 py-1.5 text-xs',
+        total ? 'border-t border-white/10 mt-1 pt-2 font-black text-white' :
+        bold  ? 'font-bold text-white/90 mt-2' : 'text-white/60',
+      )}>
+        <span>{label}</span>
+        <span className={clsx('font-mono tabular-nums', value != null && value < 0 ? 'text-red-400' : '')}>{r(value)}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass-card rounded-xl overflow-hidden">
+      {/* Dönem seçici */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10 flex-wrap">
+        <span className="text-[10px] font-black uppercase tracking-widest text-white/40">TEK DÜZEN HESAP PLANI · </span>
+        <div className="flex gap-2 flex-wrap">
+          {data.map(d => (
+            <button
+              key={d.id}
+              onClick={() => setSelectedId(d.id)}
+              className={clsx(
+                'text-[10px] px-3 py-1 rounded-lg font-bold uppercase tracking-wider border transition-all',
+                selectedId === d.id
+                  ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'
+                  : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70'
+              )}
+            >
+              {d.year} · {PERIOD_LABELS[d.period] ?? d.period}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* İçerik: 3 sütun */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-white/5">
+        {/* AKTİF */}
+        <div className="py-4">
+          <p className="px-4 pb-2 text-[9px] font-black uppercase tracking-[0.25em] text-cyan-400">Aktif (Varlıklar)</p>
+          {AKTIF.map((row, i) => <TdhpRow key={i} {...row} />)}
+        </div>
+
+        {/* PASİF */}
+        <div className="py-4">
+          <p className="px-4 pb-2 text-[9px] font-black uppercase tracking-[0.25em] text-cyan-400">Pasif (Kaynaklar)</p>
+          {PASIF.map((row, i) => <TdhpRow key={i} {...row} />)}
+        </div>
+
+        {/* GELİR TABLOSU */}
+        <div className="py-4">
+          <p className="px-4 pb-2 text-[9px] font-black uppercase tracking-[0.25em] text-cyan-400">Gelir Tablosu</p>
+          {GELIR.map((row, i) => <TdhpRow key={i} {...row} />)}
+        </div>
+      </div>
     </div>
   )
 }
