@@ -385,11 +385,17 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
   if (type === 'kurumlar_gecici') {
     const taxFields = parseTaxForm(text)
 
-    // Geçici beyanname "TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU" EK'i içerebilir (tek dönem)
+    // Geçici beyanname "TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU" EK'i içerebilir
+    // GİB formatında sütun sırası: 1. sütun = önceki dönem, 2. sütun = cari dönem (yıllık ile aynı)
     const gelirIdx = text.indexOf('TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU')
     if (gelirIdx !== -1) {
-      const { cari: gelirFields } = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
-      return [{ year, period, fields: { ...gelirFields, ...taxFields }, unmapped: [] }]
+      const { cari: prevData, onceki: currData } = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
+      // prevData = 1. sütun = önceki dönem, currData = 2. sütun = cari dönem
+      const cariFields = { ...currData, ...taxFields }
+      const results: ParsedRow[] = [{ year, period, fields: cariFields, unmapped: [] }]
+      const hasOnceki = Object.values(prevData).some(v => v !== 0)
+      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: prevData, unmapped: [] })
+      return results
     }
 
     return [{ year, period, fields: taxFields, unmapped: [] }]
