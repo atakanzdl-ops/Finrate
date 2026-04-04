@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 const ENTITY_TYPES = [
   { value: 'STANDALONE', label: 'Bağımsız Şirket' },
@@ -51,6 +52,7 @@ export default function YeniSirketPage() {
   }
 
   return (
+    <DashboardShell>
     <div className="max-w-lg space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/dashboard/sirketler" className="text-white/40 hover:text-white transition-colors">
@@ -142,5 +144,6 @@ export default function YeniSirketPage() {
         </button>
       </form>
     </div>
+    </DashboardShell>
   )
 }

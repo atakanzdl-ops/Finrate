@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Building2, Plus, X, Loader2 } from 'lucide-react'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface Entity {
   id: string
@@ -92,6 +93,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   if (!group)  return <p className="text-white/50">Grup bulunamadı.</p>
 
   return (
+    <DashboardShell>
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/dashboard/gruplar" className="text-white/40 hover:text-white transition-colors">
@@ -177,5 +179,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
         )}
       </div>
     </div>
+    </DashboardShell>
   )
 }

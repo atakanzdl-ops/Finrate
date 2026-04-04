@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Sliders, Plus, ToggleLeft, ToggleRight, Trash2, Loader2, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface TenzilatEntry {
   id: string
@@ -70,6 +71,7 @@ export default function TenzilatPage() {
   }
 
   return (
+    <DashboardShell>
     <div className="space-y-6">
       {/* Başlık */}
       <div className="flex items-center justify-between">
@@ -171,6 +173,7 @@ export default function TenzilatPage() {
         </div>
       )}
     </div>
+    </DashboardShell>
   )
 }
 

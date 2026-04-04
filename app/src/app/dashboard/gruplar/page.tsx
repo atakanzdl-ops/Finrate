@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { GitBranch, Plus, Building2, ChevronRight, Loader2, Trash2 } from 'lucide-react'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface Entity {
   id: string
@@ -64,6 +65,7 @@ export default function GruplarPage() {
   }
 
   return (
+    <DashboardShell>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -173,5 +175,6 @@ export default function GruplarPage() {
         </div>
       )}
     </div>
+    </DashboardShell>
   )
 }

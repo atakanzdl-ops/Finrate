@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User, Lock, CreditCard, Shield, Loader2, Check } from 'lucide-react'
+import DashboardShell from '@/components/layout/DashboardShell'
 
 interface UserProfile {
   id: string
@@ -76,6 +77,7 @@ export default function AyarlarPage() {
   if (loading) return <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-cyan-400" /></div>
 
   return (
+    <DashboardShell>
     <div className="max-w-xl space-y-6">
       <h1 className="text-2xl font-bold text-white">Ayarlar</h1>
 
@@ -207,6 +209,7 @@ export default function AyarlarPage() {
         </div>
       </Section>
     </div>
+    </DashboardShell>
   )
 }
 
