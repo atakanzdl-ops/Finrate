@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       leverageScore: true,
       activityScore: true,
       ratios: true,
-      entity: { select: { id: true, name: true } },
+      entity: { select: { id: true, name: true, sector: true } },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Building2, Filter, Download, MousePointer2, Loader2
@@ -9,6 +10,7 @@ import clsx from 'clsx'
 import DashboardShell from '@/components/layout/DashboardShell'
 import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
 import SubjectiveForm from '@/components/analysis/SubjectiveForm'
+import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 
 /* ─── Types ───────────────────────────────────── */
 
@@ -30,7 +32,7 @@ interface Analysis {
   leverageScore: number
   activityScore: number
   ratios: Record<string, number | null>
-  entity?: { id: string; name: string }
+  entity?: { id: string; name: string; sector?: string | null }
   financialData?: FinData
 }
 
@@ -46,7 +48,7 @@ const RATING_LABEL: Record<string, string> = {
 function CircularScore({ score, rating }: { score: number; rating: string }) {
   const radius = 45
   const circumference = 2 * Math.PI * radius
-  const offset = circumference - (score / 1000) * circumference
+  const offset = circumference - (score / 100) * circumference
 
   return (
     <div className="flex flex-col items-center">
@@ -70,7 +72,7 @@ function CircularScore({ score, rating }: { score: number; rating: string }) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-5xl font-black text-[#0a1727] tracking-tighter" style={{ fontFamily: 'Outfit, sans-serif' }}>{Math.round(score)}</span>
-          <span className="text-[10px] font-bold text-[#3d5a80] tracking-widest mt-0.5">/ 1000</span>
+          <span className="text-[10px] font-bold text-[#3d5a80] tracking-widest mt-0.5">/ 100</span>
           <span className="text-[9px] font-black text-[#8da4bf] tracking-[0.2em] mt-1 uppercase">FİNRATE SKORU</span>
         </div>
       </div>
@@ -118,6 +120,8 @@ export default function AnalizPage() {
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [selected, setSelected]  = useState<Analysis | null>(null)
   const [loading, setLoading]    = useState(true)
+  const searchParams = useSearchParams()
+  const entityId = searchParams.get('entityId')
 
   useEffect(() => {
     fetch('/api/analyses')
@@ -125,10 +129,14 @@ export default function AnalizPage() {
       .then(d => {
         const list: Analysis[] = d.analyses ?? []
         setAnalyses(list)
-        setSelected(list[0] ?? null)
+        // entityId varsa o entity'nin ilk analizini seç, yoksa genel ilki
+        const initial = entityId
+          ? (list.find(a => a.entity?.id === entityId) ?? list[0] ?? null)
+          : (list[0] ?? null)
+        setSelected(initial)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [entityId])
 
   if (loading) return (
     <DashboardShell>
@@ -164,23 +172,24 @@ export default function AnalizPage() {
     return `%${(v * 100).toFixed(1)}`
   }
 
+  const bm = getSectorBenchmark(selected?.entity?.sector)
   const ratioRows = selected ? [
     // Likidite
-    { id: "Cari Oran",           val: fmtN(selected.ratios?.currentRatio),           avg: "1.42",  st: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= 1.2 ? "İyi" : "Zayıf",    c: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= 1.2 ? "status-good" : "status-bad" },
-    { id: "Likidite Oranı (Hızlı)", val: fmtN(selected.ratios?.quickRatio),          avg: "0.95",  st: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= 0.8 ? "Yeterli" : "Zayıf", c: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= 0.8 ? "status-good" : "status-bad" },
+    { id: "Cari Oran",                val: fmtN(selected.ratios?.currentRatio),    avg: fmtN(bm.currentRatio),            st: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= bm.currentRatio * 0.85 ? "İyi" : "Zayıf",          c: selected.ratios?.currentRatio != null && selected.ratios.currentRatio >= bm.currentRatio * 0.85 ? "status-good" : "status-bad" },
+    { id: "Likidite Oranı (Hızlı)",   val: fmtN(selected.ratios?.quickRatio),      avg: fmtN(bm.quickRatio),              st: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= bm.quickRatio * 0.85 ? "Yeterli" : "Zayıf",            c: selected.ratios?.quickRatio != null && selected.ratios.quickRatio >= bm.quickRatio * 0.85 ? "status-good" : "status-bad" },
     // Karlılık
-    { id: "Brüt Kar Marjı",      val: fmtPct(selected.ratios?.grossMargin),          avg: "%25",   st: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= 0.2 ? "İyi" : "Zayıf",    c: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= 0.2 ? "status-good" : "status-warn" },
-    { id: "FAVÖK Marjı",         val: fmtPct(selected.ratios?.ebitdaMargin),          avg: "%12",   st: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= 0.1 ? "İyi" : "Zayıf",  c: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= 0.1 ? "status-good" : "status-warn" },
-    { id: "Net Kar Marjı",       val: fmtPct(selected.ratios?.netProfitMargin),       avg: "%5",    st: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= 0.03 ? "Yeterli" : "Zayıf", c: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= 0.03 ? "status-good" : "status-bad" },
-    { id: "Öz Kaynak Karlılığı (ROE)", val: fmtPct(selected.ratios?.roe),             avg: "%15",   st: selected.ratios?.roe != null && selected.ratios.roe >= 0.1 ? "İyi" : "Zayıf",      c: selected.ratios?.roe != null && selected.ratios.roe >= 0.1 ? "status-good" : "status-warn" },
-    { id: "Aktif Karlılığı (ROA)", val: fmtPct(selected.ratios?.roa),                 avg: "%8",    st: selected.ratios?.roa != null && selected.ratios.roa >= 0.05 ? "İyi" : "Zayıf",     c: selected.ratios?.roa != null && selected.ratios.roa >= 0.05 ? "status-good" : "status-warn" },
+    { id: "Brüt Kar Marjı",           val: fmtPct(selected.ratios?.grossMargin),   avg: fmtPct(bm.grossMargin),           st: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= bm.grossMargin * 0.8 ? "İyi" : "Zayıf",              c: selected.ratios?.grossMargin != null && selected.ratios.grossMargin >= bm.grossMargin * 0.8 ? "status-good" : "status-warn" },
+    { id: "FAVÖK Marjı",              val: fmtPct(selected.ratios?.ebitdaMargin),   avg: fmtPct(bm.ebitdaMargin),          st: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= bm.ebitdaMargin * 0.8 ? "İyi" : "Zayıf",           c: selected.ratios?.ebitdaMargin != null && selected.ratios.ebitdaMargin >= bm.ebitdaMargin * 0.8 ? "status-good" : "status-warn" },
+    { id: "Net Kar Marjı",            val: fmtPct(selected.ratios?.netProfitMargin),avg: fmtPct(bm.netProfitMargin),       st: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= bm.netProfitMargin * 0.8 ? "Yeterli" : "Zayıf",c: selected.ratios?.netProfitMargin != null && selected.ratios.netProfitMargin >= bm.netProfitMargin * 0.8 ? "status-good" : "status-bad" },
+    { id: "Öz Kaynak Karlılığı (ROE)",val: fmtPct(selected.ratios?.roe),            avg: fmtPct(bm.roe),                   st: selected.ratios?.roe != null && selected.ratios.roe >= bm.roe * 0.8 ? "İyi" : "Zayıf",                                      c: selected.ratios?.roe != null && selected.ratios.roe >= bm.roe * 0.8 ? "status-good" : "status-warn" },
+    { id: "Aktif Karlılığı (ROA)",    val: fmtPct(selected.ratios?.roa),            avg: fmtPct(bm.roa),                   st: selected.ratios?.roa != null && selected.ratios.roa >= bm.roa * 0.8 ? "İyi" : "Zayıf",                                      c: selected.ratios?.roa != null && selected.ratios.roa >= bm.roa * 0.8 ? "status-good" : "status-warn" },
     // Kaldıraç
-    { id: "Borç / Özkaynak",    val: fmtN(selected.ratios?.debtToEquity),             avg: "0.95",  st: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= 1.5 ? "İyi" : "Riskli",  c: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= 1.5 ? "status-great" : "status-bad" },
-    { id: "Borç / Aktif",       val: fmtN(selected.ratios?.debtToAssets),             avg: "0.50",  st: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= 0.6 ? "İyi" : "Riskli",  c: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= 0.6 ? "status-great" : "status-bad" },
-    { id: "Net Borç / FAVÖK",   val: selected.ratios?.debtToEbitda != null ? fmtN(selected.ratios.debtToEbitda, 1) + "x" : "—", avg: "2.5x", st: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "Makul" : "Yüksek", c: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "status-warn" : "status-bad" },
-    { id: "Faiz Karşılama",     val: selected.ratios?.interestCoverage != null ? fmtN(selected.ratios.interestCoverage, 1) + "x" : "—", avg: "3x", st: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= 2 ? "İyi" : "Zayıf", c: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= 2 ? "status-good" : "status-bad" },
+    { id: "Borç / Özkaynak",          val: fmtN(selected.ratios?.debtToEquity),     avg: fmtN(bm.debtToEquity),            st: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= bm.debtToEquity * 1.2 ? "İyi" : "Riskli",          c: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity <= bm.debtToEquity * 1.2 ? "status-great" : "status-bad" },
+    { id: "Borç / Aktif",             val: fmtN(selected.ratios?.debtToAssets),     avg: fmtN(bm.debtToAssets),            st: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= bm.debtToAssets * 1.2 ? "İyi" : "Riskli",          c: selected.ratios?.debtToAssets != null && selected.ratios.debtToAssets <= bm.debtToAssets * 1.2 ? "status-great" : "status-bad" },
+    { id: "Net Borç / FAVÖK",         val: selected.ratios?.debtToEbitda != null ? fmtN(selected.ratios.debtToEbitda, 1) + "x" : "—", avg: "2.5x", st: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "Makul" : "Yüksek",   c: selected.ratios?.debtToEbitda != null && selected.ratios.debtToEbitda <= 3 ? "status-warn" : "status-bad" },
+    { id: "Faiz Karşılama",           val: selected.ratios?.interestCoverage != null ? fmtN(selected.ratios.interestCoverage, 1) + "x" : "—", avg: fmtN(bm.interestCoverage, 1) + "x", st: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= bm.interestCoverage * 0.8 ? "İyi" : "Zayıf", c: selected.ratios?.interestCoverage != null && selected.ratios.interestCoverage >= bm.interestCoverage * 0.8 ? "status-good" : "status-bad" },
     // Faaliyet
-    { id: "Aktif Devir Hızı",   val: fmtN(selected.ratios?.assetTurnover),            avg: "0.8",   st: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= 0.5 ? "İyi" : "Düşük",  c: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= 0.5 ? "status-good" : "status-warn" },
+    { id: "Aktif Devir Hızı",         val: fmtN(selected.ratios?.assetTurnover),    avg: fmtN(bm.assetTurnover),           st: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= bm.assetTurnover * 0.8 ? "İyi" : "Düşük",        c: selected.ratios?.assetTurnover != null && selected.ratios.assetTurnover >= bm.assetTurnover * 0.8 ? "status-good" : "status-warn" },
   ] : []
 
   // KPI kartları için
@@ -257,10 +266,10 @@ export default function AnalizPage() {
             {/* KPI Kartları */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
               {[
-                { label: "FİNRATE SKORU", value: `${Math.round(selected.finalScore)} / 1000`, sub: selected.finalRating, color: "#2dd4bf" },
+                { label: "FİNRATE SKORU", value: `${Math.round(selected.finalScore)} / 100`, sub: selected.finalRating, color: "#2dd4bf" },
                 { label: "AKTİF TOPLAM",  value: fmtTL(fd?.totalAssets), sub: fd?.totalCurrentAssets != null ? `Dönen: ${fmtTL(fd.totalCurrentAssets)}` : undefined, color: "#0ea5e9" },
-                { label: "CARİ ORAN",     value: fmtN(selected.ratios?.currentRatio), sub: `Sektör ort: 1.42`, color: "#2dd4bf" },
-                { label: "BORÇ / ÖZKAYNAK", value: fmtN(selected.ratios?.debtToEquity), sub: `Sektör ort: 0.95`, color: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity > 2 ? "#f87171" : "#2dd4bf" },
+                { label: "CARİ ORAN",     value: fmtN(selected.ratios?.currentRatio), sub: `Sektör ort: ${fmtN(bm.currentRatio)}`, color: "#2dd4bf" },
+                { label: "BORÇ / ÖZKAYNAK", value: fmtN(selected.ratios?.debtToEquity), sub: `Sektör ort: ${fmtN(bm.debtToEquity)}`, color: selected.ratios?.debtToEquity != null && selected.ratios.debtToEquity > bm.debtToEquity * 1.5 ? "#f87171" : "#2dd4bf" },
               ].map(kpi => (
                 <div key={kpi.label} className="bg-white/72 backdrop-blur-[30px] border border-white/65 rounded-[20px] p-5 relative overflow-hidden shadow-[0_8px_32px_rgba(10,30,60,0.08)]" style={{ boxShadow: '0 8px 32px rgba(10, 30, 60, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)' }}>
                   <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#3d5a80] mb-2">{kpi.label}</div>

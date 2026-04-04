@@ -143,8 +143,49 @@ const ROW_MAP: [RegExp, string, boolean?][] = [
   [/pas[iıİ]f\s*toplam/i,                         'totalLiabilitiesAndEquity'],
 ]
 
-function matchRow(label: string): string | null {
+// ─── Bölüm tespiti (I-V arası bilanço bölümleri) ────────────────────────────
+type EkSection = 'donen' | 'duran' | 'kv' | 'uv' | 'oz' | 'gelir' | null
+
+function detectEkSection(line: string): EkSection | null {
+  if (/^i[\s.]\s*d[öo]nen\s*varl/i.test(line))        return 'donen'
+  if (/^ii[\s.]\s*duran\s*varl/i.test(line))           return 'duran'
+  if (/^iii[\s.]\s*k[iı]sa\s*vadeli/i.test(line))      return 'kv'
+  if (/^iv[\s.]\s*uzun\s*vadeli/i.test(line))          return 'uv'
+  if (/^v[\s.]\s*[öo]z\s*(kaynak|serma)/i.test(line))  return 'oz'
+  if (/gelir\s*tablosu/i.test(line))                   return 'gelir'
+  return null
+}
+
+// ─── Bölüme duyarlı alan eşlemesi ────────────────────────────────────────────
+function matchField(label: string, sec: EkSection): string | null {
   const l = label.trim()
+
+  // KV (III. Kısa Vadeli) — bölüme özgü eşlemeler
+  if (sec === 'kv') {
+    if (/mali\s*bor[çc]/i.test(l))                          return 'shortTermFinancialDebt'
+    if (/c\.\s*di[gğ]er\s*bor[çc]/i.test(l))               return 'otherCurrentLiabilities'
+    if (/di[gğ]er\s*bor[çc]/i.test(l) && /^c/i.test(l))    return 'otherCurrentLiabilities'
+  }
+
+  // UV (IV. Uzun Vadeli) — bölüme özgü eşlemeler
+  if (sec === 'uv') {
+    if (/mali\s*bor[çc]/i.test(l))                          return 'longTermFinancialDebt'
+    if (/c\.\s*di[gğ]er\s*bor[çc]/i.test(l))               return 'otherNonCurrentLiabilities'
+  }
+
+  // Öz Kaynaklar (V.) — bölüme özgü eşlemeler
+  if (sec === 'oz') {
+    if (/[öo]denmi[şs]\s*sermaye/i.test(l))                 return 'paidInCapital'
+    if (/ge[çc]mi[şs]\s*y[iı]l.*kar/i.test(l))             return 'retainedEarnings'
+    if (/d[öo]nem\s*net\s*kar/i.test(l))                    return 'netProfitCurrentYear'
+  }
+
+  // Dönen Varlıklar (I.) — bölüme özgü
+  if (sec === 'donen') {
+    if (/di[gğ]er\s*d[öo]nen\s*varl/i.test(l))             return 'otherCurrentAssets'
+  }
+
+  // Global (bölümden bağımsız) eşlemeler
   for (const [pat, field] of ROW_MAP) {
     if (pat.test(l)) return field
   }
@@ -155,10 +196,16 @@ function matchRow(label: string): string | null {
 function parseEkSection(section: string): { cari: Record<string, number>; onceki: Record<string, number> } {
   const cari: Record<string, number> = {}
   const onceki: Record<string, number> = {}
+  let currentSection: EkSection = null
 
   for (const rawLine of section.split('\n')) {
     const line = rawLine.trim()
     if (!line || line.length < 4) continue
+
+    // Bölüm tespiti yap (değer de olabilir — skip etme)
+    const detected = detectEkSection(line)
+    if (detected !== null) currentSection = detected
+
     const nums = line.match(TR_NUM)
     if (!nums) continue
 
@@ -166,7 +213,7 @@ function parseEkSection(section: string): { cari: Record<string, number>; onceki
     const label = line.replace(TR_NUM, '').replace(/\(-\)/g, '').replace(/\s+/g, ' ').trim()
     if (!label || label.length < 3) continue
 
-    const field = matchRow(label)
+    const field = matchField(label, currentSection)
     if (!field) continue
 
     const [v1, v2] = twoNums(line)
@@ -342,7 +389,8 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
     const oncekiFields = { ...bilFields.onceki, ...gelFields.onceki }
     const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
     if (hasOnceki) {
-      results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [] })
+      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
+      results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [], isSecondary: true })
     }
 
     return results
@@ -364,17 +412,22 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
     const taxFields = parseTaxForm(text)
 
     // Kurumlar beyannamesi "TEK DÜZEN HESAP PLANI AYRINTILI BİLANÇO VE GELİR TABLOSU" EK'i içerir
-    // Sütun sırası: Önceki Dönem (year-1) | Cari Dönem (year) → parseEkSection'da swap gerekli
     const ekIdx = text.indexOf('TEK DÜZEN HESAP PLANI')
     if (ekIdx !== -1) {
-      const { cari: prevData, onceki: currData } = parseEkSection(text.slice(ekIdx, ekIdx + 20000))
-      // prevData = 1. sütun = önceki dönem, currData = 2. sütun = cari dönem
-      const cariFields  = { ...currData, ...taxFields }          // cari dönem + vergi satırları
-      const oncekiFields = { ...prevData }
+      const raw = parseEkSection(text.slice(ekIdx, ekIdx + 20000))
+      // GİB sütun sırası tespiti: 2. sütun (onceki/v2) doluysa → önceki dönem ÖNCE geliyor (swap gerekli)
+      // 2. sütun boşsa → tek sütunlu EK, v1 = cari dönem (swap gerekmez)
+      const hasTwoColumns = Object.keys(raw.onceki).length > 0
+      const cariData   = hasTwoColumns ? raw.onceki : raw.cari   // cari dönem
+      const oncekiData = hasTwoColumns ? raw.cari   : {}          // önceki dönem (varsa)
+
+      const cariFields   = { ...cariData, ...taxFields }
+      const oncekiFields = { ...oncekiData }
 
       const results: ParsedRow[] = [{ year, period: 'ANNUAL', fields: cariFields, unmapped: [] }]
       const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
-      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [] })
+      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
+      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [], isSecondary: true })
       return results
     }
 
@@ -386,15 +439,20 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
     const taxFields = parseTaxForm(text)
 
     // Geçici beyanname "TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU" EK'i içerebilir
-    // GİB formatında sütun sırası: 1. sütun = önceki dönem, 2. sütun = cari dönem (yıllık ile aynı)
     const gelirIdx = text.indexOf('TEK DÜZEN HESAP PLANINA UYGUN GELİR TABLOSU')
     if (gelirIdx !== -1) {
-      const { cari: prevData, onceki: currData } = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
-      // prevData = 1. sütun = önceki dönem, currData = 2. sütun = cari dönem
-      const cariFields = { ...currData, ...taxFields }
+      const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
+      // GİB sütun sırası tespiti: 2. sütun doluysa → önceki dönem ÖNCE geliyor (swap gerekli)
+      // 2. sütun boşsa → tek sütunlu EK, v1 = cari dönem (swap gerekmez)
+      const hasTwoColumns = Object.keys(raw.onceki).length > 0
+      const cariData   = hasTwoColumns ? raw.onceki : raw.cari
+      const oncekiData = hasTwoColumns ? raw.cari   : {}
+
+      const cariFields = { ...cariData, ...taxFields }
       const results: ParsedRow[] = [{ year, period, fields: cariFields, unmapped: [] }]
-      const hasOnceki = Object.values(prevData).some(v => v !== 0)
-      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: prevData, unmapped: [] })
+      const hasOnceki = Object.values(oncekiData).some(v => v !== 0)
+      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
+      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiData, unmapped: [], isSecondary: true })
       return results
     }
 
