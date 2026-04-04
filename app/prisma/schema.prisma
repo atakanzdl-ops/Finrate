@@ -127,49 +127,79 @@ model FinancialData {
   fileName    String?
   fileUrl     String?
 
-  cash                    Float?
-  shortTermInvestments    Float?
-  tradeReceivables        Float?
-  inventory               Float?
-  otherCurrentAssets      Float?
+  // 10-19 Dönen Varlıklar
+  cash                    Float?   // 10
+  shortTermInvestments    Float?   // 11
+  tradeReceivables        Float?   // 12
+  otherReceivables        Float?   // 13
+  inventory               Float?   // 15
+  constructionCosts       Float?   // 17
+  prepaidExpenses         Float?   // 18
+  otherCurrentAssets      Float?   // 19
   totalCurrentAssets      Float?
 
-  tangibleAssets          Float?
-  intangibleAssets        Float?
-  longTermInvestments     Float?
-  otherNonCurrentAssets   Float?
-  totalNonCurrentAssets   Float?
-  totalAssets             Float?
+  // 22-29 Duran Varlıklar
+  longTermTradeReceivables  Float? // 22
+  longTermOtherReceivables  Float? // 23
+  longTermInvestments       Float? // 24
+  tangibleAssets            Float? // 25
+  intangibleAssets          Float? // 26
+  depletableAssets          Float? // 27
+  longTermPrepaidExpenses   Float? // 28
+  otherNonCurrentAssets     Float? // 29
+  totalNonCurrentAssets     Float?
+  totalAssets               Float?
 
-  shortTermFinancialDebt  Float?
-  tradePayables           Float?
-  otherCurrentLiabilities Float?
+  // 30-39 KV Yabancı Kaynaklar
+  shortTermFinancialDebt  Float?   // 30
+  tradePayables           Float?   // 32
+  otherShortTermPayables  Float?   // 33
+  advancesReceived        Float?   // 34
+  constructionProgress    Float?   // 35
+  taxPayables             Float?   // 36
+  shortTermProvisions     Float?   // 37
+  deferredRevenue         Float?   // 38
+  otherCurrentLiabilities Float?   // 39
   totalCurrentLiabilities Float?
 
-  longTermFinancialDebt      Float?
-  otherNonCurrentLiabilities Float?
+  // 40-49 UV Yabancı Kaynaklar
+  longTermFinancialDebt      Float?  // 40
+  longTermTradePayables      Float?  // 42
+  longTermOtherPayables      Float?  // 43
+  longTermAdvancesReceived   Float?  // 44
+  longTermProvisions         Float?  // 47
+  otherNonCurrentLiabilities Float?  // 49
   totalNonCurrentLiabilities Float?
 
-  paidInCapital              Float?
-  retainedEarnings           Float?
+  // 50-59 Öz Kaynaklar
+  paidInCapital              Float?  // 50
+  capitalReserves            Float?  // 52
+  profitReserves             Float?  // 54
+  retainedEarnings           Float?  // 57
+  retainedLosses             Float?  // 58
   netProfitCurrentYear       Float?
   totalEquity                Float?
   totalLiabilitiesAndEquity  Float?
 
-  revenue             Float?
-  cogs                Float?
-  grossProfit         Float?
-  operatingExpenses   Float?
-  ebit                Float?
-  depreciation        Float?
-  ebitda              Float?
-  interestExpense     Float?
-  otherIncome         Float?
-  otherExpense        Float?
-  ebt                 Float?
-  taxExpense          Float?
-  netProfit           Float?
-  purchases           Float?
+  // Gelir Tablosu
+  grossSales              Float?   // 60
+  salesDiscounts          Float?   // 61
+  revenue                 Float?   // net satışlar
+  cogs                    Float?   // 62
+  grossProfit             Float?
+  operatingExpenses       Float?   // 63
+  ebit                    Float?
+  otherIncome             Float?   // 64
+  otherExpense            Float?   // 65
+  interestExpense         Float?   // 66
+  ebt                     Float?
+  extraordinaryIncome     Float?   // 67
+  extraordinaryExpense    Float?   // 68
+  taxExpense              Float?   // 69
+  netProfit               Float?
+  depreciation            Float?
+  ebitda                  Float?
+  purchases               Float?
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
