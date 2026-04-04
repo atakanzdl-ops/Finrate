@@ -316,7 +316,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         {/* Hesap adı — sticky */}
         <td
           className={clsx(
-            'px-3 py-1 sticky left-0 z-10',
+            'px-3 py-1 sticky left-0 z-10 text-[10px] truncate',
             isTotal  ? 'bg-[#0f1f35] font-black text-[#f59e0b]' :
             isSubtot ? 'bg-[#0d1b2e] font-bold text-[#f59e0b]' :
             hasField ? 'bg-[#0a1727] text-white/75' :
