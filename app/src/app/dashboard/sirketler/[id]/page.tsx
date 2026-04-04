@@ -254,7 +254,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* TDHP Bilanço & Gelir Tablosu Spreadsheet */}
-      <div className="max-w-[260px] overflow-hidden">
+      <div className="max-w-[260px]" style={{ overflowX: 'clip' }}>
         <TdhpSpreadsheet
           entityId={id}
           data={entity.financialData as unknown as Parameters<typeof TdhpSpreadsheet>[0]['data']}
