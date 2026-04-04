@@ -253,12 +253,14 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* TDHP Bilanço & Gelir Tablosu Spreadsheet */}
-      <TdhpSpreadsheet
-        entityId={id}
-        data={entity.financialData as unknown as Parameters<typeof TdhpSpreadsheet>[0]['data']}
-        onRefresh={reload}
-      />
+      {/* TDHP Bilanço & Gelir Tablosu Spreadsheet — max genişlik özet tablodaki "Dönem" sütunu hizası */}
+      <div className="w-fit max-w-[calc(100%/6)]">
+        <TdhpSpreadsheet
+          entityId={id}
+          data={entity.financialData as unknown as Parameters<typeof TdhpSpreadsheet>[0]['data']}
+          onRefresh={reload}
+        />
+      </div>
     </div>
     </DashboardShell>
   )
