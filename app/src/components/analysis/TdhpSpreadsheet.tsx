@@ -413,7 +413,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
 
   return (
     <div className="glass-card rounded-xl overflow-hidden">
-      <div style={{ overflowX: 'clip' }}>
+      <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-white/10 bg-white/3">
