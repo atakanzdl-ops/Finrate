@@ -103,8 +103,10 @@ const ROW_MAP: [RegExp, string, boolean?][] = [
   [/finansman\s*gider/i,                            'interestExpense', true],
   [/faiz\s*gider/i,                                 'interestExpense', true],
   [/vergi\s*[oöÖ]ncesi\s*kar/i,                    'ebt'],
+  [/olağan\s*kar\s*veya\s*zarar/i,                 'ebt'],
+  [/d[oöÖ]nem\s*kar[iıİ]\s*veya\s*zarar/i,        'ebt'],
   [/d[oöÖ]nem\s*net\s*kar[iıİ]/i,                 'netProfit'],
-  [/d[oöÖ]nem\s*kar[iıİ]\s*veya\s*zarar/i,        'netProfit'],
+  [/net\s*kar\s*veya\s*zarar/i,                    'netProfit'],
   [/net\s*kar/i,                                    'netProfit'],
   [/vergi\s*sonras[iıİ]\s*kar/i,                   'netProfit'],
   // Bilanço — Dönen Varlıklar
