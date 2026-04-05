@@ -157,7 +157,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
 
   function handleFocus(fdId: string, field: string, e: React.FocusEvent<HTMLInputElement>) {
     const v = getStoredVal(fdId, field)
-    const raw = v != null ? String(v) : ''
+    const raw = v != null ? fmtTR(v) : ''
     setInputStrings(prev => ({ ...prev, [fdId]: { ...(prev[fdId] ?? {}), [field]: raw } }))
     e.target.value = raw
     e.target.select()
