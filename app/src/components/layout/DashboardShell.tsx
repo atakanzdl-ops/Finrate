@@ -35,7 +35,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <nav className="topnav">
             <Link href="/dashboard"          className={navClass('/dashboard')}>Dashboard</Link>
             <Link href="/dashboard/sirketler" className={navClass('/dashboard/sirketler')}>Şirketler</Link>
-            <Link href="#"                   className="nav-link">Raporlar</Link>
+            <Link href="/dashboard/raporlar"  className={navClass('/dashboard/raporlar')}>Raporlar</Link>
             <Link href="/dashboard/analiz"   className={navClass('/dashboard/analiz')}>Analiz</Link>
             <Link href="#"                   className="nav-link">Ayarlar</Link>
           </nav>

@@ -162,32 +162,94 @@ function detectEkSection(line: string): EkSection | null {
 function matchField(label: string, sec: EkSection): string | null {
   const l = label.trim()
 
-  // KV (III. Kısa Vadeli) — bölüme özgü eşlemeler
-  if (sec === 'kv') {
-    if (/mali\s*bor[çc]/i.test(l))                          return 'shortTermFinancialDebt'
-    if (/c\.\s*di[gğ]er\s*bor[çc]/i.test(l))               return 'otherCurrentLiabilities'
-    if (/di[gğ]er\s*bor[çc]/i.test(l) && /^c/i.test(l))    return 'otherCurrentLiabilities'
-  }
-
-  // UV (IV. Uzun Vadeli) — bölüme özgü eşlemeler
-  if (sec === 'uv') {
-    if (/mali\s*bor[çc]/i.test(l))                          return 'longTermFinancialDebt'
-    if (/c\.\s*di[gğ]er\s*bor[çc]/i.test(l))               return 'otherNonCurrentLiabilities'
-  }
-
-  // Öz Kaynaklar (V.) — bölüme özgü eşlemeler
-  if (sec === 'oz') {
-    if (/[öo]denmi[şs]\s*sermaye/i.test(l))                 return 'paidInCapital'
-    if (/ge[çc]mi[şs]\s*y[iı]l.*kar/i.test(l))             return 'retainedEarnings'
-    if (/d[öo]nem\s*net\s*kar/i.test(l))                    return 'netProfitCurrentYear'
-  }
-
-  // Dönen Varlıklar (I.) — bölüme özgü
+  // ── I. DÖNEN VARLIKLAR ────────────────────────────────────────────────────
   if (sec === 'donen') {
-    if (/di[gğ]er\s*d[öo]nen\s*varl/i.test(l))             return 'otherCurrentAssets'
+    if (/^a[\s.]\s*haz[iıİ]r\s*de[gğĞ]er/i.test(l))           return 'cash'
+    if (/^b[\s.]\s*menkul/i.test(l))                            return 'shortTermInvestments'
+    if (/^c[\s.]\s*ticari\s*alacak/i.test(l))                   return 'tradeReceivables'
+    if (/^d[\s.]\s*di[gğĞ]er\s*alacak/i.test(l))               return 'otherReceivables'
+    if (/^e[\s.]\s*stoklar/i.test(l))                           return 'inventory'
+    if (/^f[\s.]\s*y[iıİ]llara\s*yayg[iıİ]n/i.test(l))        return 'constructionCosts'
+    if (/^g[\s.]\s*gelecek\s*ay/i.test(l))                      return 'prepaidExpenses'
+    if (/^h[\s.]\s*di[gğĞ]er\s*d[öoÖ]nen/i.test(l))           return 'otherCurrentAssets'
+    // harf prefix'siz fallback
+    if (/di[gğĞ]er\s*d[öoÖ]nen\s*varl/i.test(l))              return 'otherCurrentAssets'
+    if (/gelecek\s*ay.*gider/i.test(l))                         return 'prepaidExpenses'
+    if (/y[iıİ]llara\s*yayg[iıİ]n.*maliyet/i.test(l))         return 'constructionCosts'
+    if (/di[gğĞ]er\s*alacak/i.test(l))                         return 'otherReceivables'
   }
 
-  // Global (bölümden bağımsız) eşlemeler
+  // ── II. DURAN VARLIKLAR ───────────────────────────────────────────────────
+  if (sec === 'duran') {
+    if (/^a[\s.]\s*ticari\s*alacak/i.test(l))                   return 'longTermTradeReceivables'
+    if (/^b[\s.]\s*di[gğĞ]er\s*alacak/i.test(l))               return 'longTermOtherReceivables'
+    if (/^c[\s.]\s*mali\s*duran/i.test(l))                      return 'longTermInvestments'
+    if (/^d[\s.]\s*maddi\s*duran/i.test(l))                     return 'tangibleAssets'
+    if (/^e[\s.]\s*maddi\s*olmayan/i.test(l))                   return 'intangibleAssets'
+    if (/^f[\s.]\s*[öoÖ]zel\s*t[üuÜ]kenmeye/i.test(l))        return 'depletableAssets'
+    if (/^g[\s.]\s*gelecek\s*y[iıİ]l/i.test(l))                return 'longTermPrepaidExpenses'
+    if (/^h[\s.]\s*di[gğĞ]er\s*duran/i.test(l))                return 'otherNonCurrentAssets'
+    // harf prefix'siz fallback
+    if (/di[gğĞ]er\s*alacak/i.test(l))                         return 'longTermOtherReceivables'
+    if (/mali\s*duran\s*varl/i.test(l))                         return 'longTermInvestments'
+    if (/[öoÖ]zel\s*t[üuÜ]kenmeye/i.test(l))                  return 'depletableAssets'
+    if (/gelecek\s*y[iıİ]l.*gider/i.test(l))                   return 'longTermPrepaidExpenses'
+  }
+
+  // ── III. KISA VADELİ YABANCI KAYNAKLAR ───────────────────────────────────
+  if (sec === 'kv') {
+    if (/^a[\s.]\s*mali\s*bor[çcÇ]/i.test(l))                  return 'shortTermFinancialDebt'
+    if (/^b[\s.]\s*ticari\s*bor[çcÇ]/i.test(l))                return 'tradePayables'
+    if (/^c[\s.]\s*di[gğĞ]er\s*bor[çcÇ]/i.test(l))            return 'otherShortTermPayables'
+    if (/^d[\s.]\s*al[iıİ]nan\s*avans/i.test(l))               return 'advancesReceived'
+    if (/^e[\s.]\s*y[iıİ]llara\s*yayg[iıİ]n/i.test(l))        return 'constructionProgress'
+    if (/^f[\s.]\s*[öoÖ]denecek\s*vergi/i.test(l))             return 'taxPayables'
+    if (/^g[\s.]\s*bor[çcÇ]\s*ve\s*gider/i.test(l))           return 'shortTermProvisions'
+    if (/^h[\s.]\s*gelecek\s*ay.*gelir/i.test(l))              return 'deferredRevenue'
+    if (/^[iıİ][\s.]\s*di[gğĞ]er/i.test(l))                   return 'otherCurrentLiabilities'
+    // harf prefix'siz fallback
+    if (/mali\s*bor[çcÇ]/i.test(l))                            return 'shortTermFinancialDebt'
+    if (/di[gğĞ]er\s*bor[çcÇ]/i.test(l))                      return 'otherShortTermPayables'
+    if (/al[iıİ]nan\s*avans/i.test(l))                         return 'advancesReceived'
+    if (/y[iıİ]llara\s*yayg[iıİ]n.*hak/i.test(l))            return 'constructionProgress'
+    if (/[öoÖ]denecek\s*vergi/i.test(l))                       return 'taxPayables'
+    if (/bor[çcÇ]\s*ve\s*gider\s*kar/i.test(l))               return 'shortTermProvisions'
+    if (/gelecek\s*ay.*gelir/i.test(l))                        return 'deferredRevenue'
+  }
+
+  // ── IV. UZUN VADELİ YABANCI KAYNAKLAR ────────────────────────────────────
+  if (sec === 'uv') {
+    if (/^a[\s.]\s*mali\s*bor[çcÇ]/i.test(l))                  return 'longTermFinancialDebt'
+    if (/^b[\s.]\s*ticari\s*bor[çcÇ]/i.test(l))                return 'longTermTradePayables'
+    if (/^c[\s.]\s*di[gğĞ]er\s*bor[çcÇ]/i.test(l))            return 'longTermOtherPayables'
+    if (/^d[\s.]\s*al[iıİ]nan\s*avans/i.test(l))               return 'longTermAdvancesReceived'
+    if (/^g[\s.]\s*bor[çcÇ]\s*ve\s*gider/i.test(l))           return 'longTermProvisions'
+    if (/^[iıİ][\s.]\s*di[gğĞ]er/i.test(l))                   return 'otherNonCurrentLiabilities'
+    // harf prefix'siz fallback
+    if (/mali\s*bor[çcÇ]/i.test(l))                            return 'longTermFinancialDebt'
+    if (/di[gğĞ]er\s*bor[çcÇ]/i.test(l))                      return 'longTermOtherPayables'
+    if (/al[iıİ]nan\s*avans/i.test(l))                         return 'longTermAdvancesReceived'
+    if (/bor[çcÇ]\s*ve\s*gider\s*kar/i.test(l))               return 'longTermProvisions'
+  }
+
+  // ── V. ÖZ KAYNAKLAR ──────────────────────────────────────────────────────
+  if (sec === 'oz') {
+    if (/^a[\s.]\s*[öoÖ]denmi[şsŞ]\s*sermaye/i.test(l))       return 'paidInCapital'
+    if (/^b[\s.]\s*sermaye\s*yede[gğĞ]/i.test(l))              return 'capitalReserves'
+    if (/^c[\s.]\s*kar\s*yede[gğĞ]/i.test(l))                  return 'profitReserves'
+    if (/^d[\s.]\s*ge[çcÇ]mi[şsŞ]\s*y[iıİ]l.*kar/i.test(l))  return 'retainedEarnings'
+    if (/^e[\s.]\s*ge[çcÇ]mi[şsŞ]\s*y[iıİ]l.*zarar/i.test(l)) return 'retainedLosses'
+    if (/^f[\s.]\s*d[öoÖ]nem\s*net\s*kar/i.test(l))            return 'netProfitCurrentYear'
+    // harf prefix'siz fallback
+    if (/[öoÖ]denmi[şsŞ]\s*sermaye/i.test(l))                  return 'paidInCapital'
+    if (/sermaye\s*yede[gğĞ]/i.test(l))                         return 'capitalReserves'
+    if (/kar\s*yede[gğĞ]/i.test(l))                             return 'profitReserves'
+    if (/ge[çcÇ]mi[şsŞ]\s*y[iıİ]l.*kar/i.test(l))             return 'retainedEarnings'
+    if (/ge[çcÇ]mi[şsŞ]\s*y[iıİ]l.*zarar/i.test(l))           return 'retainedLosses'
+    if (/d[öoÖ]nem\s*net\s*kar/i.test(l))                      return 'netProfitCurrentYear'
+  }
+
+  // ── Global (bölümden bağımsız) eşlemeler ─────────────────────────────────
   for (const [pat, field] of ROW_MAP) {
     if (pat.test(l)) return field
   }
@@ -353,8 +415,15 @@ function parsePdfMizan(text: string): ParsedRow[] {
 
 // ─── Ana export ──────────────────────────────────────────────────────────────
 export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) })
-  const { text } = await parser.getText()
+  let text: string
+  try {
+    const parser = new PDFParse({ data: new Uint8Array(buffer) })
+    const result = await parser.getText()
+    text = result.text
+  } catch (e) {
+    console.error('[pdf] getText() failed:', e)
+    throw e
+  }
 
   // Mizan formatı tespiti (beyanname kontrolünden önce)
   if (detectPdfMizan(text)) {
@@ -388,13 +457,6 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
       results.push({ year, period: 'ANNUAL', fields: cariFields, unmapped: [] })
     }
 
-    const oncekiFields = { ...bilFields.onceki, ...gelFields.onceki }
-    const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
-    if (hasOnceki) {
-      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
-      results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [], isSecondary: true })
-    }
-
     return results
   }
 
@@ -423,14 +485,8 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
       const cariData   = hasTwoColumns ? raw.onceki : raw.cari   // cari dönem
       const oncekiData = hasTwoColumns ? raw.cari   : {}          // önceki dönem (varsa)
 
-      const cariFields   = { ...cariData, ...taxFields }
-      const oncekiFields = { ...oncekiData }
-
-      const results: ParsedRow[] = [{ year, period: 'ANNUAL', fields: cariFields, unmapped: [] }]
-      const hasOnceki = Object.values(oncekiFields).some(v => v !== 0)
-      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
-      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiFields, unmapped: [], isSecondary: true })
-      return results
+      const cariFields = { ...cariData, ...taxFields }
+      return [{ year, period: 'ANNUAL', fields: cariFields, unmapped: [] }]
     }
 
     return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [] }]
@@ -450,15 +506,15 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedRow[]> {
       const cariData   = hasTwoColumns ? raw.onceki : raw.cari
       const oncekiData = hasTwoColumns ? raw.cari   : {}
 
-      const cariFields = { ...cariData, ...taxFields }
-      const results: ParsedRow[] = [{ year, period, fields: cariFields, unmapped: [] }]
-      const hasOnceki = Object.values(oncekiData).some(v => v !== 0)
-      // isSecondary: önceki dönem verisi başka beyannameden türetildiği için varolan kaydı ezmez
-      if (hasOnceki) results.push({ year: year - 1, period: 'ANNUAL', fields: oncekiData, unmapped: [], isSecondary: true })
-      return results
+      // Geçici vergide taxExpense (hesaplanan geçici vergi) gelir tablosuna yazılmaz
+      const { taxExpense: _ignored, ...taxFieldsNoTax } = taxFields
+      const cariFields = { ...cariData, ...taxFieldsNoTax }
+      return [{ year, period, fields: cariFields, unmapped: [] }]
     }
 
-    return [{ year, period, fields: taxFields, unmapped: [] }]
+    // EK yoksa: ebt al, taxExpense alma (geçici vergide gelir tablosu kalemi değil)
+    const { taxExpense: _ignored2, ...taxFieldsNoTax2 } = taxFields
+    return [{ year, period, fields: taxFieldsNoTax2, unmapped: [] }]
   }
 
   // ── Bilinmeyen: satır bazlı fallback ─────────────────────────────────────

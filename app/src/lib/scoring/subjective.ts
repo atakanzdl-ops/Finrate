@@ -102,10 +102,9 @@ export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown
 }
 
 /**
- * Finansal skor (0-100) + subjektif skor (0-30) → birleşik final skor
- * Ağırlık: Finansal %75, Subjektif %25
+ * Finansal skor (0-100) + subjektif skor (0-30) → birleşik final skor (0-100)
+ * Ağırlık: Finansal %70 (max 70 puan), Subjektif max 30 puan → toplam max 100
  */
 export function combineScores(financialScore: number, subjectiveTotal: number): number {
-  const subjectivePct = (subjectiveTotal / 30) * 100
-  return financialScore * 0.75 + subjectivePct * 0.25
+  return Math.min(100, Math.round(financialScore * 0.70 + subjectiveTotal))
 }

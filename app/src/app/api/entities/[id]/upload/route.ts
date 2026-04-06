@@ -37,11 +37,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let parsedRows
     if (isExcel) {
       parsedRows = parseExcelBuffer(buffer)
+      console.log('[upload] Excel parsed, rows:', parsedRows.length, parsedRows.map(r => ({ year: r.year, period: r.period, fields: Object.keys(r.fields).length })))
     } else if (isCsv) {
       parsedRows = parseCsvText(buffer.toString('utf-8'))
+      console.log('[upload] CSV parsed, rows:', parsedRows.length)
     } else {
       const { parsePdfBuffer } = await import('@/lib/parsers/pdf')
+      console.log('[upload] PDF parsing start, size:', buffer.length)
       parsedRows = await parsePdfBuffer(buffer)
+      console.log('[upload] PDF parsed, rows:', parsedRows.length, parsedRows.map(r => ({ year: r.year, period: r.period, fields: Object.keys(r.fields).length })))
     }
 
     // Yıl/dönem override mantığı:
@@ -113,6 +117,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           f.netProfit = n(f.ebt) // vergi bilinmiyorsa ebt ≈ netProfit
         }
       }
+      // netProfitCurrentYear (bilanço 59) yoksa netProfit ile eşitle — eski yanlış kayıtların üstüne yazar
+      if (f.netProfitCurrentYear == null && f.netProfit != null) {
+        f.netProfitCurrentYear = n(f.netProfit)
+      }
 
       // Mevcut kaydı bul: varsa yeni verilerle merge et (null olan alanları koru)
       const existing = await prisma.financialData.findUnique({
@@ -149,7 +157,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       const ratios = calculateRatios(enrichedFields)
-      const score  = calculateScore(ratios)
+      const score  = calculateScore(ratios, entity.sector)
 
       await prisma.analysis.upsert({
         where: { financialDataId: financialData.id },
@@ -185,7 +193,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ imported: results.length, results })
   } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Dosya işlenirken hata oluştu.' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[upload] error:', msg)
+    return NextResponse.json({ error: `Dosya işlenirken hata oluştu: ${msg}` }, { status: 500 })
   }
 }

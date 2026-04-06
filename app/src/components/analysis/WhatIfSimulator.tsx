@@ -20,11 +20,13 @@ const LEVERS = [
   { key: 'inventory',              label: 'Stok Optimizasyonu',   category: 'Aktif',  primaryRatio: 'inventoryTurnoverDays',   primaryLabel: 'Stok Devir (gün)' },
   { key: 'shortTermFinancialDebt', label: 'KV Borç Azaltma',      category: 'Pasif',  primaryRatio: 'debtToEquity',            primaryLabel: 'Borç/Özkaynak' },
   { key: 'longTermFinancialDebt',  label: 'UV Borç Azaltma',      category: 'Pasif',  primaryRatio: 'debtToAssets',            primaryLabel: 'Borç/Aktif' },
+  { key: 'debtMigration',          label: 'KV→UV Borç Dönüşümü', category: 'Pasif',  primaryRatio: 'currentRatio',            primaryLabel: 'Cari Oran' },
   { key: 'tradePayables',          label: 'Tedarikçi Borçları',   category: 'Pasif',  primaryRatio: 'payablesTurnoverDays',    primaryLabel: 'Borç Devir (gün)' },
   { key: 'totalEquity',            label: 'Sermaye Artırımı',     category: 'Pasif',  primaryRatio: 'equityRatio',             primaryLabel: 'Özkaynak Oranı' },
   { key: 'revenue',                label: 'Ciro Artışı',          category: 'Gelir',  primaryRatio: 'assetTurnover',           primaryLabel: 'Aktif Devir' },
   { key: 'ebitda',                 label: 'FAVÖK İyileştirme',    category: 'Gelir',  primaryRatio: 'ebitdaMargin',            primaryLabel: 'FAVÖK Marjı' },
   { key: 'netProfit',              label: 'Net Kar İyileştirme',  category: 'Gelir',  primaryRatio: 'netProfitMargin',         primaryLabel: 'Net Kâr Marjı' },
+  { key: 'cogs',                   label: 'Maliyet Azaltma (SMM)', category: 'Gelir',  primaryRatio: 'grossMargin',             primaryLabel: 'Brüt Kâr Marjı' },
 ]
 
 // ─── Hızlı Senaryo tanımları ──────────────────────────────
@@ -66,14 +68,35 @@ const RATING_COLOR: Record<string, string> = {
 }
 
 // ─── Rasyo uygulama fonksiyonu ────────────────────────────
+// Varsayılan başlangıç değerleri — null olan oranlar için fallback
+const RATIO_DEFAULTS: Record<string, number> = {
+  cashRatio: 0.1, currentRatio: 1.0, quickRatio: 0.7,
+  debtToEquity: 2.0, debtToAssets: 0.6, debtToEbitda: 4.0,
+  equityRatio: 0.4, shortTermDebtRatio: 0.6,
+  interestCoverage: 1.5, netWorkingCapitalRatio: 0.1,
+  grossMargin: 0.15, ebitdaMargin: 0.08, ebitMargin: 0.05,
+  netProfitMargin: 0.03, roa: 0.04, roe: 0.08, roic: 0.06,
+  assetTurnover: 0.8, inventoryTurnoverDays: 90, receivablesTurnoverDays: 60,
+  payablesTurnoverDays: 30, fixedAssetTurnover: 1.0, operatingExpenseRatio: 0.3,
+  cashConversionCycle: 80,
+}
+
 function applyLevers(
   base: Record<string, number | null>,
   changes: Record<string, number>,
 ): RatioResult {
   const m: Record<string, number | null> = { ...base }
-  function adj(k: string, mult: number) {
-    const v = m[k]; if (v != null) m[k] = v * mult
+
+  // null olan oranları varsayılan ile doldur — simülasyon için gerekli
+  for (const [k, def] of Object.entries(RATIO_DEFAULTS)) {
+    if (m[k] == null) m[k] = def
   }
+
+  function adj(k: string, mult: number) {
+    const v = m[k]
+    if (v != null) m[k] = v * mult
+  }
+
   for (const [key, pct] of Object.entries(changes)) {
     if (pct === 0) continue
     const up = 1 + pct / 100
@@ -102,6 +125,15 @@ function applyLevers(
         adj('interestCoverage', up); adj('roa', 1 + pct / 100 * 0.6); adj('roe', 1 + pct / 100 * 0.6); adj('roic', 1 + pct / 100 * 0.6); break
       case 'netProfit':
         adj('netProfitMargin', up); adj('roa', up); adj('roe', up); adj('roic', 1 + pct / 100 * 0.7); break
+      case 'cogs':
+        // Maliyet azaltma: SMM düşer → brüt marj, FAVÖK marjı, net kar marjı artar
+        adj('grossMargin', 1 + pct / 100 * 0.8); adj('ebitdaMargin', 1 + pct / 100 * 0.7);
+        adj('ebitMargin', 1 + pct / 100 * 0.7); adj('netProfitMargin', 1 + pct / 100 * 0.6);
+        adj('roa', 1 + pct / 100 * 0.6); adj('roe', 1 + pct / 100 * 0.6); adj('roic', 1 + pct / 100 * 0.5); break
+      case 'debtMigration':
+        // KV borçlar UV'ye taşınır: toplam borç değişmez, likidite oranları iyileşir
+        adj('currentRatio', 1 + pct / 100 * 0.6); adj('quickRatio', 1 + pct / 100 * 0.5);
+        adj('shortTermDebtRatio', 1 - pct / 100 * 0.5); adj('netWorkingCapitalRatio', 1 + pct / 100 * 0.4); break
     }
   }
   return m as unknown as RatioResult
@@ -115,17 +147,23 @@ function fmtRatio(val: number | null | undefined, key: string): string {
 }
 
 // ─── Otomatik optimizasyon ────────────────────────────────
+const MAX_SINGLE_PCT = 300
+
+function getBaseFinancialScore(baseData: Record<string, number | null>): number {
+  return calculateScore(applyLevers(baseData, {})).finalScore
+}
+
 function findMinChange(
   baseData: Record<string, number | null>,
   leverKey: string,
-  targetScore: number,
+  financialTargetScore: number,
 ): { achievable: boolean; minPct: number } {
   const test = (pct: number) => calculateScore(applyLevers(baseData, { [leverKey]: pct })).finalScore
-  if (test(100) < targetScore) return { achievable: false, minPct: 100 }
-  let lo = 1, hi = 100
+  if (test(MAX_SINGLE_PCT) < financialTargetScore) return { achievable: false, minPct: MAX_SINGLE_PCT }
+  let lo = 1, hi = MAX_SINGLE_PCT
   while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2)
-    if (test(mid) >= targetScore) hi = mid
+    const mid = Math.floor((lo + hi) / 2)
+    if (test(mid) >= financialTargetScore) hi = mid
     else lo = mid + 1
   }
   return { achievable: true, minPct: lo }
@@ -134,22 +172,69 @@ function findMinChange(
 function sensitivityAt10(
   baseData: Record<string, number | null>,
   leverKey: string,
-  baseScore: number,
+  _baseScore: number,
 ): number {
-  return calculateScore(applyLevers(baseData, { [leverKey]: 10 })).finalScore - baseScore
+  const bfs = getBaseFinancialScore(baseData)
+  return (calculateScore(applyLevers(baseData, { [leverKey]: 10 })).finalScore - bfs) * 0.70
 }
 
-// Bir sonraki rating için hedef skor
+const SCORE_FOR_RATING: Record<string, number> = {
+  AAA: 92, AA: 84, A: 76, BBB: 68, BB: 60, B: 52, CCC: 44, CC: 36, C: 28, D: 0
+}
+
+// Bir sonraki rating için hedef skor (header display için)
 function nextRatingTarget(rating: string): { label: string; targetScore: number } | null {
   const idx = RATING_ORDER.indexOf(rating)
   if (idx >= RATING_ORDER.length - 1) return null
-
-  // score.ts'deki RATING_BANDS tablosuna karşılık gelen eşikler
-  const SCORE_FOR_RATING: Record<string, number> = {
-    AAA: 92, AA: 84, A: 76, BBB: 68, BB: 60, B: 52, CCC: 44, CC: 36, C: 28, D: 0
-  }
   const nextRating = RATING_ORDER[idx + 1]
   return { label: nextRating, targetScore: SCORE_FOR_RATING[nextRating] ?? 60 }
+}
+
+// +1 ve +2 not hedefleri
+function ratingTargets(rating: string): Array<{ label: string; targetScore: number; levels: number }> {
+  const idx = RATING_ORDER.indexOf(rating)
+  const results: Array<{ label: string; targetScore: number; levels: number }> = []
+  for (let i = 1; i <= 2; i++) {
+    if (idx + i >= RATING_ORDER.length) break
+    const next = RATING_ORDER[idx + i]
+    results.push({ label: next, targetScore: SCORE_FOR_RATING[next] ?? 60, levels: i })
+  }
+  return results
+}
+
+// ─── Greedy kombinasyon yolu ─────────────────────────────
+// baseFinancialScore ve financialTargetScore finansal puan cinsinden
+function findCombinationPath(
+  baseData: Record<string, number | null>,
+  baseFinancialScore: number,
+  financialTargetScore: number,
+): Array<{ lever: typeof LEVERS[number]; pct: number }> {
+  const accumulated: Record<string, number> = {}
+  const result: Array<{ lever: typeof LEVERS[number]; pct: number }> = []
+  let currentFinancialScore = baseFinancialScore
+  const testPcts = [10, 25, 50, 100, 150, 200, 300]
+
+  for (let step = 0; step < 6 && currentFinancialScore < financialTargetScore; step++) {
+    let bestGain = 0
+    let bestLever: typeof LEVERS[number] | null = null
+    let bestPct = 0
+
+    for (const lever of LEVERS) {
+      if (accumulated[lever.key] != null) continue
+      for (const pct of testPcts) {
+        const score = calculateScore(applyLevers(baseData, { ...accumulated, [lever.key]: pct })).finalScore
+        const gain = score - currentFinancialScore
+        if (gain > bestGain) { bestGain = gain; bestLever = lever; bestPct = pct }
+      }
+    }
+
+    if (!bestLever || bestGain < 0.05) break
+    accumulated[bestLever.key] = bestPct
+    result.push({ lever: bestLever, pct: bestPct })
+    currentFinancialScore = calculateScore(applyLevers(baseData, accumulated)).finalScore
+  }
+
+  return result
 }
 
 // ─── Ana Bileşen ──────────────────────────────────────────
@@ -165,24 +250,48 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
   const nextTarget = nextRatingTarget(currentRating)
   const neededPoints = nextTarget ? nextTarget.targetScore - baseScore : 0
 
+  // Finansal baz skor (combined değil; delta hesabında kullanılır)
+  const baseFinancialScore = useMemo(() => getBaseFinancialScore(baseData), [baseData])
+
   // Simülasyon sonucu
   const simResult = useMemo(() => {
     return calculateScore(applyLevers(baseData, changes))
   }, [baseData, changes])
 
-  const delta = simResult.finalScore - baseScore
+  // Delta: finansal iyileşmeyi combined score alanına çevir (×0.70)
+  const delta = (simResult.finalScore - baseFinancialScore) * 0.70
+  // Simülasyon skoru: combined bazından delta ekle
+  const simCombinedScore = Math.round(Math.min(100, Math.max(0, baseScore + delta)))
+  const simCombinedRating = scoreToRating(simCombinedScore)
 
-  // Otomatik optimizasyon: her kaldıraç için minimum değişim
-  const autoPaths = useMemo(() => {
-    if (!nextTarget) return []
-    return LEVERS.map(lever => {
-      const { achievable, minPct } = findMinChange(baseData, lever.key, nextTarget.targetScore)
-      return { lever, achievable, minPct }
+  // Otomatik optimizasyon: +1 ve +2 not için minimum değişimler
+  const allAutoPaths = useMemo(() => {
+    const targets = ratingTargets(currentRating)
+    return targets.map(target => {
+      // Combined hedefi finansal hedef skoruna çevir
+      const combinedGapNeeded = target.targetScore - baseScore
+      const financialTarget = baseFinancialScore + combinedGapNeeded / 0.70
+
+      const singlePaths = LEVERS.map(lever => {
+        const { achievable, minPct } = findMinChange(baseData, lever.key, financialTarget)
+        return { lever, achievable, minPct }
+      })
+        .filter(p => p.achievable)
+        .sort((a, b) => a.minPct - b.minPct)
+        .slice(0, 4)
+
+      // Tek kaldıraç yetmiyorsa kombinasyon hesapla
+      const combo = singlePaths.length === 0
+        ? findCombinationPath(baseData, baseFinancialScore, financialTarget)
+        : []
+
+      return { target, singlePaths, combo } as {
+        target: { label: string; targetScore: number; levels: number }
+        singlePaths: { lever: typeof LEVERS[number]; minPct: number }[]
+        combo: { lever: typeof LEVERS[number]; pct: number }[]
+      }
     })
-      .filter(p => p.achievable)
-      .sort((a, b) => a.minPct - b.minPct)
-      .slice(0, 5)
-  }, [baseData, nextTarget])
+  }, [baseData, currentRating, baseScore, baseFinancialScore])
 
   // Hassasiyet analizi
   const sensitivity = useMemo(() => {
@@ -257,17 +366,17 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                 <div className={clsx('text-lg font-black', delta > 0.5 ? 'text-emerald-400' : delta < -0.5 ? 'text-red-400' : 'text-white/30')}>
                   {delta > 0 ? '+' : ''}{delta.toFixed(1)}
                 </div>
-                {simResult.finalRating !== currentRating && (
-                  <div className={clsx('text-[9px] font-bold uppercase tracking-wider', RATING_COLOR[simResult.finalRating])}>
-                    {simResult.finalRating}!
+                {simCombinedRating !== currentRating && (
+                  <div className={clsx('text-[9px] font-bold uppercase tracking-wider', RATING_COLOR[simCombinedRating])}>
+                    {simCombinedRating}!
                   </div>
                 )}
               </div>
             </div>
             <div className="text-center">
               <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">Simülasyon</p>
-              <p className="text-2xl font-black text-white">{Math.round(simResult.finalScore)}</p>
-              <p className={clsx('text-xs font-bold', RATING_COLOR[simResult.finalRating])}>{simResult.finalRating}</p>
+              <p className="text-2xl font-black text-white">{simCombinedScore}</p>
+              <p className={clsx('text-xs font-bold', RATING_COLOR[simCombinedRating])}>{simCombinedRating}</p>
             </div>
           </div>
 
@@ -311,45 +420,98 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
 
           {/* ── TAB: Otomatik Yol ─────────────────────────── */}
           {activeTab === 'auto' && (
-            <div className="space-y-3">
-              {!nextTarget ? (
+            <div className="space-y-5">
+              {allAutoPaths.length === 0 ? (
                 <p className="text-xs text-white/40 text-center py-4">Zaten maksimum notadasınız (AAA).</p>
-              ) : autoPaths.length === 0 ? (
-                <p className="text-xs text-white/40 text-center py-4">
-                  {nextTarget.label} notasına tek kaldıraçla ulaşmak mümkün görünmüyor.<br />
-                  Özelleştir sekmesinden kombinasyon deneyin.
-                </p>
               ) : (
-                <>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-white/30">
-                    {nextTarget.label} notasına geçmek için minimum tek adım seçenekleri:
-                  </p>
-                  {autoPaths.map(({ lever, minPct }, i) => {
-                    const tl = tlAmount(lever.key, minPct)
-                    return (
-                      <button
-                        key={lever.key}
-                        onClick={() => { setChange(lever.key, minPct); setActiveTab('custom') }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:border-cyan-500/30 hover:bg-white/5 transition-all text-left group"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-black text-white/60 group-hover:text-white flex-shrink-0">
-                          {i + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-white group-hover:text-cyan-400 transition-colors">{lever.label}</p>
-                          <p className="text-[10px] text-white/40 mt-0.5">
-                            <span className="text-emerald-400 font-bold">%{minPct} değişim</span>
-                            {tl && <span className="ml-1.5 text-white/30">{tl}</span>}
-                            {' '}→ {lever.primaryLabel} etkili
-                          </p>
-                        </div>
-                        <div className={clsx('text-xs font-black', RATING_COLOR[nextTarget.label])}>
-                          {nextTarget.label}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </>
+                allAutoPaths.map(({ target, singlePaths, combo }) => (
+                  <div key={target.label} className="space-y-2">
+                    {/* Başlık */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
+                        +{target.levels} Not:
+                      </span>
+                      <span className={clsx('text-xs font-black', RATING_COLOR[target.label])}>
+                        {currentRating} → {target.label}
+                      </span>
+                      <span className="text-[9px] text-white/20 ml-auto">
+                        +{(target.targetScore - baseScore).toFixed(1)} puan
+                      </span>
+                    </div>
+
+                    {singlePaths.length > 0 ? (
+                      /* Tek kaldıraç yeterli */
+                      <div className="space-y-1.5">
+                        <p className="text-[9px] text-white/25 uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
+                        {singlePaths.map(({ lever, minPct }, i) => {
+                          const tl = tlAmount(lever.key, minPct)
+                          const isHigh = minPct > 100
+                          return (
+                            <button
+                              key={lever.key}
+                              onClick={() => { setChange(lever.key, Math.min(minPct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
+                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:border-cyan-500/30 hover:bg-white/5 transition-all text-left group"
+                            >
+                              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-black text-white/50 group-hover:text-white flex-shrink-0">
+                                {i + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-white group-hover:text-cyan-400 transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-white/40 mt-0.5">
+                                  <span className={clsx('font-bold', isHigh ? 'text-amber-400' : 'text-emerald-400')}>
+                                    %{minPct} iyileştirme
+                                    {isHigh && <span className="ml-1 opacity-70">(×{(minPct/100).toFixed(1)} kat)</span>}
+                                  </span>
+                                  {tl && <span className="ml-1.5 text-white/30">{tl}</span>}
+                                  <span className="ml-1.5">→ {lever.primaryLabel}</span>
+                                </p>
+                              </div>
+                              <div className={clsx('text-xs font-black shrink-0', RATING_COLOR[target.label])}>
+                                {target.label}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : combo.length > 0 ? (
+                      /* Kombinasyon gerekiyor */
+                      <div className="space-y-1.5">
+                        <p className="text-[9px] text-white/25 uppercase tracking-wider">Birlikte uygulandığında hedefe ulaşılır:</p>
+                        {combo.map(({ lever, pct }, i) => {
+                          const tl = tlAmount(lever.key, pct)
+                          const isHigh = pct > 100
+                          return (
+                            <button
+                              key={lever.key}
+                              onClick={() => { setChange(lever.key, Math.min(pct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
+                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-left group"
+                            >
+                              <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center text-[9px] font-black text-purple-400 flex-shrink-0">
+                                {i + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-white group-hover:text-purple-400 transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-white/40 mt-0.5">
+                                  <span className={clsx('font-bold', isHigh ? 'text-amber-400' : 'text-purple-400')}>
+                                    %{pct} iyileştirme
+                                    {isHigh && <span className="ml-1 opacity-70">(×{(pct/100).toFixed(1)} kat)</span>}
+                                  </span>
+                                  {tl && <span className="ml-1.5 text-white/30">{tl}</span>}
+                                  <span className="ml-1.5">→ {lever.primaryLabel}</span>
+                                </p>
+                              </div>
+                              <div className="text-[9px] text-purple-400 font-bold shrink-0">KOMBİNE</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-white/25 pl-2">
+                        Mevcut verilerle bu hedefe ulaşmak mümkün görünmüyor. Finansal verilerinizi tamamlayın.
+                      </p>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           )}
@@ -449,7 +611,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                               </div>
                             </div>
                             <input
-                              type="range" min={-50} max={100} step={5} value={pct}
+                              type="range" min={-50} max={300} step={5} value={pct}
                               onChange={e => setChange(lever.key, Number(e.target.value))}
                               className={clsx('w-full h-1.5 rounded-full appearance-none bg-white/10 cursor-pointer', style.slider)}
                             />
@@ -475,27 +637,35 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                 Her kaldıracın %10 değişiminde kazandırılan puan (en etkili → az etkili):
               </p>
               {sensitivity.map(({ lever, gain }, i) => {
-                const barWidth = Math.min(100, (gain / (sensitivity[0]?.gain || 1)) * 100)
+                const maxGain = sensitivity.find(s => s.gain > 0)?.gain || 1
+                const barWidth = gain > 0 ? Math.min(100, (gain / maxGain) * 100) : 0
+                const noData = gain === 0
                 return (
-                  <div key={lever.key} className="space-y-1">
+                  <div key={lever.key} className={clsx('space-y-1', noData && 'opacity-40')}>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] text-white/30 w-4">{i + 1}</span>
                         <span className="text-white/70">{lever.label}</span>
+                        {noData && (
+                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/5 text-white/20 font-bold">Veri eksik</span>
+                        )}
                       </div>
-                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-400' : gain >= 0.5 ? 'text-yellow-400' : 'text-white/30')}>
-                        {gain > 0 ? '+' : ''}{gain.toFixed(2)} puan
+                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-400' : gain >= 0.5 ? 'text-yellow-400' : 'text-white/20')}>
+                        {noData ? '—' : `+${gain.toFixed(2)} puan`}
                       </span>
                     </div>
                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                       <div
-                        className={clsx('h-full rounded-full transition-all', gain >= 1 ? 'bg-emerald-500' : gain >= 0.5 ? 'bg-yellow-500' : 'bg-white/20')}
+                        className={clsx('h-full rounded-full transition-all', gain >= 1 ? 'bg-emerald-500' : gain >= 0.5 ? 'bg-yellow-500' : 'bg-white/10')}
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
                   </div>
                 )
               })}
+              <p className="text-[9px] text-white/20 pt-1">
+                &quot;Veri eksik&quot; — bu kaldıraçlar için hesaplanamayan oranlar mevcut. Finansal verilerinizi tamamlayın.
+              </p>
             </div>
           )}
 

@@ -5,8 +5,13 @@
 
 export interface FinancialInput {
   // Büyüme hesabı için
-  prevRevenue?: number | null   // Önceki yıl cirosu (reel büyüme için)
-  ppiRate?: number | null       // ÜFE oranı (0.43 = %43)
+  prevRevenue?: number | null          // Önceki yıl cirosu (reel büyüme için)
+  ppiRate?: number | null              // ÜFE oranı (0.43 = %43)
+
+  // Önceki dönem karşılaştırma kalemleri (ortalama hesabı için)
+  prevInventory?: number | null        // Önceki yıl stok (DIO ortalama için)
+  prevTradeReceivables?: number | null // Önceki yıl ticari alacak (DSO ortalama için)
+  prevTradePayables?: number | null    // Önceki yıl ticari borç (DPO ortalama için)
 
   // Dönen Varlıklar
   cash?: number | null
@@ -171,21 +176,46 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const netWorkingCapitalRatio = safe(netWorkingCapital, totalAssets)
 
   // NDS = Stok Devir + Alacak Tahsil - Borç Ödeme (gün)
-  const dso = revenue != null && tradeReceivables != null ? (tradeReceivables / revenue) * 365 : null
-  const dpo =
-    purchases != null && tradePayables != null
-      ? (tradePayables / purchases) * 365
-      : revenue != null && tradePayables != null
-      ? (tradePayables / revenue) * 365
-      : null
-  const dio =
-    inventory != null
-      ? purchases != null
-        ? (inventory / purchases) * 365
-        : revenue != null
-        ? (inventory / revenue) * 365
-        : null
-      : null
+  // purchases yoksa cogs kullan, o da yoksa revenue fallback
+  const cogs = n(d.cogs)
+  const costBase = purchases ?? cogs ?? revenue
+
+  // Ortalama bakiye hesabı: önceki dönem verisi varsa (başlangıç+bitiş)/2,
+  // yoksa sadece dönem sonu kullanılır (standart muhasebe pratiği)
+  const prevInventory        = n(d.prevInventory)
+  const prevTradeReceivables = n(d.prevTradeReceivables)
+  const prevTradePayables    = n(d.prevTradePayables)
+
+  const avgInventory =
+    inventory != null && prevInventory != null
+      ? (inventory + prevInventory) / 2
+      : inventory
+
+  const avgReceivables =
+    tradeReceivables != null && prevTradeReceivables != null
+      ? (tradeReceivables + prevTradeReceivables) / 2
+      : tradeReceivables
+
+  const avgPayables =
+    tradePayables != null && prevTradePayables != null
+      ? (tradePayables + prevTradePayables) / 2
+      : tradePayables
+
+  // DSO: Alacak Tahsil Süresi — payda: net satışlar (standart)
+  const dso = revenue != null && avgReceivables != null
+    ? (avgReceivables / revenue) * 365
+    : null
+
+  // DPO: Borç Ödeme Süresi — payda: maliyet bazı (COGS veya alımlar)
+  const dpo = costBase != null && avgPayables != null
+    ? (avgPayables / costBase) * 365
+    : null
+
+  // DIO: Stok Devir Süresi — ortalama stok / maliyet bazı
+  const dio = avgInventory != null && costBase != null
+    ? (avgInventory / costBase) * 365
+    : null
+
   const cashConversionCycle =
     dio != null && dso != null && dpo != null ? dio + dso - dpo : null
 
@@ -223,8 +253,25 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const debtToEquity = safe(totalDebt || null, totalEquity)
   const debtToAssets = safe(totalDebt || null, totalAssets)
   const debtToEbitda = ebitda != null && ebitda !== 0 ? netFinancialDebt / ebitda : null
-  const interestCoverage = safe(ebit, interestExpense)
   const equityRatio = safe(totalEquity, totalAssets)
+
+  /**
+   * Faiz Karşılama Oranı — 3 durum:
+   *
+   * 1. interestExpense girilmemiş (null/undefined) → null döner (veri yok, hesaplanamaz)
+   * 2. interestExpense = 0 → Infinity döner (sonsuz kapasite; puanlama borç düzeyine göre yapılır)
+   * 3. interestExpense > 0 → EBIT / interestExpense (normal hesap)
+   *
+   * NOT: Muhasebe sınıflaması veya eksik veri nedeniyle faiz = 0 görünebilir.
+   * Bu nedenle Infinity doğrudan tam puan vermez; score.ts'de borç düzeyiyle
+   * birlikte değerlendirilir.
+   */
+  const interestExpenseVal = n(d.interestExpense)
+  const interestCoverage: number | null =
+    interestExpenseVal == null  ? null       // veri girilmemiş
+    : interestExpenseVal === 0  ? Infinity   // faiz yükü yok → borç düzeyine göre puan
+    : ebit != null              ? ebit / interestExpenseVal
+    : null
 
   const shortTermDebtRatio =
     totalFinancialDebt > 0 && d.shortTermFinancialDebt != null
