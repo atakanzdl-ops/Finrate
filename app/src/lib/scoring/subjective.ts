@@ -38,9 +38,9 @@ export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown
   // ─── KKB & Kredi Sicili (max 10) ──────────────────────────
   let kkb = 0
 
-  // KKB kategorisi (5 puan)
-  const kkbMap: Record<string, number> = { iyi: 5, orta: 3, kotu: 1, cok_kotu: 0 }
-  kkb += kkbMap[s.kkbCategory ?? 'orta'] ?? 3
+  // KKB kategorisi (7 puan) — iyi+gecikme yok = 10/10 mümkün
+  const kkbMap: Record<string, number> = { iyi: 7, orta: 4, kotu: 1, cok_kotu: 0 }
+  kkb += kkbMap[s.kkbCategory ?? 'orta'] ?? 4
 
   // Gecikme durumu (3 puan)
   const delay = s.activeDelayDays ?? 0
@@ -105,6 +105,32 @@ export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown
  * Finansal skor (0-100) + subjektif skor (0-30) → birleşik final skor (0-100)
  * Ağırlık: Finansal %70 (max 70 puan), Subjektif max 30 puan → toplam max 100
  */
+/**
+ * Finansal skor (0-100) + Subjektif (0-30) → Birleşik skor (0-100)
+ *
+ * CEILING (tavan): Zayıf finansal, subjektifle şişirilemesin
+ *   finansal < 35  → birleşik max 43  (B altı — en fazla CCC+)
+ *   finansal < 48  → birleşik max 59  (BBB altı — en fazla BB+)
+ *   finansal < 60  → birleşik max 67  (A altı — en fazla BBB+)
+ *
+ * FLOOR (taban): Güçlü finansal, subjektif sıfırken çökmemeli
+ *   finansal ≥ 80  → birleşik min 64  (BB ortası, güçlü tampon)
+ *   finansal ≥ 68  → birleşik min 52  (en az BB)
+ */
 export function combineScores(financialScore: number, subjectiveTotal: number): number {
-  return Math.min(100, Math.round(financialScore * 0.70 + subjectiveTotal))
+  let combined = Math.min(100, Math.round(financialScore * 0.70 + subjectiveTotal))
+
+  // Ceiling kuralları — erken return yok, floor ile çakışmayı önlemek için
+  if      (financialScore < 35) combined = Math.min(combined, 43)
+  else if (financialScore < 43) combined = Math.min(combined, 52)
+  else if (financialScore < 55) combined = Math.min(combined, 59)
+  else if (financialScore < 65) combined = Math.min(combined, 67)
+
+  // Floor kuralları (guardrail v5) — ceiling sonrası uygulanır
+  if      (financialScore >= 80) combined = Math.max(combined, 64)
+  else if (financialScore >= 68) combined = Math.max(combined, 60)
+  else if (financialScore >= 60) combined = Math.max(combined, 52)
+  else if (financialScore >= 55) combined = Math.max(combined, 44)
+
+  return combined
 }

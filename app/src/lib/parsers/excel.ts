@@ -161,6 +161,19 @@ export interface ParsedRow {
   period?: string
   fields: Record<string, number | null>
   unmapped: string[]
+  meta?: ParseMeta
+}
+
+export interface ParseMeta {
+  path: 'mizan' | 'vertical' | 'horizontal'
+  totalRows: number
+  matchedRows: number
+  ignoredRows: number
+  zeroBalanceRows: number
+  unmappedRows: number
+  reverseBalanceWarnings: string[]
+  parseWarnings: string[]
+  confidence: number
 }
 
 /**
@@ -182,7 +195,7 @@ function detectVerticalFormat(rows: unknown[][]): boolean {
 /**
  * Sayı çözümleme: Türk formatı (1.234.567,89) veya standart (1234567.89)
  */
-function parseExcelNumber(raw: unknown): number | null {
+export function parseExcelNumber(raw: unknown): number | null {
   if (raw == null) return null
   if (typeof raw === 'number') return isNaN(raw) ? null : raw
   const s = String(raw).trim()
@@ -196,6 +209,17 @@ function parseExcelNumber(raw: unknown): number | null {
   }
   const num = parseFloat(cleaned)
   return isNaN(num) ? null : num
+}
+
+function calcConfidence(meta: Omit<ParseMeta, 'confidence'>): number {
+  const denominator = Math.max(meta.totalRows, 1)
+  const penalty =
+    meta.ignoredRows * 0.2 +
+    meta.unmappedRows * 0.3 +
+    meta.zeroBalanceRows * 0.1 +
+    meta.reverseBalanceWarnings.length * 0.15 +
+    meta.parseWarnings.length * 0.15
+  return Math.max(0, Math.min(1, Number((1 - penalty / denominator).toFixed(2))))
 }
 
 /**
@@ -225,6 +249,10 @@ function parseVerticalExcel(rows: unknown[][]): ParsedRow[] {
 
   // Her yıl-dönem için boş sonuç
   const resultMap: Record<string, ParsedRow> = {}
+  let matchedRows = 0
+  let ignoredRows = 0
+  let unmappedRows = 0
+  const parseWarnings: string[] = []
   for (const yc of yearCols) {
     const key = `${yc.year}_${yc.period}`
     resultMap[key] = { year: yc.year, period: yc.period, fields: {}, unmapped: [] }
@@ -233,60 +261,181 @@ function parseVerticalExcel(rows: unknown[][]): ParsedRow[] {
   // Her satırı işle
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r] as (string | number | null)[]
-    // Etiket: genellikle ilk dolu sütun
+
+    const col0 = row[0] != null ? String(row[0]).trim() : ''
+    const col1 = row[1] != null ? String(row[1]).trim() : ''
+    const col2 = row[2] != null ? String(row[2]).trim() : ''
+    const accountCode = col0.split('.')[0].trim()
+    const isAccountCode = /^\d+$/.test(accountCode)
+
     let label = ''
-    for (let c = 0; c < Math.min(3, row.length); c++) {
-      if (row[c] != null && String(row[c]).trim().length > 1) {
-        label = String(row[c]).trim()
-        break
+    if (!isAccountCode) {
+      for (const candidate of [col0, col1, col2]) {
+        if (candidate && candidate.length > 1) {
+          label = candidate
+          break
+        }
       }
     }
-    if (!label) continue
 
-    for (const [pattern, fieldName, negateIfPositive] of VERTICAL_ROW_MAP) {
-      if (pattern.test(label)) {
+    if (!label && !isAccountCode && !col1) continue
+
+    let rowMatched = false
+
+    if (isAccountCode) {
+      // Önce MIZAN_ACCOUNT_MAP ile hesap koduna göre eşleştir
+      const mapping = MIZAN_ACCOUNT_MAP[accountCode]
+      if (mapping && mapping.field !== '_salesDeductions' && mapping.field !== '_netLoss') {
+        rowMatched = true
         for (const yc of yearCols) {
           const key = `${yc.year}_${yc.period}`
-          if (resultMap[key].fields[fieldName] != null) continue // ilk eşleşmeyi koru
           const rawVal = row[yc.colIdx]
-          let val = parseExcelNumber(rawVal)
+          const val = parseExcelNumber(rawVal)
           if (val == null) continue
-          if (negateIfPositive && val > 0) val = -val
-          resultMap[key].fields[fieldName] = val
+          const existingVal = resultMap[key].fields[mapping.field]
+          resultMap[key].fields[mapping.field] =
+            typeof existingVal === 'number' ? existingVal + val : val
         }
-        break
+      }
+
+      // Kod eşleşmezse hesap adı kolonunu regex ile dene
+      if (!rowMatched && col1) {
+        for (const [pattern, fieldName, negateIfPositive] of VERTICAL_ROW_MAP) {
+          if (pattern.test(col1)) {
+            rowMatched = true
+            for (const yc of yearCols) {
+              const key = `${yc.year}_${yc.period}`
+              const rawVal = row[yc.colIdx]
+              let val = parseExcelNumber(rawVal)
+              if (val == null) continue
+              if (negateIfPositive && val > 0) val = -val
+              const existingVal = resultMap[key].fields[fieldName]
+              resultMap[key].fields[fieldName] =
+                typeof existingVal === 'number' ? existingVal + val : val
+            }
+            break
+          }
+        }
+      }
+
+      if (!rowMatched) {
+        ignoredRows++
+        unmappedRows++
+        parseWarnings.push(`Dikey formatta eşleşmeyen satır: ${col1 || col0} (kod: ${col0}, neden: kod map'te yok ve hesap adı eşleşmedi)`)
+      }
+    } else {
+      // VERTICAL_ROW_MAP ile metin regex eşleştirmesi
+      for (const [pattern, fieldName, negateIfPositive] of VERTICAL_ROW_MAP) {
+        if (pattern.test(label)) {
+          rowMatched = true
+          for (const yc of yearCols) {
+            const key = `${yc.year}_${yc.period}`
+            const rawVal = row[yc.colIdx]
+            let val = parseExcelNumber(rawVal)
+            if (val == null) continue
+            if (negateIfPositive && val > 0) val = -val
+            const existingVal = resultMap[key].fields[fieldName]
+            resultMap[key].fields[fieldName] =
+              typeof existingVal === 'number' ? existingVal + val : val
+          }
+          break
+        }
+      }
+      if (!rowMatched) {
+        ignoredRows++
+        unmappedRows++
+        parseWarnings.push(`Dikey formatta eşleşmeyen satır: ${label} (neden: metin eşleşmesi bulunamadı)`)
       }
     }
+
+    if (rowMatched) matchedRows++
   }
 
-  return Object.values(resultMap).filter(r => Object.keys(r.fields).length > 0)
+  const baseMeta = {
+    path: 'vertical' as const,
+    totalRows: Math.max(rows.length - 1, 0),
+    matchedRows,
+    ignoredRows,
+    zeroBalanceRows: 0,
+    unmappedRows,
+    reverseBalanceWarnings: [],
+    parseWarnings,
+  }
+
+  return Object.values(resultMap)
+    .filter(r => Object.keys(r.fields).length > 0)
+    .map(r => ({
+      ...r,
+      meta: {
+        ...baseMeta,
+        confidence: calcConfidence(baseMeta),
+      },
+    }))
 }
 
 // ─── Mizan (Tek Düzen Hesap Planı) Parser ────────────────────────────────────
 
 export const MIZAN_ACCOUNT_MAP: Record<string, { field: string; src: 'bakBorç' | 'bakAlacak' | 'anyBorç' | 'anyAlacak' }> = {
+  // ── Dönen Varlıklar ──────────────────────────────────────────
   '1':   { field: 'totalCurrentAssets',          src: 'bakBorç' },
-  '10':  { field: 'cash',                         src: 'bakBorç' },
-  '12':  { field: 'tradeReceivables',             src: 'bakBorç' },
-  '15':  { field: 'inventory',                    src: 'bakBorç' },
-  '2':   { field: 'totalNonCurrentAssets',        src: 'bakBorç' },
-  '25':  { field: 'tangibleAssets',               src: 'bakBorç' },
-  '26':  { field: 'intangibleAssets',             src: 'bakBorç' },
-  '3':   { field: 'totalCurrentLiabilities',     src: 'bakAlacak' },
-  '30':  { field: 'shortTermFinancialDebt',       src: 'bakAlacak' },
-  '32':  { field: 'tradePayables',               src: 'bakAlacak' },
-  '4':   { field: 'totalNonCurrentLiabilities',  src: 'bakAlacak' },
-  '40':  { field: 'longTermFinancialDebt',        src: 'bakAlacak' },
-  '5':   { field: 'totalEquity',                 src: 'bakAlacak' },
-  '50':  { field: 'paidInCapital',               src: 'bakAlacak' },
-  '590': { field: 'netProfitCurrentYear',         src: 'bakAlacak' },
-  '591': { field: '_netLoss',                     src: 'bakBorç' },
-  '60':  { field: 'revenue',                     src: 'anyAlacak' },
-  '61':  { field: '_salesDeductions',            src: 'anyBorç' },
-  '62':  { field: 'cogs',                        src: 'anyBorç' },
-  '63':  { field: 'operatingExpenses',           src: 'anyBorç' },
-  '66':  { field: 'interestExpense',             src: 'anyBorç' },
-  '691': { field: 'taxExpense',                  src: 'anyBorç' },
+  '10':  { field: 'cash',                        src: 'bakBorç' },
+  '11':  { field: 'shortTermInvestments',        src: 'bakBorç' },
+  '12':  { field: 'tradeReceivables',            src: 'bakBorç' },
+  '13':  { field: 'otherReceivables',            src: 'bakBorç' },
+  '15':  { field: 'inventory',                   src: 'bakBorç' },
+  '17':  { field: 'constructionCosts',           src: 'bakBorç' },
+  '18':  { field: 'prepaidExpenses',             src: 'bakBorç' },
+  '19':  { field: 'otherCurrentAssets',          src: 'bakBorç' },
+  // ── Duran Varlıklar ──────────────────────────────────────────
+  '2':   { field: 'totalNonCurrentAssets',       src: 'bakBorç' },
+  '22':  { field: 'longTermTradeReceivables',    src: 'bakBorç' },
+  '23':  { field: 'longTermOtherReceivables',    src: 'bakBorç' },
+  '24':  { field: 'longTermInvestments',         src: 'bakBorç' },
+  '25':  { field: 'tangibleAssets',              src: 'bakBorç' },
+  '26':  { field: 'intangibleAssets',            src: 'bakBorç' },
+  '27':  { field: 'depletableAssets',            src: 'bakBorç' },
+  '28':  { field: 'longTermPrepaidExpenses',     src: 'bakBorç' },
+  '29':  { field: 'otherNonCurrentAssets',       src: 'bakBorç' },
+  // ── Kısa Vadeli Yabancı Kaynaklar ────────────────────────────
+  '3':   { field: 'totalCurrentLiabilities',    src: 'bakAlacak' },
+  '30':  { field: 'shortTermFinancialDebt',      src: 'bakAlacak' },
+  '32':  { field: 'tradePayables',              src: 'bakAlacak' },
+  '33':  { field: 'otherShortTermPayables',     src: 'bakAlacak' },
+  '34':  { field: 'advancesReceived',           src: 'bakAlacak' },
+  '35':  { field: 'constructionProgress',       src: 'bakAlacak' },
+  '36':  { field: 'taxPayables',                src: 'bakAlacak' },
+  '37':  { field: 'shortTermProvisions',        src: 'bakAlacak' },
+  '38':  { field: 'deferredRevenue',            src: 'bakAlacak' },
+  '39':  { field: 'otherCurrentLiabilities',   src: 'bakAlacak' },
+  // ── Uzun Vadeli Yabancı Kaynaklar ────────────────────────────
+  '4':   { field: 'totalNonCurrentLiabilities', src: 'bakAlacak' },
+  '40':  { field: 'longTermFinancialDebt',       src: 'bakAlacak' },
+  '42':  { field: 'longTermTradePayables',       src: 'bakAlacak' },
+  '43':  { field: 'longTermOtherPayables',       src: 'bakAlacak' },
+  '44':  { field: 'longTermAdvancesReceived',    src: 'bakAlacak' },
+  '47':  { field: 'longTermProvisions',          src: 'bakAlacak' },
+  '49':  { field: 'otherNonCurrentLiabilities', src: 'bakAlacak' },
+  // ── Öz Kaynaklar ─────────────────────────────────────────────
+  '5':   { field: 'totalEquity',                src: 'bakAlacak' },
+  '50':  { field: 'paidInCapital',              src: 'bakAlacak' },
+  '52':  { field: 'capitalReserves',            src: 'bakAlacak' },
+  '54':  { field: 'profitReserves',             src: 'bakAlacak' },
+  '57':  { field: 'retainedEarnings',           src: 'bakAlacak' },
+  '58':  { field: 'retainedLosses',             src: 'bakBorç'  },
+  '590': { field: 'netProfitCurrentYear',        src: 'bakAlacak' },
+  '591': { field: '_netLoss',                    src: 'bakBorç'  },
+  // ── Gelir Tablosu ─────────────────────────────────────────────
+  '60':  { field: 'grossSales',                 src: 'anyAlacak' },
+  '61':  { field: '_salesDeductions',           src: 'anyBorç'  },
+  '62':  { field: 'cogs',                       src: 'anyBorç'  },
+  '63':  { field: 'operatingExpenses',          src: 'anyBorç'  },
+  '64':  { field: 'otherIncome',                src: 'anyAlacak' },
+  '65':  { field: 'otherExpense',               src: 'anyBorç'  },
+  '66':  { field: 'interestExpense',            src: 'anyBorç'  },
+  '67':  { field: 'extraordinaryIncome',        src: 'anyAlacak' },
+  '68':  { field: 'extraordinaryExpense',       src: 'anyBorç'  },
+  '69':  { field: 'taxExpense',                 src: 'anyBorç'  },
+  '691': { field: 'taxExpense',                 src: 'anyBorç'  },
 }
 
 function detectMizanFormat(rows: unknown[][]): boolean {
@@ -338,20 +487,21 @@ function extractMizanYear(rows: unknown[][]): { year: number | null; period: str
 
 export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
   const header = findMizanHeader(rows)
-  if (!header) return []
+  if (!header) { console.log('[mizan] header bulunamadı'); return [] }
   const { headerIdx, cols } = header
+  console.log('[mizan] kolonlar:', JSON.stringify(cols))
   const { year, period } = extractMizanYear(rows)
-  if (!year) return []
+  if (!year) { console.log('[mizan] yıl bulunamadı'); return [] }
 
   const fields: Record<string, number | null> = {}
   let salesDeductions = 0
   let netLoss = 0
-
-  const n = (v: unknown): number | null => {
-    if (v == null) return null
-    const num = typeof v === 'number' ? v : parseFloat(String(v).replace(/[.,\s]/g, m => m === ',' ? '.' : ''))
-    return isNaN(num) || num === 0 ? null : num
-  }
+  let matchedRows = 0
+  let ignoredRows = 0
+  let zeroBalanceRows = 0
+  let unmappedRows = 0
+  const reverseBalanceWarnings: string[] = []
+  const parseWarnings: string[] = []
 
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as (string | number | null)[]
@@ -361,43 +511,139 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
     if (!/^\d+$/.test(code)) continue  // sadece tam sayı kodlar (alt hesap noktaları yok)
 
     const mapping = MIZAN_ACCOUNT_MAP[code]
-    if (!mapping) continue
+    if (!mapping) {
+      ignoredRows++
+      unmappedRows++
+      continue
+    }
 
-    const borç    = n(cols['borç']    !== undefined ? row[cols['borç']]    : null)
-    const alacak  = n(cols['alacak']  !== undefined ? row[cols['alacak']]  : null)
-    const bakBorç  = n(cols['bakBorç']  !== undefined ? row[cols['bakBorç']]  : null)
-    const bakAlacak = n(cols['bakAlacak'] !== undefined ? row[cols['bakAlacak']] : null)
+    const borç      = parseExcelNumber(cols['borç']      !== undefined ? row[cols['borç']]      : null)
+    const alacak    = parseExcelNumber(cols['alacak']    !== undefined ? row[cols['alacak']]    : null)
+    const bakBorç   = parseExcelNumber(cols['bakBorç']   !== undefined ? row[cols['bakBorç']]   : null)
+    const bakAlacak = parseExcelNumber(cols['bakAlacak'] !== undefined ? row[cols['bakAlacak']] : null)
+
+    const hasExplicitBalanceCols = cols['bakBorç'] !== undefined || cols['bakAlacak'] !== undefined
+    // Sadece TÜM kolonlar sıfırsa atla (bakiye=0 ama hareket var olan hesapları atlama)
+    if (hasExplicitBalanceCols && (bakBorç ?? 0) === 0 && (bakAlacak ?? 0) === 0
+        && (borç ?? 0) === 0 && (alacak ?? 0) === 0) {
+      zeroBalanceRows++
+      continue
+    }
+
+    if ((bakBorç != null && bakBorç !== 0) && (bakAlacak != null && bakAlacak !== 0)) {
+      parseWarnings.push(`Belirsiz bakiye: hesap ${code} hem borç hem alacak bakiyesi içeriyor`)
+    }
 
     let val: number | null = null
     switch (mapping.src) {
-      case 'bakBorç':   val = bakBorç ?? borç; break
-      case 'bakAlacak': val = bakAlacak ?? alacak; break
-      case 'anyBorç':   val = bakBorç ?? borç ?? alacak; break
-      case 'anyAlacak': val = bakAlacak ?? alacak ?? borç; break
+      // Bilanço hesapları: SADECE bakiye kolonunu kullan (??)
+      // bakBorç=0 gerçek sıfır bakiye demektir — hareket kolonuna düşme
+      case 'bakBorç':
+        if ((bakAlacak != null && bakAlacak !== 0) && (bakBorç == null || bakBorç === 0)) {
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} alacak bakiyesi veriyor`)
+        }
+        val = bakBorç ?? bakAlacak ?? null
+        break
+      case 'bakAlacak':
+        if ((bakBorç != null && bakBorç !== 0) && (bakAlacak == null || bakAlacak === 0)) {
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} borç bakiyesi veriyor`)
+        }
+        val = bakAlacak ?? bakBorç ?? null
+        break
+      // Gelir tablosu hesapları: bakiye=0 (kesin beyan kapanışı) → hareket kolonuna düş (||)
+      case 'anyBorç':
+        if ((bakAlacak != null && bakAlacak !== 0) && (bakBorç == null || bakBorç === 0)) {
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} alacak tarafında kapanıyor`)
+        }
+        val = bakBorç || bakAlacak || borç || alacak || null
+        break
+      case 'anyAlacak':
+        if ((bakBorç != null && bakBorç !== 0) && (bakAlacak == null || bakAlacak === 0)) {
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} borç tarafında kapanıyor`)
+        }
+        val = bakAlacak || bakBorç || alacak || borç || null
+        break
     }
-    if (!val) continue
+    if (val == null) {
+      ignoredRows++
+      continue
+    }
+    if (val === 0) {
+      zeroBalanceRows++
+      continue
+    }
 
     if (mapping.field === '_salesDeductions') salesDeductions = val
     else if (mapping.field === '_netLoss') netLoss = val
     else fields[mapping.field] = val
+    matchedRows++
   }
 
   // Post-processing
-  if (salesDeductions && fields['revenue']) {
+  // Net satışlar = Brüt satışlar - İndirimler
+  if (fields['grossSales']) {
+    fields['revenue'] = (fields['grossSales'] as number) - salesDeductions
+  } else if (salesDeductions && fields['revenue']) {
     fields['revenue'] = (fields['revenue'] as number) - salesDeductions
   }
   if (netLoss && !fields['netProfitCurrentYear']) {
     fields['netProfitCurrentYear'] = -netLoss
   }
-  if (fields['netProfitCurrentYear'] && !fields['netProfit']) {
+
+  // Net kar: gelir tablosu hesapları varsa her zaman ondan hesapla (geçici dönem de dahil)
+  // Account 590 geçici dönemde önceki yıl kapanışını taşıyabilir — güvenilmez
+  const rev      = fields['revenue']           as number | null
+  const cogs     = fields['cogs']              as number | null
+  const opex     = fields['operatingExpenses'] as number | null
+  const otherInc = fields['otherIncome']       as number | null
+  const otherExp = fields['otherExpense']      as number | null
+  const interest = fields['interestExpense']   as number | null
+  const extInc   = fields['extraordinaryIncome']  as number | null
+  const extExp   = fields['extraordinaryExpense'] as number | null
+  const tax      = fields['taxExpense']        as number | null
+  if (rev != null) {
+    const grossProfit = rev - (cogs ?? 0)
+    const ebit        = grossProfit - (opex ?? 0)
+    const ebt         = ebit + (otherInc ?? 0) - (otherExp ?? 0) - (interest ?? 0) + (extInc ?? 0) - (extExp ?? 0)
+    const netIS       = ebt - (tax ?? 0)
+    if (!fields['grossProfit']) fields['grossProfit'] = grossProfit
+    if (!fields['ebit'])        fields['ebit']        = ebit
+    if (!fields['ebitda'])      fields['ebitda']      = ebit  // depreciation bilinmiyorsa
+    if (!fields['ebt'])         fields['ebt']         = ebt
+    // Gelir tablosu hesabından gelen netProfit her zaman 590'ın önüne geçer
+    fields['netProfit']            = netIS
+    fields['netProfitCurrentYear'] = netIS
+  } else if (fields['netProfitCurrentYear'] && !fields['netProfit']) {
+    // Gelir tablosu yoksa 590 hesabını kullan (son çare)
     fields['netProfit'] = fields['netProfitCurrentYear']
   }
+
   if (!fields['totalAssets'] && fields['totalCurrentAssets'] && fields['totalNonCurrentAssets']) {
     fields['totalAssets'] = (fields['totalCurrentAssets'] as number) + (fields['totalNonCurrentAssets'] as number)
   }
 
-  if (Object.keys(fields).length < 3) return []
-  return [{ year, period, fields, unmapped: [] }]
+  console.log('[mizan] yıl:', year, 'dönem:', period, 'alan sayısı:', Object.keys(fields).length, 'alanlar:', Object.keys(fields).join(','))
+  if (Object.keys(fields).length < 3) { console.log('[mizan] yetersiz alan, atlıyorum'); return [] }
+  const metaBase = {
+    path: 'mizan' as const,
+    totalRows: Math.max(rows.length - (headerIdx + 1), 0),
+    matchedRows,
+    ignoredRows,
+    zeroBalanceRows,
+    unmappedRows,
+    reverseBalanceWarnings,
+    parseWarnings,
+  }
+  return [{
+    year,
+    period,
+    fields,
+    unmapped: [],
+    meta: {
+      ...metaBase,
+      confidence: calcConfidence(metaBase),
+    },
+  }]
 }
 
 // ─── parseExcelBuffer ─────────────────────────────────────────────────────────
@@ -410,21 +656,34 @@ export function parseExcelBuffer(buffer: Buffer): ParsedRow[] {
 
   if (rows.length < 2) return []
 
-  // Mizan tespiti (Tek Düzen Hesap Planı)
-  if (detectMizanFormat(rows)) {
-    return parseMizanRows(rows)
+  // Dikey format tespiti ÖNCE: başlık satırında birden fazla yıl sütunu varsa dikey formattır.
+  // Mizan tespitinden önce yapılmalı — çünkü çok yıllı tablolar "HESAP KODU" içerse de
+  // mizan değil dikey tablodur.
+  if (detectVerticalFormat(rows)) {
+    console.info('[excel] parse path: vertical', { sheetName, rowCount: rows.length })
+    const result = parseVerticalExcel(rows)
+    if (result.length === 0) console.warn('[excel] vertical parse boş sonuç üretti', { sheetName, rowCount: rows.length })
+    return result
   }
 
-  // Dikey format tespiti (özet finansal tablo — sütun = yıl)
-  if (detectVerticalFormat(rows)) {
-    return parseVerticalExcel(rows)
+  // Mizan tespiti (tek dönem, Tek Düzen Hesap Planı)
+  if (detectMizanFormat(rows)) {
+    console.info('[excel] parse path: mizan', { sheetName, rowCount: rows.length })
+    const result = parseMizanRows(rows)
+    if (result.length === 0) console.warn('[excel] mizan parse boş sonuç üretti', { sheetName, rowCount: rows.length })
+    return result
   }
 
   // Yatay format: satır = dönem, sütun = alan
+  console.info('[excel] parse path: horizontal', { sheetName, rowCount: rows.length })
   const headerRow = rows[0] as (string | null)[]
   const dataRows  = rows.slice(1)
 
   const results: ParsedRow[] = []
+  let matchedRows = 0
+  let ignoredRows = 0
+  let unmappedRows = 0
+  const parseWarnings: string[] = []
 
   for (const row of dataRows) {
     if (!row || row.every((c) => c == null || c === '')) continue
@@ -450,16 +709,48 @@ export function parseExcelBuffer(buffer: Buffer): ParsedRow[] {
 
       const mapped = COLUMN_MAP[normalised]
       if (mapped) {
-        const num = value != null ? parseFloat(String(value).replace(/[.,\s]/g, (m) => m === '.' ? '.' : '')) : null
-        fields[mapped] = isNaN(num as number) ? null : num
+        fields[mapped] = parseExcelNumber(value)
       } else if (value != null && normalised) {
         unmapped.push(normalised)
       }
     })
 
-    results.push({ year, period: period ?? 'ANNUAL', fields, unmapped })
+    if (Object.keys(fields).length > 0) matchedRows++
+    else ignoredRows++
+    if (unmapped.length > 0) {
+      unmappedRows += unmapped.length
+      parseWarnings.push(`Yatay formatta eşleşmeyen başlıklar: ${unmapped.join(', ')}`)
+    }
+    if (!year) {
+      parseWarnings.push('Yatay format satırında yıl bulunamadı')
+    }
+
+    const metaBase = {
+      path: 'horizontal' as const,
+      totalRows: dataRows.length,
+      matchedRows,
+      ignoredRows,
+      zeroBalanceRows: 0,
+      unmappedRows,
+      reverseBalanceWarnings: [],
+      parseWarnings: [...parseWarnings],
+    }
+
+    results.push({
+      year,
+      period: period ?? 'ANNUAL',
+      fields,
+      unmapped,
+      meta: {
+        ...metaBase,
+        confidence: calcConfidence(metaBase),
+      },
+    })
   }
 
+  if (results.length === 0) {
+    console.warn('[excel] horizontal parse boş sonuç üretti', { sheetName, rowCount: rows.length })
+  }
   return results
 }
 

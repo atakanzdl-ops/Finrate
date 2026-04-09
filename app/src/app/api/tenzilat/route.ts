@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
-import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/auth'
 
 // GET /api/tenzilat
 export async function GET(req: NextRequest) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const entityId  = searchParams.get('entityId')
@@ -24,13 +25,13 @@ export async function GET(req: NextRequest) {
     },
   })
 
-  return NextResponse.json({ entries })
+  return jsonUtf8({ entries })
 }
 
 // POST /api/tenzilat
 export async function POST(req: NextRequest) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   try {
     const body = await req.json()
@@ -40,10 +41,10 @@ export async function POST(req: NextRequest) {
     } = body
 
     if (!adjustmentType || adjustmentAmount == null || !description || !year) {
-      return NextResponse.json({ error: 'Zorunlu alanlar eksik.' }, { status: 400 })
+      return jsonUtf8({ error: 'Zorunlu alanlar eksik.' }, { status: 400 })
     }
     if (description.trim().length < 10) {
-      return NextResponse.json({ error: 'Açıklama en az 10 karakter olmalıdır.' }, { status: 400 })
+      return jsonUtf8({ error: 'Açıklama en az 10 karakter olmalıdır.' }, { status: 400 })
     }
 
     const entry = await prisma.tenzilatEntry.create({
@@ -72,9 +73,9 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ entry }, { status: 201 })
+    return jsonUtf8({ entry }, { status: 201 })
   } catch (err) {
     console.error(err)
-    return NextResponse.json({ error: 'Sunucu hatası.' }, { status: 500 })
+    return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
   }
 }

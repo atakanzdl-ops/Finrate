@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
-import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/auth'
 
 // GET /api/entities/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
   const entity = await prisma.entity.findFirst({
@@ -16,18 +17,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
   })
 
-  if (!entity) return NextResponse.json({ error: 'Bulunamadı.' }, { status: 404 })
-  return NextResponse.json({ entity })
+  if (!entity) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
+  return jsonUtf8({ entity })
 }
 
 // PATCH /api/entities/[id]
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
   const existing = await prisma.entity.findFirst({ where: { id, userId } })
-  if (!existing) return NextResponse.json({ error: 'Bulunamadı.' }, { status: 404 })
+  if (!existing) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
 
   try {
     const body = await req.json()
@@ -46,21 +47,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
     })
 
-    return NextResponse.json({ entity })
+    return jsonUtf8({ entity })
   } catch {
-    return NextResponse.json({ error: 'Sunucu hatası.' }, { status: 500 })
+    return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
   }
 }
 
 // DELETE /api/entities/[id] — soft delete
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
   const existing = await prisma.entity.findFirst({ where: { id, userId } })
-  if (!existing) return NextResponse.json({ error: 'Bulunamadı.' }, { status: 404 })
+  if (!existing) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
 
   await prisma.entity.update({ where: { id }, data: { isActive: false } })
-  return NextResponse.json({ success: true })
+  return jsonUtf8({ success: true })
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { hashPassword, signToken } from '@/lib/auth'
 
@@ -8,15 +9,15 @@ export async function POST(req: NextRequest) {
     const { email, password, fullName, companyName, plan } = body
 
     if (!email || !password || !fullName) {
-      return NextResponse.json({ error: 'E-posta, şifre ve ad soyad zorunludur.' }, { status: 400 })
+      return jsonUtf8({ error: 'E-posta, şifre ve ad soyad zorunludur.' }, { status: 400 })
     }
     if (password.length < 8) {
-      return NextResponse.json({ error: 'Şifre en az 8 karakter olmalıdır.' }, { status: 400 })
+      return jsonUtf8({ error: 'Şifre en az 8 karakter olmalıdır.' }, { status: 400 })
     }
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
-      return NextResponse.json({ error: 'Bu e-posta adresi zaten kayıtlı.' }, { status: 409 })
+      return jsonUtf8({ error: 'Bu e-posta adresi zaten kayıtlı.' }, { status: 409 })
     }
 
     const passwordHash = await hashPassword(password)
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
-    const response = NextResponse.json({ user }, { status: 201 })
+    const response = jsonUtf8({ user }, { status: 201 })
     response.cookies.set('finrate_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
     return response
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg, DATABASE_URL: process.env.DATABASE_URL }, { status: 500 })
+    console.error('[register] error:', msg)
+    return jsonUtf8({ error: 'Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.' }, { status: 500 })
   }
 }

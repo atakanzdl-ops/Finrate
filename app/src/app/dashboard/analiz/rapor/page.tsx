@@ -101,18 +101,18 @@ function DonutChart({ score, rColor }: { score: number; rColor: string }) {
   return (
     <svg viewBox="0 0 180 180" width={160} height={160} style={{ display: 'block', margin: '0 auto' }}>
       {/* gri track */}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={14} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={2} />
       {/* renkli fill */}
       <circle
         cx={cx} cy={cy} r={r} fill="none"
-        stroke={rColor} strokeWidth={14}
+        stroke="#000000" strokeWidth={2}
         strokeDasharray={`${filled} ${circumference - filled}`}
         strokeLinecap="round"
         transform={`rotate(-90 ${cx} ${cy})`}
         style={{ transition: 'stroke-dasharray 0.6s ease' }}
       />
       {/* skor metni */}
-      <text x={cx} y={cy - 8} textAnchor="middle" fontFamily="Outfit,sans-serif" fontWeight={900} fontSize={34} fill="#0f172a">{score}</text>
+      <text x={cx} y={cy - 8} textAnchor="middle" fontFamily="Merriweather, serif" fontWeight={900} fontSize={34} fill="#0f172a">{score}</text>
       <text x={cx} y={cy + 10} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={12} fill="#64748b">/100</text>
     </svg>
   )
@@ -123,9 +123,9 @@ function CatBar({ val, color }: { val: number; color: string }) {
   const totalW = 280
   const filledW = Math.max(0, Math.min(totalW, (val / 100) * totalW))
   return (
-    <svg viewBox={`0 0 ${totalW} 8`} width={totalW} height={8} style={{ display: 'block', borderRadius: 4, overflow: 'hidden' }}>
-      <rect x={0} y={0} width={totalW} height={8} rx={4} fill="#e2e8f0" />
-      <rect x={0} y={0} width={filledW} height={8} rx={4} fill={color} />
+    <svg viewBox={`0 0 ${totalW} 8`} width={totalW} height={8} style={{ display: 'block', borderRadius: 0, overflow: 'hidden' }}>
+      <rect x={0} y={0} width={totalW} height={8} fill="none" stroke="#e2e8f0" strokeWidth={1} />
+      <rect x={0} y={0} width={filledW} height={8} fill="#000000" />
     </svg>
   )
 }
@@ -140,8 +140,8 @@ function MiniBar({ firmVal, avgVal, s }: { firmVal: string; avgVal: string; s: S
   const filledW = Math.round(ratio * 60)
   return (
     <svg viewBox="0 0 60 6" width={60} height={6} style={{ display: 'block' }}>
-      <rect x={0} y={0} width={60} height={6} rx={3} fill="#e2e8f0" />
-      <rect x={0} y={0} width={filledW} height={6} rx={3} fill={barColor} />
+      <rect x={0} y={0} width={60} height={6} fill="none" stroke="#e2e8f0" strokeWidth={1} />
+      <rect x={0} y={0} width={filledW} height={6} fill="#000000" />
     </svg>
   )
 }
@@ -176,7 +176,7 @@ function PageHeader({ title, pageNum, entityName, year }: { title: string; pageN
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-        <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#0a1f3a', letterSpacing: 1 }}>FINRATE</div>
+        <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#0a1f3a', letterSpacing: 1 }}>FINRATE</div>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: 1, textTransform: 'uppercase' }}>{title}</div>
         <div style={{ fontSize: 11, color: '#64748b' }}>{entityName} · {year}</div>
       </div>
@@ -221,12 +221,12 @@ function RaporContent() {
   }, [id])
 
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f1f5f9' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#ffffff' }}>
       <Loader2 size={28} style={{ color: '#0ea5e9', animation: 'spin 1s linear infinite' }} />
     </div>
   )
   if (!analysis) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f1f5f9', color: '#64748b' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#ffffff', color: '#64748b' }}>
       Analiz bulunamadı.
     </div>
   )
@@ -660,13 +660,13 @@ function RaporContent() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        body { background: #f1f5f9 !important; font-family: 'Inter', sans-serif; color: #0f172a; }
+        body { background: #ffffff !important; font-family: 'Inter', sans-serif; color: #000000; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @media print {
           .no-print { display: none !important; }
-          body { background: #f1f5f9 !important; }
+          body { background: #ffffff !important; }
           .page { page-break-after: always; margin: 0 !important; box-shadow: none !important; }
         }
       `}</style>
@@ -679,15 +679,15 @@ function RaporContent() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 40px', gap: 20, background: '#f1f5f9' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 40px', gap: 20, background: '#ffffff' }}>
 
         {/* ── SAYFA 1: KAPAK + SKOR ─────────────── */}
-        <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+        <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
           {/* Üst bant lacivert */}
           <div style={{ background: '#0a1f3a', padding: '24px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 32, color: '#ffffff', letterSpacing: 2, lineHeight: 1 }}>FINRATE</div>
+              <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 32, color: '#ffffff', letterSpacing: 2, lineHeight: 1 }}>FINRATE</div>
               <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, letterSpacing: 1 }}>Finansal Derecelendirme Raporu</div>
             </div>
             <div style={{ textAlign: 'right', fontSize: 11, color: '#94a3b8', lineHeight: 1.8 }}>
@@ -703,7 +703,7 @@ function RaporContent() {
               <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8 }}>
                 {analysis.entity?.sector ?? 'Sektör Belirtilmemiş'}
               </div>
-              <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 32, fontWeight: 900, color: '#0a1f3a', lineHeight: 1.1, marginBottom: 6 }}>
+              <div style={{ fontFamily: 'Merriweather, serif', fontSize: 32, fontWeight: 900, color: '#0a1f3a', lineHeight: 1.1, marginBottom: 6 }}>
                 {entityName}
               </div>
               <div style={{ fontSize: 12, color: '#64748b' }}>Finrate · TCMB 2024 Sektör Kıyaslaması</div>
@@ -716,7 +716,7 @@ function RaporContent() {
               <div style={{ background: '#ffffff', borderRadius: 16, padding: '20px 16px', textAlign: 'center', boxShadow: '0 2px 12px rgba(15,23,42,0.08)', border: `1px solid rgba(15,23,42,0.06)`, borderTop: `4px solid ${rColor}` }}>
                 <div style={{ fontSize: 10, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>Finrate Skoru</div>
                 <DonutChart score={cs} rColor={rColor} />
-                <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 36, fontWeight: 900, color: rColor, marginTop: 8 }}>{rtng}</div>
+                <div style={{ fontFamily: 'Merriweather, serif', fontSize: 36, fontWeight: 900, color: rColor, marginTop: 8 }}>{rtng}</div>
                 <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, fontWeight: 600 }}>{TEMINAT[rtng]}</div>
               </div>
 
@@ -746,7 +746,7 @@ function RaporContent() {
                 ].map(kpi => (
                   <div key={kpi.label} style={{ background: '#ffffff', borderRadius: 12, padding: '16px 12px', textAlign: 'center', boxShadow: '0 1px 6px rgba(15,23,42,0.06)', border: '1px solid rgba(15,23,42,0.06)', borderTop: `3px solid ${kpi.accent}` }}>
                     <div style={{ fontSize: 9, color: '#64748b', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>{kpi.label}</div>
-                    <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 18, fontWeight: 900, color: kpi.accent }}>{kpi.val}</div>
+                    <div style={{ fontFamily: 'Merriweather, serif', fontSize: 18, fontWeight: 900, color: kpi.accent }}>{kpi.val}</div>
                   </div>
                 ))}
               </div>
@@ -769,11 +769,11 @@ function RaporContent() {
         </div>
 
         {/* ── SAYFA 2: RASYOLAR ─────────────────── */}
-        <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+        <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
           {/* Banner */}
           <div style={{ background: '#0a1f3a', padding: '18px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
+            <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
             <div style={{ fontSize: 11, color: '#38e2d4', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Finansal Oran Analizi</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>{entityName} · {analysis.year}</div>
           </div>
@@ -801,7 +801,7 @@ function RaporContent() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                   <tbody>
                     {section.rows.map((row, i) => (
-                      <tr key={row.label} style={{ borderBottom: `1px solid #f1f5f9`, background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                      <tr key={row.label} style={{ borderBottom: `1px solid #ffffff`, background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                         <td style={{ padding: '8px 12px', color: '#64748b' }}>{row.label}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: row.val === '—' ? '#cbd5e1' : '#0f172a', fontVariantNumeric: 'tabular-nums', width: 90 }}>{row.val}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 400, color: '#94a3b8', fontVariantNumeric: 'tabular-nums', width: 90 }}>{row.avg}</td>
@@ -823,10 +823,10 @@ function RaporContent() {
         </div>
 
         {/* ── SAYFA 3: NARATİF ANALİZ ──────────────── */}
-        <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+        <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
           <div style={{ background: '#0a1f3a', padding: '18px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
+            <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
             <div style={{ fontSize: 11, color: '#38e2d4', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Finansal Değerlendirme</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>{entityName} · {analysis.year}</div>
           </div>
@@ -862,10 +862,10 @@ function RaporContent() {
         </div>
 
         {/* ── SAYFA 4: OPTİMİZASYON YOL HARİTASI ──── */}
-        <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+        <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
           <div style={{ background: '#0a1f3a', padding: '18px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
+            <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
             <div style={{ fontSize: 11, color: '#38e2d4', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Rating Artırma Yol Haritası</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>{entityName} · {analysis.year}</div>
           </div>
@@ -877,13 +877,13 @@ function RaporContent() {
             <div style={{ display: 'grid', gridTemplateColumns: next2Rating ? '1fr 28px 1fr 28px 1fr 28px 1fr' : '1fr 28px 1fr 28px 1fr', gap: 0, marginBottom: 20, alignItems: 'center' }}>
               <div style={{ background: '#ffffff', border: `2px solid ${rColor}`, borderRadius: 10, padding: '14px 12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(15,23,42,0.06)' }}>
                 <div style={{ fontSize: 8, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Mevcut</div>
-                <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 30, fontWeight: 900, color: rColor }}>{rtng}</div>
+                <div style={{ fontFamily: 'Merriweather, serif', fontSize: 30, fontWeight: 900, color: rColor }}>{rtng}</div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>{cs} puan</div>
               </div>
               <div style={{ textAlign: 'center', fontSize: 16, color: '#94a3b8' }}>→</div>
               <div style={{ background: '#f0fdf4', border: `2px solid ${(RATING_COLOR[nextRating] ?? '#38e2d4')}`, borderRadius: 10, padding: '14px 12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(15,23,42,0.06)' }}>
                 <div style={{ fontSize: 8, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>+1 Not Hedefi</div>
-                <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 30, fontWeight: 900, color: RATING_COLOR[nextRating] ?? '#38e2d4' }}>{nextRating}</div>
+                <div style={{ fontFamily: 'Merriweather, serif', fontSize: 30, fontWeight: 900, color: RATING_COLOR[nextRating] ?? '#38e2d4' }}>{nextRating}</div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>≥ {optResult.targetScore} puan</div>
                 <div style={{ fontSize: 9, color: optResult.achievable ? '#16a34a' : '#f97316', fontWeight: 700, marginTop: 4 }}>
                   {optResult.achievable ? '✓ Ulaşılabilir' : `${optResult.projectedScore} puana erişebilir`}
@@ -893,7 +893,7 @@ function RaporContent() {
               <div style={{ textAlign: 'center', fontSize: 16, color: '#94a3b8' }}>→</div>
               <div style={{ background: '#eff6ff', border: `2px solid ${(RATING_COLOR[next2Rating] ?? '#0ea5e9')}`, borderRadius: 10, padding: '14px 12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(15,23,42,0.06)' }}>
                 <div style={{ fontSize: 8, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>+2 Not Hedefi</div>
-                <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 30, fontWeight: 900, color: RATING_COLOR[next2Rating] ?? '#0ea5e9' }}>{next2Rating}</div>
+                <div style={{ fontFamily: 'Merriweather, serif', fontSize: 30, fontWeight: 900, color: RATING_COLOR[next2Rating] ?? '#0ea5e9' }}>{next2Rating}</div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>≥ {optResult2.targetScore} puan</div>
                 <div style={{ fontSize: 9, color: optResult2.achievable ? '#16a34a' : '#f97316', fontWeight: 700, marginTop: 4 }}>
                   {optResult2.achievable ? '✓ Ulaşılabilir' : `Ek eylem gerekli`}
@@ -902,7 +902,7 @@ function RaporContent() {
               <div style={{ textAlign: 'center', fontSize: 16, color: '#94a3b8' }}>→</div>
               <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(15,23,42,0.06)' }}>
                 <div style={{ fontSize: 8, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Uzun Vade</div>
-                <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 22, fontWeight: 900, color: '#94a3b8' }}>BBB+</div>
+                <div style={{ fontFamily: 'Merriweather, serif', fontSize: 22, fontWeight: 900, color: '#94a3b8' }}>BBB+</div>
                 <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>Yatırım sınıfı</div>
               </div>
               </>)}
@@ -937,7 +937,7 @@ function RaporContent() {
                         return v.toFixed(2)
                       }
                       return (
-                        <tr key={s.key} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <tr key={s.key} style={{ borderBottom: '1px solid #ffffff', background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                           <td style={{ padding: '9px 12px', color: '#94a3b8', fontWeight: 700 }}>{i+1}</td>
                           <td style={{ padding: '9px 12px', color: '#0f172a', fontWeight: 600 }}>{s.label}</td>
                           <td style={{ padding: '9px 12px' }}>
@@ -968,7 +968,7 @@ function RaporContent() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>Aksiyon Detayları</div>
                 {optResult.suggestions.map((s, i) => (
                   <div key={s.key} style={{ display: 'flex', gap: 12, marginBottom: 14, padding: '14px 16px', background: '#ffffff', borderRadius: 8, borderLeft: `3px solid ${({ Likidite: '#0ea5e9', Karlılık: '#0ea5e9', Kaldıraç: '#f97316', Faaliyet: '#f59e0b' } as Record<string,string>)[s.category] ?? '#38e2d4'}`, boxShadow: '0 1px 4px rgba(15,23,42,0.04)' }}>
-                    <span style={{ fontSize: 11, fontWeight: 900, color: '#0a1f3a', flexShrink: 0, minWidth: 20 }}>{i+1}.</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: '#0a1f3a', flexShrink: 0, minWidth: 20 }}>[ ]</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{s.label}: {s.currentValue != null ? (s.unit === 'pct' ? `%${(s.currentValue*100).toFixed(1)}` : s.unit === 'x' ? `${s.currentValue.toFixed(2)}x` : s.unit === 'day' ? `${Math.round(s.currentValue)} gün` : s.currentValue.toFixed(2)) : '—'} → {s.unit === 'pct' ? `%${(s.targetValue*100).toFixed(1)}` : s.unit === 'x' ? `${s.targetValue.toFixed(2)}x` : s.unit === 'day' ? `${Math.round(s.targetValue)} gün` : s.targetValue.toFixed(2)}</div>
                       <div style={{ fontSize: 10.5, color: '#475569', lineHeight: 1.7 }}>{richAction(s.key, s.currentValue, s.targetValue, s.unit)}</div>
@@ -984,10 +984,10 @@ function RaporContent() {
 
         {/* ── SAYFA 5: SENARYO ANALİZİ ─────────────── */}
         {scenarios.length > 0 && (
-          <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+          <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
             <div style={{ background: '#0a1f3a', padding: '18px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
+              <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
               <div style={{ fontSize: 11, color: '#f97316', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Senaryo Analizi</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>{entityName} · {analysis.year}</div>
             </div>
@@ -1017,13 +1017,13 @@ function RaporContent() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 9, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase' }}>Mevcut</div>
-                        <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 22, fontWeight: 900, color: rColor }}>{rtng}</div>
+                        <div style={{ fontFamily: 'Merriweather, serif', fontSize: 22, fontWeight: 900, color: rColor }}>{rtng}</div>
                         <div style={{ fontSize: 9, color: '#94a3b8' }}>{cs} puan</div>
                       </div>
                       <div style={{ fontSize: 18, color: '#cbd5e1' }}>→</div>
                       <div style={{ textAlign: 'center', background: `${RATING_COLOR[sc.projRating] ?? sc.color}12`, borderRadius: 8, padding: '6px 14px', border: `1px solid ${RATING_COLOR[sc.projRating] ?? sc.color}30` }}>
                         <div style={{ fontSize: 9, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase' }}>Projeksiyon</div>
-                        <div style={{ fontFamily: 'Outfit,sans-serif', fontSize: 22, fontWeight: 900, color: RATING_COLOR[sc.projRating] ?? sc.color }}>{sc.projRating}</div>
+                        <div style={{ fontFamily: 'Merriweather, serif', fontSize: 22, fontWeight: 900, color: RATING_COLOR[sc.projRating] ?? sc.color }}>{sc.projRating}</div>
                         <div style={{ fontSize: 9, color: sc.delta > 0 ? '#16a34a' : '#64748b', fontWeight: 700 }}>
                           {sc.delta > 0 ? `+${sc.delta.toFixed(1)}` : sc.delta.toFixed(1)} puan
                         </div>
@@ -1034,7 +1034,7 @@ function RaporContent() {
                   {/* Parametre Tablosu */}
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+                      <tr style={{ borderBottom: '1px solid #ffffff', background: '#fafafa' }}>
                         <th style={{ padding: '8px 20px', textAlign: 'left', fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: 2, textTransform: 'uppercase' }}>Parametre</th>
                         <th style={{ padding: '8px 20px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: '#94a3b8', letterSpacing: 2, textTransform: 'uppercase' }}>Mevcut</th>
                         <th style={{ padding: '8px 20px', textAlign: 'right', fontSize: 9, fontWeight: 700, color: sc.color, letterSpacing: 2, textTransform: 'uppercase' }}>Senaryo</th>
@@ -1043,7 +1043,7 @@ function RaporContent() {
                     </thead>
                     <tbody>
                       {sc.rows.map((row, ri) => (
-                        <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', background: ri % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <tr key={ri} style={{ borderBottom: '1px solid #ffffff', background: ri % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                           <td style={{ padding: '10px 20px', color: '#64748b', fontWeight: 500 }}>{row.label}</td>
                           <td style={{ padding: '10px 20px', textAlign: 'right', color: '#0f172a', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{row.from}</td>
                           <td style={{ padding: '10px 20px', textAlign: 'right', color: sc.color, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{row.to}</td>
@@ -1072,10 +1072,10 @@ function RaporContent() {
 
         {/* ── SAYFA 6: MALİ VERİLER ─────────────── */}
         {fd && (
-          <div className="page" style={{ width: 794, minHeight: 1123, background: '#f1f5f9', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+          <div className="page" style={{ width: 794, minHeight: 1123, background: '#ffffff', padding: '0', position: 'relative', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
 
             <div style={{ background: '#0a1f3a', padding: '18px 56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
+              <div style={{ fontFamily: 'Merriweather, serif', fontWeight: 900, fontSize: 18, color: '#ffffff' }}>FINRATE</div>
               <div style={{ fontSize: 11, color: '#38e2d4', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Mali Tablolar</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>{entityName} · {analysis.year}</div>
             </div>
@@ -1103,7 +1103,7 @@ function RaporContent() {
                     const isSection = (label as string) === (label as string).toUpperCase() && val == null
                     const isTotal = (label as string).startsWith('TOPLAM')
                     if (isSection && !isTotal) return (
-                      <div key={i} style={{ padding: '8px 0 3px', fontSize: 9, fontWeight: 800, color: '#94a3b8', letterSpacing: 2, borderTop: i > 0 ? '1px solid #f1f5f9' : 'none', marginTop: i > 0 ? 6 : 0, textTransform: 'uppercase' }}>{label}</div>
+                      <div key={i} style={{ padding: '8px 0 3px', fontSize: 9, fontWeight: 800, color: '#94a3b8', letterSpacing: 2, borderTop: i > 0 ? '1px solid #ffffff' : 'none', marginTop: i > 0 ? 6 : 0, textTransform: 'uppercase' }}>{label}</div>
                     )
                     return (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: isTotal ? '7px 0' : '4px 0', borderBottom: isTotal ? '2px solid #e0f2fe' : '1px solid #f8fafc', fontSize: 11, marginTop: isTotal ? 4 : 0 }}>
@@ -1132,7 +1132,7 @@ function RaporContent() {
                     const isSection = (label as string) === (label as string).toUpperCase() && val == null
                     const isTotal = (label as string).startsWith('TOPLAM')
                     if (isSection && !isTotal) return (
-                      <div key={i} style={{ padding: '8px 0 3px', fontSize: 9, fontWeight: 800, color: '#94a3b8', letterSpacing: 2, borderTop: i > 0 ? '1px solid #f1f5f9' : 'none', marginTop: i > 0 ? 6 : 0, textTransform: 'uppercase' }}>{label}</div>
+                      <div key={i} style={{ padding: '8px 0 3px', fontSize: 9, fontWeight: 800, color: '#94a3b8', letterSpacing: 2, borderTop: i > 0 ? '1px solid #ffffff' : 'none', marginTop: i > 0 ? 6 : 0, textTransform: 'uppercase' }}>{label}</div>
                     )
                     return (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: isTotal ? '7px 0' : '4px 0', borderBottom: isTotal ? '2px solid #ffedd5' : '1px solid #f8fafc', fontSize: 11, marginTop: isTotal ? 4 : 0 }}>
@@ -1202,7 +1202,7 @@ function RaporContent() {
 export default function RaporPage() {
   return (
     <Suspense fallback={
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f1f5f9' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#ffffff' }}>
         <Loader2 size={24} style={{ color: '#0ea5e9' }} />
       </div>
     }>

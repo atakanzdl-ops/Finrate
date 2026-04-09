@@ -329,8 +329,8 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         <td
           className={clsx(
             'px-3 py-1 sticky z-10 text-[10px] truncate',
-            isTotal  ? 'bg-[#0f1f35] font-black text-[#f59e0b]' :
-            isSubtot ? 'bg-[#0d1b2e] font-bold text-[#f59e0b]' :
+            isTotal  ? 'bg-[#0f1f35] font-black text-[#2dd4bf]' :
+            isSubtot ? 'bg-[#0d1b2e] font-bold text-[#2dd4bf]' :
             hasField ? 'bg-[#0a1727] text-white/75' :
                        'bg-[#0a1727] text-white/25',
           )}
@@ -362,7 +362,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                   className={clsx(
                     'w-full bg-transparent text-right tabular-nums focus:outline-none focus:bg-white/10 focus:rounded px-1',
                     isTotal ? 'font-black text-[10px]' : 'font-bold text-[10px]',
-                    v != null && v < 0 ? 'text-red-400' : 'text-[#f59e0b]',
+                    v != null && v < 0 ? 'text-red-400' : 'text-[#2dd4bf]',
                   )}
                   placeholder="0,00"
                 />

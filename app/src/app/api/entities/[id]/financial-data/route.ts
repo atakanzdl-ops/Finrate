@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
-import { verifyToken, getUserIdFromRequest } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/auth'
 import { calculateRatios } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
+import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 
 // POST /api/entities/[id]/financial-data — finansal veri kaydet + skor hesapla
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id: entityId } = await params
   const entity = await prisma.entity.findFirst({ where: { id: entityId, userId } })
-  if (!entity) return NextResponse.json({ error: 'Şirket bulunamadı.' }, { status: 404 })
+  if (!entity) return jsonUtf8({ error: 'Şirket bulunamadı.' }, { status: 404 })
 
   try {
     const body = await req.json()
     const { year, period = 'ANNUAL', source = 'MANUAL', ...financialFields } = body
 
     if (!year || year < 2000 || year > 2100) {
-      return NextResponse.json({ error: 'Geçerli bir yıl girin.' }, { status: 400 })
+      return jsonUtf8({ error: 'Geçerli bir yıl girin.' }, { status: 400 })
     }
 
     // Mevcut veriyi güncelle veya yeni oluştur (upsert)
@@ -31,6 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Otomatik skor hesapla
     const ratios = calculateRatios(financialFields)
     const scoreResult = calculateScore(ratios)
+    const optimizerSnapshot = createOptimizerSnapshot(ratios, scoreResult.finalScore, entity.sector)
 
     // Analysis kaydını upsert et
     const analysis = await prisma.analysis.upsert({
@@ -42,7 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         profitabilityScore: scoreResult.profitabilityScore,
         leverageScore:      scoreResult.leverageScore,
         activityScore:      scoreResult.activityScore,
-        ratios:             JSON.stringify(ratios),
+        ratios:             JSON.stringify({ ...ratios, __overallCoverage: scoreResult.overallCoverage ?? null }),
+        optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
         updatedAt:          new Date(),
       },
       create: {
@@ -58,13 +62,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         profitabilityScore: scoreResult.profitabilityScore,
         leverageScore:      scoreResult.leverageScore,
         activityScore:      scoreResult.activityScore,
-        ratios:             JSON.stringify(ratios),
+        ratios:             JSON.stringify({ ...ratios, __overallCoverage: scoreResult.overallCoverage ?? null }),
+        optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
       },
     })
 
-    return NextResponse.json({ financialData, analysis, ratios, score: scoreResult }, { status: 201 })
+    return jsonUtf8({ financialData, analysis, ratios, score: scoreResult }, { status: 201 })
   } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Sunucu hatası.' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[financial-data] error:', msg)
+    return jsonUtf8({ error: 'Finansal veri işlenirken hata oluştu.' }, { status: 500 })
   }
 }

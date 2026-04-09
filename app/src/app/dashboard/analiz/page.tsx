@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Building2, Filter, Download, Loader2,
   LayoutDashboard, BarChart3, Sliders, Star, TrendingUp,
   ChevronDown,
 } from 'lucide-react'
 import clsx from 'clsx'
-import DashboardShell from '@/components/layout/DashboardShell'
+import FinrateShell from '@/components/layout/FinrateShell'
 import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
 import SubjectiveForm from '@/components/analysis/SubjectiveForm'
 import OptimizationPanel from '@/components/analysis/OptimizationPanel'
@@ -17,6 +17,7 @@ import TrendChart from '@/components/analysis/TrendChart'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import type { RatioResult } from '@/lib/scoring/ratios'
 import { combineScores } from '@/lib/scoring/subjective'
+import { scoreToRating } from '@/lib/scoring/score'
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -25,6 +26,9 @@ interface FinData {
   ebit: number | null; ebitda: number | null; netProfit: number | null
   totalAssets: number | null; totalEquity: number | null
   totalCurrentAssets: number | null; totalCurrentLiabilities: number | null
+  totalNonCurrentAssets: number | null; totalNonCurrentLiabilities: number | null
+  cash: number | null; tradeReceivables: number | null; inventory: number | null
+  shortTermFinancialDebt: number | null; longTermFinancialDebt: number | null
 }
 
 interface Analysis {
@@ -32,6 +36,7 @@ interface Analysis {
   finalScore: number; finalRating: string
   liquidityScore: number; profitabilityScore: number
   leverageScore: number; activityScore: number
+  overallCoverage?: number | null
   ratios: Record<string, number | null>
   entity?: { id: string; name: string; sector?: string | null }
   financialData?: FinData
@@ -53,62 +58,315 @@ const RATING_LABEL: Record<string, string> = {
 }
 
 const RATING_COLOR: Record<string, string> = {
-  AAA: '#10b981', AA: '#10b981', A: '#34d399',
-  BBB: '#a3e635', BB: '#facc15', B: '#fb923c',
-  CCC: '#f97316', CC: '#f87171', C: '#ef4444', D: '#dc2626',
+  AAA: '#0B3C5D', AA: '#0B3C5D', A: '#0B3C5D',
+  BBB: '#0B3C5D', BB: '#0B3C5D',
+  B: '#0B3C5D',
+  CCC: '#0B3C5D',
+  CC: '#0B3C5D',
+  C: '#0B3C5D',
+  D: '#0B3C5D',
 }
 
-const GLASS = {
-  background: 'rgba(255,255,255,0.72)',
-  backdropFilter: 'blur(20px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-  border: '1px solid rgba(255,255,255,0.65)',
-  boxShadow: '0 8px 32px rgba(10,30,60,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
-} as React.CSSProperties
+function prussianBlue(score: number): string {
+  if (score > 80) return '#0B3C5D'
+  if (score > 50) return '#0B3C5D'
+  return '#EF4444'
+}
 
-/* ─── CircularScore ──────────────────────────────── */
-function CircularScore({ score, rating }: { score: number; rating: string }) {
-  const r = 45, circ = 2 * Math.PI * r
-  const offset = circ - (score / 100) * circ
-  const color = RATING_COLOR[rating] ?? '#2dd4bf'
+/* ─── BarMetricChart ─────────────────────────────── */
+type BarPeriod = { label: string; primary: number | null; secondary: number | null }
+
+function BarMetricChart({ periods, primaryLabel, secondaryLabel, tab, onTab }: {
+  periods: BarPeriod[]
+  primaryLabel: string; secondaryLabel: string
+  tab: 'gelir' | 'borc'; onTab: (t: 'gelir' | 'borc') => void
+}) {
+  const [hoveredBar, setHoveredBar] = React.useState<string | null>(null)
+
+  const vals = periods.flatMap(p => [p.primary ?? 0, p.secondary ?? 0])
+  const maxVal = Math.max(...vals, 1)
+  const pct = (v: number | null) => maxVal > 0 ? Math.round(((v ?? 0) / maxVal) * 100) : 0
+
+  const fmtV = (v: number) => {
+    if (v >= 1_000_000_000) return `₺${(v / 1_000_000_000).toFixed(1)}B`
+    if (v >= 1_000_000)     return `₺${(v / 1_000_000).toFixed(1)}M`
+    if (v >= 1_000)         return `₺${(v / 1_000).toFixed(0)}K`
+    return `₺${v.toFixed(0)}`
+  }
+
+  const n = periods.length
+  const trendPoints = periods.map((p, i) => {
+    const x = n === 1 ? 200 : 50 + i * (300 / Math.max(n - 1, 1))
+    const y = 200 - (pct(p.primary) / 100) * 200
+    return [x, y] as [number, number]
+  })
+
+  const pathD = trendPoints.length < 2 ? '' : trendPoints.reduce((acc, [x, y], i) => {
+    if (i === 0) return `M${x},${y}`
+    const [px, py] = trendPoints[i - 1]
+    const cx = (px + x) / 2
+    return acc + ` C${cx},${py} ${cx},${y} ${x},${y}`
+  }, '')
+  const areaD = pathD ? pathD + ` L${trendPoints[trendPoints.length-1][0]},200 L${trendPoints[0][0]},200 Z` : ''
+
+  // Son dönem değeri — büyüme % yerine sadece değer
+  const lastPrimary = periods[periods.length - 1]?.primary
+  const hasSec = periods.some(p => p.secondary != null && p.secondary !== 0)
+
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-44 h-44 mb-5">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="6" />
-          <motion.circle
-            cx="50" cy="50" r={r} fill="none"
-            stroke={color} strokeWidth="6"
-            strokeDasharray={circ}
-            initial={{ strokeDashoffset: circ }}
-            animate={{ strokeDashoffset: offset }}
-            transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-4xl font-black text-[#0a1727]" style={{ fontFamily: 'Outfit,sans-serif' }}>
-            {Math.round(score)}
-          </span>
-          <span className="text-[9px] font-bold text-[#8da4bf] tracking-widest">/ 100</span>
+    <div className="card card-chart">
+      <div className="card-head">
+        <div className="card-head-left">
+          <h2 className="card-title">Gelir &amp; Performans Analizi</h2>
+          <p className="card-desc">{periods.length} Dönemlik mukayeseli trend</p>
+        </div>
+        <div className="card-head-right">
+          <div className="tab-group">
+            <button className={`tab ${tab==='gelir'?'active':''}`} onClick={() => onTab('gelir')}>Gelir</button>
+            <button className={`tab ${tab==='borc' ?'active':''}`} onClick={() => onTab('borc')}>Borç/Öz</button>
+          </div>
         </div>
       </div>
-      <div className="text-center">
-        <div className="text-2xl font-black italic" style={{ color, fontFamily: 'Outfit,sans-serif' }}>{rating}</div>
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-          {RATING_LABEL[rating] ?? 'Kredi Notu'}
+      <div className="card-body">
+        <div className="chart-area">
+          <div className="chart-y-axis">
+            {[1, 0.75, 0.5, 0.25, 0].map(f => (
+              <span key={f}>{fmtV(maxVal * f)}</span>
+            ))}
+          </div>
+          <div className="chart-canvas">
+            {[100,75,50,25,0].map(b => <div key={b} className="chart-grid-line" style={{ bottom:`${b}%` }}/>)}
+            {periods.map((p) => {
+              const hKey = p.label
+              const isHov = hoveredBar === hKey
+              return (
+                <div key={p.label} className="bar-group"
+                  onMouseEnter={() => setHoveredBar(hKey)}
+                  onMouseLeave={() => setHoveredBar(null)}
+                  style={{ position:'relative' }}>
+                  {/* Hover tooltip */}
+                  {isHov && (
+                    <div style={{
+                      position:'absolute', bottom:'100%', left:'50%', transform:'translateX(-50%)',
+                      background:'#0B3C5D', color:'#fff', borderRadius:8,
+                      padding:'5px 8px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
+                      zIndex:10, marginBottom:4, pointerEvents:'none',
+                      boxShadow:'0 8px 18px rgba(11,60,93,0.14)',
+                    }}>
+                      <div style={{ color:'#2EC4B6' }}>{p.label}</div>
+                      <div>{primaryLabel}: {p.primary != null ? fmtV(p.primary) : '—'}</div>
+                      {hasSec && <div style={{ color:'rgba(255,255,255,0.6)' }}>{secondaryLabel}: {p.secondary != null ? fmtV(p.secondary) : 'Veri yok'}</div>}
+                    </div>
+                  )}
+                  <div className="bar-pair">
+                    <motion.div className="bar"
+                      style={{ background: '#0B3C5D', width: '10px', borderRadius: '2px' }}
+                      initial={{ height:0 }} animate={{ height:`${pct(p.primary)}%` }}
+                      transition={{ duration:0.7, ease:[0.16,1,0.3,1] }}>
+                    </motion.div>
+                    {hasSec && (
+                      <motion.div className="bar"
+                        style={{ background: '#2EC4B6', width: '10px', borderRadius: '2px', marginLeft: '2px' }}
+                        initial={{ height:0 }} animate={{ height:`${pct(p.secondary)}%` }}
+                        transition={{ duration:0.7, delay:0.05, ease:[0.16,1,0.3,1] }}/>
+                    )}
+                  </div>
+                  <span className="bar-label">{p.label}</span>
+                </div>
+              )
+            })}
+            {pathD && (
+              <svg className="trend-overlay" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="trendGradBM" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2EC4B6" stopOpacity="0.2"/>
+                    <stop offset="100%" stopColor="#2EC4B6" stopOpacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d={pathD} fill="none" stroke="#2EC4B6" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+                <path d={areaD} fill="url(#trendGradBM)"/>
+                <circle cx={trendPoints[trendPoints.length-1][0]} cy={trendPoints[trendPoints.length-1][1]}
+                  r="4" fill="#2EC4B6" />
+              </svg>
+            )}
+          </div>
+        </div>
+        <div className="chart-legend">
+          <div className="legend-item"><span className="legend-dot" style={{ background: '#0B3C5D' }}/><span>{primaryLabel}</span></div>
+          {hasSec && <div className="legend-item"><span className="legend-dot" style={{ background: '#2EC4B6' }}/><span>{secondaryLabel}</span></div>}
+          <div className="legend-item"><span className="legend-dot" style={{ background: '#2EC4B6' }}/><span>Trend</span></div>
+          {lastPrimary != null && (
+            <div className="chart-summary">
+              <span className="summary-label">Son Dönem:</span>
+              <span className="summary-value">{fmtV(lastPrimary)}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
+/* ─── DonutSegChart ──────────────────────────────── */
+function DonutSegChart({ title, totalLabel, segments, displayTotal }: {
+  title: string
+  totalLabel: string
+  segments: { label: string; value: number; color: string }[]
+  displayTotal?: number  // merkezde gösterilecek gerçek toplam (ör: totalAssets)
+}) {
+  const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null)
+
+  const fmtM = (v: number) => {
+    if (v >= 1_000_000) return `₺${(v / 1_000_000).toFixed(1)}M`
+    if (v >= 1_000)     return `₺${(v / 1_000).toFixed(0)}K`
+    return `₺${v.toFixed(0)}`
+  }
+
+  // Denominator = sum of segments (not external total → avoids >100% bug)
+  const total = segments.reduce((s, x) => s + x.value, 0)
+
+  const r = 60; const cx = 80; const cy = 80
+  const circ = 2 * Math.PI * r
+
+  let offset = 0
+  const segs = segments.map((s, i) => {
+    const frac = total > 0 ? s.value / total : 0
+    const len  = frac * circ
+    const seg  = { ...s, idx: i, dasharray: `${len} ${circ - len}`, dashoffset: circ - offset, pct: (frac * 100).toFixed(1) }
+    offset += len
+    return seg
+  })
+
+  return (
+    <div className="card card-donut" style={{ flex: 1 }}>
+      <div className="card-head"><h2 className="card-title">{title}</h2></div>
+      <div className="card-body">
+        <div className="donut-wrap">
+          <svg className="donut-chart" viewBox="0 0 160 160" style={{ overflow: 'visible' }}>
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth={20}/>
+            {segs.map(s => {
+              const isHov = hoveredIdx === s.idx
+              return (
+                <motion.circle
+                  key={s.label}
+                  className="donut-seg"
+                  cx={cx} cy={cy} r={r}
+                  stroke={s.color}
+                  strokeDasharray={s.dasharray}
+                  initial={{ strokeDashoffset: circ, strokeWidth: 20 }}
+                  animate={{ strokeDashoffset: s.dashoffset, strokeWidth: isHov ? 26 : 20 }}
+                  transition={{ strokeDashoffset: { duration: 1.2, ease: [0.16,1,0.3,1] }, strokeWidth: { duration: 0.2 } }}
+                  transform="rotate(-90 80 80)"
+                  style={{
+                    cursor: 'pointer',
+                    filter: 'none',
+                    transition: 'filter 0.2s',
+                  }}
+                  onMouseEnter={() => setHoveredIdx(s.idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                />
+              )
+            })}
+          </svg>
+          <div className="donut-center">
+            <div className="donut-total">{fmtM(displayTotal ?? total)}</div>
+            <span className="donut-label">{totalLabel}</span>
+          </div>
+        </div>
+        <div className="donut-legend">
+          {segs.map(s => (
+            <div
+              key={s.label}
+              className="donut-legend-item"
+              style={{
+                fontWeight: hoveredIdx === s.idx ? 700 : undefined,
+                opacity: hoveredIdx !== null && hoveredIdx !== s.idx ? 0.45 : 1,
+                transition: 'opacity 0.2s, font-weight 0.2s',
+                cursor: 'default',
+              }}
+              onMouseEnter={() => setHoveredIdx(s.idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              <div className="legend-color" style={{ background: s.color, transform: hoveredIdx === s.idx ? 'scale(1.3)' : 'scale(1)', transition: 'transform 0.2s' }}/>
+              <span className="legend-text" style={{ color: hoveredIdx === s.idx ? s.color : undefined }}>{s.label}</span>
+              <span className="legend-val" style={{ color: hoveredIdx === s.idx ? s.color : undefined }}>%{s.pct}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── CoverageBanner ─────────────────────────────── */
+function CoverageBanner({ coverage }: { coverage: number | null | undefined }) {
+  if (coverage == null || coverage >= 0.5) return null
+  const pct  = Math.round(coverage * 100)
+  const low  = coverage < 0.25
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+      background: low ? 'rgba(234,88,12,0.08)' : 'rgba(234,179,8,0.08)',
+      border: `1px solid ${low ? 'rgba(234,88,12,0.35)' : 'rgba(234,179,8,0.35)'}`,
+    }}>
+      <span style={{ fontSize: 16, lineHeight: 1.4 }}>{low ? '🟠' : '🟡'}</span>
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: low ? '#9a3412' : '#854d0e' }}>
+        {low
+          ? `Veri kapsamı çok düşük (%${pct}). Skor güvenilirliği sınırlıdır, eksik verileri tamamlayın.`
+          : `Veri kapsamı düşük (%${pct}). Bazı metrikler hesaplanamadı — skor tahmini niteliğindedir.`
+        }
+      </p>
+    </div>
+  )
+}
+
+/* ─── CircularScore ──────────────────────────────── */
+function CircularScore({ score, rating }: { score: number; rating: string }) {
+  const circ   = 2 * Math.PI * 34
+  const offset = circ - (score / 100) * circ
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="score-ring-wrap mb-4">
+        <svg className="score-ring" viewBox="0 0 80 80">
+          <defs>
+            <linearGradient id="scoreGradAn" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#2dd4bf"/>
+              <stop offset="100%" stopColor="#14b8a6"/>
+            </linearGradient>
+          </defs>
+          <circle className="ring-bg" cx="40" cy="40" r="34" />
+          <motion.circle
+            className="ring-fill"
+            cx="40" cy="40" r="34"
+            stroke="url(#scoreGradAn)"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </svg>
+        <div className="score-value">
+          <div className="score-num" style={{ color: '#2dd4bf' }}>{Math.round(score)}</div>
+          <div className="score-max">/ 100</div>
+        </div>
+      </div>
+      <div className="text-center">
+        <div className="score-grade" style={{ color: RATING_COLOR[rating] ?? '#2dd4bf' }}>{rating}</div>
+        <div className="score-label mt-1">{RATING_LABEL[rating] ?? 'Kredi Notu'}</div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Main Page ──────────────────────────────────── */
-export default function AnalizPage() {
+function AnalizPageContent() {
   const [analyses,        setAnalyses]        = useState<Analysis[]>([])
   const [selected,        setSelected]        = useState<Analysis | null>(null)
   const [loading,         setLoading]         = useState(true)
   const [activeTab,       setActiveTab]       = useState<TabId>('overview')
+  const [chartTab,        setChartTab]        = useState<'gelir' | 'borc'>('gelir')
   const [subjectiveScores, setSubjectiveScores] = useState<Record<string, number>>({})
   const [yearOpen,        setYearOpen]        = useState(false)
   const searchParams = useSearchParams()
@@ -116,17 +374,20 @@ export default function AnalizPage() {
   const router       = useRouter()
 
   useEffect(() => {
-    const recalcDone = sessionStorage.getItem('finrate_recalc_v2')
     const doLoad = () => {
       fetch('/api/analyses')
         .then(r => r.json())
         .then(d => {
           const list: Analysis[] = d.analyses ?? []
           setAnalyses(list)
+          const storedEid = sessionStorage.getItem('finrate_last_entity')
           const initial = entityId
-            ? (list.find(a => a.entity?.id === entityId) ?? list[0] ?? null)
-            : (list[0] ?? null)
+            ? (list.filter(a => a.entity?.id === entityId).sort((a, b) => b.year - a.year)[0] ?? list[0] ?? null)
+            : storedEid
+              ? (list.filter(a => a.entity?.id === storedEid).sort((a, b) => b.year - a.year)[0] ?? list[0] ?? null)
+              : (list[0] ?? null)
           setSelected(initial)
+          if (initial?.entity?.id) sessionStorage.setItem('finrate_last_entity', initial.entity.id)
           const eids = [...new Set(list.map(a => a.entity?.id).filter(Boolean))] as string[]
           eids.forEach(eid => {
             fetch(`/api/entities/${eid}/subjective`)
@@ -139,23 +400,26 @@ export default function AnalizPage() {
         })
         .finally(() => setLoading(false))
     }
-    if (!recalcDone) {
+    // Recalculate en fazla 3 dakikada bir (sayfa geçişlerini yavaşlatmamak için)
+    // Race condition önlemi: timestamp'i fetch ÖNCE yaz, böylece paralel sekme de tetiklemez
+    const RECALC_KEY = 'finrate_recalc_ts'
+    const lastTs = sessionStorage.getItem(RECALC_KEY)
+    const stale  = !lastTs || Date.now() - parseInt(lastTs) > 3 * 60 * 1000
+    if (stale) {
+      sessionStorage.setItem(RECALC_KEY, Date.now().toString())
       fetch('/api/analyses/recalculate', { method: 'POST' })
-        .catch(() => {})
-        .finally(() => { sessionStorage.setItem('finrate_recalc_v2', '1'); doLoad() })
-    } else { doLoad() }
+        .catch(() => { sessionStorage.removeItem(RECALC_KEY) }) // Hata olursa kilit kaldır
+        .finally(() => doLoad())
+    } else {
+      doLoad()
+    }
   }, [entityId])
 
   function combinedScore(a: Analysis) {
     const subj = a.entity?.id ? (subjectiveScores[a.entity.id] ?? 0) : 0
     return combineScores(a.finalScore, subj)
   }
-  function combinedRating(s: number) {
-    if (s >= 92) return 'AAA'; if (s >= 84) return 'AA'; if (s >= 76) return 'A'
-    if (s >= 68) return 'BBB'; if (s >= 60) return 'BB'; if (s >= 52) return 'B'
-    if (s >= 44) return 'CCC'; if (s >= 36) return 'CC'; if (s >= 28) return 'C'
-    return 'D'
-  }
+  function combinedRating(s: number) { return scoreToRating(s) }
 
   const fmtN   = (v?: number | null, d = 2) => v == null ? '—' : v.toFixed(d)
   const fmtPct = (v?: number | null) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
@@ -168,21 +432,21 @@ export default function AnalizPage() {
 
   /* ─── Loading / Empty ─────────────────────────── */
   if (loading) return (
-    <DashboardShell>
+    <FinrateShell>
       <div className="flex justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-cyan-400" />
+        <Loader2 size={24} className="animate-spin text-prussian-900" />
       </div>
-    </DashboardShell>
+    </FinrateShell>
   )
   if (analyses.length === 0) return (
-    <DashboardShell>
+    <FinrateShell>
       <div className="space-y-5">
-        <h1 className="text-2xl font-bold text-white">Analizler</h1>
-        <div className="glass-card rounded-xl p-10 text-center">
-          <p className="text-white/40 text-sm">Henüz analiz yok. Bir şirkete finansal veri girerek başlayın.</p>
+        <h1 className="text-2xl font-bold text-slate-900">Analizler</h1>
+        <div className="card rounded-xl p-10 text-center">
+          <p className="text-sm text-slate-500">Henüz analiz yok. Bir şirkete finansal veri girerek başlayın.</p>
         </div>
       </div>
-    </DashboardShell>
+    </FinrateShell>
   )
 
   /* ─── Derived ─────────────────────────────────── */
@@ -190,6 +454,36 @@ export default function AnalizPage() {
   const fd  = selected?.financialData
   const cs  = selected ? combinedScore(selected) : 0
   const cr  = combinedRating(cs)
+  const r   = selected?.ratios ?? {}
+  const whyItems = selected ? [
+    {
+      tone: r.currentRatio != null && r.currentRatio >= bm.currentRatio * 0.9 ? 'positive' : 'warning',
+      category: 'Likidite',
+      metric: 'Cari Oran:',
+      val: fmtN(r.currentRatio),
+      comment: r.currentRatio != null
+        ? (r.currentRatio >= bm.currentRatio * 0.9 ? 'Sektör ortalaması üzerinde, likidite güçlü.' : 'Sektör ortalaması altında, işletme sermaye açığı riski.')
+        : 'Veri eksik',
+    },
+    {
+      tone: r.netProfitMargin != null && r.netProfitMargin >= 0 ? 'positive' : 'negative',
+      category: 'Karlılık',
+      metric: 'Net Marj:',
+      val: fmtPct(r.netProfitMargin),
+      comment: r.netProfitMargin != null
+        ? (r.netProfitMargin >= 0 ? 'Pozitif faaliyet karlılığı, sürdürülebilir büyüme.' : 'Negatif net marj, maliyet baskısı.')
+        : 'Veri eksik',
+    },
+    {
+      tone: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 ? 'positive' : 'negative',
+      category: 'Kaldıraç',
+      metric: 'Borç / Özkaynak:',
+      val: fmtN(r.debtToEquity),
+      comment: r.debtToEquity != null
+        ? (r.debtToEquity <= bm.debtToEquity * 1.2 ? 'Güvenli borçluluk aralığı, kredi genişlemesine uygun.' : 'Yüksek kaldıraç, riskli borçluluk yapısı.')
+        : 'Veri eksik',
+    },
+  ] : []
 
   // Aynı entity'nin tüm analizleri (yıl seçici için)
   const entityAnalyses = selected
@@ -206,7 +500,6 @@ export default function AnalizPage() {
   }, {})
 
   /* ─── Rasyo Tablosu ───────────────────────────── */
-  const r = selected?.ratios ?? {}
   const ratioSections = selected ? [
     {
       label: 'Likidite', color: '#2dd4bf',
@@ -233,7 +526,7 @@ export default function AnalizPage() {
       ]
     },
     {
-      label: 'Kaldıraç', color: '#fb923c',
+      label: 'Kaldıraç', color: '#0ea5e9',
       rows: [
         { id: 'Borç / Özkaynak',        val: fmtN(r.debtToEquity),             avg: fmtN(bm.debtToEquity),        good: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 },
         { id: 'Borç / Aktif',           val: fmtN(r.debtToAssets),             avg: fmtN(bm.debtToAssets),        good: r.debtToAssets != null && r.debtToAssets <= bm.debtToAssets * 1.2 },
@@ -244,7 +537,7 @@ export default function AnalizPage() {
       ]
     },
     {
-      label: 'Faaliyet', color: '#fbbf24',
+      label: 'Faaliyet', color: '#6366f1',
       rows: [
         { id: 'Aktif Devir Hızı',       val: fmtN(r.assetTurnover),            avg: fmtN(bm.assetTurnover),       good: r.assetTurnover != null && r.assetTurnover >= bm.assetTurnover * 0.8 },
         { id: 'Sabit Aktif Devir',      val: fmtN(r.fixedAssetTurnover),       avg: '—',                          good: r.fixedAssetTurnover != null && r.fixedAssetTurnover >= 1.0 },
@@ -258,18 +551,20 @@ export default function AnalizPage() {
 
   /* ─── Render ──────────────────────────────────── */
   return (
-    <DashboardShell>
-    <div className="space-y-5 max-w-[1440px] mx-auto">
+    <FinrateShell>
+    <div className="flex flex-col gap-6">
 
-      {/* ── Üst Bar ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: 'Outfit,sans-serif' }}>Analizler</h1>
+        <div className="page-header-left">
+          <h1>Analizler</h1>
+          <p className="page-subtitle">Şirket finansal analizleri ve skor değerlendirmeleri</p>
+        </div>
         <div className="flex gap-3">
           <div className="relative">
             <Filter className="absolute left-3 top-2.5 text-slate-400" size={14} />
             <input
               type="text" placeholder="Şirket, Dönem Ara..."
-              className="h-10 pl-9 pr-4 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-white w-56 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 placeholder-slate-500"
+              className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
             />
           </div>
           <button
@@ -279,19 +574,54 @@ export default function AnalizPage() {
               router.push(`/dashboard/analiz/rapor?id=${selected.id}`)
             }}
             disabled={!selected}
-            className="h-10 px-5 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-2 hover:bg-black transition-all border border-white/10 disabled:opacity-40"
+            className="btn btn-primary disabled:opacity-40"
           >
             <Download size={14} /> Rapor Oluştur
           </button>
         </div>
       </div>
 
+      {selected && (
+        <div className="bg-white border border-slate-200 rounded-[4px]">
+          <div className="p-4 border-b border-slate-200 bg-slate-50">
+            <h2 className="text-sm font-bold text-[#0B3C5D]">Hızlı Teşhis (Quick Screen)</h2>
+          </div>
+          <div className="p-0">
+            <div className="divide-y divide-slate-100">
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                  <div className="col-span-3">METRİK</div>
+                  <div className="col-span-2">DURUM</div>
+                  <div className="col-span-7">YORUM</div>
+              </div>
+              {whyItems.map((item) => (
+                <div key={item.category} className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
+                  <div className="col-span-3 flex flex-col">
+                    <span className="text-sm font-bold text-[#0B3C5D]">{item.metric} {item.val}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`inline-flex px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase tracking-widest ${
+                      item.tone === 'positive' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 
+                      item.tone === 'negative' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-warning/10 text-warning border border-warning/20'
+                    }`}>
+                      {item.tone === 'positive' ? '✅ İYİ' : item.tone === 'negative' ? '❌ RİSK' : '⚠️ İZLE'}
+                    </span>
+                  </div>
+                  <div className="col-span-7">
+                    <p className="text-sm text-slate-600">{item.comment}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         {/* ── Sol: Şirket Listesi ─────────────── */}
         <div className="lg:col-span-3">
-          <div style={GLASS} className="rounded-[20px] p-5">
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#3d5a80] mb-4">Şirketler</p>
+          <div className="card p-5">
+            <p className="card-desc uppercase tracking-[0.3em] mb-4">Şirketler</p>
             <div className="space-y-2">
               {Object.entries(entityGroups).map(([, group]) => {
                 const best = group[0] // en yeni (sorted desc by year)
@@ -301,29 +631,29 @@ export default function AnalizPage() {
                 return (
                   <button
                     key={best.entity?.id}
-                    onClick={() => setSelected(best)}
+                    onClick={() => { setSelected(best); if (best.entity?.id) sessionStorage.setItem('finrate_last_entity', best.entity.id) }}
                     className={clsx(
                       "w-full p-3.5 rounded-xl border transition-all text-left",
                       isActive
-                        ? "bg-white/40 border-cyan-400/40 shadow-lg shadow-cyan-500/10"
-                        : "bg-white/15 border-white/10 hover:bg-white/25"
+                        ? "border-slate-300 bg-slate-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0",
-                        isActive ? "bg-cyan-500/15 border-cyan-400/30" : "bg-white/5 border-white/5")}>
-                        <Building2 size={14} className={isActive ? "text-cyan-400" : "text-slate-500"} />
+                      <div className={clsx("flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border",
+                        isActive ? "border-slate-300 bg-[#EDF4F8]" : "border-slate-200 bg-slate-50")}>
+                        <Building2 size={14} className={isActive ? "text-[#0B3C5D]" : "text-slate-400"} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={clsx("text-[11px] font-bold truncate", isActive ? "text-[#0a1727]" : "text-[#3d5a80]")}>
+                        <p className={clsx("truncate text-[11px] font-semibold", isActive ? "text-slate-900" : "text-slate-700")}>
                           {best.entity?.name ?? 'Şirket'}
                         </p>
-                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        <p className="mt-0.5 font-mono text-[9px] font-semibold text-slate-400">
                           {group.length > 1 ? `${group.length} dönem` : `${best.year} · ${best.period}`}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-black" style={{ color: RATING_COLOR[rating] ?? '#8da4bf', fontFamily: 'Outfit,sans-serif' }}>
+                        <div className="text-sm font-black font-mono" style={{ color: RATING_COLOR[rating] ?? '#8da4bf' }}>
                           {score}
                         </div>
                         <div className="text-[9px] font-black" style={{ color: RATING_COLOR[rating] ?? '#8da4bf' }}>{rating}</div>
@@ -341,17 +671,17 @@ export default function AnalizPage() {
           <div className="lg:col-span-9 space-y-4">
 
             {/* Şirket başlığı + Yıl seçici */}
-            <div style={GLASS} className="rounded-[20px] px-6 py-4 flex items-center justify-between">
+            <div className="card px-6 py-4 flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#3d5a80]">{selected.entity?.sector ?? 'Sektör belirtilmemiş'}</p>
-                <h2 className="text-lg font-black text-[#0a1727] mt-0.5" style={{ fontFamily: 'Outfit,sans-serif' }}>
+                <p className="card-desc uppercase tracking-[0.3em]">{selected.entity?.sector ?? 'Sektör belirtilmemiş'}</p>
+                <h2 className="card-title mt-0.5" style={{ fontSize: '18px' }}>
                   {selected.entity?.name ?? 'Şirket'}
                 </h2>
               </div>
               <div className="flex items-center gap-3">
                 {/* Sektör benchmark etiketi */}
                 {selected.entity?.sector && (
-                  <span className="text-[9px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-600 border border-cyan-400/20">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-semibold text-slate-600">
                     {bm.label} · TCMB 2024
                   </span>
                 )}
@@ -360,7 +690,7 @@ export default function AnalizPage() {
                   <div className="relative">
                     <button
                       onClick={() => setYearOpen(v => !v)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-black/10 bg-white/50 text-xs font-black text-[#0a1727] hover:bg-white/70 transition-all"
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-semibold text-slate-900 transition-colors hover:bg-slate-50"
                     >
                       {selected.year} · {selected.period}
                       <ChevronDown size={12} className={clsx("transition-transform", yearOpen && "rotate-180")} />
@@ -368,15 +698,15 @@ export default function AnalizPage() {
                     {yearOpen && (
                       <div
                         className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden z-20 min-w-[140px]"
-                        style={{ ...GLASS, padding: 0 }}
+                        style={{ background: '#ffffff', border: '1px solid #e5e9f0', boxShadow: '0 8px 18px rgba(15,23,42,0.08)', padding: 0 }}
                       >
                         {entityAnalyses.map(a => (
                           <button
                             key={a.id}
                             onClick={() => { setSelected(a); setYearOpen(false) }}
                             className={clsx(
-                              "w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-cyan-500/10 transition-colors",
-                              selected.id === a.id ? "text-cyan-600 bg-cyan-500/10" : "text-[#3d5a80]"
+                              "w-full px-4 py-2.5 text-left font-mono text-xs font-semibold transition-colors hover:bg-slate-50",
+                              selected.id === a.id ? "bg-[#EDF4F8] text-[#0B3C5D]" : "text-slate-600"
                             )}
                           >
                             {a.year} · {a.period}
@@ -390,178 +720,373 @@ export default function AnalizPage() {
             </div>
 
             {/* ── Tab Bar ───────────────────────── */}
-            <div style={GLASS} className="rounded-[20px] p-1.5 flex gap-1">
+            <div className="tab-group p-1">
               {TABS.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={clsx(
-                    "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-[14px] text-[11px] font-black transition-all",
-                    activeTab === tab.id
-                      ? "bg-white text-[#0a1727] shadow-md shadow-black/10"
-                      : "text-[#8da4bf] hover:text-[#3d5a80]"
+                    "tab",
+                    activeTab === tab.id && "active"
                   )}
                 >
                   {tab.icon}
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="hidden sm:inline ml-2">{tab.label}</span>
                 </button>
               ))}
             </div>
 
             {/* ── Tab İçerikleri ────────────────── */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
-              >
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
+            >
 
                 {/* ── GENEL BAKIŞ ─────────────── */}
-                {activeTab === 'overview' && (
+                {activeTab === 'overview' && (() => {
+                  // ── hesaplamalar ──────────────────────────────────────
+                  const de        = r.debtToEquity ?? 0
+                  const deBench   = bm.debtToEquity ?? 1
+                  const deStatus  = de > 2.0 ? 'danger' : de > 1.0 ? 'warning' : 'normal'
+                  const deTrend   = de <= deBench ? 'up' : 'down'
+                  const deColor   = de > 2.0 ? '#ef4444' : de > 1.0 ? '#94a3b8' : '#10b981'
+
+                  const crRatio     = r.currentRatio ?? 0
+                  const crBench     = bm.currentRatio ?? 1.5
+                  const crBarPct    = Math.min(crRatio / 3, 1) * 100
+                  const crMarkPct   = Math.min(crBench / 3, 1) * 100
+                  const crStatus    = crRatio < 1 ? 'warning' : 'normal'
+
+                  const activeRating = cr.replace(/[+\-]/g, '')
+                  const RATING_SCALE = ['AAA','AA','A','BBB','BB','B','CCC']
+                  const RISK_LABEL: Record<string,string> = {
+                    AAA:'Çok Düşük', AA:'Düşük', A:'Düşük', BBB:'Orta',
+                    BB:'Orta-Yüksek', B:'Yüksek', CCC:'Çok Yüksek', CC:'Kritik', C:'Kritik', D:'İflas',
+                  }
+                  const catItems = [
+                    { label: 'Likidite',  value: Math.round(selected.liquidityScore),     color: '#0ea5e9', fill: 'fill-cyan'   },
+                    { label: 'Karlılık',  value: Math.round(selected.profitabilityScore), color: '#6366f1', fill: 'fill-indigo' },
+                    { label: 'Kaldıraç', value: Math.round(selected.leverageScore),      color: '#2dd4bf', fill: 'fill-teal'   },
+                    { label: 'Faaliyet', value: Math.round(selected.activityScore),      color: '#10b981', fill: 'fill-emerald'},
+                  ]
+
+                  return (
                   <div className="space-y-4">
-                    {/* KPI Kartları */}
-                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                      {[
-                        { label: "FİNRATE SKORU", value: `${Math.round(cs)} / 100`, sub: cr, color: RATING_COLOR[cr] ?? '#2dd4bf' },
-                        { label: "AKTİF TOPLAM",  value: fmtTL(fd?.totalAssets),   sub: fd?.totalCurrentAssets != null ? `Dönen: ${fmtTL(fd.totalCurrentAssets)}` : '—', color: '#0ea5e9' },
-                        { label: "CARİ ORAN",     value: fmtN(r.currentRatio),       sub: `Sektör: ${fmtN(bm.currentRatio)}`, color: '#2dd4bf' },
-                        { label: "BORÇ/ÖZKAYNAK", value: fmtN(r.debtToEquity),       sub: `Sektör: ${fmtN(bm.debtToEquity)}`, color: r.debtToEquity != null && r.debtToEquity > bm.debtToEquity * 1.5 ? '#f87171' : '#2dd4bf' },
-                      ].map(kpi => (
-                        <div key={kpi.label} style={GLASS} className="rounded-[20px] p-5 relative overflow-hidden">
-                          <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#3d5a80] mb-2">{kpi.label}</div>
-                          <div className="text-2xl font-black text-[#0a1727]" style={{ fontFamily: 'Outfit,sans-serif' }}>{kpi.value}</div>
-                          <div className="text-[10px] font-bold mt-1" style={{ color: kpi.color }}>{kpi.sub}</div>
+
+                    {/* ── Row 1: KPI kartları — kompakt boyut ─────────── */}
+                    <div className="kpi-row" style={{ fontSize: '0.85em' }}>
+
+                      {/* KPI 1 — Finrate Skoru */}
+                      <div className={clsx('kpi-card kpi-score', cs < 60 && 'kpi-card-warning')}>
+                        <div className="kpi-header">
+                          <span className="kpi-label">Finrate Skoru</span>
+                          <span className={clsx('kpi-badge', cs >= 60 ? 'badge-up' : 'badge-down')}>
+                            {cr}
+                          </span>
                         </div>
-                      ))}
+                        <div className="kpi-body-score">
+                          <div className="score-ring-wrap" style={{ width:80, height:80 }}>
+                            <svg className="score-ring" viewBox="0 0 120 120">
+                              <defs>
+                                <linearGradient id="scoreGradOv" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#2dd4bf"/>
+                                  <stop offset="100%" stopColor="#14b8a6"/>
+                                </linearGradient>
+                              </defs>
+                              <circle className="ring-bg" cx="60" cy="60" r="50"/>
+                              <motion.circle className="ring-fill" cx="60" cy="60" r="50"
+                                stroke="url(#scoreGradOv)"
+                                strokeDasharray="314.16"
+                                initial={{ strokeDashoffset: 314.16 }}
+                                animate={{ strokeDashoffset: 314.16 - (cs / 100) * 314.16 }}
+                                transition={{ duration:1.5, ease:[0.16,1,0.3,1] }}
+                              />
+                            </svg>
+                            <div className="score-value">
+                              <span className="score-num" style={{ color:'#2dd4bf', fontSize:20 }}>{Math.round(cs)}</span>
+                              <span className="score-max">/100</span>
+                            </div>
+                          </div>
+                          <div className="score-meta">
+                            <span className="score-grade" style={{ color: RATING_COLOR[cr] ?? '#2dd4bf', fontSize:18 }}>{cr}</span>
+                            <span className="score-label">{RATING_LABEL[cr] ?? 'Kredi Notu'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* KPI 2 — Aktif Toplam */}
+                      <div className="kpi-card">
+                        <div className="kpi-header">
+                          <span className="kpi-label">Aktif Toplam</span>
+                        </div>
+                        <div className="kpi-body">
+                          <span className="kpi-value" style={{ fontSize:22 }}>{fmtTL(fd?.totalAssets)}</span>
+                          <div className="kpi-sparkline">
+                            <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+                              <defs>
+                                <linearGradient id="spGrad1" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.3"/>
+                                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0"/>
+                                </linearGradient>
+                              </defs>
+                              <polyline points="0,25 20,20 40,16 60,11 80,5" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
+                              <polygon points="0,25 20,20 40,16 60,11 80,5 80,30 0,30" fill="url(#spGrad1)"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="kpi-footer">
+                          <span>{fd?.totalCurrentAssets != null ? `Dönen: ${fmtTL(fd.totalCurrentAssets)}` : '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* KPI 3 — Cari Oran */}
+                      <div className={clsx('kpi-card', crStatus === 'warning' && 'kpi-card-warning')}>
+                        <div className="kpi-header">
+                          <span className="kpi-label">Cari Oran</span>
+                          <span className={clsx('kpi-badge', crRatio >= crBench ? 'badge-up' : 'badge-down')}>
+                            {crRatio >= crBench ? '+' : '−'}{Math.abs(crRatio - crBench).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="kpi-body" style={{ flexDirection:'column', alignItems:'flex-start', gap:6 }}>
+                          <span className="kpi-value" style={{ fontSize:22 }}>{fmtN(crRatio)}</span>
+                          <div style={{ width:'100%' }}>
+                            <div style={{ position:'relative', height:5, background:'rgba(0,0,0,0.08)', borderRadius:3 }}>
+                              <motion.div initial={{ width:0 }} animate={{ width:`${crBarPct}%` }}
+                                style={{ position:'absolute', left:0, top:0, height:'100%', borderRadius:3,
+                                         background: crRatio>=1.5 ? '#0ea5e9' : crRatio>=1 ? '#94a3b8' : '#ef4444' }}/>
+                              <div style={{ position:'absolute', top:-3, width:2, height:11, background:'#94a3b8', borderRadius:1,
+                                            left:`${crMarkPct}%`, transform:'translateX(-50%)' }}/>
+                            </div>
+                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#94a3b8', marginTop:3 }}>
+                              <span>Düşük</span><span>Hedef</span><span>Yüksek</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="kpi-footer"><span>Sektör ort: {fmtN(crBench)}</span></div>
+                      </div>
+
+                      {/* KPI 4 — Borç/Özkaynak */}
+                      <div className={clsx('kpi-card', deStatus==='danger'&&'kpi-card-danger', deStatus==='warning'&&'kpi-card-warning')}>
+                        <div className="kpi-header">
+                          <span className="kpi-label">Borç / Özkaynak</span>
+                          <span className={clsx('kpi-badge', deTrend==='up'?'badge-up':'badge-down')}>
+                            {deTrend==='up' ? '↓ İyi' : '↑ Yük'}
+                          </span>
+                        </div>
+                        <div className="kpi-body">
+                          <span className="kpi-value" style={{ fontSize:22, color:deColor }}>{fmtN(de)}</span>
+                          <div className="kpi-sparkline">
+                            <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+                              {de <= deBench
+                                ? <polyline points="0,22 20,18 40,13 60,9 80,5"  fill="none" stroke={deColor} strokeWidth="2" strokeLinecap="round"/>
+                                : <polyline points="0,8  20,12 40,16 60,21 80,25" fill="none" stroke={deColor} strokeWidth="2" strokeLinecap="round"/>}
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="kpi-footer"><span>Sektör ort: {fmtN(deBench)}</span></div>
+                      </div>
                     </div>
 
-                    {/* Skor + Kategori Barları */}
-                    <div style={GLASS} className="rounded-[20px] p-8 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-                      <div className="flex flex-col items-center border-r border-black/5 pr-10">
-                        <CircularScore score={cs} rating={cr} />
-                      </div>
-                      <div className="space-y-6">
-                        <div>
-                          <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-[#3d5a80] mb-4">Finansal Güç Göstergesi</h3>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold text-[#3d5a80]">Faiz Karşılama</span>
-                            <span className="text-lg font-black text-emerald-500" style={{ fontFamily: 'Outfit,sans-serif' }}>
-                              {r.interestCoverage != null ? `${r.interestCoverage.toFixed(1)}x` : '—'}
-                            </span>
+                    {/* ── Row 2: Chart + Rating ──────────────────────── */}
+                    <div className="content-grid">
+
+                      {/* Sol: Finansal bar chart — dönem × metrik */}
+                      {(() => {
+                        const sorted4 = [...entityAnalyses]
+                          .sort((a, b) => a.year - b.year || a.period.localeCompare(b.period))
+                          .slice(-4)
+                        const PERIOD_S: Record<string,string> = { ANNUAL:'', Q1:'Q1', Q2:'Q2', Q3:'Q3', Q4:'Q4' }
+                        const periods: BarPeriod[] = sorted4.map(a => {
+                          const fd = a.financialData as FinData | undefined
+                          const p  = PERIOD_S[a.period] ?? a.period
+                          const lbl = p ? `${a.year}/${p}` : String(a.year)
+                          const totalDebt = ((fd?.totalCurrentLiabilities ?? 0) + (fd?.totalNonCurrentLiabilities ?? 0)) || null
+                          return chartTab === 'gelir'
+                            ? { label: lbl, primary: fd?.revenue ?? null,     secondary: fd?.ebit ?? null }
+                            : { label: lbl, primary: totalDebt,                secondary: fd?.totalEquity ?? null }
+                        })
+                        const pLabel = chartTab === 'gelir' ? 'Net Satışlar'  : 'Toplam Borç'
+                        const sLabel = chartTab === 'gelir' ? 'Faaliyet Karı' : 'Özsermaye'
+                        return (
+                          <BarMetricChart
+                            periods={periods}
+                            primaryLabel={pLabel}
+                            secondaryLabel={sLabel}
+                            tab={chartTab}
+                            onTab={setChartTab}
+                          />
+                        )
+                      })()}
+
+                      {/* Sağ sidebar: Kredi Derecelendirme */}
+                      <div className="sidebar-stack">
+                        <div className="card card-rating">
+                          <div className="card-head">
+                            <h2 className="card-title">Kredi Derecelendirme</h2>
                           </div>
-                          <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min(selected.leverageScore, 100)}%` }}
-                              className="h-full bg-emerald-500 rounded-full"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          {[
-                            { label: 'Likidite',  value: Math.round(selected.liquidityScore),     color: '#2dd4bf' },
-                            { label: 'Karlılık',  value: Math.round(selected.profitabilityScore), color: '#818cf8' },
-                            { label: 'Kaldıraç', value: Math.round(selected.leverageScore),      color: '#fb923c' },
-                            { label: 'Faaliyet', value: Math.round(selected.activityScore),      color: '#fbbf24' },
-                          ].map(item => (
-                            <div key={item.label}>
-                              <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                                <span className="text-[#3d5a80]">{item.label}</span>
-                                <span className="text-[#0a1727]">{item.value} / 100</span>
+                          <div className="card-body">
+                            <div className="rating-scale">
+                              {RATING_SCALE.map(rt => (
+                                <div key={rt}
+                                  className={clsx('rating-pill', (activeRating === rt || cr === rt) && 'active')}
+                                  data-rating={rt}>
+                                  {rt === activeRating ? cr : rt}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="rating-info">
+                              <div className="rating-detail">
+                                <span className="rating-detail-label">Risk Seviyesi</span>
+                                <span className={clsx('rating-detail-value', cs >= 68 && 'low')}>
+                                  {RISK_LABEL[activeRating] ?? '—'}
+                                </span>
                               </div>
-                              <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                                <motion.div
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${item.value}%` }}
-                                  className="h-full rounded-full"
-                                  style={{ background: item.color }}
-                                />
+                              <div className="rating-detail">
+                                <span className="rating-detail-label">EBITDA Marjı</span>
+                                <span className="rating-detail-value">
+                                  {r.ebitdaMargin != null ? fmtPct(r.ebitdaMargin) : '—'}
+                                </span>
+                              </div>
+                              <div className="rating-detail">
+                                <span className="rating-detail-label">Net Kâr Marjı</span>
+                                <span className="rating-detail-value">
+                                  {r.netProfitMargin != null ? fmtPct(r.netProfitMargin) : '—'}
+                                </span>
+                              </div>
+                              <div className="rating-detail">
+                                <span className="rating-detail-label">Faiz Karşılama</span>
+                                <span className="rating-detail-value">
+                                  {r.interestCoverage != null ? `${r.interestCoverage.toFixed(1)}x` : '—'}
+                                </span>
                               </div>
                             </div>
-                          ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
+
+                    </div>{/* /content-grid */}
+
+                    <CoverageBanner coverage={selected?.overallCoverage} />
+
+                    {/* ── Row 3: Aktif & Pasif Dağılımı ──────────────── */}
+                    {fd && (
+                      <div style={{ display:'flex', gap:16 }}>
+                        {/* Aktif Dağılımı */}
+                        {(() => {
+                          const duran   = fd.totalNonCurrentAssets ?? 0
+                          const nakit   = fd.cash ?? 0
+                          const alacak  = fd.tradeReceivables ?? 0
+                          const stok    = fd.inventory ?? 0
+                          const diger   = Math.max(0, (fd.totalCurrentAssets ?? 0) - nakit - alacak - stok)
+                          const segs = [
+                            { label:'Duran Varlıklar',    value: duran,  color:'#1e3a8a' },
+                            { label:'Ticari Mallar/Stok',  value: stok,   color:'#f59e0b' },
+                            { label:'Ticari Alacaklar',    value: alacak, color:'#0ea5e9' },
+                            { label:'Nakit & Benzerleri',  value: nakit,  color:'#6366f1' },
+                            { label:'Diğer Dönen',         value: diger,  color:'#2dd4bf' },
+                          ].filter(s => s.value > 0)
+                          const realTotal = fd.totalAssets ?? (duran + (fd.totalCurrentAssets ?? (nakit + alacak + stok + diger)))
+                          return <DonutSegChart title="Aktif Dağılımı" totalLabel="Toplam Aktif" segments={segs} displayTotal={realTotal}/>
+                        })()}
+
+                        {/* Pasif Dağılımı */}
+                        {(() => {
+                          const kvBorc  = fd.totalCurrentLiabilities ?? 0
+                          const uvBorc  = fd.totalNonCurrentLiabilities ?? 0
+                          const ozkay   = fd.totalEquity ?? 0
+                          const segs = [
+                            { label:'Kısa Vadeli Borç',   value: kvBorc, color:'#ef4444' },
+                            { label:'Uzun Vadeli Borç',   value: uvBorc, color:'#f87171' },
+                            { label:'Özkaynaklar',         value: ozkay,  color:'#10b981' },
+                          ].filter(s => s.value > 0)
+                          const realPasif = fd.totalAssets ?? (kvBorc + uvBorc + ozkay)
+                          return <DonutSegChart title="Pasif Dağılımı" totalLabel="Toplam Pasif" segments={segs} displayTotal={realPasif}/>
+                        })()}
+                      </div>
+                    )}
+
                   </div>
-                )}
+                  )
+                })()}
 
                 {/* ── RASYOLAR ────────────────── */}
                 {activeTab === 'ratios' && (
-                  <div style={GLASS} className="rounded-[20px] overflow-hidden">
+                  <div className="card overflow-hidden">
+                    <CoverageBanner coverage={selected?.overallCoverage} />
                     {/* Başlık */}
-                    <div className="px-7 py-5 border-b border-black/5 flex items-center justify-between">
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#3d5a80]">Finansal Oran Analizi</h4>
-                        <p className="text-[9px] text-[#8da4bf] mt-0.5">{ratioSections.reduce((s, sec) => s + sec.rows.length, 0)} rasyo · Tümü</p>
+                    <div className="card-head">
+                      <div className="card-head-left">
+                        <h4 className="card-title">Finansal Oran Analizi</h4>
+                        <p className="card-desc">{ratioSections.reduce((s, sec) => s + sec.rows.length, 0)} rasyo · Tümü</p>
                       </div>
-                      <span className="text-[9px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-600 border border-cyan-400/20">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
                         Sektör: {bm.label} · TCMB 2024
                       </span>
                     </div>
 
-                    {/* Kolon Başlıkları */}
-                    <div className="grid grid-cols-12 px-7 py-2.5 border-b border-black/[0.04]" style={{ background: 'rgba(0,0,0,0.025)' }}>
-                      <span className="col-span-6 text-[9px] font-black uppercase tracking-[0.2em] text-[#8da4bf]">Oran</span>
-                      <span className="col-span-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#3d5a80] text-right">Firma Değeri</span>
-                      <span className="col-span-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#8da4bf] text-right">Sektör Ort.</span>
-                      <span className="col-span-2 text-[9px] font-black uppercase tracking-[0.2em] text-[#8da4bf] text-center">Durum</span>
-                    </div>
-
-                    {ratioSections.map(sec => (
-                      <div key={sec.label}>
-                        {/* Kategori Başlığı */}
-                        <div className="grid grid-cols-12 px-7 py-2.5 items-center" style={{ background: 'rgba(0,0,0,0.015)' }}>
-                          <div className="col-span-12 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ background: sec.color }} />
-                            <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: sec.color }}>
-                              {sec.label}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Satırlar */}
-                        <div className="divide-y divide-black/[0.03]">
-                          {sec.rows.map(row => (
-                            <div key={row.id} className="grid grid-cols-12 items-center px-0 hover:bg-black/[0.015] transition-colors">
-                              <div className="col-span-6 px-7 py-3.5 text-[11px] font-semibold text-[#3d5a80]">{row.id}</div>
-                              <div className="col-span-2 px-4 py-3.5 text-[11px] font-black text-[#0a1727] text-right">{row.val}</div>
-                              <div className="col-span-2 px-4 py-3.5 text-[11px] font-bold text-[#8da4bf] text-right">{row.avg}</div>
-                              <div className="col-span-2 px-7 py-3.5 text-center">
-                                {row.val !== '—' && (
-                                  <span className={clsx(
-                                    "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
-                                    row.good
-                                      ? "bg-emerald-500/10 text-emerald-600"
-                                      : "bg-red-500/10 text-red-500"
-                                  )}>
-                                    {row.good ? 'İyi' : 'Zayıf'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                    <div className="card-body !p-0 mt-4">
+                      <table className="fin-table">
+                        <thead>
+                          <tr>
+                            <th>Oran</th>
+                            <th className="text-right">Firma Değeri</th>
+                            <th className="text-right">Sektör Ort.</th>
+                            <th className="text-center">Durum</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ratioSections.map(sec => (
+                            <React.Fragment key={sec.label}>
+                              {/* Kategori Satırı */}
+                              <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                <td colSpan={4} className="py-2 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: sec.color }} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: sec.color }}>
+                                      {sec.label}
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+                              {/* Rasyo Satırları */}
+                              {sec.rows.map(row => (
+                                <tr key={row.id}>
+                                  <td className="indicator-name px-4">{row.id}</td>
+                                  <td className="indicator-val text-right px-4 font-mono">{row.val}</td>
+                                  <td className="indicator-avg text-right px-4 font-mono">{row.avg}</td>
+                                  <td className="text-center px-4">
+                                    {row.val !== '—' && (
+                                      <span className={clsx(
+                                        "status-chip",
+                                        row.good ? "status-great" : "status-bad"
+                                      )}>
+                                        {row.good ? 'İyi' : 'Zayıf'}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
                           ))}
-                        </div>
-                      </div>
-                    ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 
                 {/* ── SENARYO ─────────────────── */}
                 {activeTab === 'scenario' && (
                   <div className="space-y-5">
-                    <div className="rounded-[20px] overflow-hidden" style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      backdropFilter: 'blur(20px) saturate(140%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: '0 8px 32px rgba(10,30,60,0.16)',
-                    }}>
-                      <div className="px-7 py-4 border-b border-white/5">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50">Senaryo Simülatörü</h4>
-                        <p className="text-[9px] text-white/30 mt-0.5">Finansal kalemleri değiştirerek skor etkisini anlık görün</p>
+                    <div className="card overflow-hidden">
+                      <div className="card-head">
+                        <div className="card-head-left">
+                          <h4 className="card-title">Senaryo Simülatörü</h4>
+                          <p className="card-desc">Finansal kalemleri değiştirerek skor etkisini anlık görün</p>
+                        </div>
                       </div>
-                      <div className="p-5">
+                      <div className="card-body">
                         <WhatIfSimulator
                           baseData={selected.ratios ?? {}}
                           baseScore={cs}
@@ -569,12 +1094,14 @@ export default function AnalizPage() {
                         />
                       </div>
                     </div>
-                    <div style={GLASS} className="rounded-[20px] overflow-hidden">
-                      <div className="px-7 py-4 border-b border-black/5">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#3d5a80]">Hedef Nota Ulaş</h4>
-                        <p className="text-[9px] text-[#8da4bf] mt-0.5">Hangi iyileştirme en çok puan kazandırır?</p>
+                    <div className="card overflow-hidden">
+                      <div className="card-head">
+                        <div className="card-head-left">
+                          <h4 className="card-title">Hedef Nota Ulaş</h4>
+                          <p className="card-desc">Hangi iyileştirme en çok puan kazandırır?</p>
+                        </div>
                       </div>
-                      <div className="p-5">
+                      <div className="card-body">
                         <OptimizationPanel
                           ratios={selected.ratios as unknown as RatioResult}
                           currentScore={cs}
@@ -602,11 +1129,26 @@ export default function AnalizPage() {
                 )}
 
               </motion.div>
-            </AnimatePresence>
           </div>
         )}
       </div>
     </div>
-    </DashboardShell>
+    </FinrateShell>
+  )
+}
+
+export default function AnalizPage() {
+  return (
+    <Suspense
+      fallback={
+        <FinrateShell>
+          <div className="flex justify-center py-20">
+            <Loader2 size={24} className="animate-spin text-cyan-600" />
+          </div>
+        </FinrateShell>
+      }
+    >
+      <AnalizPageContent />
+    </Suspense>
   )
 }

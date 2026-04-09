@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 
@@ -6,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const userId = getUserIdFromRequest(req)
     if (!userId) {
-      return NextResponse.json({ error: 'Oturum açılmamış.' }, { status: 401 })
+      return jsonUtf8({ error: 'Oturum açılmamış.' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
@@ -29,12 +30,12 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    if (!user || !user) {
-      return NextResponse.json({ error: 'Kullanıcı bulunamadı.' }, { status: 404 })
+    if (!user) {
+      return jsonUtf8({ error: 'Kullanıcı bulunamadı.' }, { status: 404 })
     }
 
-    return NextResponse.json({ user })
+    return jsonUtf8({ user })
   } catch {
-    return NextResponse.json({ error: 'Oturum geçersiz.' }, { status: 401 })
+    return jsonUtf8({ error: 'Oturum geçersiz.' }, { status: 401 })
   }
 }

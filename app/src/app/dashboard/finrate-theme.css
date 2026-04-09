@@ -1118,8 +1118,8 @@ body {
 }
 
 .status-warn {
-    background: rgba(251, 191, 36, 0.12);
-    color: #d97706;
+    background: rgba(148, 163, 184, 0.12);
+    color: #94a3b8;
 }
 
 .status-bad {

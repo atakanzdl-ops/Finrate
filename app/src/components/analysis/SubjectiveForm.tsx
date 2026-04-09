@@ -9,24 +9,16 @@ interface Props {
   entityId: string
 }
 
-const GLASS: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.72)',
-  backdropFilter: 'blur(20px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-  border: '1px solid rgba(255,255,255,0.65)',
-  boxShadow: '0 8px 32px rgba(10,30,60,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
-}
-
 function ScoreBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = (value / max) * 100
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-[11px] font-bold">
         <span className="text-[#3d5a80]">{label}</span>
-        <span className="text-[#0a1727]">{value} / {max}</span>
+        <span className="text-[#0a1727] font-mono">{value} / {max}</span>
       </div>
-      <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
+      <div className="ratio-bar-track">
+        <div className="ratio-bar-fill transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
   )
@@ -37,7 +29,7 @@ function SwitchField({ label, desc, value, onChange }: { label: string; desc?: s
     <div className="flex items-center justify-between py-3 border-b border-black/5 last:border-0">
       <div>
         <div className="text-xs font-bold text-[#0a1727]">{label}</div>
-        {desc && <div className="text-[10px] text-[#8da4bf] mt-0.5">{desc}</div>}
+        {desc && <div className="card-desc mt-0.5">{desc}</div>}
       </div>
       <button
         onClick={() => onChange(!value)}
@@ -48,7 +40,7 @@ function SwitchField({ label, desc, value, onChange }: { label: string; desc?: s
       >
         <span className={clsx(
           "absolute w-4 h-4 rounded-full bg-white shadow transition-all duration-300",
-          value ? "left-5.5 left-[22px]" : "left-0.5"
+          value ? "left-[22px]" : "left-0.5"
         )} />
       </button>
     </div>
@@ -57,8 +49,8 @@ function SwitchField({ label, desc, value, onChange }: { label: string; desc?: s
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { val: string; label: string }[]; onChange: (v: string) => void }) {
   return (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">{label}</label>
+    <div className="space-y-2">
+      <label className="card-desc uppercase tracking-widest">{label}</label>
       <div className="flex gap-2 flex-wrap">
         {options.map(opt => (
           <button
@@ -85,13 +77,17 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
   return (
     <div className="space-y-2">
       <div className="flex justify-between">
-        <label className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">{label}</label>
-        <span className="text-xs font-black text-[#0a1727]">{value}{unit}</span>
+        <label className="card-desc uppercase tracking-widest">{label}</label>
+        <span className="text-xs font-black text-[#0a1727] font-mono">{value}{unit}</span>
       </div>
       <input
-        type="range" min={min} max={max} step={step} value={value}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-cyan-500 h-1.5 rounded-full"
+        className="w-full accent-cyan-500 h-1.5 rounded-full cursor-pointer"
       />
       <div className="flex justify-between text-[9px] text-[#8da4bf]">
         <span>{min}{unit}</span>
@@ -123,6 +119,7 @@ export default function SubjectiveForm({ entityId }: Props) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     fetch(`/api/entities/${entityId}/subjective`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -162,27 +159,26 @@ export default function SubjectiveForm({ entityId }: Props) {
 
   const totalColor = score
     ? score.percentage >= 70 ? '#10b981'
-    : score.percentage >= 40 ? '#f59e0b'
+    : score.percentage >= 40 ? '#94a3b8'
     : '#f87171'
     : '#8da4bf'
 
   return (
     <div className="space-y-6">
-      {/* Başlık + Özet Skor */}
-      <div style={GLASS} className="rounded-[20px] p-8">
+      <div className="card p-8">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#3d5a80]">Subjektif Değerlendirme</h3>
-            <p className="text-[10px] text-[#8da4bf] mt-1">KKB · Banka · Kurumsal · Uyum — toplam 30 puan</p>
+            <h3 className="card-title text-[10px] uppercase tracking-[0.3em]">Subjektif Değerlendirme</h3>
+            <p className="card-desc mt-1">KKB · Banka · Kurumsal · Uyum — toplam 30 puan</p>
           </div>
           <button
             onClick={handleSave}
             disabled={saving}
             className={clsx(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all",
+              "btn px-4 py-2 text-xs",
               saved
                 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
-                : "bg-cyan-500 border-cyan-500 text-white hover:bg-cyan-600 shadow-md"
+                : "btn-primary"
             )}
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle2 size={13} /> : <Save size={13} />}
@@ -190,26 +186,22 @@ export default function SubjectiveForm({ entityId }: Props) {
           </button>
         </div>
 
-        {/* Skor Özet */}
         {score && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 pb-6 border-b border-black/5">
             <div className="text-center">
-              <div className="text-3xl font-black" style={{ color: totalColor, fontFamily: 'Outfit, sans-serif' }}>{score.total}</div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf] mt-1">/ 30 PUAN</div>
+              <div className="text-3xl font-black font-mono" style={{ color: totalColor }}>{score.total}</div>
+              <div className="card-desc uppercase tracking-widest mt-1">/ 30 PUAN</div>
             </div>
             <div className="col-span-3 space-y-3">
               <ScoreBar label="KKB & Kredi Sicili" value={score.kkbScore} max={10} color="#2dd4bf" />
               <ScoreBar label="Banka İlişkileri" value={score.bankScore} max={10} color="#0ea5e9" />
               <ScoreBar label="Kurumsal Yapı" value={score.corpScore} max={5} color="#6366f1" />
-              <ScoreBar label="Uyum & Risk" value={score.complianceScore} max={5} color={score.complianceScore >= 4 ? "#10b981" : score.complianceScore >= 2 ? "#f59e0b" : "#f87171"} />
+              <ScoreBar label="Uyum & Risk" value={score.complianceScore} max={5} color={score.complianceScore >= 4 ? "#10b981" : score.complianceScore >= 2 ? "#94a3b8" : "#f87171"} />
             </div>
           </div>
         )}
 
-        {/* Form Alanları */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-          {/* KKB & Kredi Sicili */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard size={14} className="text-cyan-500" />
@@ -254,7 +246,6 @@ export default function SubjectiveForm({ entityId }: Props) {
             </div>
           </div>
 
-          {/* Banka İlişkileri */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <Building2 size={14} className="text-blue-500" />
@@ -283,7 +274,6 @@ export default function SubjectiveForm({ entityId }: Props) {
             </div>
           </div>
 
-          {/* Kurumsal Yapı */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <Shield size={14} className="text-indigo-500" />
@@ -318,12 +308,11 @@ export default function SubjectiveForm({ entityId }: Props) {
             </div>
           </div>
 
-          {/* Uyum & Risk */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle size={14} className="text-amber-500" />
+              <AlertTriangle size={14} className="text-sky-500" />
               <span className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">Uyum & Risk</span>
-              <span className="ml-auto text-[9px] font-bold text-amber-500">{score?.complianceScore ?? '–'} / 5</span>
+              <span className="ml-auto text-[9px] font-bold text-sky-500">{score?.complianceScore ?? '–'} / 5</span>
             </div>
             <div className="rounded-xl p-4 space-y-0" style={{ background: 'rgba(0,0,0,0.03)' }}>
               <SwitchField
@@ -346,7 +335,6 @@ export default function SubjectiveForm({ entityId }: Props) {
               onChange={v => update('activeLawsuitCount', v)}
             />
           </div>
-
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Building2, Plus, X, Loader2 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
@@ -42,7 +42,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   const [addOwn, setAddOwn]     = useState('100')
   const [adding, setAdding]     = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     const [gr, en] = await Promise.all([
       fetch(`/api/groups/${id}`).then((r) => r.json()),
       fetch('/api/entities').then((r) => r.json()),
@@ -50,9 +50,9 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     setGroup(gr.group)
     setAll(en.entities ?? [])
     setLoading(false)
-  }
+  }, [id])
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [load])
 
   // Grupta olmayan şirketler
   const available = allEntities.filter(

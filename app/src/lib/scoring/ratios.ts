@@ -3,6 +3,13 @@
  * 4 kategori: Likidite (6), Karlılık (7), Kaldıraç (6), Faaliyet (6)
  */
 
+/**
+ * Türkiye kurumlar vergisi oranı (ROIC/NOPAT hesabı için).
+ * 2024 itibarıyla %25'e yükseltildi. Değişirse buradan güncelle.
+ * Kaynak: 7456 Sayılı Kanun (Resmi Gazete: 02.08.2023)
+ */
+export const CORPORATE_TAX_RATE = 0.25
+
 export interface FinancialInput {
   // Büyüme hesabı için
   prevRevenue?: number | null          // Önceki yıl cirosu (reel büyüme için)
@@ -178,7 +185,7 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   // NDS = Stok Devir + Alacak Tahsil - Borç Ödeme (gün)
   // purchases yoksa cogs kullan, o da yoksa revenue fallback
   const cogs = n(d.cogs)
-  const costBase = purchases ?? cogs ?? revenue
+  const costBase = purchases ?? cogs  // revenue fallback kaldırıldı: DIO/DPO maliyet bazlı olmalı
 
   // Ortalama bakiye hesabı: önceki dönem verisi varsa (başlangıç+bitiş)/2,
   // yoksa sadece dönem sonu kullanılır (standart muhasebe pratiği)
@@ -233,7 +240,7 @@ export function calculateRatios(d: FinancialInput): RatioResult {
     totalAssets != null && totalCurrentLiabilities != null
       ? totalAssets - totalCurrentLiabilities
       : null
-  const nopat = ebit != null ? ebit * (1 - 0.22) : null
+  const nopat = ebit != null ? ebit * (1 - CORPORATE_TAX_RATE) : null
   const roic = safe(nopat, investedCapital)
 
   // Büyüme rasyoları
@@ -250,8 +257,9 @@ export function calculateRatios(d: FinancialInput): RatioResult {
       : null
 
   // ─── KALDIRAC ─────────────────────────────────────────────
-  const debtToEquity = safe(totalDebt || null, totalEquity)
-  const debtToAssets = safe(totalDebt || null, totalAssets)
+  // totalDebt=0 (borçsuz şirket) → 0 döndür, null değil (pozitif sinyal olarak skorlanmalı)
+  const debtToEquity = safe(totalDebt, totalEquity)
+  const debtToAssets = safe(totalDebt, totalAssets)
   const debtToEbitda = ebitda != null && ebitda !== 0 ? netFinancialDebt / ebitda : null
   const equityRatio = safe(totalEquity, totalAssets)
 
@@ -259,17 +267,14 @@ export function calculateRatios(d: FinancialInput): RatioResult {
    * Faiz Karşılama Oranı — 3 durum:
    *
    * 1. interestExpense girilmemiş (null/undefined) → null döner (veri yok, hesaplanamaz)
-   * 2. interestExpense = 0 → Infinity döner (sonsuz kapasite; puanlama borç düzeyine göre yapılır)
+   * 2. interestExpense = 0 → 9999 döner (sentinel; JSON'da Infinity bozulur)
+   *    score.ts'de >= 9999 kontrolüyle muhafazakâr puanlama yapılır
    * 3. interestExpense > 0 → EBIT / interestExpense (normal hesap)
-   *
-   * NOT: Muhasebe sınıflaması veya eksik veri nedeniyle faiz = 0 görünebilir.
-   * Bu nedenle Infinity doğrudan tam puan vermez; score.ts'de borç düzeyiyle
-   * birlikte değerlendirilir.
    */
   const interestExpenseVal = n(d.interestExpense)
   const interestCoverage: number | null =
-    interestExpenseVal == null  ? null       // veri girilmemiş
-    : interestExpenseVal === 0  ? Infinity   // faiz yükü yok → borç düzeyine göre puan
+    interestExpenseVal == null  ? null   // veri girilmemiş
+    : interestExpenseVal === 0  ? 9999  // faiz yükü yok → borç düzeyine göre puan
     : ebit != null              ? ebit / interestExpenseVal
     : null
 

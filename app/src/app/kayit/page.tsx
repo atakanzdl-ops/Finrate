@@ -195,7 +195,7 @@ export default function KayitPage() {
                     )}
                   </div>
                   <span className="text-white/40 text-xs leading-relaxed">
-                    <a href="#" className="text-white/60 hover:text-white/80">KVKK Aydınlatma Metni</a>'ni okudum,
+                    <a href="#" className="text-white/60 hover:text-white/80">KVKK Aydinlatma Metni</a>&apos;ni okudum,
                     kişisel verilerimin işlenmesine onay veriyorum.
                   </span>
                 </label>
@@ -250,3 +250,4 @@ export default function KayitPage() {
     </div>
   )
 }
+

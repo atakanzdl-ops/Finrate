@@ -1,6 +1,9 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable is not set. Set it before starting the server.')
+}
 const JWT_SECRET = process.env.JWT_SECRET ?? 'finrate-super-secret-key-change-this-in-production-2024'
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d'
 

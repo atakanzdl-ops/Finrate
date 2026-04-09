@@ -1,6 +1,7 @@
 'use client'
 
 import './dashboard.css'
+import './finrate-v2.css'
 
 /**
  * Dashboard Layout - 1:1 Migration Mode

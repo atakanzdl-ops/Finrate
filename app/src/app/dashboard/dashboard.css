@@ -700,7 +700,7 @@
 /* ─── TABS ────────────────────────────────────── */
 .tab-group {
     display: flex;
-    background: rgba(0, 0, 0, 0.04);
+    background: rgba(0, 0, 0, 0.18);
     border-radius: var(--radius-sm);
     padding: 3px;
 }
@@ -709,7 +709,7 @@
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
-    border: none;
+    border: 1px solid transparent;
     background: none;
     color: var(--text-muted);
     border-radius: 6px;
@@ -719,9 +719,12 @@
 }
 
 .tab.active {
-    background: #fff;
-    color: var(--text-primary);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #0a1727;
+    border-color: rgba(255, 255, 255, 0.65);
+    box-shadow: 0 2px 8px rgba(10, 30, 60, 0.14);
 }
 
 .tab:hover:not(.active) {
@@ -1070,8 +1073,8 @@
 }
 
 .status-warn {
-    background: rgba(251, 191, 36, 0.12);
-    color: #d97706;
+    background: rgba(148, 163, 184, 0.12);
+    color: #94a3b8;
 }
 
 .status-bad {

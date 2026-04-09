@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Target, Zap, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Zap, ChevronRight, Target, Info } from 'lucide-react'
 import clsx from 'clsx'
 import type { RatioResult } from '@/lib/scoring/ratios'
-import { findOptimalPath, getNextRating, RATING_MIN, type RatioSuggestion } from '@/lib/scoring/optimizer'
+import { findOptimalPath, getNextRating, type RatioSuggestion } from '@/lib/scoring/optimizer'
 
 interface Props {
   ratios: RatioResult
@@ -14,218 +14,223 @@ interface Props {
 }
 
 const RATING_COLOR: Record<string, string> = {
-  AAA: '#10b981', AA: '#10b981', A: '#34d399',
-  BBB: '#a3e635', BB: '#facc15', B: '#fb923c',
-  CCC: '#f97316', CC: '#f87171', C: '#ef4444', D: '#dc2626',
+  AAA: '#15803d', AA: '#16a34a', A: '#22c55e',
+  BBB: '#d97706', BB: '#dc2626', B: '#dc2626',
+  CCC: '#b91c1c', CC: '#b91c1c', C: '#991b1b', D: '#7f1d1d',
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
-  Likidite: '#2dd4bf',
-  Karlılık: '#818cf8',
-  Kaldıraç: '#fb923c',
-  Faaliyet: '#60a5fa',
-}
-
-const RATING_ORDER = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C', 'D']
-
-function SuggestionCard({ s, index }: { s: RatioSuggestion; index: number }) {
-  const catColor = CATEGORY_COLOR[s.category] ?? '#8da4bf'
-  return (
-    <div
-      className="rounded-2xl p-5 border transition-all hover:scale-[1.01]"
-      style={{
-        background: 'rgba(255,255,255,0.55)',
-        borderColor: 'rgba(255,255,255,0.5)',
-        boxShadow: '0 4px 16px rgba(10,30,60,0.06)',
-      }}
-    >
-      <div className="flex items-start gap-3">
-        {/* Sıra */}
-        <div
-          className="w-7 h-7 rounded-xl flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 mt-0.5"
-          style={{ background: catColor }}
-        >
-          {index + 1}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          {/* Başlık */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: catColor }}>
-              {s.category}
-            </span>
-            <span className="text-[9px] font-bold text-[#8da4bf]">·</span>
-            <span className="text-[10px] font-bold text-[#3d5a80]">{s.label}</span>
-          </div>
-
-          {/* Mevcut → Hedef */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-black text-[#0a1727]">
-              {formatVal(s.currentValue, s.unit)}
-            </span>
-            <ChevronRight size={12} className="text-[#8da4bf]" />
-            <span className="text-xs font-black" style={{ color: catColor }}>
-              {formatVal(s.targetValue, s.unit)}
-            </span>
-            {s.direction === 'up'
-              ? <TrendingUp size={12} style={{ color: catColor }} />
-              : <TrendingDown size={12} style={{ color: catColor }} />
-            }
-          </div>
-
-          {/* Aksiyon metni */}
-          <p className="text-[10px] text-[#3d5a80] leading-relaxed">{s.actionText}</p>
-        </div>
-
-        {/* Puan kazancı */}
-        <div className="text-right flex-shrink-0">
-          <div className="text-sm font-black" style={{ color: catColor }}>
-            +{s.scoreGain.toFixed(1)}
-          </div>
-          <div className="text-[8px] font-bold text-[#8da4bf] uppercase">puan</div>
-        </div>
-      </div>
-    </div>
-  )
+  Likidite: '#2EC4B6',
+  Karlılık: '#0B3C5D',
+  Kaldıraç: '#0ea5e9',
+  Faaliyet: '#6366f1',
 }
 
 function formatVal(val: number | null, unit: RatioSuggestion['unit']): string {
   if (val == null) return '—'
   if (unit === 'pct') return `%${(val * 100).toFixed(1)}`
-  if (unit === 'x')   return `${val.toFixed(2)}x`
+  if (unit === 'x') return `${val.toFixed(2)}x`
   if (unit === 'day') return `${Math.round(val)} gün`
   return val.toFixed(2)
+}
+
+function SuggestionCard({ s }: { s: RatioSuggestion }) {
+  const catColor = CATEGORY_COLOR[s.category] ?? '#6B7280'
+  return (
+    <div className="card hover:shadow-elevated transition-shadow duration-300">
+      <div className="card-body">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-6 rounded-full" style={{ background: catColor }} />
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest block" style={{ color: catColor }}>
+                {s.category}
+              </span>
+              <h4 className="text-sm font-bold text-prussian-900">{s.label}</h4>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest block">ETKİ</span>
+            <span className="text-sm font-black text-turquoise-500">+{s.marginalScoreGain.toFixed(1)} Puan</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 bg-brand-bg p-4 rounded-xl border border-border mb-4">
+          <div>
+            <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">Mevcut Durum</span>
+            <div className="font-mono text-lg font-black text-prussian-900">
+              {formatVal(s.currentValue, s.unit)}
+            </div>
+          </div>
+          <div className="border-l border-border pl-4">
+            <span className="text-[10px] font-bold text-turquoise-500 uppercase block mb-1">Banka Hedefi</span>
+            <div className="font-mono text-lg font-black text-turquoise-500">
+              {formatVal(s.targetValue, s.unit)}
+              {s.direction === 'up' ? <TrendingUp size={16} className="inline ml-2" /> : <TrendingDown size={16} className="inline ml-2" />}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Badge label={s.priority.toUpperCase()} tone="warning" />
+          <Badge label={s.timeHorizon} tone="neutral" />
+          <Badge label={s.difficulty.toUpperCase()} tone="neutral" />
+        </div>
+
+        <p className="text-xs leading-relaxed text-text-secondary font-medium">
+          {s.actionText}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Badge({ label, tone }: { label: string; tone: 'warning' | 'neutral' | 'success' }) {
+  const colors = {
+    warning: 'bg-amber-50 text-amber-700 border-amber-100',
+    neutral: 'bg-slate-50 text-slate-600 border-slate-100',
+    success: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  }
+  return (
+    <span className={clsx("text-[9px] font-bold px-2 py-1 rounded-lg border", colors[tone])}>
+      {label}
+    </span>
+  )
 }
 
 export default function OptimizationPanel({ ratios, currentScore, currentRating, sector }: Props) {
   const nextRating = getNextRating(currentRating)
   const [targetRating, setTargetRating] = useState<string>(nextRating ?? 'BB')
 
-  const result = useMemo(
-    () => findOptimalPath(ratios, currentScore, targetRating, sector),
-    [ratios, currentScore, targetRating, sector]
-  )
+  const result = useMemo(() => findOptimalPath(ratios, currentScore, targetRating, sector), [ratios, currentScore, targetRating, sector])
 
-  // Seçilebilir hedef ratingler (mevcut ratingden üst)
   const availableTargets = useMemo(() => {
-    const idx = RATING_ORDER.indexOf(currentRating)
-    return idx > 0 ? RATING_ORDER.slice(0, idx) : []
+    const idx = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C', 'D'].indexOf(currentRating)
+    return idx > 0 ? ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C', 'D'].slice(0, idx) : []
   }, [currentRating])
 
   if (availableTargets.length === 0) {
     return (
-      <div className="rounded-[20px] p-8 text-center"
-        style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.5)' }}>
-        <Zap size={28} className="text-emerald-400 mx-auto mb-3" />
-        <p className="text-sm font-black text-[#0a1727]">Zirvedesiniz!</p>
-        <p className="text-[10px] text-[#8da4bf] mt-1">AAA reytinginde daha yüksek hedef yok.</p>
+      <div className="card p-12 text-center bg-brand-bg border-dashed">
+        <Target size={32} className="mx-auto mb-4 text-turquoise-500" opacity={0.5} />
+        <h3 className="text-lg font-bold text-prussian-900">En Üst Seviyedesiniz</h3>
+        <p className="text-text-secondary mt-2 text-sm max-w-xs mx-auto">
+          AAA reytingi ile kurumunuz finansal mükemmeliyet seviyesindedir. Mevcut disiplini korumanız önerilir.
+        </p>
       </div>
     )
   }
 
-  const projColor = RATING_COLOR[result.projectedRating] ?? '#8da4bf'
-  const targetColor = RATING_COLOR[result.targetRating] ?? '#8da4bf'
-
   return (
-    <div className="space-y-4">
-      {/* Başlık + Hedef Seçici */}
-      <div className="rounded-[20px] p-6"
-        style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.65)', boxShadow: '0 8px 32px rgba(10,30,60,0.08)' }}>
-        <div className="flex items-start justify-between mb-5">
+    <div className="space-y-8 animate-fade-in">
+      
+      {/* Target Selection Header */}
+      <div className="card">
+        <div className="card-head">
           <div>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#3d5a80]">Hedef Nota Ulaş</h3>
-            <p className="text-[10px] text-[#8da4bf] mt-1">Seçilen hedefe en kısa yoldan ulaşmak için öneriler</p>
+            <h2 className="card-title">Stratejik Rating Hedefi</h2>
+            <p className="card-desc">Hangi reyting notuna yükselmek istiyorsunuz?</p>
           </div>
-          <Target size={16} className="text-cyan-400 mt-1" />
-        </div>
-
-        {/* Hedef seçici */}
-        <div className="space-y-2 mb-5">
-          <span className="text-[9px] font-black uppercase tracking-widest text-[#3d5a80]">Hedef Reyting</span>
-          <div className="flex gap-2 flex-wrap">
-            {availableTargets.map(r => (
+          <div className="flex gap-2">
+            {availableTargets.map((rating) => (
               <button
-                key={r}
-                onClick={() => setTargetRating(r)}
+                key={rating}
+                onClick={() => setTargetRating(rating)}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-[11px] font-black border transition-all",
-                  targetRating === r
-                    ? "text-white shadow-md border-transparent"
-                    : "border-black/10 text-[#3d5a80] hover:border-cyan-400/50"
+                  'px-4 py-2 text-xs font-black rounded-xl transition-all border-2',
+                  targetRating === rating 
+                    ? 'bg-prussian-900 text-white border-prussian-900 shadow-premium' 
+                    : 'bg-white text-prussian-300 border-border hover:border-text-muted'
                 )}
-                style={targetRating === r ? { background: RATING_COLOR[r] ?? '#6366f1' } : {}}
               >
-                {r}
+                {rating}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Mevcut → Projeksiyon */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
-            <div className="text-[8px] font-black uppercase tracking-widest text-[#8da4bf] mb-1">Mevcut</div>
-            <div className="text-xl font-black" style={{ color: RATING_COLOR[currentRating] ?? '#8da4bf', fontFamily: 'Outfit, sans-serif' }}>
-              {currentRating}
+        
+        <div className="card-body">
+            <div className="grid grid-cols-3 gap-6">
+                <StatBox label="MEVCUT NOT" value={currentRating} score={currentScore} />
+                <StatBox label="HEDEF NOT" value={result.targetRating} score={result.targetScore} isTarget />
+                <StatBox label="PROJEKSİYON" value={result.projectedRating} score={result.projectedScore} highlight />
             </div>
-            <div className="text-[9px] font-bold text-[#8da4bf] mt-0.5">{currentScore.toFixed(0)} puan</div>
-          </div>
-
-          <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
-            <div className="text-[8px] font-black uppercase tracking-widest text-[#8da4bf] mb-1">Hedef</div>
-            <div className="text-xl font-black" style={{ color: targetColor, fontFamily: 'Outfit, sans-serif' }}>
-              {result.targetRating}
-            </div>
-            <div className="text-[9px] font-bold text-[#8da4bf] mt-0.5">{result.targetScore} puan</div>
-          </div>
-
-          <div className="rounded-xl p-3 text-center" style={{ background: result.achievable ? 'rgba(16,185,129,0.08)' : 'rgba(251,146,60,0.08)' }}>
-            <div className="text-[8px] font-black uppercase tracking-widest text-[#8da4bf] mb-1">Projeksiyon</div>
-            <div className="text-xl font-black" style={{ color: projColor, fontFamily: 'Outfit, sans-serif' }}>
-              {result.projectedRating}
-            </div>
-            <div className="text-[9px] font-bold mt-0.5" style={{ color: result.achievable ? '#10b981' : '#fb923c' }}>
-              {result.projectedScore.toFixed(0)} puan {result.achievable ? '✓' : ''}
-            </div>
-          </div>
+            
+            {result.gap > 0 && (
+                <div className="mt-8">
+                    <div className="flex justify-between text-[10px] font-black text-text-muted tracking-widest mb-2">
+                        <span>Skor İlerlemesi</span>
+                        <span>GAP: {result.gap.toFixed(1)} PUAN</span>
+                    </div>
+                    <div className="h-2 w-full bg-brand-bg rounded-full overflow-hidden border border-border">
+                        <div 
+                            className="h-full bg-turquoise-500 transition-all duration-1000"
+                            style={{ width: `${Math.min(100, (currentScore / result.targetScore) * 100)}%` }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
-
-        {/* Boşluk göstergesi */}
-        {result.gap > 0 && (
-          <div className="mt-4">
-            <div className="flex justify-between text-[9px] font-bold text-[#8da4bf] mb-1.5">
-              <span>Mevcut {currentScore.toFixed(0)}</span>
-              <span className="text-[#3d5a80]">Kapatılacak boşluk: {result.gap.toFixed(1)} puan</span>
-              <span>Hedef {result.targetScore}</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${Math.min(100, (currentScore / result.targetScore) * 100)}%`,
-                  background: `linear-gradient(90deg, ${RATING_COLOR[currentRating] ?? '#6366f1'}, ${targetColor})`,
-                }}
-              />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Öneri listesi */}
+      {/* Action Plans */}
       {result.suggestions.length > 0 ? (
-        <div className="space-y-3">
-          <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#3d5a80] px-1">
-            En Etkili {result.suggestions.length} Öneri
-          </div>
-          {result.suggestions.map((s, i) => (
-            <SuggestionCard key={s.key} s={s} index={i} />
-          ))}
+        <div className="grid lg:grid-cols-2 gap-8">
+            <PlanSection 
+                title="MİNİMUM AKSİYON SETİ" 
+                subtitle="Hedefe ulaşmak için gerekli olan en kritik çekirdek adımlar."
+                suggestions={result.minimumPlan.suggestions}
+            />
+            <PlanSection 
+                title="İDEAL AKSİYON SETİ" 
+                subtitle="Daha güçlü bir kredi limiti için önerilen ek tampon adımlar."
+                suggestions={result.idealPlan.suggestions}
+            />
         </div>
       ) : (
-        <div className="rounded-[16px] p-6 text-center" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.5)' }}>
-          <p className="text-[10px] text-[#8da4bf]">Bu hedef için tüm rasyolar zaten yeterli seviyede.</p>
+        <div className="p-12 text-center">
+            <p className="text-text-muted font-medium italic">Bu hedef için rasyolarınız zaten yeterli seviyededir.</p>
         </div>
       )}
     </div>
   )
 }
+
+function StatBox({ label, value, score, highlight, isTarget }: { label: string; value: string; score: number; highlight?: boolean; isTarget?: boolean }) {
+    return (
+        <div className={clsx("p-6 rounded-2xl text-center border transition-all", 
+            highlight ? "bg-turquoise-500 border-turquoise-500 shadow-premium" : "bg-brand-bg border-border"
+        )}>
+            <span className={clsx("text-[10px] font-black tracking-widest block mb-2", 
+                highlight ? "text-white/80" : "text-text-muted"
+            )}>{label}</span>
+            <div className={clsx("text-3xl font-black font-display", 
+                highlight ? "text-white" : isTarget ? "text-turquoise-500" : "text-prussian-900"
+            )}>{value}</div>
+            <div className={clsx("text-xs font-bold mt-1", 
+                highlight ? "text-white/70" : "text-text-muted"
+            )}>{score.toFixed(0)} Puan</div>
+        </div>
+    )
+}
+
+function PlanSection({ title, subtitle, suggestions }: { title: string; subtitle: string; suggestions: RatioSuggestion[] }) {
+    return (
+        <div className="space-y-6">
+            <div className="px-1">
+                <h3 className="text-xs font-black text-prussian-900 tracking-widest flex items-center gap-2">
+                    <Zap size={14} className="text-turquoise-500" />
+                    {title}
+                </h3>
+                <p className="text-[11px] text-text-muted mt-1 font-medium">{subtitle}</p>
+            </div>
+            <div className="space-y-4">
+                {suggestions.map((s) => (
+                    <SuggestionCard key={s.key} s={s} />
+                ))}
+            </div>
+        </div>
+    )
+}
+
+

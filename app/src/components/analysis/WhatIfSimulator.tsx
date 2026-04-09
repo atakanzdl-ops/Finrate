@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Sliders, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp,
+import { Sliders, ChevronDown, ChevronUp,
          Zap, Target, BarChart2, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
-import { calculateScore, scoreToRating } from '@/lib/scoring/score'
+import { calculateScore, getRatingMinimum, scoreToRating } from '@/lib/scoring/score'
 import type { RatioResult } from '@/lib/scoring/ratios'
 
 interface Props {
@@ -26,7 +26,7 @@ const LEVERS = [
   { key: 'revenue',                label: 'Ciro Artışı',          category: 'Gelir',  primaryRatio: 'assetTurnover',           primaryLabel: 'Aktif Devir' },
   { key: 'ebitda',                 label: 'FAVÖK İyileştirme',    category: 'Gelir',  primaryRatio: 'ebitdaMargin',            primaryLabel: 'FAVÖK Marjı' },
   { key: 'netProfit',              label: 'Net Kar İyileştirme',  category: 'Gelir',  primaryRatio: 'netProfitMargin',         primaryLabel: 'Net Kâr Marjı' },
-  { key: 'cogs',                   label: 'Maliyet Azaltma (SMM)', category: 'Gelir',  primaryRatio: 'grossMargin',             primaryLabel: 'Brüt Kâr Marjı' },
+  { key: 'cogs',                   label: 'Maliyet Azaltma (SMM)', category: 'Gelir', primaryRatio: 'grossMargin',             primaryLabel: 'Brüt Kâr Marjı' },
 ]
 
 // ─── Hızlı Senaryo tanımları ──────────────────────────────
@@ -35,36 +35,36 @@ const PRESET_SCENARIOS: Array<{ id: string; label: string; desc: string; color: 
     id: 'conservative',
     label: 'Muhafazakar',
     desc: 'Risksiz, mevcut yapıyla kademeli iyileşme',
-    color: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/5',
+    color: 'text-cyan-600 border-cyan-500/40 bg-cyan-500/8',
     changes: { ebitda: 10, shortTermFinancialDebt: -10, tradeReceivables: 15 },
   },
   {
     id: 'growth',
     label: 'Büyüme Odaklı',
     desc: 'Agresif büyüme — ciro + karlılık artışı',
-    color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5',
+    color: 'text-emerald-600 border-emerald-500/40 bg-emerald-500/8',
     changes: { revenue: 25, ebitda: 20, totalEquity: 15 },
   },
   {
     id: 'debt_restructuring',
     label: 'Borç Yapılandırma',
     desc: 'Kısa vadeli borçları erteleyerek likidite iyileştir',
-    color: 'text-purple-400 border-purple-500/30 bg-purple-500/5',
+    color: 'text-purple-600 border-purple-500/40 bg-purple-500/8',
     changes: { shortTermFinancialDebt: -30, longTermFinancialDebt: -10, totalEquity: 20 },
   },
 ]
 
 const CATEGORY_STYLES: Record<string, { header: string; slider: string }> = {
-  Aktif: { header: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/5',   slider: 'accent-cyan-500' },
-  Pasif: { header: 'text-purple-400 border-purple-500/30 bg-purple-500/5', slider: 'accent-purple-500' },
-  Gelir: { header: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5', slider: 'accent-emerald-500' },
+  Aktif: { header: 'text-cyan-700 border-cyan-500/30 bg-cyan-500/6',    slider: 'accent-cyan-500' },
+  Pasif: { header: 'text-purple-700 border-purple-500/30 bg-purple-500/6', slider: 'accent-purple-500' },
+  Gelir: { header: 'text-emerald-700 border-emerald-500/30 bg-emerald-500/6', slider: 'accent-emerald-500' },
 }
 
 const RATING_ORDER = ['D', 'C', 'CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
 const RATING_COLOR: Record<string, string> = {
-  AAA: 'text-emerald-400', AA: 'text-emerald-400', A: 'text-green-400',
-  BBB: 'text-lime-400', BB: 'text-yellow-400', B: 'text-orange-400',
-  CCC: 'text-orange-500', CC: 'text-red-400', C: 'text-red-500', D: 'text-red-600',
+  AAA: 'text-emerald-600', AA: 'text-emerald-600', A: 'text-green-600',
+  BBB: 'text-teal-500', BB: 'text-slate-500', B: 'text-red-400',
+  CCC: 'text-red-500', CC: 'text-red-500', C: 'text-red-600', D: 'text-red-700',
 }
 
 // ─── Rasyo uygulama fonksiyonu ────────────────────────────
@@ -178,16 +178,12 @@ function sensitivityAt10(
   return (calculateScore(applyLevers(baseData, { [leverKey]: 10 })).finalScore - bfs) * 0.70
 }
 
-const SCORE_FOR_RATING: Record<string, number> = {
-  AAA: 92, AA: 84, A: 76, BBB: 68, BB: 60, B: 52, CCC: 44, CC: 36, C: 28, D: 0
-}
-
 // Bir sonraki rating için hedef skor (header display için)
 function nextRatingTarget(rating: string): { label: string; targetScore: number } | null {
   const idx = RATING_ORDER.indexOf(rating)
   if (idx >= RATING_ORDER.length - 1) return null
   const nextRating = RATING_ORDER[idx + 1]
-  return { label: nextRating, targetScore: SCORE_FOR_RATING[nextRating] ?? 60 }
+  return { label: nextRating, targetScore: getRatingMinimum(nextRating) }
 }
 
 // +1 ve +2 not hedefleri
@@ -197,7 +193,7 @@ function ratingTargets(rating: string): Array<{ label: string; targetScore: numb
   for (let i = 1; i <= 2; i++) {
     if (idx + i >= RATING_ORDER.length) break
     const next = RATING_ORDER[idx + i]
-    results.push({ label: next, targetScore: SCORE_FOR_RATING[next] ?? 60, levels: i })
+    results.push({ label: next, targetScore: getRatingMinimum(next), levels: i })
   }
   return results
 }
@@ -335,59 +331,59 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
   }
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/3 transition-colors"
+        className="w-full flex items-center justify-between px-1 py-3 hover:bg-black/[0.03] transition-colors rounded-lg"
       >
         <div className="flex items-center gap-2">
-          <Sliders size={16} className="text-cyan-400" />
-          <p className="text-sm font-semibold text-white">Senaryo Simülatörü & Optimizasyon</p>
+          <Sliders size={16} className="text-cyan-600" />
+          <p className="text-sm font-semibold text-[#0a1727]">Senaryo Simülatörü & Optimizasyon</p>
           {hasChanges && (
-            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold uppercase tracking-wider">Aktif</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-700 font-bold uppercase tracking-wider border border-cyan-500/20">Aktif</span>
           )}
         </div>
-        {expanded ? <ChevronUp size={16} className="text-white/40" /> : <ChevronDown size={16} className="text-white/40" />}
+        {expanded ? <ChevronUp size={16} className="text-[#8da4bf]" /> : <ChevronDown size={16} className="text-[#8da4bf]" />}
       </button>
 
       {expanded && (
-        <div className="px-5 pb-5 space-y-4">
+        <div className="pt-2 space-y-4">
 
           {/* Skor Özeti */}
-          <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+          <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-white/10 border border-white/5 backdrop-blur-sm">
             <div className="text-center">
-              <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">Mevcut</p>
-              <p className="text-2xl font-black text-white">{Math.round(baseScore)}</p>
-              <p className={clsx('text-xs font-bold', RATING_COLOR[currentRating])}>{currentRating}</p>
+              <p className="card-desc uppercase tracking-wider mb-1">Mevcut</p>
+              <p className="text-2xl font-black text-[#0a1727] font-mono">{Math.round(baseScore)}</p>
+              <p className={clsx('text-xs font-bold font-mono', RATING_COLOR[currentRating])}>{currentRating}</p>
             </div>
             <div className="flex items-center justify-center">
               <div className="text-center">
-                <div className={clsx('text-lg font-black', delta > 0.5 ? 'text-emerald-400' : delta < -0.5 ? 'text-red-400' : 'text-white/30')}>
+                <div className={clsx('text-lg font-black font-mono', delta > 0.5 ? 'text-emerald-600' : delta < -0.5 ? 'text-red-500' : 'text-[#8da4bf]')}>
                   {delta > 0 ? '+' : ''}{delta.toFixed(1)}
                 </div>
                 {simCombinedRating !== currentRating && (
-                  <div className={clsx('text-[9px] font-bold uppercase tracking-wider', RATING_COLOR[simCombinedRating])}>
+                  <div className={clsx('text-[9px] font-bold uppercase tracking-wider font-mono', RATING_COLOR[simCombinedRating])}>
                     {simCombinedRating}!
                   </div>
                 )}
               </div>
             </div>
             <div className="text-center">
-              <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">Simülasyon</p>
-              <p className="text-2xl font-black text-white">{simCombinedScore}</p>
+              <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider mb-1">Simülasyon</p>
+              <p className="text-2xl font-black text-[#0a1727]" style={{ fontFamily: 'Outfit,sans-serif' }}>{simCombinedScore}</p>
               <p className={clsx('text-xs font-bold', RATING_COLOR[simCombinedRating])}>{simCombinedRating}</p>
             </div>
           </div>
 
           {nextTarget && (
-            <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between">
-              <p className="text-xs text-white/50">
+            <div className="px-3 py-2 rounded-lg bg-black/[0.03] border border-black/[0.05] flex items-center justify-between">
+              <p className="text-xs text-[#3d5a80]">
                 <span className={clsx('font-bold', RATING_COLOR[nextTarget.label])}>{nextTarget.label}</span>
-                {' '}için <span className="text-white font-bold">+{neededPoints.toFixed(1)} puan</span> gerekiyor
+                {' '}için <span className="text-[#0a1727] font-bold">+{neededPoints.toFixed(1)} puan</span> gerekiyor
               </p>
               {hasChanges && (
-                <button onClick={resetAll} className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors">
+                <button onClick={resetAll} className="flex items-center gap-1 text-[10px] text-[#8da4bf] hover:text-[#3d5a80] transition-colors">
                   <RefreshCw size={10} /> Sıfırla
                 </button>
               )}
@@ -395,24 +391,22 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           )}
 
           {/* Tab seçici */}
-          <div className="flex gap-1 p-1 bg-white/5 rounded-xl">
+          <div className="tab-group p-1">
             {[
-              { id: 'auto',        icon: Target,    label: 'Otomatik Yol' },
+              { id: 'auto',        icon: Target,    label: 'Otomatik' },
               { id: 'scenarios',   icon: Zap,       label: 'Senaryolar' },
               { id: 'custom',      icon: Sliders,   label: 'Özelleştir' },
-              { id: 'sensitivity', icon: BarChart2, label: 'Hassasiyet' },
+              { id: 'sensitivity', icon: BarChart2, label: 'Etki' },
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={clsx(
-                  'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all',
-                  activeTab === tab.id
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                    : 'text-white/40 hover:text-white/60'
+                  'tab flex-1',
+                   activeTab === tab.id && 'active'
                 )}
               >
-                <tab.icon size={11} />
+                <tab.icon size={11} className="mr-1.5" />
                 <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
@@ -422,19 +416,19 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           {activeTab === 'auto' && (
             <div className="space-y-5">
               {allAutoPaths.length === 0 ? (
-                <p className="text-xs text-white/40 text-center py-4">Zaten maksimum notadasınız (AAA).</p>
+                <p className="text-xs text-[#8da4bf] text-center py-4">Zaten maksimum notadasınız (AAA).</p>
               ) : (
                 allAutoPaths.map(({ target, singlePaths, combo }) => (
                   <div key={target.label} className="space-y-2">
                     {/* Başlık */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf]">
                         +{target.levels} Not:
                       </span>
                       <span className={clsx('text-xs font-black', RATING_COLOR[target.label])}>
                         {currentRating} → {target.label}
                       </span>
-                      <span className="text-[9px] text-white/20 ml-auto">
+                      <span className="text-[9px] text-[#8da4bf] ml-auto">
                         +{(target.targetScore - baseScore).toFixed(1)} puan
                       </span>
                     </div>
@@ -442,7 +436,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                     {singlePaths.length > 0 ? (
                       /* Tek kaldıraç yeterli */
                       <div className="space-y-1.5">
-                        <p className="text-[9px] text-white/25 uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
+                        <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
                         {singlePaths.map(({ lever, minPct }, i) => {
                           const tl = tlAmount(lever.key, minPct)
                           const isHigh = minPct > 100
@@ -450,19 +444,19 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                             <button
                               key={lever.key}
                               onClick={() => { setChange(lever.key, Math.min(minPct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
-                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:border-cyan-500/30 hover:bg-white/5 transition-all text-left group"
+                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-black/[0.08] hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all text-left group"
                             >
-                              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-black text-white/50 group-hover:text-white flex-shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-black/5 flex items-center justify-center text-[9px] font-black text-[#8da4bf] group-hover:text-[#0a1727] flex-shrink-0">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-white group-hover:text-cyan-400 transition-colors">{lever.label}</p>
-                                <p className="text-[10px] text-white/40 mt-0.5">
-                                  <span className={clsx('font-bold', isHigh ? 'text-amber-400' : 'text-emerald-400')}>
+                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-cyan-700 transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-[#8da4bf] mt-0.5">
+                                  <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-emerald-600')}>
                                     %{minPct} iyileştirme
                                     {isHigh && <span className="ml-1 opacity-70">(×{(minPct/100).toFixed(1)} kat)</span>}
                                   </span>
-                                  {tl && <span className="ml-1.5 text-white/30">{tl}</span>}
+                                  {tl && <span className="ml-1.5 text-[#8da4bf]">{tl}</span>}
                                   <span className="ml-1.5">→ {lever.primaryLabel}</span>
                                 </p>
                               </div>
@@ -476,7 +470,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                     ) : combo.length > 0 ? (
                       /* Kombinasyon gerekiyor */
                       <div className="space-y-1.5">
-                        <p className="text-[9px] text-white/25 uppercase tracking-wider">Birlikte uygulandığında hedefe ulaşılır:</p>
+                        <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider">Birlikte uygulandığında hedefe ulaşılır:</p>
                         {combo.map(({ lever, pct }, i) => {
                           const tl = tlAmount(lever.key, pct)
                           const isHigh = pct > 100
@@ -486,27 +480,27 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                               onClick={() => { setChange(lever.key, Math.min(pct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
                               className="w-full flex items-center gap-3 p-3 rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-left group"
                             >
-                              <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center text-[9px] font-black text-purple-400 flex-shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center text-[9px] font-black text-purple-600 flex-shrink-0">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-white group-hover:text-purple-400 transition-colors">{lever.label}</p>
-                                <p className="text-[10px] text-white/40 mt-0.5">
-                                  <span className={clsx('font-bold', isHigh ? 'text-amber-400' : 'text-purple-400')}>
+                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-purple-700 transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-[#8da4bf] mt-0.5">
+                                  <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-purple-600')}>
                                     %{pct} iyileştirme
                                     {isHigh && <span className="ml-1 opacity-70">(×{(pct/100).toFixed(1)} kat)</span>}
                                   </span>
-                                  {tl && <span className="ml-1.5 text-white/30">{tl}</span>}
+                                  {tl && <span className="ml-1.5 text-[#8da4bf]">{tl}</span>}
                                   <span className="ml-1.5">→ {lever.primaryLabel}</span>
                                 </p>
                               </div>
-                              <div className="text-[9px] text-purple-400 font-bold shrink-0">KOMBİNE</div>
+                              <div className="text-[9px] text-purple-600 font-bold shrink-0">KOMBİNE</div>
                             </button>
                           )
                         })}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-white/25 pl-2">
+                      <p className="text-[10px] text-[#8da4bf] pl-2">
                         Mevcut verilerle bu hedefe ulaşmak mümkün görünmüyor. Finansal verilerinizi tamamlayın.
                       </p>
                     )}
@@ -530,33 +524,33 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                     className={clsx(
                       'w-full flex items-start justify-between p-4 rounded-xl border transition-all text-left',
                       activePreset === scenario.id
-                        ? scenario.color + ' shadow-lg'
-                        : 'border-white/10 bg-white/3 hover:bg-white/5'
+                        ? scenario.color + ' shadow-md'
+                        : 'border-black/[0.08] bg-black/[0.02] hover:bg-black/[0.04]'
                     )}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-bold text-white">{scenario.label}</p>
+                        <p className="text-sm font-bold text-[#0a1727]">{scenario.label}</p>
                         {ratingChanged && (
                           <span className={clsx('text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border', scenario.color)}>
                             {presetResult.finalRating}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-white/40">{scenario.desc}</p>
+                      <p className="text-[10px] text-[#8da4bf]">{scenario.desc}</p>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         {Object.entries(scenario.changes).map(([k, v]) => (
-                          <span key={k} className="text-[9px] px-2 py-0.5 rounded bg-white/10 text-white/50">
+                          <span key={k} className="text-[9px] px-2 py-0.5 rounded bg-black/5 text-[#3d5a80] border border-black/[0.06]">
                             {LEVERS.find(l => l.key === k)?.label} {v > 0 ? '+' : ''}{v}%
                           </span>
                         ))}
                       </div>
                     </div>
                     <div className="text-right ml-4 flex-shrink-0">
-                      <p className={clsx('text-sm font-black', presetDelta > 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      <p className={clsx('text-sm font-black', presetDelta > 0 ? 'text-emerald-600' : 'text-red-500')}>
                         {presetDelta > 0 ? '+' : ''}{presetDelta.toFixed(1)}
                       </p>
-                      <p className="text-[10px] text-white/30">{Math.round(presetResult.finalScore)}</p>
+                      <p className="text-[10px] text-[#8da4bf]">{Math.round(presetResult.finalScore)}</p>
                     </div>
                   </button>
                 )
@@ -587,34 +581,34 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                         return (
                           <div key={lever.key} className="space-y-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-xs text-white/70">{lever.label}</p>
+                              <p className="text-xs text-[#3d5a80]">{lever.label}</p>
                               <div className="flex items-center gap-1.5 text-xs">
                                 {before != null ? (
                                   <>
-                                    <span className="text-white/30">{lever.primaryLabel}:</span>
-                                    <span className="text-white/60">{fmtRatio(before, lever.primaryRatio)}</span>
+                                    <span className="text-[#8da4bf]">{lever.primaryLabel}:</span>
+                                    <span className="text-[#3d5a80]">{fmtRatio(before, lever.primaryRatio)}</span>
                                     {after !== null && pct !== 0 && (
                                       <>
-                                        <span className="text-white/20">→</span>
-                                        <span className={clsx('font-bold', after > before ? 'text-emerald-400' : 'text-red-400')}>
+                                        <span className="text-[#8da4bf]">→</span>
+                                        <span className={clsx('font-bold', after > before ? 'text-emerald-600' : 'text-red-500')}>
                                           {fmtRatio(after, lever.primaryRatio)}
                                         </span>
                                       </>
                                     )}
                                   </>
                                 ) : (
-                                  <span className={clsx('font-semibold', pct > 0 ? 'text-emerald-400' : pct < 0 ? 'text-red-400' : 'text-white/20')}>
+                                  <span className={clsx('font-semibold', pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-red-500' : 'text-[#8da4bf]')}>
                                     {pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}%` : '—'}
                                   </span>
                                 )}
-                                {tl && <span className="text-white/20 ml-1">{tl}</span>}
+                                {tl && <span className="text-[#8da4bf] ml-1">{tl}</span>}
                               </div>
                             </div>
-                            <input
-                              type="range" min={-50} max={300} step={5} value={pct}
-                              onChange={e => setChange(lever.key, Number(e.target.value))}
-                              className={clsx('w-full h-1.5 rounded-full appearance-none bg-white/10 cursor-pointer', style.slider)}
-                            />
+                              <input
+                                type="range" min={-50} max={300} step={5} value={pct}
+                                onChange={e => setChange(lever.key, Number(e.target.value))}
+                                className="w-full h-1.5 rounded-full appearance-none bg-black/10 cursor-pointer accent-cyan-500"
+                              />
                           </div>
                         )
                       })}
@@ -623,7 +617,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                 )
               })}
               {hasChanges && (
-                <button onClick={resetAll} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition-colors">
+                <button onClick={resetAll} className="flex items-center gap-1.5 text-xs text-[#8da4bf] hover:text-[#3d5a80] transition-colors">
                   <RefreshCw size={12} /> Tümünü sıfırla
                 </button>
               )}
@@ -633,7 +627,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           {/* ── TAB: Hassasiyet Analizi ──────────────────── */}
           {activeTab === 'sensitivity' && (
             <div className="space-y-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-white/30">
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf]">
                 Her kaldıracın %10 değişiminde kazandırılan puan (en etkili → az etkili):
               </p>
               {sensitivity.map(({ lever, gain }, i) => {
@@ -644,26 +638,26 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                   <div key={lever.key} className={clsx('space-y-1', noData && 'opacity-40')}>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-white/30 w-4">{i + 1}</span>
-                        <span className="text-white/70">{lever.label}</span>
+                        <span className="text-[9px] text-[#8da4bf] w-4">{i + 1}</span>
+                        <span className="text-[#3d5a80]">{lever.label}</span>
                         {noData && (
-                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/5 text-white/20 font-bold">Veri eksik</span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/5 text-[#8da4bf] font-bold border border-black/5">Veri eksik</span>
                         )}
                       </div>
-                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-400' : gain >= 0.5 ? 'text-yellow-400' : 'text-white/20')}>
+                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-600' : gain >= 0.5 ? 'text-sky-500' : 'text-[#8da4bf]')}>
                         {noData ? '—' : `+${gain.toFixed(2)} puan`}
                       </span>
                     </div>
-                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
                       <div
-                        className={clsx('h-full rounded-full transition-all', gain >= 1 ? 'bg-emerald-500' : gain >= 0.5 ? 'bg-yellow-500' : 'bg-white/10')}
+                        className={clsx('h-full rounded-full transition-all', gain >= 1 ? 'bg-emerald-500' : gain >= 0.5 ? 'bg-sky-400' : 'bg-black/10')}
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
                   </div>
                 )
               })}
-              <p className="text-[9px] text-white/20 pt-1">
+              <p className="text-[9px] text-[#8da4bf] pt-1">
                 &quot;Veri eksik&quot; — bu kaldıraçlar için hesaplanamayan oranlar mevcut. Finansal verilerinizi tamamlayın.
               </p>
             </div>

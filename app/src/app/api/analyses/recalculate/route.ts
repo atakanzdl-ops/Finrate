@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
+import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 
 /**
  * POST /api/analyses/recalculate
@@ -11,7 +13,7 @@ import { calculateScore } from '@/lib/scoring/score'
  */
 export async function POST(req: NextRequest) {
   const userId = getUserIdFromRequest(req)
-  if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+  if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const allData = await prisma.financialData.findMany({
     where: { entity: { userId } },
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
 
     const ratios = calculateRatios(enriched as Parameters<typeof calculateRatios>[0])
     const score  = calculateScore(ratios, fd.entity.sector)
+    const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, fd.entity.sector)
 
     if (fd.analysis) {
       await prisma.analysis.update({
@@ -59,7 +62,8 @@ export async function POST(req: NextRequest) {
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
           activityScore:      score.activityScore,
-          ratios:             JSON.stringify(ratios),
+          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null }),
+          optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),
         },
       })
@@ -67,5 +71,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ recalculated: updated })
+  return jsonUtf8({ recalculated: updated })
 }

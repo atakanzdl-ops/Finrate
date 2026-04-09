@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 
 export async function PATCH(req: NextRequest) {
   try {
     const userId = getUserIdFromRequest(req)
-    if (!userId) return NextResponse.json({ error: 'Yetkisiz.' }, { status: 401 })
+    if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
     const { fullName, companyName } = await req.json()
 
@@ -18,8 +19,8 @@ export async function PATCH(req: NextRequest) {
       select: { id: true, email: true, fullName: true, companyName: true },
     })
 
-    return NextResponse.json({ user })
+    return jsonUtf8({ user })
   } catch {
-    return NextResponse.json({ error: 'Sunucu hatası.' }, { status: 500 })
+    return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
   }
 }
