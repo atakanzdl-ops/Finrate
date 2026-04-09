@@ -11,8 +11,7 @@
   "dependencies": {
     "@libsql/client": "^0.17.2",
     "@pdf-lib/fontkit": "^1.1.1",
-    "@prisma/adapter-libsql": "^7.6.0",
-    "@prisma/adapter-pg": "^7.6.0",
+    "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.6.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     take: 100,
   })
 
-  const analyses = raw.map((a) => {
+  const analyses = raw.map((a: (typeof raw)[number]) => {
     const parsedRatios = a.ratios ? JSON.parse(a.ratios as string) : null
     const overallCoverage: number | null = parsedRatios?.__overallCoverage ?? null
     return {
