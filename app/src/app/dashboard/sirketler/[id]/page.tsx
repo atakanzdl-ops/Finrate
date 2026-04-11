@@ -134,7 +134,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-800">{entity.name}</h1>
+          <h1 className="text-xl font-bold" style={{ color: '#0B3C5D' }}>{entity.name}</h1>
           <p className="text-slate-400 text-xs mt-0.5">
             {entity.sector && `${entity.sector} · `}
             {entity.taxNumber && `VKN: ${entity.taxNumber} · `}
