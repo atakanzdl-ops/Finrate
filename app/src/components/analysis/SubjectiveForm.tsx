@@ -7,6 +7,7 @@ import type { SubjectiveInputData, SubjectiveBreakdown } from '@/lib/scoring/sub
 
 interface Props {
   entityId: string
+  onScoreChange?: (total: number) => void
 }
 
 function ScoreBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
@@ -97,7 +98,7 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
   )
 }
 
-export default function SubjectiveForm({ entityId }: Props) {
+export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
   const [data, setData] = useState<SubjectiveInputData>({
     kkbCategory: 'iyi',
     activeDelayDays: 0,
@@ -143,7 +144,10 @@ export default function SubjectiveForm({ entityId }: Props) {
         body: JSON.stringify(data),
       })
       const d = await res.json()
-      if (d.score) setScore(d.score)
+      if (d.score) {
+        setScore(d.score)
+        onScoreChange?.(d.score.total)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } finally {

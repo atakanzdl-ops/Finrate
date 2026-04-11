@@ -1139,7 +1139,13 @@ function AnalizPageContent() {
 
                 {/* ── SUBJEKTİF ───────────────── */}
                 {activeTab === 'subjective' && selected.entity?.id && (
-                  <SubjectiveForm entityId={selected.entity.id} />
+                  <SubjectiveForm
+                    entityId={selected.entity.id}
+                    onScoreChange={(total) =>
+                      selected.entity?.id &&
+                      setSubjectiveScores(prev => ({ ...prev, [selected.entity!.id]: total }))
+                    }
+                  />
                 )}
 
                 {/* ── TREND ───────────────────── */}

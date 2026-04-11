@@ -49,14 +49,14 @@ const PRESET_SCENARIOS: Array<{ id: string; label: string; desc: string; color: 
     id: 'debt_restructuring',
     label: 'Borç Yapılandırma',
     desc: 'Kısa vadeli borçları erteleyerek likidite iyileştir',
-    color: 'text-purple-600 border-purple-500/40 bg-purple-500/8',
+    color: 'text-[#0B3C5D] border-[#0B3C5D]/30 bg-[#0B3C5D]/5',
     changes: { shortTermFinancialDebt: -30, longTermFinancialDebt: -10, totalEquity: 20 },
   },
 ]
 
 const CATEGORY_STYLES: Record<string, { header: string; slider: string }> = {
   Aktif: { header: 'text-cyan-700 border-cyan-500/30 bg-cyan-500/6',    slider: 'accent-cyan-500' },
-  Pasif: { header: 'text-purple-700 border-purple-500/30 bg-purple-500/6', slider: 'accent-purple-500' },
+  Pasif: { header: 'text-[#0B3C5D] border-[#0B3C5D]/20 bg-[#0B3C5D]/5', slider: 'accent-slate-500' },
   Gelir: { header: 'text-emerald-700 border-emerald-500/30 bg-emerald-500/6', slider: 'accent-emerald-500' },
 }
 
@@ -478,15 +478,15 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                             <button
                               key={lever.key}
                               onClick={() => { setChange(lever.key, Math.min(pct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
-                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-left group"
+                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-[#0B3C5D]/15 hover:border-[#0B3C5D]/30 hover:bg-[#0B3C5D]/5 transition-all text-left group"
                             >
-                              <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center text-[9px] font-black text-purple-600 flex-shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-[#0B3C5D]/10 flex items-center justify-center text-[9px] font-black text-[#0B3C5D] flex-shrink-0">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-purple-700 transition-colors">{lever.label}</p>
+                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-[#0B3C5D] transition-colors">{lever.label}</p>
                                 <p className="text-[10px] text-[#8da4bf] mt-0.5">
-                                  <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-purple-600')}>
+                                  <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-[#0B3C5D]')}>
                                     %{pct} iyileştirme
                                     {isHigh && <span className="ml-1 opacity-70">(×{(pct/100).toFixed(1)} kat)</span>}
                                   </span>
@@ -494,7 +494,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                                   <span className="ml-1.5">→ {lever.primaryLabel}</span>
                                 </p>
                               </div>
-                              <div className="text-[9px] text-purple-600 font-bold shrink-0">KOMBİNE</div>
+                              <div className="text-[9px] text-[#0B3C5D] font-bold shrink-0">KOMBİNE</div>
                             </button>
                           )
                         })}
