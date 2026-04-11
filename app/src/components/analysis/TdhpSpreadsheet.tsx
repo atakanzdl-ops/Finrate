@@ -432,8 +432,13 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
               {cols.map(col => (
                 <th key={col.id} className="text-right px-3 py-2 min-w-[130px]">
                   <div className="text-slate-800 font-bold">{col.year}</div>
-                  <div className="text-[9px] text-slate-500 font-normal mt-0.5">
-                    {PERIOD_LABEL[col.period] ?? col.period}
+                  <div className="mt-1 flex justify-end">
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{ background: '#0B3C5D', color: '#ffffff' }}
+                    >
+                      {PERIOD_LABEL[col.period] ?? col.period}
+                    </span>
                   </div>
                   {saving[col.id] && (
                     <div className="text-[8px] text-[#1FA4A9] mt-0.5 animate-pulse">kaydediliyor</div>

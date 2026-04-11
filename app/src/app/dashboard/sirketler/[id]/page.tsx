@@ -115,13 +115,13 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
   if (loading) return (
     <DashboardShell>
       <div className="flex justify-center py-16">
-        <Loader2 size={24} className="animate-spin text-cyan-400" />
+        <Loader2 size={24} className="animate-spin" style={{ color: '#2EC4B6' }} />
       </div>
     </DashboardShell>
   )
   if (!entity) return (
     <DashboardShell>
-      <p className="text-white/50">Şirket bulunamadı.</p>
+      <p className="text-slate-400">Şirket bulunamadı.</p>
     </DashboardShell>
   )
 
@@ -130,12 +130,12 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-6">
       {/* Başlık */}
       <div className="flex items-center gap-3">
-        <Link href="/dashboard/sirketler" className="text-white/40 hover:text-white transition-colors">
+        <Link href="/dashboard/sirketler" className="text-slate-400 hover:text-slate-700 transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-white">{entity.name}</h1>
-          <p className="text-white/40 text-xs mt-0.5">
+          <h1 className="text-xl font-bold text-slate-800">{entity.name}</h1>
+          <p className="text-slate-400 text-xs mt-0.5">
             {entity.sector && `${entity.sector} · `}
             {entity.taxNumber && `VKN: ${entity.taxNumber} · `}
             {entity.financialData.length} dönem veri
@@ -144,7 +144,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowUpload(!showUpload)}
-            className="flex items-center gap-2 px-3 py-2 glass border border-white/10 hover:border-cyan-500/30 rounded-lg text-xs font-semibold text-white/70 hover:text-white transition-all"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-800 transition-all shadow-sm"
           >
             <Upload size={14} />
             Excel / PDF
@@ -152,58 +152,64 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {/* Excel/CSV Upload */}
+      {/* Upload Paneli */}
       {showUpload && (
-        <div className="glass-card rounded-xl p-5">
-          <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4">
-            Excel / CSV İçe Aktar
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            Dosya Yükle
+          </p>
+          <p className="text-[11px] text-slate-400 mb-4">
+            .xlsx, .xls, .csv ve .pdf — aynı anda birden fazla dosya seçilebilir
           </p>
           <FileUpload entityId={id} onImported={() => { reload(); setShowUpload(false) }} />
         </div>
       )}
 
       {/* Dönem Özet Tablosu — veri yoksa başlık + boş satır, yapı değişmez */}
-      <div className="glass-card rounded-xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left px-4 py-3 text-white/50 font-medium text-xs">Dönem</th>
-                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Ciro</th>
-                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">FAVÖK / FVÖK</th>
-                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Net Kar</th>
-                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Toplam Varlık</th>
-                <th className="text-right px-4 py-3 text-white/50 font-medium text-xs">Öz Kaynak</th>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Dönem</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Ciro</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">FAVÖK / FVÖK</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Net Kar</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Toplam Varlık</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Öz Kaynak</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-slate-100">
               {entity.financialData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-white/30 text-xs">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400 text-xs">
                     Henüz finansal veri girilmedi. Excel veya PDF yükleyin.
                   </td>
                 </tr>
               ) : entity.financialData.map((fd) => (
-                  <tr key={fd.id} className="hover:bg-white/3 transition-colors">
+                  <tr key={fd.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-semibold text-white">{fd.year}</span>
-                      <span className="ml-2 text-xs text-white/40">{PERIOD_LABELS[fd.period]}</span>
+                      <span className="font-semibold text-slate-800">{fd.year}</span>
+                      <span
+                        className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{ background: '#0B3C5D', color: '#ffffff' }}
+                      >{PERIOD_LABELS[fd.period]}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-white/80">{fmt(fd.revenue)}</td>
-                    <td className="px-4 py-3 text-right text-white/80">
+                    <td className="px-4 py-3 text-right text-slate-700">{fmt(fd.revenue)}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">
                       {fd.ebitda != null
-                        ? <>{fmt(fd.ebitda)} <span className="text-[10px] text-white/30">FAVÖK</span></>
+                        ? <>{fmt(fd.ebitda)} <span className="text-[10px] text-slate-400">FAVÖK</span></>
                         : fd.ebit != null
-                          ? <>{fmt(fd.ebit)} <span className="text-[10px] text-white/30">FVÖK</span></>
+                          ? <>{fmt(fd.ebit)} <span className="text-[10px] text-slate-400">FVÖK</span></>
                           : '—'
                       }
                     </td>
-                    <td className={clsx('px-4 py-3 text-right', fd.netProfit != null && fd.netProfit < 0 ? 'text-red-400' : 'text-white/80')}>
+                    <td className={clsx('px-4 py-3 text-right', fd.netProfit != null && fd.netProfit < 0 ? 'text-red-500' : 'text-slate-700')}>
                       {fmt(fd.netProfit)}
                     </td>
-                    <td className="px-4 py-3 text-right text-white/80">{fmt(fd.totalAssets)}</td>
-                    <td className="px-4 py-3 text-right text-white/80">{fmt(fd.totalEquity)}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{fmt(fd.totalAssets)}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{fmt(fd.totalEquity)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
                         {confirmFd === fd.id ? (
@@ -211,13 +217,13 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
                             <button
                               onClick={() => deleteFd(fd.id)}
                               disabled={deletingFd === fd.id}
-                              className="text-xs px-2 py-0.5 bg-red-500/20 border border-red-500/40 text-red-400 rounded hover:bg-red-500/30 transition-all disabled:opacity-50"
+                              className="text-xs px-2 py-0.5 bg-red-50 border border-red-200 text-red-500 rounded hover:bg-red-100 transition-all disabled:opacity-50"
                             >
                               {deletingFd === fd.id ? '...' : 'Sil'}
                             </button>
                             <button
                               onClick={() => setConfirmFd(null)}
-                              className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
                             >
                               İptal
                             </button>
@@ -225,7 +231,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
                         ) : (
                           <button
                             onClick={() => setConfirmFd(fd.id)}
-                            className="text-white/20 hover:text-red-400 transition-colors"
+                            className="text-slate-300 hover:text-red-400 transition-colors"
                             title="Bu dönemi sil"
                           >
                             <Trash2 size={14} />
@@ -245,9 +251,10 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         <div className="flex justify-end">
           <Link
             href={`/dashboard/analiz?entityId=${entity.id}`}
-            className="flex items-center gap-2 px-5 py-2.5 btn-gradient rounded-lg text-sm font-semibold text-white"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-80 transition-opacity"
+            style={{ background: '#0B3C5D' }}
           >
-            <BarChart3 size={16} />
+            <BarChart3 size={13} />
             Analize Başla
           </Link>
         </div>
