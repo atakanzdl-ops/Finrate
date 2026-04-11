@@ -506,9 +506,9 @@ function AnalizPageContent() {
       rows: [
         { id: 'Cari Oran',              val: fmtN(r.currentRatio),             avg: fmtN(bm.currentRatio),        good: r.currentRatio != null && r.currentRatio >= bm.currentRatio * 0.85 },
         { id: 'Asit-Test (Hızlı)',      val: fmtN(r.quickRatio),               avg: fmtN(bm.quickRatio),          good: r.quickRatio != null && r.quickRatio >= bm.quickRatio * 0.85 },
-        { id: 'Nakit Oran',             val: fmtN(r.cashRatio),                avg: '—',                          good: r.cashRatio != null && r.cashRatio >= 0.10 },
-        { id: 'Net Çal. Ser. / Aktif',  val: fmtN(r.netWorkingCapitalRatio),   avg: '—',                          good: r.netWorkingCapitalRatio != null && r.netWorkingCapitalRatio > 0 },
-        { id: 'Nakit Dönüşüm Süresi',  val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: '—', good: r.cashConversionCycle != null && r.cashConversionCycle < 60 },
+        { id: 'Nakit Oran',             val: fmtN(r.cashRatio),                avg: fmtN(bm.cashRatio),           good: r.cashRatio != null && r.cashRatio >= 0.10 },
+        { id: 'Net Çal. Ser. / Aktif',  val: fmtN(r.netWorkingCapitalRatio),   avg: fmtN(bm.netWorkingCapitalRatio), good: r.netWorkingCapitalRatio != null && r.netWorkingCapitalRatio > 0 },
+        { id: 'Nakit Dönüşüm Süresi',  val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: fmtN(bm.cashConversionCycle, 0) + ' gün', good: r.cashConversionCycle != null && r.cashConversionCycle < 60 },
       ]
     },
     {
@@ -516,12 +516,12 @@ function AnalizPageContent() {
       rows: [
         { id: 'Brüt Kar Marjı',                   val: fmtPct(r.grossMargin),            avg: fmtPct(bm.grossMargin),       good: r.grossMargin != null && r.grossMargin >= bm.grossMargin * 0.8 },
         { id: 'FAVÖK Marjı',                       val: fmtPct(r.ebitdaMargin),           avg: fmtPct(bm.ebitdaMargin),      good: r.ebitdaMargin != null && r.ebitdaMargin >= bm.ebitdaMargin * 0.8 },
-        { id: 'FVÖK Marjı (EBIT)',                 val: fmtPct(r.ebitMargin),             avg: '—',                          good: r.ebitMargin != null && r.ebitMargin >= 0.05 },
+        { id: 'FVÖK Marjı (EBIT)',                 val: fmtPct(r.ebitMargin),             avg: fmtPct(bm.ebitMargin),        good: r.ebitMargin != null && r.ebitMargin >= 0.05 },
         { id: 'Net Kar Marjı',                     val: fmtPct(r.netProfitMargin),        avg: fmtPct(bm.netProfitMargin),   good: r.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 },
         { id: 'Aktif Karlılığı (ROA)',             val: fmtPct(r.roa),                    avg: fmtPct(bm.roa),               good: r.roa != null && r.roa >= bm.roa * 0.8 },
         { id: 'Özkaynak Karlılığı (ROE)',          val: fmtPct(r.roe),                    avg: fmtPct(bm.roe),               good: r.roe != null && r.roe >= bm.roe * 0.8 },
-        { id: 'Yatırım Getirisi (ROIC)',           val: fmtPct(r.roic),                   avg: '—',                          good: r.roic != null && r.roic >= 0.10 },
-        { id: 'Nominal Gelir Büyümesi',            val: r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '—', avg: '—', good: r.revenueGrowth != null && r.revenueGrowth >= 0 },
+        { id: 'Yatırım Getirisi (ROIC)',           val: fmtPct(r.roic),                   avg: fmtPct(bm.roic),              good: r.roic != null && r.roic >= 0.10 },
+        { id: 'Nominal Gelir Büyümesi',            val: r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '—', avg: fmtPct(bm.revenueGrowth), good: r.revenueGrowth != null && r.revenueGrowth >= 0 },
         { id: 'Reel Büyüme (ÜFE Arındırılmış)',   val: r.realGrowth != null ? fmtPct(r.realGrowth) : '—', avg: '—', good: r.realGrowth != null && r.realGrowth >= 0 },
       ]
     },
@@ -531,8 +531,8 @@ function AnalizPageContent() {
         { id: 'Borç / Özkaynak',        val: fmtN(r.debtToEquity),             avg: fmtN(bm.debtToEquity),        good: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 },
         { id: 'Borç / Aktif',           val: fmtN(r.debtToAssets),             avg: fmtN(bm.debtToAssets),        good: r.debtToAssets != null && r.debtToAssets <= bm.debtToAssets * 1.2 },
         { id: 'Özkaynak Oranı',         val: fmtN(r.equityRatio),              avg: '—',                          good: r.equityRatio != null && r.equityRatio >= 0.30 },
-        { id: 'KV Borç Oranı',          val: fmtN(r.shortTermDebtRatio),       avg: '—',                          good: r.shortTermDebtRatio != null && r.shortTermDebtRatio < 0.5 },
-        { id: 'Net Borç / FAVÖK',       val: r.debtToEbitda != null ? fmtN(r.debtToEbitda, 1) + 'x' : '—', avg: '3.0x', good: r.debtToEbitda != null && r.debtToEbitda <= 3 },
+        { id: 'KV Borç Oranı',          val: fmtN(r.shortTermDebtRatio),       avg: fmtN(bm.shortTermDebtRatio),  good: r.shortTermDebtRatio != null && r.shortTermDebtRatio < 0.5 },
+        { id: 'Net Borç / FAVÖK',       val: r.debtToEbitda != null ? fmtN(r.debtToEbitda, 1) + 'x' : '—', avg: fmtN(bm.debtToEbitda, 1) + 'x', good: r.debtToEbitda != null && r.debtToEbitda <= 3 },
         { id: 'Faiz Karşılama',         val: r.interestCoverage === Infinity ? '∞x (Faiz Yok)' : r.interestCoverage != null ? fmtN(r.interestCoverage, 1) + 'x' : '—', avg: fmtN(bm.interestCoverage, 1) + 'x', good: r.interestCoverage === Infinity || (r.interestCoverage != null && r.interestCoverage >= bm.interestCoverage * 0.8) },
       ]
     },
@@ -540,11 +540,11 @@ function AnalizPageContent() {
       label: 'Faaliyet', color: '#6366f1',
       rows: [
         { id: 'Aktif Devir Hızı',       val: fmtN(r.assetTurnover),            avg: fmtN(bm.assetTurnover),       good: r.assetTurnover != null && r.assetTurnover >= bm.assetTurnover * 0.8 },
-        { id: 'Sabit Aktif Devir',      val: fmtN(r.fixedAssetTurnover),       avg: '—',                          good: r.fixedAssetTurnover != null && r.fixedAssetTurnover >= 1.0 },
+        { id: 'Sabit Aktif Devir',      val: fmtN(r.fixedAssetTurnover),       avg: fmtN(bm.fixedAssetTurnover),  good: r.fixedAssetTurnover != null && r.fixedAssetTurnover >= 1.0 },
         { id: 'Stok Devir Süresi',      val: r.inventoryTurnoverDays != null ? fmtN(r.inventoryTurnoverDays, 0) + ' gün' : '—', avg: r.inventoryTurnoverDays != null ? fmtN(bm.inventoryDays, 0) + ' gün' : '—', good: r.inventoryTurnoverDays != null && r.inventoryTurnoverDays <= bm.inventoryDays * 1.2 },
         { id: 'Alacak Tahsil Süresi',   val: r.receivablesTurnoverDays != null ? fmtN(r.receivablesTurnoverDays, 0) + ' gün' : '—', avg: r.receivablesTurnoverDays != null ? fmtN(bm.receivablesDays, 0) + ' gün' : '—', good: r.receivablesTurnoverDays != null && r.receivablesTurnoverDays <= bm.receivablesDays * 1.2 },
-        { id: 'Borç Ödeme Süresi',      val: r.payablesTurnoverDays != null ? fmtN(r.payablesTurnoverDays, 0) + ' gün' : '—', avg: '—', good: r.payablesTurnoverDays != null && r.payablesTurnoverDays >= 30 },
-        { id: 'Faaliyet Gid. Oranı',    val: fmtN(r.operatingExpenseRatio),    avg: '—',                          good: r.operatingExpenseRatio != null && r.operatingExpenseRatio < 0.30 },
+        { id: 'Borç Ödeme Süresi',      val: r.payablesTurnoverDays != null ? fmtN(r.payablesTurnoverDays, 0) + ' gün' : '—', avg: fmtN(bm.payablesTurnoverDays, 0) + ' gün', good: r.payablesTurnoverDays != null && r.payablesTurnoverDays >= 30 },
+        { id: 'Faaliyet Gid. Oranı',    val: fmtN(r.operatingExpenseRatio),    avg: fmtPct(bm.operatingExpenseRatio), good: r.operatingExpenseRatio != null && r.operatingExpenseRatio < 0.30 },
       ]
     },
   ] : []
@@ -695,7 +695,7 @@ function AnalizPageContent() {
           <div className="lg:col-span-9 space-y-4">
 
             {/* Şirket başlığı + Yıl seçici */}
-            <div className="card px-6 py-4 flex items-center justify-between">
+            <div className="card px-6 py-4 flex items-center justify-between" style={{ overflow: 'visible' }}>
               <div>
                 <p className="card-desc uppercase tracking-[0.3em]">{selected.entity?.sector ?? 'Sektör belirtilmemiş'}</p>
                 <h2 className="card-title mt-0.5" style={{ fontSize: '18px' }}>
