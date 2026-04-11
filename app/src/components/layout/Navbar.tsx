@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Logo } from '@/components/ui/Logo'
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -11,9 +12,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-1 text-xl font-bold tracking-tight">
-          <span className="text-gradient">Fin</span>
-          <span className="text-white">rate</span>
+        <Link href="/" aria-label="Finrate ana sayfa">
+          <Logo showSubtext={false} />
         </Link>
 
         {/* Desktop Menu */}

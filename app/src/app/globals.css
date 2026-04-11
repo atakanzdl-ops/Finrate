@@ -14,7 +14,7 @@
     --surface: #FFFFFF;
     --border: #E5E9F0;
     
-    --text-primary: #1A2B45;
+    --text-primary: #1E293B;
     --text-secondary: #64748B;
     --text-muted: #94A3B8;
     
@@ -338,4 +338,49 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-fade-in {
     animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* ─── Auth Pages (giris / kayit) ─── */
+.dot-pattern {
+    background-color: #060e1a;
+    background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+}
+
+.glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #2EC4B6 0%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.btn-gradient {
+    background: linear-gradient(135deg, #2EC4B6 0%, #0ea5e9 100%);
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn-gradient:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-gradient:active:not(:disabled) {
+    transform: translateY(0);
 }

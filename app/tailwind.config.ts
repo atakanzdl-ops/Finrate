@@ -9,6 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        navy: {
+          900: '#060e1a',
+          800: '#0a1628',
+          700: '#0f2040',
+        },
         prussian: {
           900: '#0B3C5D', // Brand Primary
           800: '#07263d',
@@ -25,7 +30,7 @@ const config: Config = {
           light: '#E5E9F0',
         },
         text: {
-          primary: '#1A2B45',
+          primary: '#1E293B',
           secondary: '#6B7280',
           muted: '#8DA4BF',
         }

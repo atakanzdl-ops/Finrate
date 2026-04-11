@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
     })
 
     return jsonUtf8({ entity }, { status: 201 })
-  } catch {
-    return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/entities]', msg)
+    return jsonUtf8({ error: 'Sunucu hatası.', detail: msg }, { status: 500 })
   }
 }

@@ -25,7 +25,7 @@
  */
 
 import { RatioResult } from './ratios'
-import { getSectorBenchmark, SectorBenchmark } from './benchmarks'
+import { getSectorBenchmark, getSectorWeights, SectorBenchmark } from './benchmarks'
 
 export interface CategoryScores {
   liquidityScore:     number
@@ -219,23 +219,23 @@ function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: num
       bm?.quickRatio,
       HYBRID_BM_HEAVY), 1.5],
 
-    // NÇS / Aktif — benchmark yok, mutlak
+    // NÇS / Aktif — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.netWorkingCapitalRatio,
       { bad: -0.10, good: 0.25, sf: 0.15 },
-      null,
-      HYBRID_DEFAULT), 1.0],
+      bm?.netWorkingCapitalRatio,
+      HYBRID_BM_HEAVY), 1.0],
 
-    // Nakit Oranı — benchmark yok, mutlak
+    // Nakit Oranı — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.cashRatio,
       { bad: 0.05, good: 0.50, sf: 0.15 },
-      null,
-      HYBRID_DEFAULT), 0.75],
+      bm?.cashRatio,
+      HYBRID_BM_HEAVY), 0.75],
 
-    // Nakit Dönüşüm Süresi — benchmark yok, mutlak (gün bazlı)
+    // Nakit Dönüşüm Süresi — artık sektör benchmark'ı var, gün bazlı (BM_HEAVY)
     [hybridMetricScore(r.cashConversionCycle,
       { bad: 150, good: 20, lowerIsBetter: true, sf: 0.15 },
-      null,
-      HYBRID_DEFAULT), 0.75],
+      bm?.cashConversionCycle,
+      HYBRID_BM_HEAVY), 0.75],
   ])
 }
 
@@ -280,19 +280,19 @@ function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score:
       bm?.grossMargin,
       HYBRID_DEFAULT), 1.0],
 
-    // FVÖK Marjı — benchmark yok, dengeli
+    // FVÖK Marjı — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.ebitMargin,
       { bad: -0.05, good: 0.10, sf: 0.05 },
-      null,
-      HYBRID_DEFAULT), 1.0],
+      bm?.ebitMargin,
+      HYBRID_BM_HEAVY), 1.0],
 
-    // ROIC — benchmark yok, dengeli
+    // ROIC — artık sektör benchmark'ı var (DEFAULT)
     [hybridMetricScore(r.roic,
       { bad: -0.02, good: 0.12, sf: 0.08 },
-      null,
+      bm?.roic,
       HYBRID_DEFAULT), 0.75],
 
-    // Büyüme — benchmark yok, ağırlık koşullu
+    // Büyüme — artık sektör benchmark'ı var (DEFAULT)
     [growthScore, growthWeight],
   ])
 }
@@ -320,17 +320,17 @@ function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: numb
       bm?.debtToAssets,
       HYBRID_ABS_HEAVY), 1.0],
 
-    // KV Borç Oranı — benchmark yok, düşük ağırlık
+    // KV Borç Oranı — artık sektör benchmark'ı var (DEFAULT)
     [hybridMetricScore(r.shortTermDebtRatio,
       { bad: 1.0, good: 0.3, lowerIsBetter: true, sf: 0.05 },
-      null,
+      bm?.shortTermDebtRatio,
       HYBRID_DEFAULT), 0.5],
 
-    // Net Borç / FAVÖK — ABS_HEAVY, null ise atlanır
+    // Net Borç / FAVÖK — artık sektör benchmark'ı var (ABS_HEAVY)
     [r.debtToEbitda != null
       ? hybridMetricScore(r.debtToEbitda,
           { bad: 10.0, good: 3.0, lowerIsBetter: true, sf: 0.10 },
-          null,
+          bm?.debtToEbitda,
           HYBRID_ABS_HEAVY)
       : null, 1.0],
   ]
@@ -377,22 +377,22 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
       bm?.receivablesDays,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Borç Ödeme Süresi (DPO) — benchmark yok, uzun = tedarikçi avantajı
+    // Borç Ödeme Süresi (DPO) — artık sektör benchmark'ı var (DEFAULT)
     [hybridMetricScore(r.payablesTurnoverDays,
       { bad: 15, good: 60, sf: 0.15 },
-      null,
+      bm?.payablesTurnoverDays,
       HYBRID_DEFAULT), 1.0],
 
-    // Duran Varlık Devir — benchmark yok
+    // Duran Varlık Devir — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.fixedAssetTurnover,
       { bad: 0.3, good: 2.5, sf: 0.15 },
-      null,
-      HYBRID_DEFAULT), 1.0],
+      bm?.fixedAssetTurnover,
+      HYBRID_BM_HEAVY), 1.0],
 
-    // Faaliyet Gideri Oranı — sektöre bağımlı
+    // Faaliyet Gideri Oranı — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.operatingExpenseRatio,
       { bad: 0.5, good: 0.22, lowerIsBetter: true, sf: 0.15 },
-      null,
+      bm?.operatingExpenseRatio,
       HYBRID_BM_HEAVY), 1.0],
   ])
 }
@@ -453,6 +453,7 @@ function applyFloorCap(
 // ─── ANA FONKSİYON ────────────────────────────────────────────────────────
 export function calculateScore(ratios: RatioResult, sector?: string | null): ScoringResult {
   const bm = sector ? getSectorBenchmark(sector) : null
+  const w  = getSectorWeights(sector)   // sektöre özgü ağırlık profili
 
   const liqResult  = calcLiquidity(ratios, bm)
   const profResult = calcProfitability(ratios, bm)
@@ -466,14 +467,14 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
 
   const { liq, prof, lev, act, cap } = applyFloorCap(rawLiq, rawProf, rawLev, rawAct, ratios)
 
-  let final = clamp(liq * 0.25 + prof * 0.30 + lev * 0.30 + act * 0.15)
+  let final = clamp(liq * w.liquidity + prof * w.profitability + lev * w.leverage + act * w.activity)
   if (cap !== undefined) final = Math.min(final, cap)
 
   const overallCoverage =
-    liqResult.coverage  * 0.25 +
-    profResult.coverage * 0.30 +
-    levResult.coverage  * 0.30 +
-    actResult.coverage  * 0.15
+    liqResult.coverage  * w.liquidity     +
+    profResult.coverage * w.profitability +
+    levResult.coverage  * w.leverage      +
+    actResult.coverage  * w.activity
 
   const rating = scoreToRating(final)
 

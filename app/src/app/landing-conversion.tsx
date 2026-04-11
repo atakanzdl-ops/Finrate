@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, ShieldCheck, FileText, BarChart, Check, Shield, Lock } from 'lucide-react'
 import RatiosTable from '@/components/analysis/RatiosTable'
+import { Logo } from '@/components/ui/Logo'
 
 const MOCK_RATIOS = [
   { label: 'Cari Oran', value: '1.85', avg: '1.42', status: 'positive' as const },
@@ -20,10 +21,9 @@ export default function LandingConversionPage() {
       {/* Navigation */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-6 h-[72px] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#0B3C5D] rounded-[4px] flex items-center justify-center text-white font-bold text-xs">F</div>
-            <div className="font-display font-black text-sm tracking-widest text-[#0B3C5D]">FINRATE</div>
-          </div>
+          <Link href="/" aria-label="Finrate ana sayfa">
+            <Logo showSubtext={false} />
+          </Link>
           
           <div className="hidden md:flex items-center gap-8 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
             <Link href="#nasil" className="hover:text-[#0B3C5D] transition-colors">YÖNTEM</Link>
@@ -71,7 +71,7 @@ export default function LandingConversionPage() {
             <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-4 pt-6 border-t border-slate-100">
                <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-slate-500 tracking-widest">
                   <Shield size={14} className="text-slate-400" />
-                  KVK / GDPR Uyumlu
+                  KVKK / GDPR Uyumlu
                </div>
                <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-slate-500 tracking-widest">
                   <FileText size={14} className="text-slate-400" />
@@ -171,10 +171,9 @@ export default function LandingConversionPage() {
 
       <footer className="py-12 bg-white border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-[#0B3C5D] rounded-[2px] flex items-center justify-center text-white font-black text-[9px]">F</div>
-              <span className="font-display font-black text-[#0B3C5D]">FINRATE</span>
-            </div>
+            <Link href="/" aria-label="Finrate ana sayfa">
+              <Logo showSubtext={false} className="scale-75 origin-left" />
+            </Link>
             <div>© 2026 FINRATE ANALYTICS · İKİZ YAZILIM LTD</div>
             <div className="flex gap-6">
                 <Link href="#" className="hover:text-[#0B3C5D]">GİZLİLİK</Link>

@@ -28,15 +28,28 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 export default function GruplarPage() {
   const [groups, setGroups]     = useState<Group[]>([])
   const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [newName, setNewName]   = useState('')
   const [creating, setCreating] = useState(false)
 
   async function load() {
-    const res = await fetch('/api/groups')
-    const d = await res.json()
-    setGroups(d.groups ?? [])
-    setLoading(false)
+    try {
+      setError(null)
+      const res = await fetch('/api/groups')
+      if (res.status === 401) {
+        window.location.href = '/giris'
+        return
+      }
+      const d = await res.json()
+      if (!res.ok) throw new Error(d?.error || 'Gruplar yüklenemedi.')
+      setGroups(d.groups ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gruplar yüklenemedi.')
+      setGroups([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -114,6 +127,10 @@ export default function GruplarPage() {
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 size={24} className="animate-spin text-cyan-400" />
+        </div>
+      ) : error ? (
+        <div className="glass-card rounded-xl p-6">
+          <p className="text-sm text-red-300">{error}</p>
         </div>
       ) : groups.length === 0 ? (
         <div className="glass-card rounded-xl p-10 text-center">

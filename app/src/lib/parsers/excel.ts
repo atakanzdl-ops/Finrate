@@ -487,11 +487,10 @@ function extractMizanYear(rows: unknown[][]): { year: number | null; period: str
 
 export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
   const header = findMizanHeader(rows)
-  if (!header) { console.log('[mizan] header bulunamadı'); return [] }
+  if (!header) return []
   const { headerIdx, cols } = header
-  console.log('[mizan] kolonlar:', JSON.stringify(cols))
   const { year, period } = extractMizanYear(rows)
-  if (!year) { console.log('[mizan] yıl bulunamadı'); return [] }
+  if (!year) return []
 
   const fields: Record<string, number | null> = {}
   let salesDeductions = 0
@@ -502,15 +501,42 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
   let unmappedRows = 0
   const reverseBalanceWarnings: string[] = []
   const parseWarnings: string[] = []
+  const exactParentMatched = new Set<string>()
 
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as (string | number | null)[]
     const rawCode = row[cols['code'] ?? 0]
     if (!rawCode) continue
     const code = String(rawCode).trim()
-    if (!/^\d+$/.test(code)) continue  // sadece tam sayı kodlar (alt hesap noktaları yok)
+    const normalizedCode = code.replace(/[^\d]/g, '')
+    if (!normalizedCode) continue
 
-    const mapping = MIZAN_ACCOUNT_MAP[code]
+    let mappedCode: string | null = null
+    let mapping = MIZAN_ACCOUNT_MAP[normalizedCode]
+    let matchedByPrefix = false
+
+    if (mapping) {
+      mappedCode = normalizedCode
+      if (normalizedCode.length <= 3) exactParentMatched.add(normalizedCode)
+    } else {
+      const prefixCandidates = [
+        normalizedCode.slice(0, 3),
+        normalizedCode.slice(0, 2),
+        normalizedCode.slice(0, 1),
+      ].filter(Boolean)
+
+      for (const candidate of prefixCandidates) {
+        if (exactParentMatched.has(candidate)) continue
+        const prefixMapping = MIZAN_ACCOUNT_MAP[candidate]
+        if (prefixMapping) {
+          mapping = prefixMapping
+          mappedCode = candidate
+          matchedByPrefix = true
+          break
+        }
+      }
+    }
+
     if (!mapping) {
       ignoredRows++
       unmappedRows++
@@ -540,26 +566,26 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
       // bakBorç=0 gerçek sıfır bakiye demektir — hareket kolonuna düşme
       case 'bakBorç':
         if ((bakAlacak != null && bakAlacak !== 0) && (bakBorç == null || bakBorç === 0)) {
-          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} alacak bakiyesi veriyor`)
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${normalizedCode} alacak bakiyesi veriyor`)
         }
         val = bakBorç ?? bakAlacak ?? null
         break
       case 'bakAlacak':
         if ((bakBorç != null && bakBorç !== 0) && (bakAlacak == null || bakAlacak === 0)) {
-          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} borç bakiyesi veriyor`)
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${normalizedCode} borç bakiyesi veriyor`)
         }
         val = bakAlacak ?? bakBorç ?? null
         break
       // Gelir tablosu hesapları: bakiye=0 (kesin beyan kapanışı) → hareket kolonuna düş (||)
       case 'anyBorç':
         if ((bakAlacak != null && bakAlacak !== 0) && (bakBorç == null || bakBorç === 0)) {
-          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} alacak tarafında kapanıyor`)
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${normalizedCode} alacak tarafında kapanıyor`)
         }
         val = bakBorç || bakAlacak || borç || alacak || null
         break
       case 'anyAlacak':
         if ((bakBorç != null && bakBorç !== 0) && (bakAlacak == null || bakAlacak === 0)) {
-          reverseBalanceWarnings.push(`Ters bakiye: hesap ${code} borç tarafında kapanıyor`)
+          reverseBalanceWarnings.push(`Ters bakiye: hesap ${normalizedCode} borç tarafında kapanıyor`)
         }
         val = bakAlacak || bakBorç || alacak || borç || null
         break
@@ -573,9 +599,17 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
       continue
     }
 
-    if (mapping.field === '_salesDeductions') salesDeductions = val
-    else if (mapping.field === '_netLoss') netLoss = val
-    else fields[mapping.field] = val
+    if (mapping.field === '_salesDeductions') {
+      salesDeductions = matchedByPrefix ? salesDeductions + val : val
+    } else if (mapping.field === '_netLoss') {
+      netLoss = matchedByPrefix ? netLoss + val : val
+    } else if (matchedByPrefix) {
+      const prev = fields[mapping.field]
+      fields[mapping.field] = typeof prev === 'number' ? prev + val : val
+    } else {
+      fields[mapping.field] = val
+      if (mappedCode && mappedCode.length <= 3) exactParentMatched.add(mappedCode)
+    }
     matchedRows++
   }
 
@@ -622,8 +656,7 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
     fields['totalAssets'] = (fields['totalCurrentAssets'] as number) + (fields['totalNonCurrentAssets'] as number)
   }
 
-  console.log('[mizan] yıl:', year, 'dönem:', period, 'alan sayısı:', Object.keys(fields).length, 'alanlar:', Object.keys(fields).join(','))
-  if (Object.keys(fields).length < 3) { console.log('[mizan] yetersiz alan, atlıyorum'); return [] }
+  if (Object.keys(fields).length < 3) return []
   const metaBase = {
     path: 'mizan' as const,
     totalRows: Math.max(rows.length - (headerIdx + 1), 0),

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       activityScore: true,
       ratios: true,
       optimizerSnapshot: true,
-      entity: { select: { id: true, name: true, sector: true } },
+      entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,

@@ -87,6 +87,7 @@ model Entity {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   group               Group?   @relation(fields: [groupId], references: [id])
   financialData       FinancialData[]
+  financialDataUploads FinancialDataUpload[]
   analyses            Analysis[]
   tenzilatEntries     TenzilatEntry[]
   icTransactionsSell  IcTransaction[] @relation("SellerEntity")
@@ -206,9 +207,31 @@ model FinancialData {
 
   entity              Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
   analysis            Analysis?
+  uploads             FinancialDataUpload[]
 
   @@unique([entityId, year, period])
   @@map("financial_data")
+}
+
+model FinancialDataUpload {
+  id               String   @id @default(uuid())
+  entityId         String
+  financialDataId  String
+  year             Int
+  period           String   @default("ANNUAL")
+  source           String
+  fileName         String
+  parsedFieldCount Int      @default(0)
+  unmapped         String?
+  parseWarnings    String?
+  createdAt        DateTime @default(now())
+
+  entity           Entity        @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  financialData    FinancialData @relation(fields: [financialDataId], references: [id], onDelete: Cascade)
+
+  @@index([entityId, year, period])
+  @@index([financialDataId, createdAt])
+  @@map("financial_data_uploads")
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -252,6 +275,7 @@ model Analysis {
   financialData       FinancialData? @relation(fields: [financialDataId], references: [id])
   tenzilatEntries     TenzilatEntry[]
 
+  @@unique([entityId, year, period])
   @@map("analyses")
 }
 

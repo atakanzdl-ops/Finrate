@@ -39,15 +39,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let parsedRows
     if (isExcel) {
       parsedRows = parseExcelBuffer(buffer)
-      console.log('[upload] Excel parsed, rows:', parsedRows.length, parsedRows.map(r => ({ year: r.year, period: r.period, fields: Object.keys(r.fields).length })))
     } else if (isCsv) {
       parsedRows = parseCsvText(buffer.toString('utf-8'))
-      console.log('[upload] CSV parsed, rows:', parsedRows.length)
     } else {
       const { parsePdfBuffer } = await import('@/lib/parsers/pdf')
-      console.log('[upload] PDF parsing start, size:', buffer.length)
       parsedRows = await parsePdfBuffer(buffer)
-      console.log('[upload] PDF parsed, rows:', parsedRows.length, parsedRows.map(r => ({ year: r.year, period: r.period, fields: Object.keys(r.fields).length })))
     }
 
     // Yıl/dönem override mantığı:
@@ -158,6 +154,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const existing = await prisma.financialData.findUnique({
         where: { entityId_year_period: { entityId, year: row.year, period } },
       })
+      const nextSource = existing && existing.source !== source ? 'MIXED' : source
       // Merge: yeni dosyadaki null olmayan alanlar öncelikli, eksik alanlar mevcut kayıttan gelir
       const mergedFields = existing
         ? Object.fromEntries(
@@ -172,9 +169,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const financialData = await prisma.financialData.upsert({
         where: { entityId_year_period: { entityId, year: row.year, period } },
-        update: { ...mergedFields, source, fileName: file.name, updatedAt: new Date() },
-        create: { entityId, year: row.year, period, source, fileName: file.name, ...mergedFields },
+        update: { ...mergedFields, source: nextSource, fileName: file.name, updatedAt: new Date() },
+        create: { entityId, year: row.year, period, source: nextSource, fileName: file.name, ...mergedFields },
       })
+
+      const parseWarningsJson = row.meta?.parseWarnings ? JSON.stringify(row.meta.parseWarnings) : null
+      const unmappedJson = row.unmapped?.length ? JSON.stringify(row.unmapped) : null
+      const uploadId = crypto.randomUUID()
+      await prisma.$executeRaw`
+        INSERT INTO "financial_data_uploads"
+          ("id", "entityId", "financialDataId", "year", "period", "source", "fileName", "parsedFieldCount", "unmapped", "parseWarnings", "createdAt")
+        VALUES
+          (${uploadId}, ${entityId}, ${financialData.id}, ${row.year}, ${period}, ${source}, ${file.name}, ${Object.keys(row.fields ?? {}).length}, ${unmappedJson}, ${parseWarningsJson}, NOW())
+      `
 
       // Önceki yıl cirosunu sorgula (reel büyüme hesabı için)
       const prevYearData = await prisma.financialData.findFirst({

@@ -6,6 +6,8 @@ import {
   LayoutDashboard,
   Building2,
   BarChart3,
+  GitBranch,
+  Scissors,
   FileText,
   Settings,
 } from 'lucide-react'
@@ -22,10 +24,12 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/sirketler', label: 'Sirketler', icon: Building2 },
-    { href: '/dashboard/analiz', label: 'Analiz', icon: BarChart3 },
-    { href: '/dashboard/raporlar', label: 'Raporlar', icon: FileText },
+    { href: '/dashboard',             label: 'Kontrol Paneli', icon: LayoutDashboard },
+    { href: '/dashboard/sirketler',   label: 'Şirketler',      icon: Building2 },
+    { href: '/dashboard/analiz',      label: 'Analizler',      icon: BarChart3 },
+    { href: '/dashboard/gruplar',     label: 'Gruplar',        icon: GitBranch },
+    { href: '/dashboard/tenzilat',    label: 'Tenzilat',       icon: Scissors },
+    { href: '/dashboard/raporlar',    label: 'Raporlar',       icon: FileText },
   ]
 
   return (
@@ -35,7 +39,7 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
           <div className="brand-mark">F</div>
           <div>
             <div className="brand-title">FINRATE</div>
-            <div className="brand-subtitle">Bank Grade Rating</div>
+            <div className="brand-subtitle">BANKACI KALİTESİ DEĞERLENDİRME</div>
           </div>
         </div>
 
@@ -48,8 +52,8 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
           ))}
         </nav>
 
-        <div className="mt-auto">
-          <Link href="#" className="nav-link">
+        <div className="sidebar-footer">
+          <Link href="/dashboard/ayarlar" className={navClass('/dashboard/ayarlar')}>
             <Settings size={18} strokeWidth={2.5} />
             <span>Ayarlar</span>
           </Link>

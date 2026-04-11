@@ -196,7 +196,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   }
 
   function TrendCell({ v }: { v: number | null }) {
-    if (v == null) return <td className="px-2 py-1 text-center text-white/20 text-[10px]">—</td>
+    if (v == null) return <td className="px-2 py-1 text-center text-slate-300 text-[10px]">—</td>
     const pos = v >= 0
     return (
       <td className={clsx(
@@ -221,10 +221,10 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     if (!anyDiff) return null
 
     return (
-      <tr className="bg-red-500/10 border-b border-red-500/20">
+      <tr className="bg-red-50 border-b border-red-100">
         <td
           colSpan={2}
-          className="px-3 py-1.5 sticky left-0 bg-red-500/10 text-red-400 font-bold text-[10px] whitespace-nowrap"
+          className="px-3 py-1.5 sticky left-0 bg-red-50 text-red-700 font-bold text-[10px] whitespace-nowrap"
           style={{ minWidth: LABEL_W + CODE_W }}
         >
           ⚠ AKTİF — PASİF FARKI
@@ -232,13 +232,13 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         {cols.map((col, ci) => {
           const d = diffs[ci]
           return (
-            <td key={col.id} className="px-3 py-1.5 text-right text-[10px] font-bold tabular-nums text-red-400">
+            <td key={col.id} className="px-3 py-1.5 text-right text-[10px] font-bold tabular-nums text-red-700">
               {d == null ? '—' : Math.abs(d) < 0.5 ? '✓' : fmtTR(d)}
             </td>
           )
         })}
-        <td className="px-2 py-1 text-center text-white/20 text-[10px]">—</td>
-        <td className="px-2 py-1 text-center text-white/20 text-[10px]">—</td>
+        <td className="px-2 py-1 text-center text-slate-300 text-[10px]">—</td>
+        <td className="px-2 py-1 text-center text-slate-300 text-[10px]">—</td>
       </tr>
     )
   }
@@ -255,10 +255,10 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     if (!anyDiff) return null
 
     return (
-      <tr className="bg-red-500/10 border-b border-red-500/20">
+      <tr className="bg-red-50 border-b border-red-100">
         <td
           colSpan={2}
-          className="px-3 py-1.5 sticky left-0 bg-red-500/10 text-red-400 font-bold text-[10px] whitespace-nowrap"
+          className="px-3 py-1.5 sticky left-0 bg-red-50 text-red-700 font-bold text-[10px] whitespace-nowrap"
           style={{ minWidth: LABEL_W + CODE_W }}
         >
           ⚠ BİLANÇO — GT K/Z FARKI
@@ -266,13 +266,13 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         {cols.map((col, ci) => {
           const d = diffs[ci]
           return (
-            <td key={col.id} className="px-3 py-1.5 text-right text-[10px] font-bold tabular-nums text-red-400">
+            <td key={col.id} className="px-3 py-1.5 text-right text-[10px] font-bold tabular-nums text-red-700">
               {d == null ? '—' : Math.abs(d) < 0.5 ? '✓' : fmtTR(d)}
             </td>
           )
         })}
-        <td className="px-2 py-1 text-center text-white/20 text-[10px]">—</td>
-        <td className="px-2 py-1 text-center text-white/20 text-[10px]">—</td>
+        <td className="px-2 py-1 text-center text-slate-300 text-[10px]">—</td>
+        <td className="px-2 py-1 text-center text-slate-300 text-[10px]">—</td>
       </tr>
     )
   }
@@ -284,10 +284,10 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     // Bölüm başlığı
     if (row.type === 'header') {
       renderedRows.push(
-        <tr key={`h${i}`} className="border-t-2 border-white/10 bg-white/2">
+        <tr key={`h${i}`} className="border-t-2 border-slate-200 bg-slate-50">
           <td
             colSpan={2 + cols.length + 2}
-            className="px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-cyan-400 sticky left-0"
+            className="px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#0B3C5D] sticky left-0 bg-slate-50"
           >
             {row.label}
           </td>
@@ -307,18 +307,18 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
       <tr
         key={`r${i}`}
         className={clsx(
-          'border-b border-white/5 transition-colors',
-          isTotal  ? 'bg-white/3 hover:bg-white/5' :
-          isSubtot ? 'bg-white/2 hover:bg-white/4' :
-                     'hover:bg-white/2',
+          'border-b border-slate-100 transition-colors',
+          isTotal  ? 'bg-[#F0F7FA] hover:bg-[#EAF4F8]' :
+          isSubtot ? 'bg-[#F8FBFD] hover:bg-[#F1F7FA]' :
+                     'hover:bg-slate-50',
         )}
       >
         {/* Kod — sticky (ilk sütun) */}
         <td
           className={clsx(
             'text-center px-1 py-1 sticky left-0 z-10',
-            isCalc   ? 'bg-[#0d1b2e]' : 'bg-[#0a1727]',
-            hasField ? 'text-white/40' : 'text-white/15',
+            isCalc   ? 'bg-[#F8FBFD] border-r border-slate-100' : 'bg-white border-r border-slate-100',
+            hasField ? 'text-slate-500' : 'text-slate-300',
           )}
           style={{ width: CODE_W, minWidth: CODE_W, maxWidth: CODE_W }}
         >
@@ -329,10 +329,10 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         <td
           className={clsx(
             'px-3 py-1 sticky z-10 text-[10px] truncate',
-            isTotal  ? 'bg-[#0f1f35] font-black text-[#2dd4bf]' :
-            isSubtot ? 'bg-[#0d1b2e] font-bold text-[#2dd4bf]' :
-            hasField ? 'bg-[#0a1727] text-white/75' :
-                       'bg-[#0a1727] text-white/25',
+            isTotal  ? 'bg-[#F0F7FA] font-black text-[#0B3C5D] border-r border-slate-100' :
+            isSubtot ? 'bg-[#F8FBFD] font-bold text-[#0B3C5D] border-r border-slate-100' :
+            hasField ? 'bg-white text-slate-700 border-r border-slate-100' :
+                       'bg-white text-slate-300 border-r border-slate-100',
           )}
           style={{ left: CODE_W, minWidth: LABEL_W }}
         >
@@ -344,7 +344,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
           if (!hasField) {
             return (
               <td key={col.id} className="px-2 py-1 text-right">
-                <span className="text-white/15 tabular-nums">0,00</span>
+                <span className="text-slate-300 tabular-nums">0,00</span>
               </td>
             )
           }
@@ -360,9 +360,9 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                   onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
                   onBlur={() => handleBlur(col.id, row.field!)}
                   className={clsx(
-                    'w-full bg-transparent text-right tabular-nums focus:outline-none focus:bg-white/10 focus:rounded px-1',
+                    'w-full bg-transparent text-right tabular-nums focus:outline-none focus:bg-slate-100 focus:rounded px-1',
                     isTotal ? 'font-black text-[10px]' : 'font-bold text-[10px]',
-                    v != null && v < 0 ? 'text-red-400' : 'text-[#2dd4bf]',
+                    v != null && v < 0 ? 'text-red-600' : 'text-[#0B3C5D]',
                   )}
                   placeholder="0,00"
                 />
@@ -382,9 +382,9 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                 onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
                 onBlur={() => handleBlur(col.id, row.field!)}
                 className={clsx(
-                  'w-full bg-white/5 border border-white/10 rounded px-1.5 py-0.5',
-                  'text-right tabular-nums text-[10px] focus:outline-none focus:border-cyan-500/50',
-                  isNeg ? 'text-red-400' : 'text-white',
+                  'w-full bg-white border border-slate-200 rounded px-1.5 py-0.5',
+                  'text-right tabular-nums text-[10px] focus:outline-none focus:border-[#1FA4A9]/50',
+                  isNeg ? 'text-red-600' : 'text-slate-900',
                 )}
                 placeholder="0,00"
               />
@@ -412,40 +412,40 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   })
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden border border-[#E5E9F0] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="border-b border-white/10 bg-white/3">
+            <tr className="border-b border-slate-200 bg-slate-50">
               <th
-                className="text-center py-2.5 text-white/50 font-medium sticky left-0 bg-[#0a1727] z-10"
+                className="text-center py-2.5 text-slate-500 font-medium sticky left-0 bg-slate-50 z-10 border-r border-slate-200"
                 style={{ width: CODE_W, minWidth: CODE_W, maxWidth: CODE_W }}
               >
                 KOD
               </th>
               <th
-                className="text-left px-3 py-2.5 text-white/50 font-medium sticky bg-[#0a1727] z-10"
+                className="text-left px-3 py-2.5 text-slate-500 font-medium sticky bg-slate-50 z-10 border-r border-slate-200"
                 style={{ left: CODE_W, minWidth: LABEL_W }}
               >
                 HESAP ADI
               </th>
               {cols.map(col => (
                 <th key={col.id} className="text-right px-3 py-2 min-w-[130px]">
-                  <div className="text-white font-bold">{col.year}</div>
-                  <div className="text-[9px] text-white/40 font-normal mt-0.5">
+                  <div className="text-slate-800 font-bold">{col.year}</div>
+                  <div className="text-[9px] text-slate-500 font-normal mt-0.5">
                     {PERIOD_LABEL[col.period] ?? col.period}
                   </div>
                   {saving[col.id] && (
-                    <div className="text-[8px] text-cyan-400 mt-0.5 animate-pulse">kaydediliyor</div>
+                    <div className="text-[8px] text-[#1FA4A9] mt-0.5 animate-pulse">kaydediliyor</div>
                   )}
                 </th>
               ))}
               {/* Trend başlıkları */}
               <th className="text-center px-2 py-2 min-w-[52px]">
-                <div className="text-[9px] text-white/40 font-medium leading-tight">Son 2<br />Dönem</div>
+                <div className="text-[9px] text-slate-500 font-medium leading-tight">Son 2<br />Dönem</div>
               </th>
               <th className="text-center px-2 py-2 min-w-[52px]">
-                <div className="text-[9px] text-white/40 font-medium leading-tight">İlk-Son<br />Dönem</div>
+                <div className="text-[9px] text-slate-500 font-medium leading-tight">İlk-Son<br />Dönem</div>
               </th>
             </tr>
           </thead>

@@ -1,54 +1,16 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
-  Loader2,
   ArrowRight,
-  ShieldCheck,
-  AlertTriangle,
-  FileText,
-  ChevronRight,
-  CheckCircle2,
+  CalendarClock,
+  Loader2,
+  Plus,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
 import FinrateShell from '@/components/layout/FinrateShell'
-
-/* ─── Types ─── */
-interface RatioSuggestion {
-  key: string
-  label: string
-  category: string
-  currentValue: number | null
-  targetValue: number
-  unit: 'pct' | 'x' | 'day' | 'ratio'
-  marginalScoreGain: number
-  difficulty: 'medium' | 'hard'
-  timeHorizon: '0-90 days' | '3-6 months' | '6-12 months'
-}
-
-interface ActionPlan {
-  label: 'minimum' | 'ideal'
-  title: string
-  targetScore: number
-  projectedScore: number
-  projectedRating: string
-  achievable: boolean
-  suggestions: RatioSuggestion[]
-}
-
-interface OptimizerTargetSnapshot {
-  targetRating: string
-  totalGain: number
-  minimumPlan: ActionPlan
-  idealPlan: ActionPlan
-}
-
-interface OptimizerSnapshot {
-  currentScore: number
-  currentRating: string
-  generatedAt: string
-  targets: OptimizerTargetSnapshot[]
-}
 
 interface Analysis {
   id: string
@@ -57,227 +19,289 @@ interface Analysis {
   updatedAt: string
   finalScore: number
   finalRating: string
-  liquidityScore: number
-  profitabilityScore: number
-  leverageScore: number
-  activityScore: number
-  optimizerSnapshot?: OptimizerSnapshot | null
   entity?: { id: string; name: string; sector?: string | null }
 }
 
-/* ─── Helpers ─── */
-function getRiskLevel(rating: string) {
-  const high = ['CCC', 'CC', 'C', 'D', 'B', 'BB']
-  const med = ['BBB', 'A']
-  if (high.includes(rating)) return { label: 'YÜKSEK RİSK', color: 'text-red-600', dot: 'bg-red-600' }
-  if (med.includes(rating)) return { label: 'ORTA RİSK', color: 'text-amber-600', dot: 'bg-amber-500' }
-  return { label: 'DÜŞÜK RİSK', color: 'text-emerald-700', dot: 'bg-emerald-600' }
+const SECTORS = [
+  'Üretim',
+  'Ticaret',
+  'Hizmet',
+  'İnşaat',
+  'Turizm',
+  'Tarım',
+  'Enerji',
+  'Sağlık',
+  'Eğitim',
+  'Finans',
+  'Teknoloji',
+  'Diğer',
+]
+
+function toValidDate(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
-function formatValue(val: number | null, unit: RatioSuggestion['unit']) {
-  if (val == null) return '-'
-  if (unit === 'pct') return `%${(val * 100).toFixed(1)}`
-  if (unit === 'x') return `${val.toFixed(2)}x`
-  if (unit === 'day') return `${Math.round(val)} gün`
-  return val.toFixed(2)
+function formatDate(value?: string | null) {
+  const date = toValidDate(value)
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
+function ratingTone(rating: string) {
+  if (['AAA', 'AA', 'A'].includes(rating)) return 'text-emerald-600 bg-emerald-50 border-emerald-100'
+  if (rating === 'BBB') return 'text-amber-700 bg-amber-50 border-amber-100'
+  return 'text-red-600 bg-red-50 border-red-100'
 }
 
 export default function DashboardHome() {
+  const router = useRouter()
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [loading, setLoading] = useState(true)
+  const [showNewAnalysis, setShowNewAnalysis] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [entityName, setEntityName] = useState('')
+  const [sector, setSector] = useState('')
 
   useEffect(() => {
     fetch('/api/analyses')
       .then((r) => (r.ok ? r.json() : { analyses: [] }))
       .then((d) => {
-          const list = (d.analyses ?? []) as Analysis[]
-          setAnalyses([...list].sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()))
+        const list = (d.analyses ?? []) as Analysis[]
+        setAnalyses(
+          [...list].sort((a, b) => {
+            const aTime = toValidDate(a.updatedAt)?.getTime() ?? 0
+            const bTime = toValidDate(b.updatedAt)?.getTime() ?? 0
+            return bTime - aTime
+          }),
+        )
       })
       .catch(() => setAnalyses([]))
       .finally(() => setLoading(false))
   }, [])
 
-  const summary = useMemo(() => {
-    if (!analyses.length) return null
-    const latest = analyses[0]
-    const risk = getRiskLevel(latest.finalRating)
-    const latestTarget = latest.optimizerSnapshot?.targets[0] ?? null
+  const latest = analyses[0] ?? null
+  const previous = analyses[1] ?? null
+  const change = latest && previous ? latest.finalScore - previous.finalScore : null
 
-    return { latest, risk, latestTarget }
-  }, [analyses])
+  const subtitle = useMemo(() => {
+    if (!latest) return 'Henüz analiz bulunmuyor.'
+    return `${latest.entity?.name ?? 'Şirket'} • Son analiz: ${formatDate(latest.updatedAt)}`
+  }, [latest])
 
-  if (loading) return (
-    <FinrateShell>
-      <div className="flex items-center justify-center py-32">
-        <Loader2 className="animate-spin text-[#0B3C5D]" size={32} />
-      </div>
-    </FinrateShell>
-  )
+  async function handleCreateAnalysis(e: React.FormEvent) {
+    e.preventDefault()
+    setCreateError('')
 
-  if (!summary) return (
-    <FinrateShell>
-      <div className="flex flex-col items-center justify-center py-32 text-center">
-        <FileText className="text-slate-300 mb-6" size={48} />
-        <h2 className="text-xl font-bold text-[#0B3C5D]">Analiz Bulunamadı</h2>
-        <p className="text-slate-500 mt-2 text-sm max-w-sm">
-          Mizan yükleyerek finansal kredi analiz raporunuzu oluşturun.
-        </p>
-        <Link href="/dashboard/analiz" className="bg-[#0B3C5D] text-white px-6 py-3 rounded-[4px] text-xs font-bold mt-6 hover:bg-[#072b43] transition-colors">
-          YENİ ANALİZ
-        </Link>
-      </div>
-    </FinrateShell>
-  )
+    if (!entityName.trim()) {
+      setCreateError('Şirket adı zorunludur.')
+      return
+    }
+    if (!sector) {
+      setCreateError('Sektör seçimi zorunludur.')
+      return
+    }
 
-  return (
-    <FinrateShell>
-      <div className="space-y-6 pb-20 max-w-6xl mx-auto px-4 sm:px-6 mt-6">
-        
-        {/* Page Header */}
-        <div className="flex items-end justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h1 className="text-2xl font-display font-black text-[#0B3C5D]">
-              {summary.latest.entity?.name}
-            </h1>
-            <p className="text-slate-500 mt-1 text-xs">
-              Sektör: Üretim | Dönem: {summary.latest.year}/{summary.latest.period} | Rapor No: FX-{summary.latest.id.slice(0,6).toUpperCase()}
-            </p>
-          </div>
-          <Link href="/dashboard/analiz" className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-[4px] text-[10px] font-bold tracking-widest hover:bg-slate-50 transition-colors flex items-center gap-2">
-            RAPOR DETAYI <ArrowRight size={14} />
-          </Link>
-        </div>
-
-        {/* 1. Header Blocks (Top 3) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          <div className="bg-white p-6 border border-slate-200 rounded-[4px]">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">Fİnrate Skoru</span>
-            <div className="flex flex-col">
-              <div className="text-5xl font-display font-black text-[#0B3C5D] leading-none mb-1">
-                {Math.round(summary.latest.finalScore)}
-              </div>
-              <div className="text-[10px] text-slate-400 font-bold tracking-widest">/ 100 PUAN</div>
-            </div>
-          </div>
-          
-          <div className="bg-[#0B3C5D] p-6 border border-[#0B3C5D] rounded-[4px]">
-            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest block mb-4">Kredİ Reytİngİ</span>
-            <div className="flex flex-col">
-              <div className="text-5xl font-display font-black text-white leading-none mb-1">
-                {summary.latest.finalRating}
-              </div>
-              <div className="text-[10px] text-slate-300 font-bold tracking-widest">BANKA KARŞILIĞI: TEMİNATLI ÇALIŞILABİLİR</div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 border border-slate-200 rounded-[4px] flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">Rİsk Sevİyesİ</span>
-            <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${summary.risk.dot}`} />
-              <div className={`text-2xl font-bold tracking-tight ${summary.risk.color}`}>
-                {summary.risk.label}
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* 2. Category Cards (Middle 4) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <CategoryCard label="LİKİDİTE" score={summary.latest.liquidityScore} />
-          <CategoryCard label="KARLILIK" score={summary.latest.profitabilityScore} />
-          <CategoryCard label="KALDIRAÇ" score={summary.latest.leverageScore} />
-          <CategoryCard label="FAALİYET" score={summary.latest.activityScore} />
-        </div>
-
-        {/* 3. Action Engine (Prominent Block) */}
-        <div className="bg-white border border-slate-200 rounded-[4px] mt-8">
-          <div className="p-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-[#0B3C5D]">Kritik Aksiyon Planı</h2>
-              <p className="text-slate-500 text-xs mt-1">Kredi skorunu &quot;{summary.latestTarget?.targetRating ?? 'AA'}&quot; seviyesine yükseltmek için öncelikli eylemler.</p>
-            </div>
-          </div>
-          
-          <div className="p-0">
-            {summary.latestTarget ? (
-              <ActionPanel plan={summary.latestTarget.minimumPlan} idealPlan={summary.latestTarget.idealPlan} />
-            ) : (
-              <div className="p-16 text-center text-slate-400 text-sm">
-                Aksiyon listesi bulunamadı. Lütfen analiz motorunu çalıştırın.
-              </div>
-            )}
-          </div>
-        </div>
-
-      </div>
-    </FinrateShell>
-  )
-}
-
-function CategoryCard({ label, score }: { label: string; score: number; }) {
-  return (
-    <div className="bg-white p-5 border border-slate-200 rounded-[4px]">
-      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-2">{label} GÜCÜ</span>
-      <div className="text-2xl font-bold text-[#0B3C5D]">{Math.round(score)}</div>
-    </div>
-  )
-}
-
-function ActionPanel({ plan, idealPlan }: { plan: ActionPlan; idealPlan: ActionPlan }) {
-  const [activeTab, setActiveTab] = useState<'minimum'|'ideal'>('minimum')
-  const currentPlan = activeTab === 'minimum' ? plan : idealPlan
+    setCreating(true)
+    try {
+      const res = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: entityName.trim(), sector }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCreateError(data.error ?? 'Şirket oluşturulamadı.')
+        return
+      }
+      const entityId = data?.entity?.id as string | undefined
+      if (!entityId) {
+        setCreateError('Şirket kimliği alınamadı.')
+        return
+      }
+      setShowNewAnalysis(false)
+      router.push(`/dashboard/analiz/yukle/${entityId}`)
+    } catch {
+      setCreateError('Bağlantı hatası. Lütfen tekrar deneyin.')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div>
-      {/* Tabs */}
-      <div className="flex items-center gap-6 px-6 border-b border-slate-200">
-        <button 
-          onClick={() => setActiveTab('minimum')}
-          className={`py-4 text-xs font-bold tracking-widest uppercase border-b-2 transition-colors ${activeTab === 'minimum' ? 'border-[#0B3C5D] text-[#0B3C5D]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-           MİNİMUM SET ({plan.suggestions.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('ideal')}
-          className={`py-4 text-xs font-bold tracking-widest uppercase border-b-2 transition-colors ${activeTab === 'ideal' ? 'border-[#0B3C5D] text-[#0B3C5D]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-           İDEAL SET ({idealPlan.suggestions.length})
-        </button>
+    <FinrateShell>
+      <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1>Finansal Kontrol Paneli</h1>
+            <p>{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNewAnalysis(true)}
+            className="btn btn-primary"
+          >
+            <Plus size={16} />
+            Yeni Analiz Başlat
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="card p-16 flex items-center justify-center">
+            <Loader2 className="animate-spin text-[#0B3C5D]" size={28} />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="card p-6 md:col-span-2">
+                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Skor / Rating</p>
+                <div className="mt-3 flex items-end gap-3">
+                  <span className="text-5xl font-black text-[#0B3C5D]">{latest ? Math.round(latest.finalScore) : '-'}</span>
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full border ${latest ? ratingTone(latest.finalRating) : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
+                    {latest?.finalRating ?? '—'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Son Analiz Tarihi</p>
+                <div className="mt-3 flex items-center gap-2 text-[#0B3C5D]">
+                  <CalendarClock size={18} />
+                  <span className="font-bold text-lg">{latest ? formatDate(latest.updatedAt) : '—'}</span>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Son Değişim</p>
+                <div className="mt-3 flex items-center gap-2">
+                  {change == null ? (
+                    <span className="text-slate-500 font-bold text-lg">—</span>
+                  ) : change >= 0 ? (
+                    <>
+                      <TrendingUp size={18} className="text-emerald-600" />
+                      <span className="text-emerald-600 font-bold text-lg">+{change.toFixed(1)} puan</span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown size={18} className="text-red-600" />
+                      <span className="text-red-600 font-bold text-lg">{change.toFixed(1)} puan</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <h2 className="card-title">Analiz Geçmişi</h2>
+              </div>
+              <div className="card-body">
+                {analyses.length === 0 ? (
+                  <div className="text-center py-10 text-slate-500">
+                    İlk analiz için <strong>Yeni Analiz Başlat</strong> butonunu kullanın.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {analyses.slice(0, 9).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => router.push(`/dashboard/analiz?entityId=${item.entity?.id ?? ''}`)}
+                        className="text-left p-4 rounded-xl border border-[#E5E9F0] hover:border-[#0B3C5D]/25 hover:bg-[#F8FAFC] transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-[#1E293B]">{item.entity?.name ?? 'Şirket'}</span>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(item.finalRating)}`}>
+                            {item.finalRating}
+                          </span>
+                        </div>
+                        <div className="mt-3 text-2xl font-black text-[#0B3C5D]">{Math.round(item.finalScore)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{formatDate(item.updatedAt)} • {item.year}/{item.period}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => router.push('/dashboard/analiz')}
+              >
+                Tüm Analizleri Gör <ArrowRight size={16} />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* List */}
-      <div className="divide-y divide-slate-100">
-         <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <div className="col-span-3">FİNANSAL METRİK</div>
-            <div className="col-span-6">GEREKLİ AKSİYON</div>
-            <div className="col-span-3 text-right">SKOR ETKİSİ</div>
-         </div>
-        
-        {currentPlan.suggestions.map((s) => (
-          <div key={s.key} className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-slate-50 transition-colors">
-            <div className="col-span-3">
-               <span className="text-sm font-bold text-[#0B3C5D]">{s.label}</span>
-               <div className="text-[10px] text-slate-500 mt-1">Mevcut: {formatValue(s.currentValue, s.unit)}</div>
+      {showNewAnalysis && (
+        <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[1px] flex items-center justify-center px-4">
+          <div className="w-full max-w-md bg-white border border-[#E5E9F0] rounded-xl shadow-xl">
+            <div className="px-6 py-5 border-b border-[#E5E9F0]">
+              <h3 className="text-lg font-black text-[#0B3C5D]">Yeni Analiz Başlat</h3>
+              <p className="text-sm text-slate-500 mt-1">Şirket bilgilerini girin, ardından doğrudan mali veri yükleme ekranına geçin.</p>
             </div>
-            <div className="col-span-6">
-               <span className="text-sm text-slate-700">Skoru hedefe taşımak için oranı <strong className="text-[#0B3C5D]">{formatValue(s.targetValue, s.unit)}</strong> seviyesine çekmeniz/yapılandırmanız önerilir.</span>
-            </div>
-            <div className="col-span-3 text-right">
-               <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-1 rounded text-xs font-bold border border-emerald-100">
-                  +{s.marginalScoreGain.toFixed(1)} Puan
-               </span>
-            </div>
+            <form onSubmit={handleCreateAnalysis} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Şirket Adı</label>
+                <input
+                  type="text"
+                  value={entityName}
+                  onChange={(e) => setEntityName(e.target.value)}
+                  className="w-full h-11 rounded-lg border border-[#E5E9F0] px-3 text-sm outline-none focus:border-[#0B3C5D]"
+                  placeholder="Örn: ABC Tekstil A.Ş."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Sektör</label>
+                <select
+                  value={sector}
+                  onChange={(e) => setSector(e.target.value)}
+                  className="w-full h-11 rounded-lg border border-[#E5E9F0] px-3 text-sm outline-none focus:border-[#0B3C5D] bg-white"
+                >
+                  <option value="">Sektör seçin</option>
+                  {SECTORS.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+
+              {createError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {createError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (creating) return
+                    setShowNewAnalysis(false)
+                    setCreateError('')
+                  }}
+                >
+                  Vazgeç
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
+                  Kaydet ve Devam Et
+                </button>
+              </div>
+            </form>
           </div>
-        ))}
-      </div>
-      
-      <div className="p-4 bg-slate-50 border-t border-slate-200 text-center">
-         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-            Bu metrikler sağlandığında projeksiyon notunuz <strong className="text-[#0B3C5D]">{currentPlan.projectedRating}</strong> seviyesine ulaşacaktır.
-         </span>
-      </div>
-    </div>
+        </div>
+      )}
+    </FinrateShell>
   )
 }
