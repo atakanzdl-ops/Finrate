@@ -4,6 +4,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Area, AreaChart,
 } from 'recharts'
+import { useState } from 'react'
+import { Info } from 'lucide-react'
 import { scoreToRating } from '@/lib/scoring/score'
 
 interface AnalysisBrief {
@@ -92,6 +94,40 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
   )
 }
 
+function DeltaInfo({ delta, isUp, first, last }: { delta: number; isUp: boolean; first: string; last: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-end gap-1">
+        <div className="text-lg font-black font-mono" style={{ color: isUp ? '#16a34a' : '#dc2626' }}>
+          {isUp ? '+' : ''}{delta.toFixed(1)}
+        </div>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <Info size={13} />
+        </button>
+      </div>
+      <div className="text-[10px] text-slate-400">{first} → {last}</div>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-left"
+          style={{ width: 220 }}
+        >
+          <p className="text-[11px] font-bold text-slate-700 mb-1">Dönemler Arası Skor Değişimi</p>
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            İlk dönem ({first}) ile son dönem ({last}) arasındaki Finrate kombine skoru farkı.
+            {isUp
+              ? ' Pozitif değer: finansal profil güçlendi.'
+              : ' Negatif değer: finansal profil zayıfladı.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TrendChart({ analyses, entityName, subjectiveScores, entityId }: Props) {
   const subjective = entityId ? (subjectiveScores?.[entityId] ?? 0) : 0
 
@@ -135,19 +171,11 @@ export default function TrendChart({ analyses, entityName, subjectiveScores, ent
       {/* Başlık */}
       <div className="card-head">
         <div className="card-head-left">
-          <h4 className="card-title">Çok Yıllı Trend Analizi</h4>
+          <h4 className="card-title" style={{ color: '#0B3C5D' }}>Çok Yıllı Trend Analizi</h4>
           <p className="card-desc">{entityName} · {sorted.length} dönem</p>
         </div>
-        <div className="text-right">
-          <div
-            className="text-lg font-black font-mono"
-            style={{ color: isUp ? 'var(--emerald-500)' : 'var(--red-400)' }}
-          >
-            {isUp ? '+' : ''}{delta.toFixed(1)}
-          </div>
-          <div className="card-desc">
-            {first.label} → {last.label}
-          </div>
+        <div className="text-right flex flex-col items-end gap-0.5">
+          <DeltaInfo delta={delta} isUp={isUp} first={first.label} last={last.label} />
         </div>
       </div>
 

@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finrate — Bankadan Önce Finrate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0B3C5D;
+  --navy-dark: #072d46;
+  --navy-light: #124d77;
+  --teal: #2EC4B6;
+  --teal-light: #4dd8cb;
+  --teal-pale: #e6f9f7;
+  --bg: #F8FAFC;
+  --bg2: #EEF3F8;
+  --text: #1E293B;
+  --text2: #5A7A96;
+  --text3: #8FA8BF;
+  --white: #ffffff;
+  --border: rgba(11,60,93,0.1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--white);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.outfit { font-family: 'Outfit', sans-serif; }
+
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800; font-size: 20px;
+  color: var(--navy); text-decoration: none;
+  letter-spacing: -0.3px;
+}
+.nav-logo-mark {
+  width: 32px; height: 32px; border-radius: 7px;
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: white;
+  font-family: 'Outfit', sans-serif;
+}
+.nav-links {
+  display: flex; align-items: center; gap: 32px;
+  list-style: none;
+}
+.nav-links a {
+  font-size: 14px; font-weight: 500;
+  color: var(--text2); text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--navy); }
+.nav-actions { display: flex; align-items: center; gap: 12px; }
+.btn-ghost {
+  font-size: 14px; font-weight: 500;
+  color: var(--navy); text-decoration: none;
+  padding: 8px 16px; border-radius: 8px;
+  transition: background 0.15s;
+}
+.btn-ghost:hover { background: var(--bg); }
+.btn-primary {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px; font-weight: 700;
+  color: white; background: var(--navy);
+  text-decoration: none; padding: 10px 20px;
+  border-radius: 8px; transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: var(--navy-dark); }
+
+/* HERO */
+.hero {
+  background: var(--navy);
+  padding: 100px 40px 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+  min-height: 600px;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(46,196,182,0.15);
+  border: 1px solid rgba(46,196,182,0.3);
+  color: var(--teal);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 100px;
+  margin-bottom: 24px;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--teal);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.hero h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 52px; font-weight: 800;
+  color: white; line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 20px;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--teal);
+}
+.hero-sub {
+  font-size: 18px; color: rgba(255,255,255,0.6);
+  max-width: 460px; line-height: 1.7;
+  margin-bottom: 36px;
+}
+.hero-btns {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+.btn-hero {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 700;
+  padding: 14px 28px; border-radius: 10px;
+  text-decoration: none; transition: all 0.15s;
+  display: inline-block;
+}
+.btn-hero-primary {
+  background: var(--teal); color: var(--navy);
+}
+.btn-hero-primary:hover { background: var(--teal-light); transform: translateY(-1px); }
+.btn-hero-secondary {
+  background: rgba(255,255,255,0.1);
+  color: white; border: 1px solid rgba(255,255,255,0.2);
+}
+.btn-hero-secondary:hover { background: rgba(255,255,255,0.15); }
+.hero-stats {
+  display: flex; gap: 32px; margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.stat-item {}
+.stat-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px; font-weight: 800; color: white;
+}
+.stat-label { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+/* SCORE CARD */
+.hero-card-wrap {
+  display: flex; align-items: center; justify-content: center;
+}
+.score-card {
+  background: white;
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.3);
+}
+.score-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 24px;
+}
+.score-card-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.score-card-title { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: var(--navy); margin-top: 2px; }
+.score-badge {
+  background: var(--teal-pale); color: var(--teal);
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+}
+.score-main {
+  display: flex; align-items: center; gap: 20px;
+  padding: 20px; background: var(--navy);
+  border-radius: 14px; margin-bottom: 16px;
+}
+.score-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 48px; font-weight: 800; color: white; line-height: 1;
+}
+.score-denom { font-size: 16px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+.score-rating {
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px; font-weight: 800; color: var(--teal);
+}
+.score-rating-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+.score-teminat {
+  background: var(--bg); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+}
+.score-teminat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 4px; }
+.score-teminat-text { font-size: 13px; font-weight: 500; color: var(--navy); line-height: 1.4; }
+.score-actions {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.score-action-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.score-action-row:last-child { border-bottom: none; }
+.score-action-icon {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0;
+}
+.score-action-text { font-size: 12px; color: var(--text2); flex: 1; }
+.score-action-pts {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px; font-weight: 700; color: var(--teal);
+}
+
+/* TRUST BAR */
+.trust-bar {
+  background: var(--bg2); padding: 20px 40px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 48px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.trust-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text2);
+}
+.trust-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--teal-pale);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.trust-dot-inner {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--teal);
+}
+
+/* SECTIONS */
+.section { padding: 96px 40px; }
+.section-alt { background: var(--bg); }
+.section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--teal);
+  margin-bottom: 12px;
+}
+.section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 40px; font-weight: 800; color: var(--navy);
+  line-height: 1.15; letter-spacing: -0.5px;
+  max-width: 600px; margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 17px; color: var(--text2);
+  max-width: 520px; line-height: 1.7;
+  margin-bottom: 52px;
+}
+.container { max-width: 1160px; margin: 0 auto; }
+
+/* HOW IT WORKS */
+.steps {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+  background: var(--border); border-radius: 16px; overflow: hidden;
+  margin-top: 52px;
+}
+.step {
+  background: white; padding: 36px 28px;
+  position: relative;
+}
+.step-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--text3);
+  margin-bottom: 16px;
+}
+.step-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  background: var(--navy); margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.step-icon svg { width: 20px; height: 20px; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.step h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px; font-weight: 700; color: var(--navy);
+  margin-bottom: 8px;
+}
+.step p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+/* FEATURES */
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+}
+.feature-card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.feature-card:hover { border-color: var(--teal); transform: translateY(-2px); }
+.feature-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  background: var(--teal-pale);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.feature-icon svg { width: 20px; height: 20px; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.feature-card h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px; font-weight: 700; color: var(--navy);
+  margin-bottom: 8px;
+}
+.feature-card p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+/* SCENARIO */
+.scenario-section {
+  background: var(--navy);
+  padding: 96px 40px;
+}
+.scenario-section .section-label { color: var(--teal); }
+.scenario-section .section-title { color: white; }
+.scenario-section .section-sub { color: rgba(255,255,255,0.55); }
+.scenario-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+  align-items: center;
+}
+.scenario-demo {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px; padding: 32px;
+}
+.scenario-title-small {
+  font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,0.4); margin-bottom: 24px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.scenario-bands {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.band {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px; border-radius: 12px;
+}
+.band-current { background: rgba(255,255,255,0.06); }
+.band-target1 { background: rgba(46,196,182,0.08); border: 1px solid rgba(46,196,182,0.2); }
+.band-target2 { background: rgba(46,196,182,0.14); border: 1px solid rgba(46,196,182,0.35); }
+.band-rating {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px; font-weight: 800;
+  min-width: 52px;
+}
+.band-rating-current { color: rgba(255,255,255,0.4); }
+.band-rating-t1 { color: var(--teal); }
+.band-rating-t2 { color: var(--teal); }
+.band-info { flex: 1; }
+.band-score { font-size: 13px; color: rgba(255,255,255,0.5); }
+.band-label { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+.band-action { font-size: 12px; color: var(--teal); font-weight: 500; }
+.band-pts {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px; font-weight: 700; color: var(--teal);
+  white-space: nowrap;
+}
+.scenario-bullets {
+  list-style: none; display: flex; flex-direction: column; gap: 20px;
+  margin-top: 16px;
+}
+.scenario-bullet {
+  display: flex; gap: 16px; align-items: flex-start;
+}
+.scenario-bullet-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(46,196,182,0.12);
+  border: 1px solid rgba(46,196,182,0.2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.scenario-bullet-icon svg { width: 18px; height: 18px; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.scenario-bullet h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 700; color: white; margin-bottom: 4px;
+}
+.scenario-bullet p { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+
+/* SCALE */
+.scale-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin-top: 48px;
+}
+.scale-card {
+  border-radius: 12px; padding: 16px 14px;
+  border: 1px solid var(--border);
+  background: white;
+}
+.scale-card.top { background: var(--navy); border-color: var(--navy); }
+.scale-card.good { background: var(--teal-pale); border-color: rgba(46,196,182,0.3); }
+.scale-rating {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px; font-weight: 800; margin-bottom: 4px;
+}
+.scale-card.top .scale-rating { color: var(--teal); }
+.scale-card.good .scale-rating { color: var(--navy); }
+.scale-card:not(.top):not(.good) .scale-rating { color: var(--text2); }
+.scale-puan { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.scale-card.top .scale-puan { color: rgba(255,255,255,0.4); }
+.scale-card.good .scale-puan { color: var(--teal); }
+.scale-desc { font-size: 11px; line-height: 1.4; color: var(--text2); }
+.scale-card.top .scale-desc { color: rgba(255,255,255,0.55); }
+.scale-card.good .scale-desc { color: var(--navy); }
+
+/* PRICING */
+.pricing-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  margin-top: 52px;
+}
+.price-card {
+  background: white; border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 32px;
+  position: relative;
+}
+.price-card.featured {
+  background: var(--navy); border-color: var(--navy);
+}
+.price-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: var(--teal); color: var(--navy);
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 4px 16px; border-radius: 100px;
+  white-space: nowrap;
+}
+.price-plan {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.price-card:not(.featured) .price-plan { color: var(--text3); }
+.price-card.featured .price-plan { color: rgba(255,255,255,0.4); }
+.price-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px; font-weight: 800; margin-bottom: 24px;
+}
+.price-card:not(.featured) .price-name { color: var(--navy); }
+.price-card.featured .price-name { color: white; }
+.price-amount {
+  font-family: 'Outfit', sans-serif;
+  font-size: 40px; font-weight: 800; line-height: 1;
+  margin-bottom: 4px;
+}
+.price-card:not(.featured) .price-amount { color: var(--navy); }
+.price-card.featured .price-amount { color: white; }
+.price-period {
+  font-size: 13px; margin-bottom: 28px;
+}
+.price-card:not(.featured) .price-period { color: var(--text3); }
+.price-card.featured .price-period { color: rgba(255,255,255,0.4); }
+.price-divider {
+  height: 1px; margin-bottom: 24px;
+}
+.price-card:not(.featured) .price-divider { background: var(--border); }
+.price-card.featured .price-divider { background: rgba(255,255,255,0.1); }
+.price-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.price-feature {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 14px;
+}
+.price-card:not(.featured) .price-feature { color: var(--text); }
+.price-card.featured .price-feature { color: rgba(255,255,255,0.75); }
+.price-check {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--teal-pale);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px;
+}
+.price-card.featured .price-check { background: rgba(46,196,182,0.2); }
+.price-check-inner {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--teal);
+}
+.btn-price {
+  width: 100%; padding: 14px;
+  border-radius: 10px; font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 700;
+  text-decoration: none; text-align: center;
+  display: block; transition: all 0.15s;
+  cursor: pointer; border: none;
+}
+.btn-price-outline {
+  background: transparent; color: var(--navy);
+  border: 2px solid var(--border);
+}
+.btn-price-outline:hover { border-color: var(--navy); }
+.btn-price-teal {
+  background: var(--teal); color: var(--navy);
+}
+.btn-price-teal:hover { background: var(--teal-light); }
+
+/* FAQ */
+.faq-list { max-width: 720px; margin: 52px auto 0; }
+.faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 20px 0;
+}
+.faq-q {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px; font-weight: 600; color: var(--navy);
+  cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+}
+.faq-q:hover { color: var(--teal); }
+.faq-icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--text3); }
+.faq-a {
+  font-size: 15px; color: var(--text2); line-height: 1.7;
+  padding-top: 12px; display: none;
+}
+.faq-item.open .faq-a { display: block; }
+
+/* CTA */
+.cta-section {
+  background: var(--navy); padding: 96px 40px;
+  text-align: center;
+}
+.cta-section h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 44px; font-weight: 800; color: white;
+  letter-spacing: -0.5px; margin-bottom: 16px;
+}
+.cta-section h2 em { font-style: normal; color: var(--teal); }
+.cta-section p { font-size: 17px; color: rgba(255,255,255,0.55); margin-bottom: 40px; }
+.cta-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* FOOTER */
+footer {
+  background: var(--navy-dark);
+  padding: 48px 40px 32px;
+}
+.footer-grid {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px; margin-bottom: 48px;
+}
+.footer-logo {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px; font-weight: 800; color: white;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.footer-logo-mark {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--teal);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--navy);
+}
+.footer-desc { font-size: 14px; color: rgba(255,255,255,0.35); line-height: 1.6; max-width: 220px; }
+.footer-col h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.35); margin-bottom: 16px;
+}
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.footer-col a {
+  font-size: 14px; color: rgba(255,255,255,0.55);
+  text-decoration: none; transition: color 0.15s;
+}
+.footer-col a:hover { color: white; }
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 24px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+}
+.footer-copy { font-size: 13px; color: rgba(255,255,255,0.25); }
+.footer-legal { display: flex; gap: 24px; }
+.footer-legal a { font-size: 13px; color: rgba(255,255,255,0.25); text-decoration: none; }
+.footer-legal a:hover { color: rgba(255,255,255,0.55); }
+
+@media (max-width: 1024px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-card-wrap { display: none; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .scenario-grid { grid-template-columns: 1fr; }
+  .scale-grid { grid-template-columns: repeat(3, 1fr); }
+  .pricing-grid { grid-template-columns: 1fr; max-width: 420px; margin-left: auto; margin-right: auto; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .hero { padding: 64px 20px 56px; }
+  .hero h1 { font-size: 36px; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .scale-grid { grid-template-columns: repeat(2, 1fr); }
+  .section { padding: 64px 20px; }
+  .scenario-section { padding: 64px 20px; }
+  .trust-bar { padding: 16px 20px; gap: 24px; }
+  .footer-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">F</div>
+    FINRATE
+  </a>
+  <ul class="nav-links">
+    <li><a href="#nasil-calisir">Nasıl Çalışır</a></li>
+    <li><a href="#ozellikler">Özellikler</a></li>
+    <li><a href="#fiyatlar">Fiyatlar</a></li>
+    <li><a href="#sss">SSS</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="/giris" class="btn-ghost">Giriş Yap</a>
+    <a href="/kayit" class="btn-primary">Ücretsiz Başla →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container" style="grid-column: 1; padding: 0;">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      Bankacılık standartlarında finansal rating
+    </div>
+    <h1 class="outfit">Bankadan Önce<br><em>Finrate.</em></h1>
+    <p class="hero-sub">Mali tablolarınızı yükleyin. Kredi notunuzu, zayıf oranlarınızı ve not artırma yol haritanızı saniyeler içinde görün.</p>
+    <div class="hero-btns">
+      <a href="/kayit" class="btn-hero btn-hero-primary">Ücretsiz Analiz Başlat</a>
+      <a href="#nasil-calisir" class="btn-hero btn-hero-secondary">Nasıl Çalışır?</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-num outfit">25</div>
+        <div class="stat-label">Finansal metrik</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num outfit">10</div>
+        <div class="stat-label">Rating kademesi</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num outfit">TCMB</div>
+        <div class="stat-label">2024 benchmark</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-card-wrap">
+    <div class="score-card">
+      <div class="score-card-header">
+        <div>
+          <div class="score-card-label">Kredi Analizi</div>
+          <div class="score-card-title outfit">Örnek Firma A.Ş.</div>
+        </div>
+        <div class="score-badge">Canlı Analiz</div>
+      </div>
+      <div class="score-main">
+        <div>
+          <div class="score-num outfit">74</div>
+          <div class="score-denom">/100 puan</div>
+        </div>
+        <div>
+          <div class="score-rating outfit">BBB+</div>
+          <div class="score-rating-label">Kredi Notu</div>
+        </div>
+      </div>
+      <div class="score-teminat">
+        <div class="score-teminat-label">Teminat Koşulu</div>
+        <div class="score-teminat-text">Kefalet veya müşteri çeki karşılığı çalışılabilir</div>
+      </div>
+      <div class="score-actions">
+        <div class="score-action-row">
+          <div class="score-action-icon"></div>
+          <div class="score-action-text">Cari oran iyileştirmesi</div>
+          <div class="score-action-pts">+4 puan</div>
+        </div>
+        <div class="score-action-row">
+          <div class="score-action-icon"></div>
+          <div class="score-action-text">KV→UV borç taşıma</div>
+          <div class="score-action-pts">+6 puan</div>
+        </div>
+        <div class="score-action-row">
+          <div class="score-action-icon"></div>
+          <div class="score-action-text">Net kâr marjı artışı</div>
+          <div class="score-action-pts">+3 puan</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <div class="trust-item">
+    <div class="trust-dot"><div class="trust-dot-inner"></div></div>
+    TCMB 2024 Verileri
+  </div>
+  <div class="trust-item">
+    <div class="trust-dot"><div class="trust-dot-inner"></div></div>
+    KVK / GDPR Uyumlu
+  </div>
+  <div class="trust-item">
+    <div class="trust-dot"><div class="trust-dot-inner"></div></div>
+    256-Bit SSL Şifreleme
+  </div>
+  <div class="trust-item">
+    <div class="trust-dot"><div class="trust-dot-inner"></div></div>
+    Bankacılık Metodolojisi
+  </div>
+  <div class="trust-item">
+    <div class="trust-dot"><div class="trust-dot-inner"></div></div>
+    Excel & PDF Desteği
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="nasil-calisir">
+  <div class="container">
+    <div class="section-label">Nasıl Çalışır</div>
+    <div class="section-title outfit">Dört adımda<br>kredi notunuzu öğrenin</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Mali Veriyi Yükleyin</h3>
+        <p>Excel mizan veya PDF beyanname. Muhasebe programınızdan aldığınız dosyayı direkt yükleyin.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Sistem Analiz Eder</h3>
+        <p>25 finansal metrik, ÜFE düzeltmesi, TCMB sektör benchmarkı. Saniyeler içinde hesaplanır.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Notunuzu Görün</h3>
+        <p>AAA'dan D'ye kredi notunuz, teminat koşulunuz ve hangi oranların zayıf olduğu görünür.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Aksiyon Alın</h3>
+        <p>Hangi adımın kaç puan getirdiğini görün. Bankaya gitmeden önce hazır olun.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section section-alt" id="ozellikler">
+  <div class="container">
+    <div class="section-label">Özellikler</div>
+    <div class="section-title outfit">Bankacı gözüyle<br>finansal analiz</div>
+    <p class="section-sub">Finrate, firmanızın finansallarını klasik muhasebe programları gibi listelemez. Banka yöneticilerinin baktığı 25 temel göstergeyi hesaplar.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        </div>
+        <h3>25 Finansal Metrik</h3>
+        <p>Likidite, kârlılık, kaldıraç ve faaliyet kategorilerinde 25 oran. Her metrik için sektör benchmarkı ile karşılaştırma.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Güvenlik Kuralları</h3>
+        <p>Finansal skor zayıfken subjektif puanın notu yapay şişirmesini engelleyen gelişmiş guardrail sistemi.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Senaryo Motoru</h3>
+        <p>"BB'den BBB'ye nasıl çıkarım?" sorusuna sayısal cevap. Her aksiyonun puan katkısını anlık görün.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3>Bankaya Hazır PDF</h3>
+        <p>Tüm analiz, oranlar ve aksiyon planıyla birlikte profesyonel PDF rapor. Banka toplantısına götürebilirsiniz.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+        </div>
+        <h3>TCMB Benchmark</h3>
+        <p>Türkiye Cumhuriyet Merkez Bankası 2024 sektör verileriyle kıyaslama. Firmanızın sektörde nerede durduğunu görün.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        </div>
+        <h3>Çoklu Dönem Analizi</h3>
+        <p>2021'den 2025'e kadar her yıl için ayrı analiz. Trend görünümü ile finansal gidişatınızı takip edin.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCENARIO -->
+<section class="scenario-section">
+  <div class="container">
+    <div class="scenario-grid">
+      <div>
+        <div class="section-label">Senaryo Motoru</div>
+        <div class="section-title outfit" style="color:white">BB'den BBB'ye<br>nasıl çıkarsınız?</div>
+        <p class="section-sub">Finrate'in senaryo motoru, her aksiyonun nota etkisini saniyeler içinde hesaplar. Bankaya gitmeden önce ne yapmanız gerektiğini bilirsiniz.</p>
+        <ul class="scenario-bullets">
+          <li class="scenario-bullet">
+            <div class="scenario-bullet-icon">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            </div>
+            <div>
+              <h4>Sermaye artışı</h4>
+              <p>Özkaynak güçlendirme ile borç/özkaynak oranınız iyileşir, nota direkt katkı sağlar.</p>
+            </div>
+          </li>
+          <li class="scenario-bullet">
+            <div class="scenario-bullet-icon">
+              <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            </div>
+            <div>
+              <h4>KV → UV borç taşıma</h4>
+              <p>Kısa vadeli banka borcunu uzun vadeye taşıyın. Cari oran düzelir, not yükselir.</p>
+            </div>
+          </li>
+          <li class="scenario-bullet">
+            <div class="scenario-bullet-icon">
+              <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div>
+              <h4>Kârlılık iyileştirmesi</h4>
+              <p>Net kâr marjı ve FAVÖK marjı artışının nota etkisini hesaplayın.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="scenario-demo">
+        <div class="scenario-title-small">Örnek Senaryo Analizi</div>
+        <div class="scenario-bands">
+          <div class="band band-current">
+            <div class="band-rating band-rating-current outfit">BB</div>
+            <div class="band-info">
+              <div class="band-score">Mevcut: 63/100</div>
+              <div class="band-label">Kefalet + ipotek teminatı</div>
+            </div>
+          </div>
+          <div class="band band-target1">
+            <div class="band-rating band-rating-t1 outfit">BBB</div>
+            <div class="band-info">
+              <div class="band-score">Hedef: 68/100</div>
+              <div class="band-action">Sermaye artışı: 12M TL</div>
+            </div>
+            <div class="band-pts">+5 puan</div>
+          </div>
+          <div class="band band-target2">
+            <div class="band-rating band-rating-t2 outfit">A</div>
+            <div class="band-info">
+              <div class="band-score">Hedef: 76/100</div>
+              <div class="band-action">KV taşıma + kârlılık</div>
+            </div>
+            <div class="band-pts">+13 puan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCALE -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">Rating Skalası</div>
+    <div class="section-title outfit">10 kademeli<br>değerlendirme notu</div>
+    <p class="section-sub">Not yükseldikçe daha az teminat, daha iyi faiz, daha hızlı kredi onayı.</p>
+    <div class="scale-grid">
+      <div class="scale-card top">
+        <div class="scale-rating outfit">AAA</div>
+        <div class="scale-puan">93 üzeri</div>
+        <div class="scale-desc">Teminatsız çalışılabilir</div>
+      </div>
+      <div class="scale-card top">
+        <div class="scale-rating outfit">AA</div>
+        <div class="scale-puan">84 – 93</div>
+        <div class="scale-desc">Maddi teminatsız kefalet</div>
+      </div>
+      <div class="scale-card good">
+        <div class="scale-rating outfit">A</div>
+        <div class="scale-puan">76 – 84</div>
+        <div class="scale-desc">Kefalet yeterli</div>
+      </div>
+      <div class="scale-card good">
+        <div class="scale-rating outfit">BBB</div>
+        <div class="scale-puan">68 – 76</div>
+        <div class="scale-desc">Kefalet veya müşteri çeki</div>
+      </div>
+      <div class="scale-card good">
+        <div class="scale-rating outfit">BB</div>
+        <div class="scale-puan">60 – 68</div>
+        <div class="scale-desc">Kefalet + ipotek teminatı</div>
+      </div>
+      <div class="scale-card">
+        <div class="scale-rating outfit">B</div>
+        <div class="scale-puan">52 – 60</div>
+        <div class="scale-desc">İpotek + müşteri çeki</div>
+      </div>
+      <div class="scale-card">
+        <div class="scale-rating outfit">CCC</div>
+        <div class="scale-puan">44 – 52</div>
+        <div class="scale-desc">Marjlı ipotek karşılığı</div>
+      </div>
+      <div class="scale-card">
+        <div class="scale-rating outfit">CC</div>
+        <div class="scale-puan">36 – 44</div>
+        <div class="scale-desc">Çalışma yapılmaz</div>
+      </div>
+      <div class="scale-card">
+        <div class="scale-rating outfit">C</div>
+        <div class="scale-puan">30 – 36</div>
+        <div class="scale-desc">Çalışma yapılmaz</div>
+      </div>
+      <div class="scale-card">
+        <div class="scale-rating outfit">D</div>
+        <div class="scale-puan">30 altı</div>
+        <div class="scale-desc">Tasfiye</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section section-alt" id="fiyatlar">
+  <div class="container">
+    <div style="text-align:center">
+      <div class="section-label">Fiyatlar</div>
+      <div class="section-title outfit" style="max-width:none;margin-bottom:12px">İhtiyacınıza göre plan</div>
+      <p style="font-size:16px;color:var(--text2);margin-bottom:0">Tüm planlarda bankacılık standartlarında analiz. KDV dahil fiyatlar.</p>
+    </div>
+    <div class="pricing-grid" style="grid-template-columns:repeat(4,1fr);max-width:none">
+
+      <div class="price-card">
+        <div class="price-plan">Bireysel</div>
+        <div class="price-name outfit">Başlangıç</div>
+        <div class="price-amount outfit">₺1.999</div>
+        <div class="price-period">4 analiz hakkı · KDV dahil</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Tüm finansal oranlar (25 metrik)</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Excel / PDF yükleme</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>5 yıllık trend analizi</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Senaryo analizi modülü</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Subjektif faktör değerlendirme</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>ÜFE reel büyüme düzeltmesi</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Kredi notu artırıcı öneriler</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>PDF rapor üretimi</li>
+        </ul>
+        <a href="/kayit" class="btn-price btn-price-outline">Hemen Satın Al</a>
+      </div>
+
+      <div class="price-card featured">
+        <div class="price-badge">En Popüler</div>
+        <div class="price-plan">Mali Müşavir</div>
+        <div class="price-name outfit">S.M.M.M</div>
+        <div class="price-amount outfit">₺6.999</div>
+        <div class="price-period">5 ayrı erişim kodu · KDV dahil</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Başlangıç paketindeki tüm özellikler</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Her kodda 4 analiz hakkı</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Toplam 20 analiz hakkı (5 × 4)</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Kodları müşterilerinize devredebilirsiniz</li>
+        </ul>
+        <a href="/kayit" class="btn-price btn-price-teal">Hemen Satın Al</a>
+      </div>
+
+      <div class="price-card">
+        <div class="price-plan">Finansal Danışman</div>
+        <div class="price-name outfit">Profesyonel</div>
+        <div class="price-amount outfit">₺29.999</div>
+        <div class="price-period">100 analiz hakkı · KDV dahil</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>S.M.M.M paketindeki tüm özellikler</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>100 müşteri analizi kapasitesi</li>
+        </ul>
+        <a href="/kayit" class="btn-price btn-price-outline">Hemen Satın Al</a>
+      </div>
+
+      <div class="price-card">
+        <div class="price-plan">Kurumsal</div>
+        <div class="price-name outfit">KOBİ / Ticari</div>
+        <div class="price-amount outfit" style="font-size:24px;padding-top:8px">İletişime Geçin</div>
+        <div class="price-period">Sınırsız kullanım · kuruma özel</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Profesyonel paketteki tüm özellikler</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Sınırsız analiz</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Kredi dosyası hazırlama</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Kredi danışmanlığı</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Forecast & nakit akış analizi</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>Kurumsal raporlama</li>
+          <li class="price-feature"><div class="price-check"><div class="price-check-inner"></div></div>1 yıllık finansal danışmanlık</li>
+        </ul>
+        <a href="mailto:info@finrate.com" class="btn-price btn-price-outline">İletişime Geçin</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- FAQ -->
+<section class="section" id="sss">
+  <div class="container">
+    <div style="text-align:center">
+      <div class="section-label">SSS</div>
+      <div class="section-title outfit" style="max-width:none">Sıkça sorulan sorular</div>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item open">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Finrate nedir, ne işe yarar?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Finrate, firmaların mali tablolarını bankacılık standartlarında analiz eden ve kredi notunu hesaplayan bir platformdur. Mali tablolarınızı yükleyin, kredi notunuzu ve not artırma yol haritanızı saniyeler içinde görün.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Hangi dosya formatlarını yükleyebilirim?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Excel (.xlsx, .xls) ve PDF formatındaki mizan ve beyanname dosyalarını yükleyebilirsiniz. Sistem dosya türünü otomatik olarak algılar, herhangi bir dönüştürme yapmanız gerekmez.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Kredi notu nasıl hesaplanıyor?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Finrate 100 puan üzerinden değerlendirme yapar: 70 puan finansal kriterler (likidite, kârlılık, kaldıraç, faaliyet etkinliği) ve 30 puan subjektif kriterler (KKB sicili, banka ilişkileri, kurumsal yapı). TCMB 2024 sektör verileriyle benchmark karşılaştırması yapılır.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Senaryo analizi ne işe yarar?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Senaryo analizi, notunuzu artırmak için hangi adımları atmanız gerektiğini somut olarak gösterir. Sermaye artışı, KV→UV borç taşıma, kârlılık iyileştirmesi gibi aksiyonların nota etkisini anlık hesaplayabilirsiniz.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Verilerim güvende mi?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Tüm veriler 256-bit SSL şifreleme ile korunur. KVK ve GDPR uyumlu altyapımız ile verileriniz güvende saklanır. Finansal bilgileriniz hiçbir üçüncü tarafla paylaşılmaz.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Mali müşavirler Finrate'i nasıl kullanabilir?
+          <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="faq-a">Danışman planı ile 25 firmaya kadar analiz yapabilirsiniz. Her müşteriniz için ayrı rapor üretebilir, müşteri portalı aracılığıyla sonuçları paylaşabilirsiniz. Toplu analiz özelliği ile birden fazla müşteriyi tek seferde değerlendirebilirsiniz.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <h2 class="outfit">Bankaya <em>hazırlıklı</em> gidin.</h2>
+    <p>Kredi notunuzu önceden öğrenin. Zayıf noktaları güçlendirin.<br>Daha az teminat, daha iyi faiz, daha hızlı onay.</p>
+    <div class="cta-btns">
+      <a href="/kayit" class="btn-hero btn-hero-primary">Ücretsiz Analiz Başlat</a>
+      <a href="mailto:info@finrate.com" class="btn-hero btn-hero-secondary">Bize Yazın</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo">
+          <div class="footer-logo-mark">F</div>
+          FINRATE
+        </div>
+        <div class="footer-desc">Bankadan önce kredi notunuzu öğrenin. Bankacılık standartlarında finansal rating platformu.</div>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <ul>
+          <li><a href="#nasil-calisir">Nasıl Çalışır</a></li>
+          <li><a href="#ozellikler">Özellikler</a></li>
+          <li><a href="#fiyatlar">Fiyatlar</a></li>
+          <li><a href="/giris">Giriş Yap</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Hukuki</h4>
+        <ul>
+          <li><a href="#">Gizlilik Politikası</a></li>
+          <li><a href="#">Kullanım Koşulları</a></li>
+          <li><a href="#">KVKK Aydınlatma</a></li>
+          <li><a href="#">Çerez Politikası</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>İletişim</h4>
+        <ul>
+          <li><a href="mailto:info@finrate.com">info@finrate.com</a></li>
+          <li><a href="#sss">SSS</a></li>
+          <li><a href="#">Destek</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2025 Finrate. Tüm hakları saklıdır.</div>
+      <div class="footer-legal">
+        <a href="#">Gizlilik</a>
+        <a href="#">Koşullar</a>
+        <a href="#">KVKK</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => {
+    q.parentElement.classList.toggle('open');
+  });
+});
+</script>
+</body>
+</html>

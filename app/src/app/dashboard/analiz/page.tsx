@@ -1,12 +1,12 @@
 'use client'
 
-import React, { Suspense, useState, useEffect } from 'react'
+import React, { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Building2, Filter, Download, Loader2,
   LayoutDashboard, BarChart3, Sliders, Star, TrendingUp,
-  ChevronDown,
+  ChevronDown, Info,
 } from 'lucide-react'
 import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
@@ -71,6 +71,39 @@ function prussianBlue(score: number): string {
   if (score > 80) return '#0B3C5D'
   if (score > 50) return '#0B3C5D'
   return '#EF4444'
+}
+
+/* ─── RatioInfoCell ─────────────────────────────── */
+function RatioInfoCell({ label, desc }: { label: string; desc?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {desc && (
+        <span className="relative inline-flex">
+          <button
+            onClick={() => setOpen(v => !v)}
+            className="text-slate-300 hover:text-[#0B3C5D] transition-colors leading-none"
+            style={{ lineHeight: 1 }}
+          >
+            <Info size={11} />
+          </button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              <div
+                className="absolute left-full top-1/2 -translate-y-1/2 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-left"
+                style={{ width: 240, minWidth: 200 }}
+              >
+                <p className="text-[11px] font-bold text-[#0B3C5D] mb-1">{label}</p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">{desc}</p>
+              </div>
+            </>
+          )}
+        </span>
+      )}
+    </span>
+  )
 }
 
 /* ─── BarMetricChart ─────────────────────────────── */
@@ -504,47 +537,47 @@ function AnalizPageContent() {
     {
       label: 'Likidite', color: '#2dd4bf',
       rows: [
-        { id: 'Cari Oran',              val: fmtN(r.currentRatio),             avg: fmtN(bm.currentRatio),        good: r.currentRatio != null && r.currentRatio >= bm.currentRatio * 0.85 },
-        { id: 'Asit-Test (Hızlı)',      val: fmtN(r.quickRatio),               avg: fmtN(bm.quickRatio),          good: r.quickRatio != null && r.quickRatio >= bm.quickRatio * 0.85 },
-        { id: 'Nakit Oran',             val: fmtN(r.cashRatio),                avg: fmtN(bm.cashRatio),           good: r.cashRatio != null && r.cashRatio >= 0.10 },
-        { id: 'Net Çal. Ser. / Aktif',  val: fmtN(r.netWorkingCapitalRatio),   avg: fmtN(bm.netWorkingCapitalRatio), good: r.netWorkingCapitalRatio != null && r.netWorkingCapitalRatio > 0 },
-        { id: 'Nakit Dönüşüm Süresi',  val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: fmtN(bm.cashConversionCycle, 0) + ' gün', good: r.cashConversionCycle != null && r.cashConversionCycle < 60 },
+        { id: 'Cari Oran',              desc: 'Dönen varlıklar / kısa vadeli borçlar. Firmanın kısa vadeli yükümlülüklerini dönen varlıklarıyla ne ölçüde karşılayabildiğini gösterir. 1.5x üzeri sağlıklıdır.',             val: fmtN(r.currentRatio),             avg: fmtN(bm.currentRatio),              good: r.currentRatio != null && r.currentRatio >= bm.currentRatio * 0.85 },
+        { id: 'Asit-Test (Hızlı)',      desc: '(Dönen varlıklar − Stoklar) / kısa vadeli borçlar. Stok satışına gerek kalmadan anlık yükümlülükleri karşılama gücü. 1.0x üzeri iyi sayılır.',                               val: fmtN(r.quickRatio),               avg: fmtN(bm.quickRatio),                good: r.quickRatio != null && r.quickRatio >= bm.quickRatio * 0.85 },
+        { id: 'Nakit Oran',             desc: 'Nakit & benzerleri / kısa vadeli borçlar. En katı likidite ölçüsüdür; yalnızca eldeki nakitle borç karşılanabilirliğini gösterir.',                                           val: fmtN(r.cashRatio),                avg: fmtN(bm.cashRatio),                 good: r.cashRatio != null && r.cashRatio >= 0.10 },
+        { id: 'Net Çal. Ser. / Aktif',  desc: 'Net çalışma sermayesi (dönen − kısa vadeli borç) / toplam aktif. Pozitif olması, işletmenin kendi kendini finanse edebildiğine işaret eder.',                                 val: fmtN(r.netWorkingCapitalRatio),   avg: fmtN(bm.netWorkingCapitalRatio),    good: r.netWorkingCapitalRatio != null && r.netWorkingCapitalRatio > 0 },
+        { id: 'Nakit Dönüşüm Süresi',  desc: 'Stok devir + alacak tahsil − borç ödeme süresi (gün). Paranın hammaddeden nakit olarak geri dönüş süresi. Düşük (0-60 gün) iyidir.',                                         val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: fmtN(bm.cashConversionCycle, 0) + ' gün', good: r.cashConversionCycle != null && r.cashConversionCycle < 60 },
       ]
     },
     {
       label: 'Karlılık', color: '#818cf8',
       rows: [
-        { id: 'Brüt Kar Marjı',                   val: fmtPct(r.grossMargin),            avg: fmtPct(bm.grossMargin),       good: r.grossMargin != null && r.grossMargin >= bm.grossMargin * 0.8 },
-        { id: 'FAVÖK Marjı',                       val: fmtPct(r.ebitdaMargin),           avg: fmtPct(bm.ebitdaMargin),      good: r.ebitdaMargin != null && r.ebitdaMargin >= bm.ebitdaMargin * 0.8 },
-        { id: 'FVÖK Marjı (EBIT)',                 val: fmtPct(r.ebitMargin),             avg: fmtPct(bm.ebitMargin),        good: r.ebitMargin != null && r.ebitMargin >= 0.05 },
-        { id: 'Net Kar Marjı',                     val: fmtPct(r.netProfitMargin),        avg: fmtPct(bm.netProfitMargin),   good: r.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 },
-        { id: 'Aktif Karlılığı (ROA)',             val: fmtPct(r.roa),                    avg: fmtPct(bm.roa),               good: r.roa != null && r.roa >= bm.roa * 0.8 },
-        { id: 'Özkaynak Karlılığı (ROE)',          val: fmtPct(r.roe),                    avg: fmtPct(bm.roe),               good: r.roe != null && r.roe >= bm.roe * 0.8 },
-        { id: 'Yatırım Getirisi (ROIC)',           val: fmtPct(r.roic),                   avg: fmtPct(bm.roic),              good: r.roic != null && r.roic >= 0.10 },
-        { id: 'Nominal Gelir Büyümesi',            val: r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '—', avg: fmtPct(bm.revenueGrowth), good: r.revenueGrowth != null && r.revenueGrowth >= 0 },
-        { id: 'Reel Büyüme (ÜFE Arındırılmış)',   val: r.realGrowth != null ? fmtPct(r.realGrowth) : '—', avg: '—', good: r.realGrowth != null && r.realGrowth >= 0 },
+        { id: 'Brüt Kar Marjı',                   desc: '(Satışlar − SMM) / Satışlar. Üretim/tedarik maliyeti düşüldükten sonra kalan kâr payı. Yükseldikçe rekabet gücü artar.',                                          val: fmtPct(r.grossMargin),            avg: fmtPct(bm.grossMargin),             good: r.grossMargin != null && r.grossMargin >= bm.grossMargin * 0.8 },
+        { id: 'FAVÖK Marjı',                       desc: 'Faiz, vergi ve amortisman öncesi kâr / satışlar. Şirketin nakit üretme kapasitesini gösterir; borç ödeme gücünün temel göstergesidir.',                            val: fmtPct(r.ebitdaMargin),           avg: fmtPct(bm.ebitdaMargin),           good: r.ebitdaMargin != null && r.ebitdaMargin >= bm.ebitdaMargin * 0.8 },
+        { id: 'FVÖK Marjı (EBIT)',                 desc: 'Faiz ve vergi öncesi kâr / satışlar. Amortismanı dahil eden operasyonel karlılık ölçüsüdür. %5 üzeri kabul edilebilir.',                                          val: fmtPct(r.ebitMargin),             avg: fmtPct(bm.ebitMargin),              good: r.ebitMargin != null && r.ebitMargin >= 0.05 },
+        { id: 'Net Kar Marjı',                     desc: 'Net kâr / satışlar. Tüm giderler, faiz ve vergi sonrası kalan kâr payı. Bankaların en çok izlediği karlılık göstergesidir.',                                       val: fmtPct(r.netProfitMargin),        avg: fmtPct(bm.netProfitMargin),        good: r.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 },
+        { id: 'Aktif Karlılığı (ROA)',             desc: 'Net kâr / toplam aktif. Varlıkların ne kadar verimli kullanıldığını gösterir. %4+ iyi, %8+ çok iyi kabul edilir.',                                                 val: fmtPct(r.roa),                    avg: fmtPct(bm.roa),                     good: r.roa != null && r.roa >= bm.roa * 0.8 },
+        { id: 'Özkaynak Karlılığı (ROE)',          desc: 'Net kâr / özkaynak. Hissedar yatırımının getirisidir. %10+ iyi, sektör ortalamasının üzeri çok iyi sayılır.',                                                      val: fmtPct(r.roe),                    avg: fmtPct(bm.roe),                     good: r.roe != null && r.roe >= bm.roe * 0.8 },
+        { id: 'Yatırım Getirisi (ROIC)',           desc: 'FVÖK×(1-vergi) / yatırılan sermaye. Tüm finanse edilmiş sermayenin verimliliğini ölçer. Sermaye maliyetinin üzerinde olması gerekir.',                             val: fmtPct(r.roic),                   avg: fmtPct(bm.roic),                    good: r.roic != null && r.roic >= 0.10 },
+        { id: 'Nominal Gelir Büyümesi',            desc: 'Cironun yıllık büyüme oranı (enflasyon dahil). Pozitif büyüme şirketin büyüdüğüne işaret eder.',                                                                   val: r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '—', avg: fmtPct(bm.revenueGrowth), good: r.revenueGrowth != null && r.revenueGrowth >= 0 },
+        { id: 'Reel Büyüme (ÜFE Arındırılmış)',   desc: 'Nominal büyümeden ÜFE (üretici fiyat endeksi) çıkarılan reel büyüme. Enflasyondan arındırılmış gerçek büyümeyi gösterir.',                                         val: r.realGrowth != null ? fmtPct(r.realGrowth) : '—', avg: '—', good: r.realGrowth != null && r.realGrowth >= 0 },
       ]
     },
     {
       label: 'Kaldıraç', color: '#0ea5e9',
       rows: [
-        { id: 'Borç / Özkaynak',        val: fmtN(r.debtToEquity),             avg: fmtN(bm.debtToEquity),        good: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 },
-        { id: 'Borç / Aktif',           val: fmtN(r.debtToAssets),             avg: fmtN(bm.debtToAssets),        good: r.debtToAssets != null && r.debtToAssets <= bm.debtToAssets * 1.2 },
-        { id: 'Özkaynak Oranı',         val: fmtN(r.equityRatio),              avg: '—',                          good: r.equityRatio != null && r.equityRatio >= 0.30 },
-        { id: 'KV Borç Oranı',          val: fmtN(r.shortTermDebtRatio),       avg: fmtN(bm.shortTermDebtRatio),  good: r.shortTermDebtRatio != null && r.shortTermDebtRatio < 0.5 },
-        { id: 'Net Borç / FAVÖK',       val: r.debtToEbitda != null ? fmtN(r.debtToEbitda, 1) + 'x' : '—', avg: fmtN(bm.debtToEbitda, 1) + 'x', good: r.debtToEbitda != null && r.debtToEbitda <= 3 },
-        { id: 'Faiz Karşılama',         val: r.interestCoverage === Infinity ? '∞x (Faiz Yok)' : r.interestCoverage != null ? fmtN(r.interestCoverage, 1) + 'x' : '—', avg: fmtN(bm.interestCoverage, 1) + 'x', good: r.interestCoverage === Infinity || (r.interestCoverage != null && r.interestCoverage >= bm.interestCoverage * 0.8) },
+        { id: 'Borç / Özkaynak',        desc: 'Toplam borç / özkaynak. 1.0x altı dengeli, 2.0x üzeri yüksek kaldıraçlıdır. Bankaların en çok dikkat ettiği kaldıraç göstergesidir.',                                        val: fmtN(r.debtToEquity),             avg: fmtN(bm.debtToEquity),              good: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 },
+        { id: 'Borç / Aktif',           desc: 'Toplam borç / toplam aktif. Varlıkların ne kadarının borçla finanse edildiğini gösterir. 0.50 altı tercih edilir.',                                                           val: fmtN(r.debtToAssets),             avg: fmtN(bm.debtToAssets),              good: r.debtToAssets != null && r.debtToAssets <= bm.debtToAssets * 1.2 },
+        { id: 'Özkaynak Oranı',         desc: 'Özkaynak / toplam aktif. Öz finansman gücüdür. %30 üzeri sağlıklı kabul edilir; yükseldikçe mali bağımsızlık artar.',                                                        val: fmtN(r.equityRatio),              avg: '—',                                good: r.equityRatio != null && r.equityRatio >= 0.30 },
+        { id: 'KV Borç Oranı',          desc: 'Kısa vadeli borçlar / toplam borçlar. %50 altı dengeli; yüksek oran yakın vadeli yeniden finansman riskine işaret eder.',                                                     val: fmtN(r.shortTermDebtRatio),       avg: fmtN(bm.shortTermDebtRatio),        good: r.shortTermDebtRatio != null && r.shortTermDebtRatio < 0.5 },
+        { id: 'Net Borç / FAVÖK',        desc: 'Net finansal borç / FAVÖK. Mevcut FAVÖK ile borcun kaç yılda ödenebileceğini gösterir. 3.0x altı iyi, 5.0x üzeri kritik sayılır.',                                           val: r.debtToEbitda != null ? fmtN(r.debtToEbitda, 1) + 'x' : '—', avg: fmtN(bm.debtToEbitda, 1) + 'x', good: r.debtToEbitda != null && r.debtToEbitda <= 3 },
+        { id: 'Faiz Karşılama',         desc: 'FVÖK / faiz giderleri. Faiz ödemelerinin kaç katı FVÖK üretildiğini gösterir. 2.0x altı riskli, 4.0x üzeri rahat kabul edilir.',                                              val: r.interestCoverage === Infinity ? '∞x (Faiz Yok)' : r.interestCoverage != null ? fmtN(r.interestCoverage, 1) + 'x' : '—', avg: fmtN(bm.interestCoverage, 1) + 'x', good: r.interestCoverage === Infinity || (r.interestCoverage != null && r.interestCoverage >= bm.interestCoverage * 0.8) },
       ]
     },
     {
       label: 'Faaliyet', color: '#6366f1',
       rows: [
-        { id: 'Aktif Devir Hızı',       val: fmtN(r.assetTurnover),            avg: fmtN(bm.assetTurnover),       good: r.assetTurnover != null && r.assetTurnover >= bm.assetTurnover * 0.8 },
-        { id: 'Sabit Aktif Devir',      val: fmtN(r.fixedAssetTurnover),       avg: fmtN(bm.fixedAssetTurnover),  good: r.fixedAssetTurnover != null && r.fixedAssetTurnover >= 1.0 },
-        { id: 'Stok Devir Süresi',      val: r.inventoryTurnoverDays != null ? fmtN(r.inventoryTurnoverDays, 0) + ' gün' : '—', avg: r.inventoryTurnoverDays != null ? fmtN(bm.inventoryDays, 0) + ' gün' : '—', good: r.inventoryTurnoverDays != null && r.inventoryTurnoverDays <= bm.inventoryDays * 1.2 },
-        { id: 'Alacak Tahsil Süresi',   val: r.receivablesTurnoverDays != null ? fmtN(r.receivablesTurnoverDays, 0) + ' gün' : '—', avg: r.receivablesTurnoverDays != null ? fmtN(bm.receivablesDays, 0) + ' gün' : '—', good: r.receivablesTurnoverDays != null && r.receivablesTurnoverDays <= bm.receivablesDays * 1.2 },
-        { id: 'Borç Ödeme Süresi',      val: r.payablesTurnoverDays != null ? fmtN(r.payablesTurnoverDays, 0) + ' gün' : '—', avg: fmtN(bm.payablesTurnoverDays, 0) + ' gün', good: r.payablesTurnoverDays != null && r.payablesTurnoverDays >= 30 },
-        { id: 'Faaliyet Gid. Oranı',    val: fmtN(r.operatingExpenseRatio),    avg: fmtPct(bm.operatingExpenseRatio), good: r.operatingExpenseRatio != null && r.operatingExpenseRatio < 0.30 },
+        { id: 'Aktif Devir Hızı',       desc: 'Satışlar / toplam aktif. Varlıkların ne kadar etkin kullanıldığının ölçüsüdür. Yükseldikçe operasyonel verimlilik artar.',                                                    val: fmtN(r.assetTurnover),            avg: fmtN(bm.assetTurnover),             good: r.assetTurnover != null && r.assetTurnover >= bm.assetTurnover * 0.8 },
+        { id: 'Sabit Aktif Devir',      desc: 'Satışlar / duran varlıklar. Makine, bina gibi sabit varlıkların kaç kat satış ürettiğini gösterir. 1.0x üzeri beklenir.',                                                     val: fmtN(r.fixedAssetTurnover),       avg: fmtN(bm.fixedAssetTurnover),        good: r.fixedAssetTurnover != null && r.fixedAssetTurnover >= 1.0 },
+        { id: 'Stok Devir Süresi',      desc: 'Stokların kaç günde satıldığını gösterir. Düşük gün = stok hızlı dönüyor = nakite çevrim hızlı. Sektöre göre 30-90 gün arasında değişir.',                                    val: r.inventoryTurnoverDays != null ? fmtN(r.inventoryTurnoverDays, 0) + ' gün' : '—', avg: r.inventoryTurnoverDays != null ? fmtN(bm.inventoryDays, 0) + ' gün' : '—', good: r.inventoryTurnoverDays != null && r.inventoryTurnoverDays <= bm.inventoryDays * 1.2 },
+        { id: 'Alacak Tahsil Süresi',   desc: 'Müşteri alacaklarının kaç günde tahsil edildiği. Düşük = para hızlı geliyor. Yüksek oran nakit akışı sıkışıklığına yol açar.',                                                val: r.receivablesTurnoverDays != null ? fmtN(r.receivablesTurnoverDays, 0) + ' gün' : '—', avg: r.receivablesTurnoverDays != null ? fmtN(bm.receivablesDays, 0) + ' gün' : '—', good: r.receivablesTurnoverDays != null && r.receivablesTurnoverDays <= bm.receivablesDays * 1.2 },
+        { id: 'Borç Ödeme Süresi',      desc: 'Tedarikçi borçlarının kaç günde ödendiği. Yüksek = tedarikçi finansmanı uzun kullanılıyor (likidite için iyi, ama ilişki yönetimi önemli).',                                  val: r.payablesTurnoverDays != null ? fmtN(r.payablesTurnoverDays, 0) + ' gün' : '—', avg: fmtN(bm.payablesTurnoverDays, 0) + ' gün', good: r.payablesTurnoverDays != null && r.payablesTurnoverDays >= 30 },
+        { id: 'Faaliyet Gid. Oranı',    desc: 'Faaliyet giderleri / satışlar. Satışların ne kadarının genel gider (personel, kira vb.) olarak harcandığını gösterir. %30 altı verimli kabul edilir.',                        val: fmtN(r.operatingExpenseRatio),    avg: fmtPct(bm.operatingExpenseRatio),   good: r.operatingExpenseRatio != null && r.operatingExpenseRatio < 0.30 },
       ]
     },
   ] : []
@@ -761,12 +794,7 @@ function AnalizPageContent() {
             </div>
 
             {/* ── Tab İçerikleri ────────────────── */}
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.15 }}
-            >
+            <div>
 
                 {/* ── GENEL BAKIŞ ─────────────── */}
                 {activeTab === 'overview' && (() => {
@@ -1037,7 +1065,7 @@ function AnalizPageContent() {
 
                 {/* ── RASYOLAR ────────────────── */}
                 {activeTab === 'ratios' && (
-                  <div className="card overflow-hidden">
+                  <div className="card" style={{ overflow: 'visible' }}>
                     <CoverageBanner coverage={selected?.overallCoverage} />
                     {/* Başlık */}
                     <div className="card-head">
@@ -1077,7 +1105,7 @@ function AnalizPageContent() {
                               {/* Rasyo Satırları */}
                               {sec.rows.map(row => (
                                 <tr key={row.id}>
-                                  <td className="indicator-name px-4">{row.id}</td>
+                                  <td className="indicator-name px-4"><RatioInfoCell label={row.id} desc={row.desc} /></td>
                                   <td className="indicator-val text-right px-4 font-mono">{row.val}</td>
                                   <td className="indicator-avg text-right px-4 font-mono">{row.avg}</td>
                                   <td className="text-center px-4">
@@ -1158,7 +1186,7 @@ function AnalizPageContent() {
                   />
                 )}
 
-              </motion.div>
+              </div>
           </div>
         )}
       </div>
