@@ -22,8 +22,7 @@ export async function GET(req: NextRequest) {
       leverageScore: true,
       activityScore: true,
       ratios: true,
-      optimizerSnapshot: true,
-      entity: { select: { id: true, name: true, sector: true } },
+      entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,
@@ -49,7 +48,6 @@ export async function GET(req: NextRequest) {
       ...a,
       ratios: parsedRatios,
       overallCoverage,
-      optimizerSnapshot: a.optimizerSnapshot ? JSON.parse(a.optimizerSnapshot as string) : null,
     }
   })
 
