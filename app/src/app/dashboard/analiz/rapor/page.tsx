@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Suspense, useState, useEffect } from 'react'
+import clsx from 'clsx'
 import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
