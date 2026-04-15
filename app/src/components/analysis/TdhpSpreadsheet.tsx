@@ -37,6 +37,7 @@ const TDHP_ROWS: RowDef[] = [
   { type: 'account', code: '15', label: 'Stoklar',                                    field: 'inventory' },
   { type: 'account', code: '17', label: 'Yıllara Yaygın İnş. ve Onarım Maliyetleri', field: 'constructionCosts' },
   { type: 'account', code: '18', label: 'Gelecek Aylara Ait Giderler',                field: 'prepaidExpenses' },
+  { type: 'account', code: '159', label: 'Verilen Sipariş Avansları',                 field: 'prepaidSuppliers' },
   { type: 'account', code: '19', label: 'Diğer Dönen Varlıklar',                      field: 'otherCurrentAssets' },
   { type: 'subtotal',            label: '▶ DÖNEN VARLIK TOPLAMI',                     field: 'totalCurrentAssets' },
 
@@ -80,7 +81,7 @@ const TDHP_ROWS: RowDef[] = [
   { type: 'account', code: '54', label: 'Kar Yedekleri',                              field: 'profitReserves' },
   { type: 'account', code: '57', label: 'Geçmiş Yıllar Karları',                      field: 'retainedEarnings' },
   { type: 'account', code: '58', label: 'Geçmiş Yıllar Zararları (-)',                field: 'retainedLosses' },
-  { type: 'account', code: '59', label: 'Dönem Net Karı (Zararı)',                    field: 'netProfit' },
+  { type: 'account', code: '59', label: 'Dönem Net Karı (Zararı)',                    field: 'netProfitCurrentYear' },
   { type: 'subtotal',            label: '▶ ÖZ KAYNAK TOPLAMI',                        field: 'totalEquity' },
   { type: 'total',               label: '▶▶ PASİF TOPLAM',                            field: 'totalLiabilitiesAndEquity' },
 
@@ -96,10 +97,10 @@ const TDHP_ROWS: RowDef[] = [
   { type: 'account', code: '64', label: 'Diğer Olağan Gelir ve Karlar',              field: 'otherIncome' },
   { type: 'account', code: '65', label: 'Diğer Olağan Gider ve Zararlar (-)',        field: 'otherExpense' },
   { type: 'account', code: '66', label: 'Finansman Giderleri (-)',                    field: 'interestExpense' },
-  { type: 'subtotal',            label: '▶ OLAĞAN KAR / ZARAR',                       field: 'ebt' },
+  { type: 'subtotal',            label: '▶ OLAĞAN KAR / ZARAR',                       field: 'ordinaryProfit' },
   { type: 'account', code: '67', label: 'Olağandışı Gelir ve Karlar',                field: 'extraordinaryIncome' },
   { type: 'account', code: '68', label: 'Olağandışı Gider ve Zararlar (-)',           field: 'extraordinaryExpense' },
-  { type: 'subtotal',            label: '▶ DÖNEM KARI / ZARARI',                      field: 'ebt' },
+  { type: 'subtotal',            label: '▶ DÖNEM KARI / ZARARI',                      field: 'donemKari' },
   { type: 'account', code: '69', label: 'Dönem Karı Vergi Karşılıkları (-)',          field: 'taxExpense' },
   { type: 'total',               label: '▶▶ DÖNEM NET KARI / ZARARI',                 field: 'netProfit' },
 ]
@@ -148,15 +149,180 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     return typeof v === 'number' ? v : null
   }
 
+  function sumNonNull(vals: Array<number | null>): number | null {
+    const nums = vals.filter((v): v is number => v != null)
+    if (nums.length === 0) return null
+    return nums.reduce((a, b) => a + b, 0)
+  }
+
+  function getEffectiveVal(fdId: string, field: string, seen = new Set<string>()): number | null {
+    const key = `${fdId}:${field}`
+    if (seen.has(key)) return null
+
+    const stored = getStoredVal(fdId, field)
+    if (stored != null) return stored
+
+    const next = new Set(seen)
+    next.add(key)
+    const g = (f: string) => getEffectiveVal(fdId, f, next)
+
+    switch (field) {
+      case 'netProfitCurrentYear':
+        return g('netProfit')
+
+      case 'revenue': {
+        const grossSales = g('grossSales')
+        const discounts = g('salesDiscounts')
+        if (grossSales == null || discounts == null) return null
+        return grossSales - discounts
+      }
+
+      case 'grossProfit': {
+        const revenue = g('revenue')
+        const cogs = g('cogs')
+        if (revenue == null || cogs == null) return null
+        return revenue - cogs
+      }
+
+      case 'ebit': {
+        const grossProfit = g('grossProfit')
+        const operatingExpenses = g('operatingExpenses')
+        if (grossProfit == null || operatingExpenses == null) return null
+        return grossProfit - operatingExpenses
+      }
+
+      // Olağan Kar = ebit + 64 - 65 - 66 (olağandışı dahil DEĞİL)
+      // Stored ebt = olağan kar değeri (beyanname'den "ticari bilanço karı")
+      case 'ordinaryProfit': {
+        const ebit = g('ebit')
+        if (ebit != null) {
+          return (
+            ebit +
+            (g('otherIncome') ?? 0) -
+            (g('otherExpense') ?? 0) -
+            (g('interestExpense') ?? 0)
+          )
+        }
+        // Fallback: stored ebt = olağan kar (beyanname'den, olağandışı dahil değil)
+        return getStoredVal(fdId, 'ebt')
+      }
+
+      // Dönem Karı = Olağan Kar + 67 - 68 (her zaman hesaplanır)
+      case 'donemKari': {
+        const ordProfit = g('ordinaryProfit')
+        if (ordProfit == null) return null
+        return (
+          ordProfit +
+          (g('extraordinaryIncome') ?? 0) -
+          (g('extraordinaryExpense') ?? 0)
+        )
+      }
+
+      case 'ebt': {
+        const ebit = g('ebit')
+        if (ebit == null) return null
+        return (
+          ebit +
+          (g('otherIncome') ?? 0) -
+          (g('otherExpense') ?? 0) -
+          (g('interestExpense') ?? 0) +
+          (g('extraordinaryIncome') ?? 0) -
+          (g('extraordinaryExpense') ?? 0)
+        )
+      }
+
+      case 'netProfit': {
+        const ebt = g('ebt')
+        if (ebt == null) return null
+        return ebt - (g('taxExpense') ?? 0)
+      }
+
+      case 'totalCurrentAssets':
+        return sumNonNull([
+          g('cash'),
+          g('shortTermInvestments'),
+          g('tradeReceivables'),
+          g('otherReceivables'),
+          g('inventory'),
+          g('constructionCosts'),
+          g('prepaidExpenses'),
+          g('prepaidSuppliers'),
+          g('otherCurrentAssets'),
+        ])
+
+      case 'totalNonCurrentAssets':
+        return sumNonNull([
+          g('longTermTradeReceivables'),
+          g('longTermOtherReceivables'),
+          g('longTermInvestments'),
+          g('tangibleAssets'),
+          g('intangibleAssets'),
+          g('depletableAssets'),
+          g('longTermPrepaidExpenses'),
+          g('otherNonCurrentAssets'),
+        ])
+
+      case 'totalAssets':
+        return sumNonNull([g('totalCurrentAssets'), g('totalNonCurrentAssets')])
+
+      case 'totalCurrentLiabilities':
+        return sumNonNull([
+          g('shortTermFinancialDebt'),
+          g('tradePayables'),
+          g('otherShortTermPayables'),
+          g('advancesReceived'),
+          g('constructionProgress'),
+          g('taxPayables'),
+          g('shortTermProvisions'),
+          g('deferredRevenue'),
+          g('otherCurrentLiabilities'),
+        ])
+
+      case 'totalNonCurrentLiabilities':
+        return sumNonNull([
+          g('longTermFinancialDebt'),
+          g('longTermTradePayables'),
+          g('longTermOtherPayables'),
+          g('longTermAdvancesReceived'),
+          g('longTermProvisions'),
+          g('otherNonCurrentLiabilities'),
+        ])
+
+      case 'totalEquity': {
+        const losses = g('retainedLosses')
+        const lossAdjustment = losses == null ? null : -Math.abs(losses)
+        const periodNet = g('netProfitCurrentYear') ?? g('netProfit')
+        return sumNonNull([
+          g('paidInCapital'),
+          g('capitalReserves'),
+          g('profitReserves'),
+          g('retainedEarnings'),
+          lossAdjustment,
+          periodNet,
+        ])
+      }
+
+      case 'totalLiabilitiesAndEquity':
+        return sumNonNull([
+          g('totalCurrentLiabilities'),
+          g('totalNonCurrentLiabilities'),
+          g('totalEquity'),
+        ])
+
+      default:
+        return null
+    }
+  }
+
   function getDisplayStr(fdId: string, field: string): string {
     const localStr = inputStrings[fdId]?.[field]
     if (localStr !== undefined) return localStr
-    const v = getStoredVal(fdId, field)
+    const v = getEffectiveVal(fdId, field)
     return v != null ? fmtTR(v) : ''
   }
 
   function handleFocus(fdId: string, field: string, e: React.FocusEvent<HTMLInputElement>) {
-    const v = getStoredVal(fdId, field)
+    const v = getEffectiveVal(fdId, field)
     const raw = v != null ? fmtTR(v) : ''
     setInputStrings(prev => ({ ...prev, [fdId]: { ...(prev[fdId] ?? {}), [field]: raw } }))
     e.target.value = raw
@@ -189,7 +355,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
 
   // ── Trend hesaplama (belirli bir field için) ────────────
   function trendCells(field: string) {
-    const vals = cols.map(col => getStoredVal(col.id, field))
+    const vals = cols.map(col => getEffectiveVal(col.id, field))
     const son2   = cols.length >= 2 ? calcPct(vals[cols.length - 2], vals[cols.length - 1]) : null
     const ilkSon = cols.length >= 2 ? calcPct(vals[0], vals[cols.length - 1])               : null
     return { son2, ilkSon }
@@ -212,8 +378,8 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   function AktifPasifWarning() {
     // Her sütun için aktif - pasif farkı
     const diffs = cols.map(col => {
-      const aktif = getStoredVal(col.id, 'totalAssets')
-      const pasif = getStoredVal(col.id, 'totalLiabilitiesAndEquity')
+      const aktif = getEffectiveVal(col.id, 'totalAssets')
+      const pasif = getEffectiveVal(col.id, 'totalLiabilitiesAndEquity')
       if (aktif == null || pasif == null) return null
       return aktif - pasif
     })
@@ -246,8 +412,8 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   function NetKarWarning() {
     // Bilanço 59 (netProfitCurrentYear) vs GT net kar (netProfit)
     const diffs = cols.map(col => {
-      const bilanco = getStoredVal(col.id, 'netProfitCurrentYear')
-      const gt      = getStoredVal(col.id, 'netProfit')
+      const bilanco = getEffectiveVal(col.id, 'netProfitCurrentYear')
+      const gt      = getEffectiveVal(col.id, 'netProfit')
       if (bilanco == null || gt == null) return null
       return bilanco - gt
     })
@@ -350,7 +516,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
           }
 
           if (isCalc) {
-            const v = getStoredVal(col.id, row.field!)
+            const v = getEffectiveVal(col.id, row.field!)
             return (
               <td key={col.id} className="px-2 py-1 text-right">
                 <input
@@ -370,7 +536,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             )
           }
 
-          const storedVal = getStoredVal(col.id, row.field!)
+          const storedVal = getEffectiveVal(col.id, row.field!)
           const isNeg     = storedVal != null && storedVal < 0
 
           return (

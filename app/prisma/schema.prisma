@@ -136,6 +136,7 @@ model FinancialData {
   inventory               Float?   // 15
   constructionCosts       Float?   // 17
   prepaidExpenses         Float?   // 18
+  prepaidSuppliers        Float?   // 159 (SipariÅŸ AvanslarÄ±)
   otherCurrentAssets      Float?   // 19
   totalCurrentAssets      Float?
 

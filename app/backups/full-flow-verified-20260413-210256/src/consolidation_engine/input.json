@@ -1,0 +1,138 @@
+{
+  "root_company_id": "A",
+  "companies": [
+    {
+      "company_id": "A",
+      "name": "Holding A",
+      "period": "2025",
+      "currency": "TRY",
+      "metrics": {
+        "current_assets": "500",
+        "cash": "120",
+        "trade_receivables": "150",
+        "inventories": "80",
+        "total_assets": "1200",
+        "current_liabilities": "320",
+        "short_term_debt": "100",
+        "long_term_debt": "220",
+        "trade_payables": "140",
+        "equity": "560",
+        "revenue": "900",
+        "gross_profit": "300",
+        "ebitda": "220",
+        "ebit": "180",
+        "net_profit": "140",
+        "finance_expense": "45",
+        "operating_cash_flow": "160"
+      },
+      "investments": {
+        "B": "300",
+        "C": "60"
+      }
+    },
+    {
+      "company_id": "B",
+      "name": "Subsidiary B",
+      "period": "2025",
+      "currency": "TRY",
+      "metrics": {
+        "current_assets": "300",
+        "cash": "60",
+        "trade_receivables": "90",
+        "inventories": "110",
+        "total_assets": "700",
+        "current_liabilities": "200",
+        "short_term_debt": "70",
+        "long_term_debt": "100",
+        "trade_payables": "80",
+        "equity": "320",
+        "revenue": "600",
+        "gross_profit": "180",
+        "ebitda": "140",
+        "ebit": "120",
+        "net_profit": "85",
+        "finance_expense": "20",
+        "operating_cash_flow": "100"
+      }
+    },
+    {
+      "company_id": "C",
+      "name": "Associate C",
+      "period": "2025",
+      "currency": "TRY",
+      "metrics": {
+        "current_assets": "180",
+        "cash": "25",
+        "trade_receivables": "50",
+        "inventories": "35",
+        "total_assets": "420",
+        "current_liabilities": "140",
+        "short_term_debt": "30",
+        "long_term_debt": "90",
+        "trade_payables": "55",
+        "equity": "190",
+        "revenue": "310",
+        "gross_profit": "90",
+        "ebitda": "60",
+        "ebit": "52",
+        "net_profit": "40",
+        "finance_expense": "10",
+        "operating_cash_flow": "48"
+      }
+    }
+  ],
+  "ownership_links": [
+    {
+      "parent_id": "A",
+      "child_id": "B",
+      "ownership_pct": "0.60"
+    },
+    {
+      "parent_id": "A",
+      "child_id": "C",
+      "ownership_pct": "0.30"
+    }
+  ],
+  "intercompany_transactions": [
+    {
+      "tx_id": "t-001",
+      "tx_type": "receivable_payable",
+      "from_company": "A",
+      "to_company": "B",
+      "amount": "40",
+      "metadata": {
+        "counterparty_amount": "40"
+      }
+    },
+    {
+      "tx_id": "t-002",
+      "tx_type": "sale_purchase",
+      "from_company": "A",
+      "to_company": "B",
+      "amount": "120",
+      "metadata": {
+        "profit_component": "18"
+      }
+    },
+    {
+      "tx_id": "t-003",
+      "tx_type": "inventory_profit",
+      "from_company": "A",
+      "to_company": "B",
+      "amount": "0",
+      "metadata": {
+        "sale_profit": "30",
+        "unsold_ratio": "0.40"
+      }
+    },
+    {
+      "tx_id": "t-004",
+      "tx_type": "dividend",
+      "from_company": "C",
+      "to_company": "A",
+      "amount": "6",
+      "metadata": {}
+    }
+  ]
+}
+

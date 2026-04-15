@@ -347,7 +347,7 @@ const Page5_Trends = ({ entity, analyses, pageNum }: any) => {
                  <RechartsTooltip 
                     cursor={{fill:'rgba(241,245,249,0.5)'}}
                     contentStyle={{borderRadius:12, border:'none', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.1)', fontWeight:600, fontSize:12}}
-                    formatter={(val:number) => numF(val) + " TL"}
+                    formatter={(val:any) => numF(val) + " TL"}
                   />
                  <Legend wrapperStyle={{paddingTop:20, fontSize:12, fontWeight:600}} />
                  <Bar yAxisId="left" dataKey="revenue" name="Net Satışlar" fill="#0284c7" radius={[6,6,0,0]} barSize={40} />
@@ -373,7 +373,7 @@ const Page5_Trends = ({ entity, analyses, pageNum }: any) => {
                  <YAxis tickFormatter={(v)=>v.toFixed(1)+'%'} axisLine={false} tickLine={false} tick={{fill:'#64748b', fontSize:11}} dx={-10}/>
                  <RechartsTooltip 
                     contentStyle={{borderRadius:12, border:'none', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.1)', fontWeight:600, fontSize:12}}
-                    formatter={(val:number) => val.toFixed(1) + "%"}
+                    formatter={(val:any) => val.toFixed(1) + "%"}
                   />
                  <Area type="monotone" dataKey="margin" name="FAVÖK/EBIT Marjı" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorMargin)" />
                </AreaChart>
@@ -445,8 +445,8 @@ function UltraPremiumRaporContent() {
   const params = useSearchParams()
   const id     = params.get('id')
   const type   = params.get('type') || 'premium' // default numune is premium
-  const [analyses, setAnalyses] = useState<Analysis[]>([])
-  const [selected, setSelected] = useState<Analysis | null>(null)
+  const [analyses, setAnalyses] = useState<any[]>([])
+  const [selected, setSelected] = useState<any | null>(null)
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -476,7 +476,7 @@ function UltraPremiumRaporContent() {
     fetch('/api/analyses').then(r => r.json()).then(d => {
       const list = d.analyses ?? []
       setAnalyses(list)
-      const found = list.find((a: Analysis) => a.id === id)
+      const found = list.find((a: any) => a.id === id)
       setSelected(found ?? null)
       if (found?.entity?.id) {
         fetch(`/api/entities/${found.entity.id}`).then(r => r.ok ? r.json() : null)

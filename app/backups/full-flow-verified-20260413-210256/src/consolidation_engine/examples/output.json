@@ -1,0 +1,285 @@
+{
+  "standalone_financials": {
+    "A": {
+      "company_id": "A",
+      "name": "Holding A",
+      "period": "2025",
+      "currency": "TRY",
+      "metrics": {
+        "current_assets": "500",
+        "cash": "120",
+        "trade_receivables": "150",
+        "inventories": "80",
+        "total_assets": "1200",
+        "current_liabilities": "320",
+        "short_term_debt": "100",
+        "long_term_debt": "220",
+        "trade_payables": "140",
+        "equity": "560",
+        "revenue": "900",
+        "gross_profit": "300",
+        "ebitda": "220",
+        "ebit": "180",
+        "net_profit": "140",
+        "finance_expense": "45",
+        "operating_cash_flow": "160"
+      },
+      "investments": {
+        "B": "300",
+        "C": "60"
+      }
+    }
+  },
+  "consolidated_financials": {
+    "root_company_id": "A",
+    "metrics": {
+      "current_assets": "800",
+      "cash": "180",
+      "trade_receivables": "200",
+      "inventories": "178.00",
+      "total_assets": "1646.0",
+      "current_liabilities": "520",
+      "short_term_debt": "170",
+      "long_term_debt": "320",
+      "trade_payables": "180",
+      "equity": "784.0",
+      "revenue": "1380",
+      "gross_profit": "450",
+      "ebitda": "330",
+      "ebit": "284",
+      "net_profit": "216.0",
+      "finance_expense": "65",
+      "operating_cash_flow": "260"
+    }
+  },
+  "scope_classification": [
+    {
+      "company_id": "A",
+      "parent_id": "A",
+      "effective_ownership_pct": "1",
+      "classification": "full_consolidation",
+      "reasons": [
+        "Root company included by definition."
+      ]
+    },
+    {
+      "company_id": "B",
+      "parent_id": "A",
+      "effective_ownership_pct": "0.60",
+      "classification": "full_consolidation",
+      "reasons": [
+        "direct ownership > 50% (0.60)",
+        "effective ownership > 50% (0.60)"
+      ]
+    },
+    {
+      "company_id": "C",
+      "parent_id": "A",
+      "effective_ownership_pct": "0.30",
+      "classification": "equity_method",
+      "reasons": [
+        "effective ownership in 20%-50% band (0.30)"
+      ]
+    }
+  ],
+  "effective_ownership_map": {
+    "effective_ownership_pct": {
+      "B": "0.60",
+      "C": "0.30"
+    },
+    "path_details": {
+      "B": [
+        {
+          "path": "A -> B",
+          "contribution": "0.60"
+        }
+      ],
+      "C": [
+        {
+          "path": "A -> C",
+          "contribution": "0.30"
+        }
+      ]
+    }
+  },
+  "elimination_logs": [
+    {
+      "type": "capital_elimination",
+      "company_id": "B",
+      "parent_investment_eliminated": "300",
+      "child_equity_eliminated": "320"
+    },
+    {
+      "tx_id": "t-001",
+      "type": "receivable_payable",
+      "amount": "40",
+      "from_company": "A",
+      "to_company": "B"
+    },
+    {
+      "tx_id": "t-002",
+      "type": "sale_purchase",
+      "amount": "120",
+      "from_company": "A",
+      "to_company": "B"
+    },
+    {
+      "tx_id": "t-003",
+      "type": "inventory_profit",
+      "amount": "0",
+      "from_company": "A",
+      "to_company": "B"
+    },
+    {
+      "tx_id": "t-004",
+      "type": "dividend",
+      "amount": "6",
+      "from_company": "C",
+      "to_company": "A"
+    },
+    {
+      "type": "equity_method",
+      "company_id": "C",
+      "old_carrying_value": "60",
+      "share_of_profit": "12.00",
+      "dividends": "6",
+      "new_carrying_value": "66.00"
+    }
+  ],
+  "minority_interest_outputs": {
+    "minority_equity": "128.0",
+    "minority_profit": "34.0",
+    "details": [
+      {
+        "company_id": "B",
+        "minority_pct": "0.40",
+        "minority_equity": "128.0",
+        "minority_profit": "34.0"
+      }
+    ]
+  },
+  "score_engine_input": {
+    "standalone": {
+      "current_assets": "500",
+      "cash": "120",
+      "trade_receivables": "150",
+      "inventories": "80",
+      "total_assets": "1200",
+      "current_liabilities": "320",
+      "short_term_debt": "100",
+      "long_term_debt": "220",
+      "trade_payables": "140",
+      "equity": "560",
+      "revenue": "900",
+      "gross_profit": "300",
+      "ebitda": "220",
+      "ebit": "180",
+      "net_profit": "140",
+      "finance_expense": "45",
+      "operating_cash_flow": "160"
+    },
+    "consolidated": {
+      "current_assets": "800",
+      "cash": "180",
+      "trade_receivables": "200",
+      "inventories": "178.00",
+      "total_assets": "1646.0",
+      "current_liabilities": "520",
+      "short_term_debt": "170",
+      "long_term_debt": "320",
+      "trade_payables": "180",
+      "equity": "784.0",
+      "revenue": "1380",
+      "gross_profit": "450",
+      "ebitda": "330",
+      "ebit": "284",
+      "net_profit": "216.0",
+      "finance_expense": "65",
+      "operating_cash_flow": "260"
+    }
+  },
+  "consolidation_impact_summary": {
+    "metric_delta": {
+      "current_assets": "300",
+      "cash": "60",
+      "trade_receivables": "50",
+      "inventories": "98.00",
+      "total_assets": "446.0",
+      "current_liabilities": "200",
+      "short_term_debt": "70",
+      "long_term_debt": "100",
+      "trade_payables": "40",
+      "equity": "224.0",
+      "revenue": "480",
+      "gross_profit": "150",
+      "ebitda": "110",
+      "ebit": "104",
+      "net_profit": "76.0",
+      "finance_expense": "20",
+      "operating_cash_flow": "100"
+    },
+    "explainability": {
+      "full_consolidation_reasons": [
+        {
+          "company_id": "A",
+          "reasons": [
+            "Root company included by definition."
+          ]
+        },
+        {
+          "company_id": "B",
+          "reasons": [
+            "direct ownership > 50% (0.60)",
+            "effective ownership > 50% (0.60)"
+          ]
+        }
+      ],
+      "equity_method_reasons": [
+        {
+          "company_id": "C",
+          "reasons": [
+            "effective ownership in 20%-50% band (0.30)"
+          ]
+        }
+      ],
+      "applied_eliminations_count": 6,
+      "main_score_drivers": [
+        {
+          "metric": "revenue",
+          "delta": "480"
+        },
+        {
+          "metric": "total_assets",
+          "delta": "446.0"
+        },
+        {
+          "metric": "current_assets",
+          "delta": "300"
+        },
+        {
+          "metric": "equity",
+          "delta": "224.0"
+        },
+        {
+          "metric": "current_liabilities",
+          "delta": "200"
+        }
+      ]
+    }
+  },
+  "warnings": [],
+  "audit_log": [
+    {
+      "stage": "scope_detection",
+      "level": "INFO",
+      "message": "B classified as full_consolidation.",
+      "context": {
+        "reasons": [
+          "direct ownership > 50% (0.60)",
+          "effective ownership > 50% (0.60)"
+        ]
+      }
+    }
+  ]
+}
+

@@ -1,0 +1,15 @@
+﻿Snapshot: manual-snapshot-20260413-142104
+Created: 2026-04-13 14:21:28
+
+Saved files:
+app/api/entities/[id]/route.ts
+components/analysis/WhatIfSimulator.tsx
+lib/scoring/optimizer.ts
+lib/scoring/score.ts
+
+Restore options:
+1) Patch ile geri dön:
+   git -C c:\finrate\app\src apply --reject --whitespace=nowarn "c:\finrate\app\backups\manual-snapshot-20260413-142104\changes.patch"
+
+2) Birebir dosya kopyasından geri dön (PowerShell):
+   Copy-Item -LiteralPath "c:\finrate\app\backups\manual-snapshot-20260413-142104\*" -Destination "c:\finrate\app\src" -Recurse -Force

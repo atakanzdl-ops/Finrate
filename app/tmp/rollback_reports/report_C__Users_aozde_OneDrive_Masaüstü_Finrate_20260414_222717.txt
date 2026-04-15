@@ -1,0 +1,17 @@
+﻿ROOT=C:\Users\aozde\OneDrive\Masaüstü\Finrate
+CUTOFF=2026-04-14 17:20:00
+RESTORED|next.config.ts|from=C:\finrate\app\backups\full-flow-snapshot-20260413-142157\next.config.ts
+RESTORED|package-lock.json|from=C:\finrate\app\backups\full-flow-snapshot-20260413-142157\package-lock.json
+RESTORED|package.json|from=C:\finrate\app\backups\full-flow-snapshot-20260413-142157\package.json
+DELETED_NEW|.claude\launch.json
+DELETED_NEW|.claude\settings.local.json
+RESTORED|prisma\schema.prisma|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\prisma\schema.prisma
+SKIPPED_NO_SNAPSHOT|src\app\api\entities\[id]\upload\route.ts
+DELETED_NEW|src\app\dashboard\sirketler\[id]\page.tsx
+RESTORED|src\components\analysis\FileUpload.tsx|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\components\analysis\FileUpload.tsx
+RESTORED|src\components\analysis\TdhpSpreadsheet.tsx|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\components\analysis\TdhpSpreadsheet.tsx
+RESTORED|src\lib\auth.ts|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\lib\auth.ts
+RESTORED|src\lib\http\jsonUtf8.ts|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\lib\http\jsonUtf8.ts
+RESTORED|src\lib\parsers\excel.ts|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\lib\parsers\excel.ts
+RESTORED|src\lib\scoring\ratios.ts|from=C:\finrate\app\backups\full-flow-verified-20260413-210913\src\lib\scoring\ratios.ts
+SUMMARY|restored=10|deleted=3|skipped=1|total=14

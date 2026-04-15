@@ -1,0 +1,406 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KULLANICI & ABONELÄ°K
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  fullName      String
+  companyName   String?
+  role          String   @default("USER")
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscription  Subscription?
+  entities      Entity[]
+  groups        Group[]
+  analyses      Analysis[]
+  tenzilatEntries TenzilatEntry[]
+  auditLogs     TenzilatAuditLog[]
+
+  @@map("users")
+}
+
+model Subscription {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  plan            String   @default("DEMO")
+  billingCycle    String   @default("MONTHLY")
+  status          String   @default("ACTIVE")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean @default(false)
+  iyzicoSubKey    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  subscriptionId  String
+  amount          Float
+  currency        String   @default("TRY")
+  status          String
+  iyzicoPaymentId String?
+  createdAt       DateTime @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ÅÄ°RKET (ENTITY) & GRUP
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Entity {
+  id                   String   @id @default(uuid())
+  userId               String
+  name                 String
+  taxNumber            String?
+  sector               String?
+  entityType           String   @default("STANDALONE")
+  groupId              String?
+  ownershipPct         Float?
+  consolidationInclude Boolean  @default(true)
+  weightBasis          String   @default("REVENUE")
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group               Group?   @relation(fields: [groupId], references: [id])
+  financialData       FinancialData[]
+  financialDataUploads FinancialDataUpload[]
+  analyses            Analysis[]
+  tenzilatEntries     TenzilatEntry[]
+  icTransactionsSell  IcTransaction[] @relation("SellerEntity")
+  icTransactionsBuy   IcTransaction[] @relation("BuyerEntity")
+  subjectiveInput     SubjectiveInput?
+
+  @@map("entities")
+}
+
+model Group {
+  id               String   @id @default(uuid())
+  userId           String
+  name             String
+  baseCurrency     String   @default("TRY")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entities         Entity[]
+  analyses         Analysis[]
+  icTransactions   IcTransaction[]
+  eliminationLogs  EliminationLog[]
+  tenzilatEntries  TenzilatEntry[]
+
+  @@map("groups")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// FÄ°NANSAL VERÄ°
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model FinancialData {
+  id          String   @id @default(uuid())
+  entityId    String
+  year        Int
+  period      String   @default("ANNUAL")
+  source      String   @default("MANUAL")
+  fileName    String?
+  fileUrl     String?
+
+  // 10-19 DÃ¶nen VarlÄ±klar
+  cash                    Float?   // 10
+  shortTermInvestments    Float?   // 11
+  tradeReceivables        Float?   // 12
+  otherReceivables        Float?   // 13
+  inventory               Float?   // 15
+  constructionCosts       Float?   // 17
+  prepaidExpenses         Float?   // 18
+  otherCurrentAssets      Float?   // 19
+  totalCurrentAssets      Float?
+
+  // 22-29 Duran VarlÄ±klar
+  longTermTradeReceivables  Float? // 22
+  longTermOtherReceivables  Float? // 23
+  longTermInvestments       Float? // 24
+  tangibleAssets            Float? // 25
+  intangibleAssets          Float? // 26
+  depletableAssets          Float? // 27
+  longTermPrepaidExpenses   Float? // 28
+  otherNonCurrentAssets     Float? // 29
+  totalNonCurrentAssets     Float?
+  totalAssets               Float?
+
+  // 30-39 KV YabancÄ± Kaynaklar
+  shortTermFinancialDebt  Float?   // 30
+  tradePayables           Float?   // 32
+  otherShortTermPayables  Float?   // 33
+  advancesReceived        Float?   // 34
+  constructionProgress    Float?   // 35
+  taxPayables             Float?   // 36
+  shortTermProvisions     Float?   // 37
+  deferredRevenue         Float?   // 38
+  otherCurrentLiabilities Float?   // 39
+  totalCurrentLiabilities Float?
+
+  // 40-49 UV YabancÄ± Kaynaklar
+  longTermFinancialDebt      Float?  // 40
+  longTermTradePayables      Float?  // 42
+  longTermOtherPayables      Float?  // 43
+  longTermAdvancesReceived   Float?  // 44
+  longTermProvisions         Float?  // 47
+  otherNonCurrentLiabilities Float?  // 49
+  totalNonCurrentLiabilities Float?
+
+  // 50-59 Ã–z Kaynaklar
+  paidInCapital              Float?  // 50
+  capitalReserves            Float?  // 52
+  profitReserves             Float?  // 54
+  retainedEarnings           Float?  // 57
+  retainedLosses             Float?  // 58
+  netProfitCurrentYear       Float?
+  totalEquity                Float?
+  totalLiabilitiesAndEquity  Float?
+
+  // Gelir Tablosu
+  grossSales              Float?   // 60
+  salesDiscounts          Float?   // 61
+  revenue                 Float?   // net satÄ±ÅŸlar
+  cogs                    Float?   // 62
+  grossProfit             Float?
+  operatingExpenses       Float?   // 63
+  ebit                    Float?
+  otherIncome             Float?   // 64
+  otherExpense            Float?   // 65
+  interestExpense         Float?   // 66
+  ebt                     Float?
+  extraordinaryIncome     Float?   // 67
+  extraordinaryExpense    Float?   // 68
+  taxExpense              Float?   // 69
+  netProfit               Float?
+  depreciation            Float?
+  ebitda                  Float?
+  purchases               Float?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  entity              Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  analysis            Analysis?
+  uploads             FinancialDataUpload[]
+
+  @@unique([entityId, year, period])
+  @@map("financial_data")
+}
+
+model FinancialDataUpload {
+  id               String   @id @default(uuid())
+  entityId         String
+  financialDataId  String
+  year             Int
+  period           String   @default("ANNUAL")
+  source           String
+  fileName         String
+  parsedFieldCount Int      @default(0)
+  unmapped         String?
+  parseWarnings    String?
+  createdAt        DateTime @default(now())
+
+  entity           Entity        @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  financialData    FinancialData @relation(fields: [financialDataId], references: [id], onDelete: Cascade)
+
+  @@index([entityId, year, period])
+  @@index([financialDataId, createdAt])
+  @@map("financial_data_uploads")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ANALÄ°Z & SKOR
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Analysis {
+  id                  String   @id @default(uuid())
+  userId              String
+  entityId            String?
+  groupId             String?
+  financialDataId     String?  @unique
+  year                Int
+  period              String   @default("ANNUAL")
+  mode                String   @default("SOLO")
+
+  finalScore          Float?
+  finalRating         String?
+  liquidityScore      Float?
+  profitabilityScore  Float?
+  leverageScore       Float?
+  activityScore       Float?
+
+  weightedScore       Float?
+  safFactor           Float?
+  icDependencyRatio   Float?
+  hasCrossGuarantee   Boolean  @default(false)
+
+  ratios              String?  // JSON string
+  consolidatedFinancials String? // JSON string
+  optimizerSnapshot   String?  // JSON string
+
+  reportedAt          DateTime? // Rapor oluÅŸturulunca set edilir
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id])
+  entity              Entity?  @relation(fields: [entityId], references: [id])
+  group               Group?   @relation(fields: [groupId], references: [id])
+  financialData       FinancialData? @relation(fields: [financialDataId], references: [id])
+  tenzilatEntries     TenzilatEntry[]
+
+  @@unique([entityId, year, period])
+  @@map("analyses")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GRUP Ä°Ã‡Ä° Ä°ÅLEM & ELÄ°MÄ°NASYON
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model IcTransaction {
+  id              String   @id @default(uuid())
+  groupId         String
+  year            Int
+  sellerEntityId  String
+  buyerEntityId   String
+  type            String
+  amount          Float
+  isMatched       Boolean  @default(false)
+  eliminationApplied Boolean @default(false)
+  materialityPct  Float?
+  createdAt       DateTime @default(now())
+
+  group           Group    @relation(fields: [groupId], references: [id])
+  seller          Entity   @relation("SellerEntity", fields: [sellerEntityId], references: [id])
+  buyer           Entity   @relation("BuyerEntity", fields: [buyerEntityId], references: [id])
+  eliminationLog  EliminationLog?
+
+  @@map("ic_transactions")
+}
+
+model EliminationLog {
+  id                String   @id @default(uuid())
+  groupId           String
+  icTransactionId   String   @unique
+  year              Int
+  amountEliminated  Float
+  ruleApplied       String
+  materialityPct    Float?
+  createdAt         DateTime @default(now())
+
+  group             Group        @relation(fields: [groupId], references: [id])
+  icTransaction     IcTransaction @relation(fields: [icTransactionId], references: [id])
+
+  @@map("elimination_logs")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MANUEL TENZÄ°LAT
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model TenzilatEntry {
+  id               String   @id @default(uuid())
+  userId           String
+  entityId         String?
+  groupId          String?
+  analysisId       String?
+  year             Int
+  period           String   @default("ANNUAL")
+  adjustmentType   String
+  adjustmentAmount Float
+  description      String
+  scope            String
+  isActive         Boolean  @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id])
+  entity           Entity?  @relation(fields: [entityId], references: [id])
+  group            Group?   @relation(fields: [groupId], references: [id])
+  analysis         Analysis? @relation(fields: [analysisId], references: [id])
+  auditLogs        TenzilatAuditLog[]
+
+  @@map("tenzilat_entries")
+}
+
+model TenzilatAuditLog {
+  id             String   @id @default(uuid())
+  entryId        String
+  userId         String
+  action         String
+  fieldChanged   String?
+  oldValue       String?
+  newValue       String?
+  timestamp      DateTime @default(now())
+  ipAddress      String?
+
+  entry          TenzilatEntry @relation(fields: [entryId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+
+  @@map("tenzilat_audit_logs")
+}
+
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SUBJEKTÄ°F SKOR GÄ°RDÄ°LERÄ°
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model SubjectiveInput {
+  id         String   @id @default(uuid())
+  entityId   String   @unique
+
+  // KKB & Kredi Sicili (max 10 puan)
+  kkbCategory       String   @default("orta")   // iyi | orta | kotu | cok_kotu
+  activeDelayDays   Int      @default(0)         // 0=yok | 30=1-30gÃ¼n | 90=31-90gÃ¼n | 999=90+gÃ¼n
+  checkProtest      Boolean  @default(false)
+  enforcementFile   Boolean  @default(false)
+
+  // Banka Ä°liÅŸkileri (max 10 puan)
+  creditLimitUtilPct Float   @default(70)        // 0-100
+  hasMultipleBanks   Boolean @default(false)
+  avgMaturityMonths  Int     @default(6)         // 3 | 6 | 12 | 24 | 36
+
+  // Kurumsal YapÄ± (max 5 puan)
+  companyAgeYears    Int     @default(3)
+  auditLevel         String  @default("ymm")    // yok | smmm | ymm | tam_tasdik | bagimsiz
+  ownershipClarity   Boolean @default(true)
+
+  // Uyum & Risk (max 5 puan)
+  hasTaxDebt         Boolean @default(false)
+  hasSgkDebt         Boolean @default(false)
+  activeLawsuitCount Int     @default(0)
+
+  updatedAt  DateTime @updatedAt
+
+  entity     Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@map("subjective_inputs")
+}
+

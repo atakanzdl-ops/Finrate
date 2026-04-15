@@ -1,0 +1,4 @@
+﻿Snapshot: full-flow-snapshot-20260413-142157
+Created: 2026-04-13 14:21:57
+Scope: landing + dashboard + api + scoring + prisma + public + build configs
+Excluded: node_modules, .next, runtime logs

@@ -37,8 +37,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Analysis kaydını upsert et
     const analysis = await prisma.analysis.upsert({
-      where: { financialDataId: financialData.id },
+      where: { entityId_year_period: { entityId, year, period } },
       update: {
+        financialDataId:    financialData.id,
         finalScore:         scoreResult.finalScore,
         finalRating:        scoreResult.finalRating,
         liquidityScore:     scoreResult.liquidityScore,

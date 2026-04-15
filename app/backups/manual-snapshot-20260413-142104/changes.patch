@@ -1,0 +1,434 @@
+﻿diff --git a/app/src/app/api/entities/[id]/route.ts b/app/src/app/api/entities/[id]/route.ts
+index 63c5d72..d7a767c 100644
+--- a/app/src/app/api/entities/[id]/route.ts
++++ b/app/src/app/api/entities/[id]/route.ts
+@@ -9,13 +9,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id:
+   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
+ 
+   const { id } = await params
+-  const entity = await prisma.entity.findFirst({
+-    where: { id, userId },
+-    include: {
+-      financialData: { orderBy: [{ year: 'desc' }, { period: 'asc' }] },
+-      group: { select: { id: true, name: true } },
+-    },
+-  })
++  let entity: any
++  try {
++    entity = await prisma.entity.findFirst({
++      where: { id, userId },
++      include: {
++        financialData: { orderBy: [{ year: 'desc' }, { period: 'asc' }] },
++        group: { select: { id: true, name: true } },
++      },
++    })
++  } catch (error: any) {
++    // DB şeması geride kaldığında (eksik kolon), endpoint JSON döndürmeye devam etsin.
++    if (error?.code === 'P2022') {
++      entity = await prisma.entity.findFirst({
++        where: { id, userId },
++        include: {
++          group: { select: { id: true, name: true } },
++        },
++      })
++      if (entity) entity.financialData = []
++    } else {
++      return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
++    }
++  }
+ 
+   if (!entity) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
+   return jsonUtf8({ entity })
+diff --git a/app/src/components/analysis/WhatIfSimulator.tsx b/app/src/components/analysis/WhatIfSimulator.tsx
+index 1969972..3affb38 100644
+--- a/app/src/components/analysis/WhatIfSimulator.tsx
++++ b/app/src/components/analysis/WhatIfSimulator.tsx
+@@ -330,6 +330,8 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+     return `≈₺${Math.round(amount)}`
+   }
+ 
++  const deltaText = Math.abs(delta) < 0.05 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
++
+   return (
+     <div className="overflow-hidden">
+       {/* Header */}
+@@ -351,33 +353,28 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+         <div className="pt-2 space-y-4">
+ 
+           {/* Skor Özeti */}
+-          <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-white/10 border border-white/5 backdrop-blur-sm">
+-            <div className="text-center">
+-              <p className="card-desc uppercase tracking-wider mb-1">Mevcut</p>
+-              <p className="text-2xl font-black text-[#0a1727] font-mono">{Math.round(baseScore)}</p>
+-              <p className={clsx('text-xs font-bold font-mono', RATING_COLOR[currentRating])}>{currentRating}</p>
++          <div className="grid grid-cols-3 gap-3">
++            <div className="rounded-xl border border-[#E5E9F0] bg-white p-4 text-center">
++              <p className="text-[10px] font-black tracking-widest text-[#8da4bf] uppercase">Mevcut</p>
++              <p className="mt-1 text-2xl font-black text-[#0a1727] font-mono">{Math.round(baseScore)}</p>
++              <p className={clsx('text-xs font-bold font-mono mt-0.5', RATING_COLOR[currentRating])}>{currentRating}</p>
+             </div>
+-            <div className="flex items-center justify-center">
+-              <div className="text-center">
+-                <div className={clsx('text-lg font-black font-mono', delta > 0.5 ? 'text-emerald-600' : delta < -0.5 ? 'text-red-500' : 'text-[#8da4bf]')}>
+-                  {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+-                </div>
+-                {simCombinedRating !== currentRating && (
+-                  <div className={clsx('text-[9px] font-bold uppercase tracking-wider font-mono', RATING_COLOR[simCombinedRating])}>
+-                    {simCombinedRating}!
+-                  </div>
+-                )}
+-              </div>
++            <div className="rounded-xl border border-[#E5E9F0] bg-white p-4 text-center">
++              <p className="text-[10px] font-black tracking-widest text-[#8da4bf] uppercase">Delta</p>
++              <p className={clsx('mt-1 text-2xl font-black font-mono', delta > 0.5 ? 'text-emerald-600' : delta < -0.5 ? 'text-red-500' : 'text-[#8da4bf]')}>
++                {deltaText}
++              </p>
++              <p className="text-[10px] text-[#8da4bf] mt-0.5">puan</p>
+             </div>
+-            <div className="text-center">
+-              <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider mb-1">Simülasyon</p>
+-              <p className="text-2xl font-black text-[#0a1727]" style={{ fontFamily: 'Outfit,sans-serif' }}>{simCombinedScore}</p>
+-              <p className={clsx('text-xs font-bold', RATING_COLOR[simCombinedRating])}>{simCombinedRating}</p>
++            <div className="rounded-xl border border-[#E5E9F0] bg-white p-4 text-center">
++              <p className="text-[10px] font-black tracking-widest text-[#8da4bf] uppercase">Simülasyon</p>
++              <p className="mt-1 text-2xl font-black text-[#0a1727] font-mono">{simCombinedScore}</p>
++              <p className={clsx('text-xs font-bold mt-0.5', RATING_COLOR[simCombinedRating])}>{simCombinedRating}</p>
+             </div>
+           </div>
+ 
+           {nextTarget && (
+-            <div className="px-3 py-2 rounded-lg bg-black/[0.03] border border-black/[0.05] flex items-center justify-between">
++            <div className="px-3 py-2 rounded-lg bg-[#F8FAFC] border border-[#E5E9F0] flex items-center justify-between">
+               <p className="text-xs text-[#3d5a80]">
+                 <span className={clsx('font-bold', RATING_COLOR[nextTarget.label])}>{nextTarget.label}</span>
+                 {' '}için <span className="text-[#0a1727] font-bold">+{neededPoints.toFixed(1)} puan</span> gerekiyor
+@@ -391,7 +388,10 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+           )}
+ 
+           {/* Tab seçici */}
+-          <div className="tab-group p-1">
++          <div
++            className="rounded-xl border border-[#E5E9F0] bg-[#EEF2F6] p-1"
++            style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '4px' }}
++          >
+             {[
+               { id: 'auto',        icon: Target,    label: 'Otomatik' },
+               { id: 'scenarios',   icon: Zap,       label: 'Senaryolar' },
+@@ -402,12 +402,15 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+                 key={tab.id}
+                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                 className={clsx(
+-                  'tab flex-1',
+-                   activeTab === tab.id && 'active'
++                  'h-10 rounded-lg border text-sm font-semibold transition-colors text-center',
++                  activeTab === tab.id
++                    ? 'bg-white border-[#D7E4EE] text-[#0B3C5D] shadow-sm'
++                    : 'bg-transparent border-transparent text-[#64748b] hover:text-[#334155]'
+                 )}
++                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%' }}
+               >
+-                <tab.icon size={11} className="mr-1.5" />
+-                <span className="hidden sm:inline">{tab.label}</span>
++                <tab.icon size={11} />
++                <span>{tab.label}</span>
+               </button>
+             ))}
+           </div>
+@@ -435,8 +438,8 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+ 
+                     {singlePaths.length > 0 ? (
+                       /* Tek kaldıraç yeterli */
+-                      <div className="space-y-1.5">
+-                        <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-[#8da4bf] uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
+                         {singlePaths.map(({ lever, minPct }, i) => {
+                           const tl = tlAmount(lever.key, minPct)
+                           const isHigh = minPct > 100
+@@ -444,14 +447,14 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+                             <button
+                               key={lever.key}
+                               onClick={() => { setChange(lever.key, Math.min(minPct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
+-                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-black/[0.08] hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all text-left group"
++                              className="w-full flex items-center gap-3 p-3 rounded-xl border border-[#DCE4EE] bg-white hover:border-[#8FD7D8] hover:bg-[#F8FEFE] transition-all text-left group"
+                             >
+-                              <div className="w-5 h-5 rounded-full bg-black/5 flex items-center justify-center text-[9px] font-black text-[#8da4bf] group-hover:text-[#0a1727] flex-shrink-0">
++                              <div className="w-6 h-6 rounded-full bg-[#EEF2F6] flex items-center justify-center text-[10px] font-black text-[#64748b] group-hover:text-[#0a1727] flex-shrink-0">
+                                 {i + 1}
+                               </div>
+                               <div className="flex-1 min-w-0">
+-                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-cyan-700 transition-colors">{lever.label}</p>
+-                                <p className="text-[10px] text-[#8da4bf] mt-0.5">
++                                <p className="text-sm font-bold text-[#0a1727] group-hover:text-cyan-700 transition-colors">{lever.label}</p>
++                                <p className="text-[12px] text-[#8da4bf] mt-0.5">
+                                   <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-emerald-600')}>
+                                     %{minPct} iyileştirme
+                                     {isHigh && <span className="ml-1 opacity-70">(×{(minPct/100).toFixed(1)} kat)</span>}
+@@ -515,7 +518,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
+             <div className="space-y-3">
+               {PRESET_SCENARIOS.map(scenario => {
+                 const presetResult = calculateScore(applyLevers(baseData, scenario.changes))
+-                const presetDelta = presetResult.finalScore - baseScore
++                const presetDelta = (presetResult.finalScore - baseFinancialScore) * 0.70
+                 const ratingChanged = presetResult.finalRating !== currentRating
+                 return (
+                   <button
+diff --git a/app/src/lib/scoring/optimizer.ts b/app/src/lib/scoring/optimizer.ts
+index ab2f2a8..89a037c 100644
+--- a/app/src/lib/scoring/optimizer.ts
++++ b/app/src/lib/scoring/optimizer.ts
+@@ -131,14 +131,14 @@ function buildMeta(key: keyof RatioResult): Pick<RatioSuggestion, 'priority' | '
+ }
+ 
+ function simulatePlan(
+-  ratios: RatioResult,
++  ratios: Partial<RatioResult>,
+   planSuggestions: RatioSuggestion[],
+   currentScore: number,
+   baseFinancialScore: number,
+   targetScore: number,
+   sector?: string | null,
+ ): Omit<ActionPlan, 'label' | 'title'> {
+-  let projected = { ...ratios } as RatioResult
++  let projected: Partial<RatioResult> = { ...ratios }
+   for (const suggestion of planSuggestions) {
+     projected = { ...projected, [suggestion.key]: suggestion.targetValue }
+   }
+@@ -155,18 +155,19 @@ function simulatePlan(
+ }
+ 
+ export function findOptimalPath(
+-  ratios: RatioResult,
++  ratios: RatioResult | null | undefined,
+   currentScore: number,
+   targetRating: string,
+   sector?: string | null,
+ ): OptimizationResult {
++  const safeRatios: Partial<RatioResult> = ratios ?? {}
+   const currentRating = scoreToRating(currentScore)
+   const targetScore = getRatingMinimum(targetRating)
+   const gap = Math.max(0, targetScore - currentScore)
+-  const baseFinancialScore = calculateScore(ratios, sector).finalScore
++  const baseFinancialScore = calculateScore(safeRatios, sector).finalScore
+ 
+   function gain(key: keyof RatioResult, newVal: number): number {
+-    const modified = { ...ratios, [key]: newVal } as RatioResult
++    const modified = { ...safeRatios, [key]: newVal } as RatioResult
+     const newFinancial = calculateScore(modified, sector).finalScore
+     return (newFinancial - baseFinancialScore) * 0.70
+   }
+@@ -199,84 +200,84 @@ export function findOptimalPath(
+     })
+   }
+ 
+-  const cr = ratios.currentRatio
++  const cr = safeRatios.currentRatio
+   if (cr != null && cr < 2.5) {
+     const target = Math.min(cr * 1.4, 2.5)
+     const g = gain('currentRatio', target)
+     if (g > 0.3) pushCandidate('currentRatio', 'Cari Oran', 'Likidite', cr, target, 'x', 'up', g, `Cari oranı ${fmtVal(cr, 'x')}'den ${fmtVal(target, 'x')}'e çıkarın. ① Kısa vadeli banka kredilerini 2+ yıl vadeye çevirmek için banka ile görüşün. ② Müşteri alacak vadelerini kısaltın — erken ödeme için %1-2 iskonto tanımlayın. ③ Stoklardaki yavaş dönen kalemleri indirimli satışa çıkararak nakit yaratın.`)
+   }
+ 
+-  const qr = ratios.quickRatio
++  const qr = safeRatios.quickRatio
+   if (qr != null && qr < 1.8) {
+     const target = Math.min(qr * 1.35, 1.8)
+     const g = gain('quickRatio', target)
+     if (g > 0.3) pushCandidate('quickRatio', 'Asit-Test Oranı', 'Likidite', qr, target, 'x', 'up', g, `Asit-test oranını ${fmtVal(qr, 'x')}'den ${fmtVal(target, 'x')}'e çıkarın. ① Stok birikimini eriterek nakit elde edin — stoğa bağlı kaynağı serbest bırakın. ② Kısa vadeli borç ödemelerini uzun vadeye yeniden yapılandırın. ③ Kısa vadeli finansmandan (açık kredi) uzak durun; vadeli borç kullanın.`)
+   }
+ 
+-  const npm = ratios.netProfitMargin
++  const npm = safeRatios.netProfitMargin
+   if (npm != null && npm < 0.2) {
+     const target = Math.min(npm + 0.04, 0.2)
+     const g = gain('netProfitMargin', target)
+     if (g > 0.3) pushCandidate('netProfitMargin', 'Net Kar Marjı', 'Karlılık', npm, target, 'pct', 'up', g, `Net kar marjını ${fmtVal(npm, 'pct')}'dan ${fmtVal(target, 'pct')}'a çıkarın. ① Faaliyet giderlerini kalem kalem analiz edin; %10 gider azaltması doğrudan kâra yansır. ② Fiyat listesini gözden geçirin — satış hacmini düşürmeden yapılabiliyorsa fiyat artışı öncelikli. ③ Yüksek faizli kredileri refinanse edin; faiz gideri azalınca net kâr otomatik artar.`)
+   }
+ 
+-  const em = ratios.ebitdaMargin
++  const em = safeRatios.ebitdaMargin
+   if (em != null && em < 0.25) {
+     const target = Math.min(em + 0.05, 0.25)
+     const g = gain('ebitdaMargin', target)
+     if (g > 0.3) pushCandidate('ebitdaMargin', 'FAVÖK Marjı', 'Karlılık', em, target, 'pct', 'up', g, `FAVÖK marjını ${fmtVal(em, 'pct')}'dan ${fmtVal(target, 'pct')}'a çıkarın. ① Tedarikçilerle fiyat müzakeresi yapın veya alternatif tedarik kaynağı arayın — hammadde maliyeti düşerse FAVÖK doğrudan artar. ② Kira, personel, enerji giderlerini gözden geçirin; verimsiz alanları kapatın veya kiraya verin. ③ Düşük marjlı müşteri/ürün grubunu yeniden fiyatlandırın ya da ürün karmasından çıkarın.`)
+   }
+ 
+-  const gm = ratios.grossMargin
++  const gm = safeRatios.grossMargin
+   if (gm != null && gm < 0.45) {
+     const target = Math.min(gm + 0.06, 0.45)
+     const g = gain('grossMargin', target)
+     if (g > 0.3) pushCandidate('grossMargin', 'Brüt Kar Marjı', 'Karlılık', gm, target, 'pct', 'up', g, `Brüt marjı ${fmtVal(gm, 'pct')}'dan ${fmtVal(target, 'pct')}'a artırın. ① Toplu alım veya uzun vadeli tedarik sözleşmesiyle hammadde maliyetini indirin. ② Maliyet bazlı fiyatlandırma yerine değer bazlı model deneyin — rakip analizi yapın. ③ Yüksek marjlı ürün/hizmetlere satış ağırlığını kaydırın; düşük marjlı kalemler için fiyat artışı yapın.`)
+   }
+ 
+-  const roa = ratios.roa
++  const roa = safeRatios.roa
+   if (roa != null && roa < 0.15) {
+     const target = Math.min(roa + 0.04, 0.15)
+     const g = gain('roa', target)
+     if (g > 0.3) pushCandidate('roa', 'Aktif Karlılığı (ROA)', 'Karlılık', roa, target, 'pct', 'up', g, `ROA'yı ${fmtVal(roa, 'pct')}'dan ${fmtVal(target, 'pct')}'a çıkarın. ① Atıl makine, taşıt veya gayrimenkul satın ya da kiraya verin — aktif küçülürse aynı kârla oran artar. ② Aynı varlık tabanıyla satış hacmini artırın; kapasite kullanım oranını yükseltin. ③ Net kârı artırmak için yukarıdaki gelir/gider aksiyonlarını paralel uygulayın.`)
+   }
+ 
+-  const dte = ratios.debtToEquity
++  const dte = safeRatios.debtToEquity
+   if (dte != null && dte > 0.4) {
+     const target = Math.max(dte * 0.65, 0.3)
+     const g = gain('debtToEquity', target)
+     if (g > 0.3) pushCandidate('debtToEquity', 'Borç/Özkaynak', 'Kaldıraç', dte, target, 'x', 'down', g, `Borç/özkaynak oranını ${fmtVal(dte, 'x')}'den ${fmtVal(target, 'x')}'e indirin. ① Kâr dağıtmayı durdurun; birikmiş kârı özkaynakta tutun — her yıl dağıtılmayan kâr oranı düşürür. ② Ortak veya yeni hissedar aracılığıyla sermaye artışı yapın. ③ Mevcut kredileri erken kapatın; yeni kredi almaktan kaçının.`)
+   }
+ 
+-  const dta = ratios.debtToAssets
++  const dta = safeRatios.debtToAssets
+   if (dta != null && dta > 0.25) {
+     const target = Math.max(dta * 0.65, 0.2)
+     const g = gain('debtToAssets', target)
+     if (g > 0.3) pushCandidate('debtToAssets', 'Borç/Aktif', 'Kaldıraç', dta, target, 'ratio', 'down', g, `Borç/aktif oranını ${fmtVal(dta, 'ratio')}'den ${fmtVal(target, 'ratio')}'e indirin. ① Toplam borcu azaltın: yeni kredi kullanmayın, mevcut borçları öncelikli kapatın. ② Kâr birikimi veya sermaye artışıyla özkaynak tarafını güçlendirin — aktif tabanı büyüdükçe oran düşer. ③ Yüksek faizli kısa vadeli kredi yerine düşük faizli uzun vadeli kaynak kullanın.`)
+   }
+ 
+-  const ic = ratios.interestCoverage
++  const ic = safeRatios.interestCoverage
+   if (ic != null && ic < 8) {
+     const target = Math.min(ic * 1.5, 8)
+     const g = gain('interestCoverage', target)
+     if (g > 0.3) pushCandidate('interestCoverage', 'Faiz Karşılama', 'Kaldıraç', ic, target, 'x', 'up', g, `Faiz karşılama oranını ${fmtVal(ic, 'x')}'den ${fmtVal(target, 'x')}'e çıkarın. ① Yüksek faizli kredileri daha düşük maliyetli finansmanla değiştirin; bankayla faiz indirimi müzakeresi yapın. ② FAVÖK'ü artırın — daha fazla nakit faiz yükünü karşılar. ③ Kullanılmayan kredi limitlerini kapatın; gereksiz finansman maliyetini sıfırlayın.`)
+   }
+ 
+-  const rec = ratios.receivablesTurnoverDays
++  const rec = safeRatios.receivablesTurnoverDays
+   if (rec != null && rec > 20) {
+     const target = Math.max(rec * 0.65, 20)
+     const g = gain('receivablesTurnoverDays', target)
+     if (g > 0.3) pushCandidate('receivablesTurnoverDays', 'Alacak Tahsil Süresi', 'Faaliyet', rec, target, 'day', 'down', g, `Alacak tahsil süresini ${fmtVal(rec, 'day')}'den ${fmtVal(target, 'day')}'e kısaltın. ① Vadesi geçmiş alacaklar için hukuki ihtar gönderin; gecikme faizi uygulayın. ② Erken ödeme yapan müşterilere %1-2 iskonto tanımlayın. ③ Yeni müşterilerde azami 30 gün vade politikası uygulayın; büyük siparişlerde avans isteyin.`)
+   }
+ 
+-  const inv = ratios.inventoryTurnoverDays
++  const inv = safeRatios.inventoryTurnoverDays
+   if (inv != null && inv > 15) {
+     const target = Math.max(inv * 0.65, 15)
+     const g = gain('inventoryTurnoverDays', target)
+     if (g > 0.3) pushCandidate('inventoryTurnoverDays', 'Stok Devir Süresi', 'Faaliyet', inv, target, 'day', 'down', g, `Stok devir süresini ${fmtVal(inv, 'day')}'den ${fmtVal(target, 'day')}'e indirin. ① ABC analizi yapın: yavaş dönen C grubu ürünleri indirimli satışa çıkarın. ② Minimum stok seviyeleri belirleyin; talep tahminine göre sipariş verin (just-in-time). ③ Bozulma veya demode riski taşıyan stokları elden çıkarın — nakit yaratın.`)
+   }
+ 
+-  const at = ratios.assetTurnover
++  const at = safeRatios.assetTurnover
+   if (at != null && at < 2.0) {
+     const target = Math.min(at * 1.35, 2.0)
+     const g = gain('assetTurnover', target)
+@@ -301,25 +302,25 @@ export function findOptimalPath(
+     if (suggestions.length >= 5) break
+   }
+ 
+-  const idealBase = simulatePlan(ratios, suggestions, currentScore, baseFinancialScore, targetScore, sector)
++  const idealBase = simulatePlan(safeRatios, suggestions, currentScore, baseFinancialScore, targetScore, sector)
+ 
+   const minimumSuggestions: RatioSuggestion[] = []
+   for (const suggestion of suggestions) {
+     minimumSuggestions.push(suggestion)
+-    const plan = simulatePlan(ratios, minimumSuggestions, currentScore, baseFinancialScore, targetScore, sector)
++    const plan = simulatePlan(safeRatios, minimumSuggestions, currentScore, baseFinancialScore, targetScore, sector)
+     if (plan.projectedScore >= targetScore) break
+   }
+ 
+   for (let i = minimumSuggestions.length - 1; i >= 0; i -= 1) {
+     const testSuggestions = minimumSuggestions.filter((_, index) => index !== i)
+     if (testSuggestions.length === 0) continue
+-    const testPlan = simulatePlan(ratios, testSuggestions, currentScore, baseFinancialScore, targetScore, sector)
++    const testPlan = simulatePlan(safeRatios, testSuggestions, currentScore, baseFinancialScore, targetScore, sector)
+     if (testPlan.projectedScore >= targetScore) {
+       minimumSuggestions.splice(i, 1)
+     }
+   }
+ 
+-  const minimumBase = simulatePlan(ratios, minimumSuggestions, currentScore, baseFinancialScore, targetScore, sector)
++  const minimumBase = simulatePlan(safeRatios, minimumSuggestions, currentScore, baseFinancialScore, targetScore, sector)
+ 
+   return {
+     currentRating,
+@@ -343,4 +344,3 @@ export function findOptimalPath(
+     },
+   }
+ }
+-
+diff --git a/app/src/lib/scoring/score.ts b/app/src/lib/scoring/score.ts
+index cd08fd3..d7b873e 100644
+--- a/app/src/lib/scoring/score.ts
++++ b/app/src/lib/scoring/score.ts
+@@ -205,7 +205,7 @@ function clamp(v: number): number {
+ // ─── LİKİDİTE ─────────────────────────────────────────────────────────────
+ // Sektöre bağımlı metrikler (BM_HEAVY): cari, hızlı, nakit oran
+ // Mutlak bazlı: NÇS/Aktif, NDS (benchmark yok)
+-function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
++function calcLiquidity(r: Partial<RatioResult>, bm: SectorBenchmark | null): { score: number; coverage: number } {
+   return weightedAvgCov([
+     // Cari Oran — sektöre göre yorumlanır (BM_HEAVY)
+     [hybridMetricScore(r.currentRatio,
+@@ -242,7 +242,7 @@ function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: num
+ // ─── KARLILIK ─────────────────────────────────────────────────────────────
+ // FAVÖK, net kar, ROA, ROE → sektöre bağımlı (BM_HEAVY), ama mutlak sıfır eşiği kritik
+ // Brüt kar, FVÖK, ROIC → dengeli (DEFAULT)
+-function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
++function calcProfitability(r: Partial<RatioResult>, bm: SectorBenchmark | null): { score: number; coverage: number } {
+   // Büyüme: en iyi mevcut metriği seç
+   const growthScore = r.realGrowth != null
+     ? linearScore(r.realGrowth,    -0.20, 0.20, false, 0.08)
+@@ -300,7 +300,7 @@ function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score:
+ // ─── KALDIRAC ─────────────────────────────────────────────────────────────
+ // D/E, D/A, faiz karşılama → sektörden bağımsız (ABS_HEAVY)
+ // Özkaynak oranı → dengeli
+-function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
++function calcLeverage(r: Partial<RatioResult>, bm: SectorBenchmark | null): { score: number; coverage: number } {
+   const items: [number | null, number][] = [
+     // Borç / Özkaynak — ABS_HEAVY (sektörden bağımsız risk kriteri)
+     [hybridMetricScore(r.debtToEquity,
+@@ -357,7 +357,7 @@ function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: numb
+ // ─── FAALİYET ─────────────────────────────────────────────────────────────
+ // DSO, DIO, aktif devir, faaliyet gideri oranı → sektöre bağımlı (BM_HEAVY)
+ // Duran varlık devir, DPO → dengeli (benchmark eksik veya sektör bağımsız)
+-function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
++function calcActivity(r: Partial<RatioResult>, bm: SectorBenchmark | null): { score: number; coverage: number } {
+   return weightedAvgCov([
+     // Aktif Devir Hızı — sektöre bağımlı
+     [hybridMetricScore(r.assetTurnover,
+@@ -415,7 +415,7 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
+  */
+ function applyFloorCap(
+   liq: number, prof: number, lev: number, act: number,
+-  r: RatioResult,
++  r: Partial<RatioResult>,
+ ): { liq: number; prof: number; lev: number; act: number; cap?: number } {
+   let liqAdj = liq
+   let levAdj = lev
+@@ -451,21 +451,22 @@ function applyFloorCap(
+ }
+ 
+ // ─── ANA FONKSİYON ────────────────────────────────────────────────────────
+-export function calculateScore(ratios: RatioResult, sector?: string | null): ScoringResult {
++export function calculateScore(ratios: RatioResult | null | undefined, sector?: string | null): ScoringResult {
++  const safeRatios: Partial<RatioResult> = ratios ?? {}
+   const bm = sector ? getSectorBenchmark(sector) : null
+   const w  = getSectorWeights(sector)   // sektöre özgü ağırlık profili
+ 
+-  const liqResult  = calcLiquidity(ratios, bm)
+-  const profResult = calcProfitability(ratios, bm)
+-  const levResult  = calcLeverage(ratios, bm)
+-  const actResult  = calcActivity(ratios, bm)
++  const liqResult  = calcLiquidity(safeRatios, bm)
++  const profResult = calcProfitability(safeRatios, bm)
++  const levResult  = calcLeverage(safeRatios, bm)
++  const actResult  = calcActivity(safeRatios, bm)
+ 
+   const rawLiq  = clamp(liqResult.score)
+   const rawProf = clamp(profResult.score)
+   const rawLev  = clamp(levResult.score)
+   const rawAct  = clamp(actResult.score)
+ 
+-  const { liq, prof, lev, act, cap } = applyFloorCap(rawLiq, rawProf, rawLev, rawAct, ratios)
++  const { liq, prof, lev, act, cap } = applyFloorCap(rawLiq, rawProf, rawLev, rawAct, safeRatios)
+ 
+   let final = clamp(liq * w.liquidity + prof * w.profitability + lev * w.leverage + act * w.activity)
+   if (cap !== undefined) final = Math.min(final, cap)
+@@ -492,3 +493,4 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
+     overallCoverage:       Math.round(overallCoverage * 100) / 100,
+   }
+ }
++

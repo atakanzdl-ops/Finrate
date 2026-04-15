@@ -4,7 +4,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import type { OptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 
-type Difficulty = 'medium' | 'hard'
+type Difficulty = 'medium' | 'hard' | 'ORTA' | 'ZOR' | 'KOLAY'
 type MetricUnit = 'pct' | 'x' | 'day' | 'ratio'
 
 interface PdfSuggestion {
