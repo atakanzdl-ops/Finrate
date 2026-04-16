@@ -343,7 +343,7 @@ function parsePdfMizan(text: string): ParsedRow[] {
 
   const endMonth = parseInt(dateMatch[5])
   const year     = parseInt(dateMatch[6])
-  const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
+  const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'Q4'
 
   const fields: Record<string, number | null> = {}
 

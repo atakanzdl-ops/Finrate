@@ -22,7 +22,7 @@ interface Group {
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  STANDALONE: 'Bağımsız', PARENT: 'Ana', SUBSIDIARY: 'Bağlı', JV: 'OG',
+  STANDALONE: 'Bağımsız', PARENT: 'Ana', SUBSIDIARY: 'Bağlı', JV: 'Grup Şirketi',
 }
 
 export default function GruplarPage() {

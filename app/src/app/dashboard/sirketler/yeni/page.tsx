@@ -10,7 +10,7 @@ const ENTITY_TYPES = [
   { value: 'STANDALONE', label: 'Bağımsız Şirket' },
   { value: 'PARENT',     label: 'Ana Şirket' },
   { value: 'SUBSIDIARY', label: 'Bağlı Ortaklık' },
-  { value: 'JV',         label: 'Ortak Girişim (JV)' },
+  { value: 'JV',         label: 'Grup Şirketi' },
 ]
 
 const SECTORS = [
@@ -53,97 +53,109 @@ export default function YeniSirketPage() {
 
   return (
     <DashboardShell>
-    <div className="max-w-lg space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/sirketler" className="text-white/40 hover:text-white transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-white">Yeni Şirket</h1>
-          <p className="text-white/50 text-sm">Şirket bilgilerini girin</p>
-        </div>
-      </div>
+      <div className="max-w-lg space-y-6">
 
-      <form onSubmit={handleSubmit} className="glass-card rounded-xl p-6 space-y-4">
-        {/* Ad */}
-        <div>
-          <label className="block text-xs font-medium text-white/60 mb-1.5">
-            Şirket Adı <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => set('name', e.target.value)}
-            placeholder="Örn: ABC Tekstil A.Ş."
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50"
-          />
-        </div>
-
-        {/* VKN */}
-        <div>
-          <label className="block text-xs font-medium text-white/60 mb-1.5">
-            Vergi Kimlik No
-          </label>
-          <input
-            type="text"
-            value={form.taxNumber}
-            onChange={(e) => set('taxNumber', e.target.value)}
-            placeholder="10 haneli VKN"
-            maxLength={11}
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50"
-          />
-        </div>
-
-        {/* Sektör */}
-        <div>
-          <label className="block text-xs font-medium text-white/60 mb-1.5">Sektör</label>
-          <select
-            value={form.sector}
-            onChange={(e) => set('sector', e.target.value)}
-            className="w-full px-3 py-2.5 bg-[#0a1628] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50 [&>option]:bg-[#0a1628] [&>option]:text-white"
+        {/* Başlık */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/sirketler"
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-[#5A7A96] hover:text-[#0B3C5D]"
           >
-            <option value="">— Seçiniz —</option>
-            {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-[#0B3C5D]">Yeni Şirket</h1>
+            <p className="text-sm text-gray-500">Şirket bilgilerini girin</p>
+          </div>
         </div>
 
-        {/* Tip */}
-        <div>
-          <label className="block text-xs font-medium text-white/60 mb-1.5">Şirket Tipi</label>
-          <div className="grid grid-cols-2 gap-2">
-            {ENTITY_TYPES.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => set('entityType', value)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium text-left transition-all border ${
-                  form.entityType === value
-                    ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
-                    : 'border-white/10 bg-white/5 text-white/60 hover:text-white'
-                }`}
+        {/* Form kartı */}
+        <div className="glass-card rounded-xl p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Şirket Adı */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                Şirket Adı <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+                placeholder="Örn: ABC Tekstil A.Ş."
+                className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500 transition-colors"
+              />
+            </div>
+
+            {/* Vergi Kimlik No */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                Vergi Kimlik No
+              </label>
+              <input
+                type="text"
+                value={form.taxNumber}
+                onChange={(e) => set('taxNumber', e.target.value)}
+                placeholder="10 haneli VKN"
+                maxLength={11}
+                className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500 transition-colors"
+              />
+            </div>
+
+            {/* Sektör */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Sektör</label>
+              <select
+                value={form.sector}
+                onChange={(e) => set('sector', e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500 transition-colors"
               >
-                {label}
-              </button>
-            ))}
-          </div>
+                <option value="">— Seçiniz —</option>
+                {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            {/* Şirket Tipi */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Şirket Tipi</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ENTITY_TYPES.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => set('entityType', value)}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-medium text-left transition-all border ${
+                      form.entityType === value
+                        ? 'border-cyan-500 bg-cyan-50 text-[#0B3C5D]'
+                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-[#0B3C5D]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hata */}
+            {error && (
+              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            {/* Gönder */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-[#0B3C5D] hover:bg-[#0a3354] rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            >
+              {loading && <Loader2 size={16} className="animate-spin" />}
+              Şirket Oluştur
+            </button>
+          </form>
         </div>
 
-        {error && (
-          <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2.5 btn-gradient rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {loading && <Loader2 size={16} className="animate-spin" />}
-          Şirket Oluştur
-        </button>
-      </form>
-    </div>
+      </div>
     </DashboardShell>
   )
 }

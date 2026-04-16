@@ -29,7 +29,7 @@ interface AllEntity {
 const ENTITY_TYPES = [
   { value: 'PARENT',     label: 'Ana Şirket' },
   { value: 'SUBSIDIARY', label: 'Bağlı Ortaklık' },
-  { value: 'JV',         label: 'Ortak Girişim' },
+  { value: 'JV',         label: 'Grup Şirketi' },
 ]
 
 export default function GrupDetayPage({ params }: { params: Promise<{ id: string }> }) {
@@ -161,7 +161,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   {e.sector && <p className="text-xs text-white/30 mt-0.5">{e.sector}</p>}
                 </div>
                 <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-white/50">
-                  {e.entityType === 'PARENT' ? 'Ana' : e.entityType === 'JV' ? 'OG' : 'Bağlı'}
+                  {e.entityType === 'PARENT' ? 'Ana' : e.entityType === 'JV' ? 'Grup' : 'Bağlı'}
                 </span>
                 {e.ownershipPct != null && (
                   <span className="text-xs font-medium text-cyan-400">

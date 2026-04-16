@@ -353,21 +353,32 @@ function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<s
 }
 
 function extractMizanYear(rows: unknown[][]): { year: number | null; period: string } {
+  // Birden fazla tarih aralığı olabilir (karşılaştırmalı dönem + cari dönem).
+  // Tüm aralıkları topla, en son olanı (en büyük endYear * 100 + endMonth) döndür.
+  const candidates: { year: number; month: number }[] = []
+
   for (let i = 0; i < Math.min(6, rows.length); i++) {
-    for (const cell of rows[i] as (unknown)[]) {
+    for (const cell of rows[i] as unknown[]) {
       if (!cell) continue
-      const m = String(cell).match(
-        /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-–—]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/
-      )
-      if (m) {
+      const s = String(cell)
+      const re = /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-–—]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/g
+      let m: RegExpExecArray | null
+      while ((m = re.exec(s)) !== null) {
         const endMonth = parseInt(m[5])
         const endYear  = parseInt(m[6])
-        const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
-        return { year: endYear, period }
+        candidates.push({ year: endYear, month: endMonth })
       }
     }
   }
-  return { year: null, period: 'ANNUAL' }
+
+  if (candidates.length === 0) return { year: null, period: 'ANNUAL' }
+
+  // En son tarihi seç (endYear * 100 + endMonth maksimum)
+  const latest = candidates.reduce((best, c) =>
+    c.year * 100 + c.month > best.year * 100 + best.month ? c : best
+  )
+  const period = latest.month <= 3 ? 'Q1' : latest.month <= 6 ? 'Q2' : latest.month <= 9 ? 'Q3' : 'Q4'
+  return { year: latest.year, period }
 }
 
 // ─── Mizan satır eşlemesi ─────────────────────────────────────────────────────
