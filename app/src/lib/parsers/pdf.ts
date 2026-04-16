@@ -133,27 +133,45 @@ type EkSection = 'donen' | 'duran' | 'kv' | 'uv' | 'oz' | 'gelir' | null
 
 function detectEkSection(line: string): EkSection | null {
   const n = norm(line)
-  if (/^i[\s.]\s*donen\s*varlik/.test(n))  return 'donen'
-  if (/^ii[\s.]\s*duran\s*varlik/.test(n)) return 'duran'
-  if (/^iii[\s.]\s*kisa\s*vadeli/.test(n)) return 'kv'
-  if (/^iv[\s.]\s*uzun\s*vadeli/.test(n))  return 'uv'
-  if (/^v[\s.]\s*oz\s*(kaynak|serma)/.test(n)) return 'oz'
+  // [\s.\-] — nokta, boşluk veya tire ile ayrılmış (KVB PDF çeşitleri)
+  if (/^i[\s.\-]\s*donen\s*varlik/.test(n))  return 'donen'
+  if (/^ii[\s.\-]\s*duran\s*varlik/.test(n)) return 'duran'
+  if (/^iii[\s.\-]\s*kisa\s*vadeli/.test(n)) return 'kv'
+  if (/^iv[\s.\-]\s*uzun\s*vadeli/.test(n))  return 'uv'
+  if (/^v[\s.\-]\s*oz\s*(kaynak|serma)/.test(n)) return 'oz'
+  // Bilanço bölüm etiketleri olmadan sadece "dönen varlıklar" geçen satırlar
+  if (/donen\s*varlik/.test(n) && !/toplam/.test(n) && n.length < 60) return 'donen'
+  if (/duran\s*varlik/.test(n) && !/toplam/.test(n) && n.length < 60) return 'duran'
+  if (/kisa\s*vadeli\s*yabanci/.test(n) && !/toplam/.test(n))         return 'kv'
+  if (/uzun\s*vadeli\s*yabanci/.test(n) && !/toplam/.test(n))         return 'uv'
+  if (/oz\s*kaynak/.test(n) && !/toplam/.test(n) && n.length < 60)    return 'oz'
   if (n.includes('gelir tablosu'))          return 'gelir'
   return null
 }
 
 function matchBilField(label: string, sec: EkSection): string | null {
   const n = norm(label)
+  // KVB PDF'lerinde hem "A." hem "A-" hem "A " prefix'i kullanılabilir
+  // ^a[\s.\-] tüm varyantları yakalar
+  const PFXA = /^a[\s.\-]\s*/
+  const PFXB = /^b[\s.\-]\s*/
+  const PFXC = /^c[\s.\-]\s*/
+  const PFXD = /^d[\s.\-]\s*/
+  const PFXE = /^e[\s.\-]\s*/
+  const PFXF = /^f[\s.\-]\s*/
+  const PFXG = /^g[\s.\-]\s*/
+  const PFXH = /^h[\s.\-]\s*/
+  const PFXI = /^i[\s.\-]\s*/
 
   if (sec === 'donen') {
-    if (/^a[\s.]\s*hazir/.test(n))         return 'cash'
-    if (/^b[\s.]\s*menkul/.test(n))        return 'shortTermInvestments'
-    if (/^c[\s.]\s*ticari\s*alacak/.test(n)) return 'tradeReceivables'
-    if (/^d[\s.]\s*diger\s*alacak/.test(n)) return 'otherReceivables'
-    if (/^e[\s.]\s*stoklar/.test(n))       return 'inventory'
-    if (/^f[\s.]\s*yillara\s*yaygin/.test(n)) return 'constructionCosts'
-    if (/^g[\s.]\s*gelecek\s*ay/.test(n))  return 'prepaidExpenses'
-    if (/^h[\s.]\s*diger\s*donen/.test(n)) return 'otherCurrentAssets'
+    if (PFXA.test(n) && /hazir/.test(n))          return 'cash'
+    if (PFXB.test(n) && /menkul/.test(n))          return 'shortTermInvestments'
+    if (PFXC.test(n) && /ticari\s*alacak/.test(n)) return 'tradeReceivables'
+    if (PFXD.test(n) && /diger\s*alacak/.test(n))  return 'otherReceivables'
+    if (PFXE.test(n) && /stoklar/.test(n))         return 'inventory'
+    if (PFXF.test(n) && /yillara\s*yaygin/.test(n)) return 'constructionCosts'
+    if (PFXG.test(n) && /gelecek\s*ay/.test(n))    return 'prepaidExpenses'
+    if (PFXH.test(n) && /diger\s*donen/.test(n))   return 'otherCurrentAssets'
     if (n.includes('hazir deger') || n.includes('nakit')) return 'cash'
     if (n.includes('ticari alacak'))        return 'tradeReceivables'
     if (n.includes('stoklar'))              return 'inventory'
@@ -163,14 +181,14 @@ function matchBilField(label: string, sec: EkSection): string | null {
   }
 
   if (sec === 'duran') {
-    if (/^a[\s.]\s*ticari\s*alacak/.test(n)) return 'longTermTradeReceivables'
-    if (/^b[\s.]\s*diger\s*alacak/.test(n))  return 'longTermOtherReceivables'
-    if (/^c[\s.]\s*mali\s*duran/.test(n))    return 'longTermInvestments'
-    if (/^d[\s.]\s*maddi\s*duran/.test(n))   return 'tangibleAssets'
-    if (/^e[\s.]\s*maddi\s*olmayan/.test(n)) return 'intangibleAssets'
-    if (/^f[\s.]\s*ozel\s*tukenmeye/.test(n)) return 'depletableAssets'
-    if (/^g[\s.]\s*gelecek\s*yil/.test(n))   return 'longTermPrepaidExpenses'
-    if (/^h[\s.]\s*diger\s*duran/.test(n))   return 'otherNonCurrentAssets'
+    if (PFXA.test(n) && /ticari\s*alacak/.test(n)) return 'longTermTradeReceivables'
+    if (PFXB.test(n) && /diger\s*alacak/.test(n))  return 'longTermOtherReceivables'
+    if (PFXC.test(n) && /mali\s*duran/.test(n))    return 'longTermInvestments'
+    if (PFXD.test(n) && /maddi\s*duran/.test(n))   return 'tangibleAssets'
+    if (PFXE.test(n) && /maddi\s*olmayan/.test(n)) return 'intangibleAssets'
+    if (PFXF.test(n) && /ozel\s*tukenmeye/.test(n)) return 'depletableAssets'
+    if (PFXG.test(n) && /gelecek\s*yil/.test(n))   return 'longTermPrepaidExpenses'
+    if (PFXH.test(n) && /diger\s*duran/.test(n))   return 'otherNonCurrentAssets'
     if (n.includes('maddi duran'))    return 'tangibleAssets'
     if (n.includes('maddi olmayan'))  return 'intangibleAssets'
     if (n.includes('mali duran'))     return 'longTermInvestments'
@@ -179,15 +197,15 @@ function matchBilField(label: string, sec: EkSection): string | null {
   }
 
   if (sec === 'kv') {
-    if (/^a[\s.]\s*mali\s*bor/.test(n))         return 'shortTermFinancialDebt'
-    if (/^b[\s.]\s*ticari\s*bor/.test(n))        return 'tradePayables'
-    if (/^c[\s.]\s*diger\s*bor/.test(n))         return 'otherShortTermPayables'
-    if (/^d[\s.]\s*alinan\s*avans/.test(n))      return 'advancesReceived'
-    if (/^e[\s.]\s*yillara\s*yaygin/.test(n))    return 'constructionProgress'
-    if (/^f[\s.]\s*odenecek\s*vergi/.test(n))    return 'taxPayables'
-    if (/^g[\s.]\s*bor.?\s*ve\s*gider/.test(n))  return 'shortTermProvisions'
-    if (/^h[\s.]\s*gelecek\s*ay.*gelir/.test(n)) return 'deferredRevenue'
-    if (/^[i][\s.]\s*diger/.test(n))             return 'otherCurrentLiabilities'
+    if (PFXA.test(n) && /mali\s*bor/.test(n))         return 'shortTermFinancialDebt'
+    if (PFXB.test(n) && /ticari\s*bor/.test(n))        return 'tradePayables'
+    if (PFXC.test(n) && /diger\s*bor/.test(n))         return 'otherShortTermPayables'
+    if (PFXD.test(n) && /alinan\s*avans/.test(n))      return 'advancesReceived'
+    if (PFXE.test(n) && /yillara\s*yaygin/.test(n))    return 'constructionProgress'
+    if (PFXF.test(n) && /odenecek\s*vergi/.test(n))    return 'taxPayables'
+    if (PFXG.test(n) && /bor.?\s*ve\s*gider/.test(n))  return 'shortTermProvisions'
+    if (PFXH.test(n) && /gelecek\s*ay.*gelir/.test(n)) return 'deferredRevenue'
+    if (PFXI.test(n) && /diger/.test(n))               return 'otherCurrentLiabilities'
     if (n.includes('mali bor'))           return 'shortTermFinancialDebt'
     if (n.includes('ticari bor') && !n.includes('uzun')) return 'tradePayables'
     if (n.includes('diger bor') && !n.includes('uzun'))  return 'otherShortTermPayables'
@@ -197,24 +215,24 @@ function matchBilField(label: string, sec: EkSection): string | null {
   }
 
   if (sec === 'uv') {
-    if (/^a[\s.]\s*mali\s*bor/.test(n))        return 'longTermFinancialDebt'
-    if (/^b[\s.]\s*ticari\s*bor/.test(n))       return 'longTermTradePayables'
-    if (/^c[\s.]\s*diger\s*bor/.test(n))        return 'longTermOtherPayables'
-    if (/^d[\s.]\s*alinan\s*avans/.test(n))     return 'longTermAdvancesReceived'
-    if (/^g[\s.]\s*bor.?\s*ve\s*gider/.test(n)) return 'longTermProvisions'
-    if (/^[i][\s.]\s*diger/.test(n))            return 'otherNonCurrentLiabilities'
+    if (PFXA.test(n) && /mali\s*bor/.test(n))        return 'longTermFinancialDebt'
+    if (PFXB.test(n) && /ticari\s*bor/.test(n))       return 'longTermTradePayables'
+    if (PFXC.test(n) && /diger\s*bor/.test(n))        return 'longTermOtherPayables'
+    if (PFXD.test(n) && /alinan\s*avans/.test(n))     return 'longTermAdvancesReceived'
+    if (PFXG.test(n) && /bor.?\s*ve\s*gider/.test(n)) return 'longTermProvisions'
+    if (PFXI.test(n) && /diger/.test(n))              return 'otherNonCurrentLiabilities'
     if (n.includes('mali bor'))          return 'longTermFinancialDebt'
     if (n.includes('diger bor'))         return 'longTermOtherPayables'
     if (n.includes('alinan avans'))      return 'longTermAdvancesReceived'
   }
 
   if (sec === 'oz') {
-    if (/^a[\s.]\s*odenmis\s*sermaye/.test(n))      return 'paidInCapital'
-    if (/^b[\s.]\s*sermaye\s*yedeg/.test(n))        return 'capitalReserves'
-    if (/^c[\s.]\s*kar\s*yedeg/.test(n))            return 'profitReserves'
-    if (/^d[\s.]\s*gecmis\s*yil.*kar/.test(n))      return 'retainedEarnings'
-    if (/^e[\s.]\s*gecmis\s*yil.*zarar/.test(n))    return 'retainedLosses'
-    if (/^f[\s.]\s*donem\s*net\s*kar/.test(n))      return 'netProfitCurrentYear'
+    if (PFXA.test(n) && /odenmis\s*sermaye/.test(n))    return 'paidInCapital'
+    if (PFXB.test(n) && /sermaye\s*yedeg/.test(n))      return 'capitalReserves'
+    if (PFXC.test(n) && /kar\s*yedeg/.test(n))          return 'profitReserves'
+    if (PFXD.test(n) && /gecmis\s*yil.*kar/.test(n))    return 'retainedEarnings'
+    if (PFXE.test(n) && /gecmis\s*yil.*zarar/.test(n))  return 'retainedLosses'
+    if (PFXF.test(n) && /donem\s*net\s*kar/.test(n))    return 'netProfitCurrentYear'
     if (n.includes('odenmis sermaye'))   return 'paidInCapital'
     if (n.includes('sermaye yedeg'))     return 'capitalReserves'
     if (n.includes('kar yedeg'))         return 'profitReserves'
@@ -468,12 +486,26 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
   // 4) Kurumlar Vergisi Yıllık (1010)
   if (type === 'kurumlar_yillik') {
     const taxFields = parseTaxForm(text)
-    const ekIdx = findNormIdx(text, 'tek duzen hesap plani')
-    if (ekIdx !== -1) {
-      const raw = parseEkSection(text.slice(ekIdx, ekIdx + 20000))
-      const hasTwoColumns = Object.keys(raw.onceki).length > 0
-      const cariData = hasTwoColumns ? raw.onceki : raw.cari
-      return [{ year, period: 'ANNUAL', fields: { ...cariData, ...taxFields }, unmapped: [] }]
+
+    // Bilanço + gelir tablosu başlangıç noktalarını ayrı ayrı bul
+    let bilIdx = findNormIdx(text, 'tek duzen hesap planina uygun bilanco')
+    if (bilIdx === -1) bilIdx = findNormIdx(text, 'tek duzen hesap plani')
+    const gelirIdx = findNormIdx(text, 'tek duzen hesap planina uygun gelir tablosu')
+
+    if (bilIdx !== -1) {
+      const bilEnd = gelirIdx !== -1 && gelirIdx > bilIdx ? gelirIdx : bilIdx + 12000
+      const bilRaw = parseEkSection(text.slice(bilIdx, bilEnd))
+      const bilHasTwoCols = Object.keys(bilRaw.onceki).length > 0
+      const bilData = bilHasTwoCols ? bilRaw.onceki : bilRaw.cari
+
+      let gelData: Record<string, number> = {}
+      if (gelirIdx !== -1) {
+        const gelRaw = parseEkSection(text.slice(gelirIdx, gelirIdx + 8000))
+        const gelHasTwoCols = Object.keys(gelRaw.onceki).length > 0
+        gelData = gelHasTwoCols ? gelRaw.onceki : gelRaw.cari
+      }
+
+      return [{ year, period: 'ANNUAL', fields: { ...bilData, ...gelData, ...taxFields }, unmapped: [] }]
     }
     return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [] }]
   }
@@ -481,15 +513,63 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
   // 5) Kurumlar Geçici Vergi (1032-KV)
   if (type === 'kurumlar_gecici') {
     const taxFields = parseTaxForm(text)
-    const gelirIdx  = findNormIdx(text, 'tek duzen hesap planina uygun gelir tablosu')
-    if (gelirIdx !== -1) {
-      const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
-      const hasTwoColumns = Object.keys(raw.onceki).length > 0
-      const cariData = hasTwoColumns ? raw.onceki : raw.cari
-      // Geçici vergide taxExpense gelir tablosu kalemi değil
-      const { taxExpense: _t, ...taxNoTax } = taxFields
-      return [{ year, period, fields: { ...cariData, ...taxNoTax }, unmapped: [] }]
+    const { taxExpense: _t, ...taxNoTax } = taxFields
+
+    // ── Bilanço bölümünü bul ─────────────────────────────────
+    // KVB PDF'inde bilanço gelir tablosundan ÖNCE gelir, ayrı parse et.
+    let bilIdx = findNormIdx(text, 'tek duzen hesap planina uygun bilanco')
+    if (bilIdx === -1) bilIdx = findNormIdx(text, 'hesap planina gore bilanco')
+    if (bilIdx === -1) bilIdx = findNormIdx(text, 'hesap planina uygun bilanco')
+    // Bilanço başlığı bulunamazsa, TDHP bölüm başlığı "I. DONEN VARLIK" üzerinden bul
+    if (bilIdx === -1) {
+      const donenIdx = norm(text).indexOf('i. donen varlik')
+      if (donenIdx > 0) bilIdx = Math.max(0, donenIdx - 100)
     }
+    if (bilIdx === -1) {
+      const donenIdx = norm(text).indexOf('i.donen varlik')
+      if (donenIdx > 0) bilIdx = Math.max(0, donenIdx - 100)
+    }
+
+    const gelirIdx = findNormIdx(text, 'tek duzen hesap planina uygun gelir tablosu')
+
+    let bilData: Record<string, number> = {}
+    let gelData: Record<string, number> = {}
+
+    // Bilanço parse: 2 sütun (önceki dönem | cari dönem) — cari = 2. sütun = onceki
+    if (bilIdx !== -1) {
+      const endIdx = gelirIdx !== -1 && gelirIdx > bilIdx ? gelirIdx : bilIdx + 12000
+      const bilRaw = parseEkSection(text.slice(bilIdx, endIdx))
+      const hasTwoCols = Object.keys(bilRaw.onceki).length > 0
+      bilData = hasTwoCols ? bilRaw.onceki : bilRaw.cari
+      console.info('[pdf] kurumlar_gecici bilanco parse', {
+        bilIdx,
+        sliceLen: endIdx - bilIdx,
+        hasTwoCols,
+        fieldCount: Object.keys(bilData).length,
+        cash: bilData.cash ?? null,
+        inventory: bilData.inventory ?? null,
+        paidInCapital: bilData.paidInCapital ?? null,
+      })
+    }
+
+    // Gelir tablosu parse: 1 sütun (cari dönem kümülatif)
+    if (gelirIdx !== -1) {
+      const gelRaw = parseEkSection(text.slice(gelirIdx, gelirIdx + 6000))
+      const hasTwoCols = Object.keys(gelRaw.onceki).length > 0
+      gelData = hasTwoCols ? gelRaw.onceki : gelRaw.cari
+      console.info('[pdf] kurumlar_gecici gelir parse', {
+        gelirIdx,
+        hasTwoCols,
+        fieldCount: Object.keys(gelData).length,
+        revenue: gelData.revenue ?? null,
+      })
+    }
+
+    if (Object.keys(bilData).length > 0 || Object.keys(gelData).length > 0) {
+      return [{ year, period, fields: { ...bilData, ...gelData, ...taxNoTax }, unmapped: [] }]
+    }
+
+    // Fallback: tüm metni parse et
     const rawFull = parseEkSection(text)
     const { taxExpense: _t2, ...taxNoTax2 } = taxFields
     if (Object.keys(rawFull.cari).length > 0) {
@@ -504,5 +584,6 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
   }
 
   // 6) Bilinmeyen: satır bazlı fallback
+  if (!year) return []
   return parseFallback(text, year, period)
 }
