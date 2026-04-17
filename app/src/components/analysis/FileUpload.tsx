@@ -18,6 +18,7 @@ interface FileEntry {
   score?: number
   error?: string
   unmapped?: string[]
+  yearMismatch?: { detected: number; saved: number } | null
 }
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -88,6 +89,7 @@ export function FileUpload({ entityId, onImported }: Props) {
         rating: first?.rating,
         score: first?.score,
         unmapped: first?.unmapped ?? [],
+        yearMismatch: first?.yearMismatch ?? null,
       })
       return true
     } catch {
@@ -183,6 +185,13 @@ export function FileUpload({ entityId, onImported }: Props) {
                     {entry.year} · {PERIOD_LABELS[entry.period] ?? entry.period} &nbsp;·&nbsp;
                     <span className="font-bold">{entry.rating}</span>
                     <span className="text-slate-400 ml-1">({entry.score?.toFixed(1)})</span>
+                  </p>
+                )}
+                {entry.status === 'done' && entry.yearMismatch && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
+                    <AlertCircle size={11} className="shrink-0" />
+                    PDF&apos;de tespit edilen yıl <strong>{entry.yearMismatch.detected}</strong>, ancak{' '}
+                    <strong>{entry.yearMismatch.saved}</strong> olarak kaydedildi. Yanlışsa kaydı silin ve doğru yılı seçin.
                   </p>
                 )}
                 {entry.status === 'error' && (

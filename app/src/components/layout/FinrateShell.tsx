@@ -7,7 +7,6 @@ import {
   Building2,
   BarChart3,
   GitBranch,
-  Scissors,
   FileText,
   Settings,
 } from 'lucide-react'
@@ -28,7 +27,6 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
     { href: '/dashboard/sirketler',   label: 'Şirketler',      icon: Building2 },
     { href: '/dashboard/analiz',      label: 'Analizler',      icon: BarChart3 },
     { href: '/dashboard/gruplar',     label: 'Gruplar',        icon: GitBranch },
-    { href: '/dashboard/tenzilat',    label: 'Tenzilat',       icon: Scissors },
     { href: '/dashboard/raporlar',    label: 'Raporlar',       icon: FileText },
   ]
 

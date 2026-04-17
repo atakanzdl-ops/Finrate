@@ -66,9 +66,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // - Tek satır veya yılsız satır varsa (PDF, yatay Excel) override uygulanır.
     const multiRowWithYears = parsedRows.length > 1 && parsedRows.every(r => r.year != null)
 
+    // Override öncesi PDF'den tespit edilen yılları sakla (mismatch uyarısı için)
+    const detectedYears: (number | null)[] = parsedRows.map(r => r.year ?? null)
+
     if (!multiRowWithYears && (overrideYear || overridePeriod)) {
-      // Hiç satır yoksa boş bir satır oluştur ÖNCE — override sonrası kaybolmasın
-      // Override yıl/dönemini uygula
       parsedRows = parsedRows.map(row => ({
         ...row,
         year:   overrideYear   ?? row.year,
@@ -129,6 +130,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Parser'ın bizzat sağladığı alanları sakla — merge sırasında sadece bunlar DB'yi ezebilir
       const parserProvidedKeys = new Set(Object.keys(f).filter(k => f[k] != null))
       const n = (v: unknown) => (v != null && !isNaN(Number(v)) ? Number(v) : null)
+
+      // Dönen sub-item çift sayım koruması:
+      // Bazı KVB PDF'lerinde "Stoklar ve Yıllara Yaygın" birleşik satırı hem inventory hem
+      // constructionCosts olarak okunabilir. Bu durumda parser totalCurrentAssets'i de
+      // yanlış (çift sayımlı) okuyabilir. Daha güvenilir referans: totalAssets - totalNonCurrentAssets.
+      if (f.inventory != null && f.constructionCosts != null) {
+        const dSum = (n(f.cash) ?? 0) + (n(f.shortTermInvestments) ?? 0) +
+          (n(f.tradeReceivables) ?? 0) + (n(f.otherReceivables) ?? 0) +
+          (n(f.inventory) ?? 0) + (n(f.constructionCosts) ?? 0) +
+          (n(f.prepaidExpenses) ?? 0) + (n(f.prepaidSuppliers) ?? 0) + (n(f.otherCurrentAssets) ?? 0)
+        // Önce totalAssets - totalNonCurrentAssets'i dene (daha güvenilir); yoksa totalCurrentAssets
+        const impliedCurrent =
+          (n(f.totalAssets) != null && n(f.totalNonCurrentAssets) != null)
+            ? Number(f.totalAssets) - Number(f.totalNonCurrentAssets)
+            : n(f.totalCurrentAssets)
+        if (impliedCurrent != null && impliedCurrent > 0) {
+          const excess = dSum - impliedCurrent
+          // Eğer fazlalık constructionCosts'a eşitse → inventory içinde zaten var
+          if (excess > 0 && Math.abs(excess - Number(f.constructionCosts)) < impliedCurrent * 0.03) {
+            f.constructionCosts = null
+            // totalCurrentAssets'i de düzelt (parser yanlış okuduysa)
+            f.totalCurrentAssets = impliedCurrent
+          }
+        }
+      }
 
       if (f.totalCurrentAssets == null) {
         const nums = [
@@ -395,6 +421,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
+      // PDF'den okunan yıl ile form override'ı farklıysa mismatch bilgisi ekle
+      const detectedYear = detectedYears[index] ?? null
+      const yearMismatch = (overrideYear && detectedYear && detectedYear !== overrideYear)
+        ? { detected: detectedYear, saved: overrideYear }
+        : null
       results.push({
         index,
         year: row.year,
@@ -403,6 +434,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         score: score.finalScore,
         unmapped: row.unmapped,
         meta: row.meta,
+        yearMismatch,
       })
     }
 

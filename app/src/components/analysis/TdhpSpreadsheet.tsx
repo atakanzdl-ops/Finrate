@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import clsx from 'clsx'
-import { Edit3, X, Loader2 } from 'lucide-react'
 
 // ─── Types ─────────────────────────────────────────────────
 type RowType = 'header' | 'account' | 'subtotal' | 'total'
@@ -19,13 +18,6 @@ interface FinData {
   year: number
   period: string
   [key: string]: number | null | string
-}
-
-interface AdjEntry {
-  id: string
-  value: number
-  originalValue: number | null
-  note?: string | null
 }
 
 interface Props {
@@ -117,8 +109,6 @@ const TDHP_ROWS: RowDef[] = [
 const PERIOD_LABEL: Record<string, string> = {
   ANNUAL: 'Kesin Beyan', Q1: '1. Geçici', Q2: '2. Geçici', Q3: '3. Geçici', Q4: '4. Geçici',
 }
-const SCENARIOS = ['Varsayilan', 'Stres Testi', 'Optimist']
-
 const CODE_W   = 44    // px — sticky kod sütun genişliği (ilk sütun)
 const LABEL_W  = 216   // px — sticky label sütun genişliği (ikinci sütun)
 
@@ -149,19 +139,9 @@ function fmtPct(v: number | null): string {
 export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   const cols = [...data].sort((a, b) => a.year - b.year || a.period.localeCompare(b.period))
 
-  // Normal mod state'leri
   const [inputStrings, setInputStrings] = useState<Record<string, Record<string, string>>>({})
   const [saving, setSaving]             = useState<Record<string, boolean>>({})
 
-  // Düzeltme modu state'leri
-  const [adjustMode,     setAdjustMode]     = useState(false)
-  const [activeScenario, setActiveScenario] = useState('Varsayilan')
-  const [adjustments,    setAdjustments]    = useState<Record<string, Record<string, AdjEntry>>>({})
-  const [adjInputs,      setAdjInputs]      = useState<Record<string, Record<string, string>>>({})
-  const [loadingAdj,     setLoadingAdj]     = useState(false)
-  const [savingAdj,      setSavingAdj]      = useState<string | null>(null)
-
-  // ── Temel değer okuma ─────────────────────────────────────
   function getStoredVal(fdId: string, field: string): number | null {
     const fd = cols.find(c => c.id === fdId)
     if (!fd) return null
@@ -175,16 +155,9 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     return nums.reduce((a, b) => a + b, 0)
   }
 
-  // ── Efektif değer hesaplama (düzeltme override'larıyla) ───
   function getEffectiveVal(fdId: string, field: string, seen = new Set<string>()): number | null {
     const key = `${fdId}:${field}`
     if (seen.has(key)) return null
-
-    // Düzeltme modu: düzeltilmiş değer varsa onu kullan (hesaplamalara yansır)
-    if (adjustMode) {
-      const adj = adjustments[fdId]?.[field]
-      if (adj !== undefined) return adj.value
-    }
 
     const stored = getStoredVal(fdId, field)
     if (stored != null) return stored
@@ -218,6 +191,8 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
         return grossProfit - operatingExpenses
       }
 
+      // Olağan Kar = ebit + 64 - 65 - 66 (olağandışı dahil DEĞİL)
+      // Stored ebt = olağan kar değeri (beyanname'den "ticari bilanço karı")
       case 'ordinaryProfit': {
         const ebit = g('ebit')
         if (ebit != null) {
@@ -228,9 +203,11 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             (g('interestExpense') ?? 0)
           )
         }
+        // Fallback: stored ebt = olağan kar (beyanname'den, olağandışı dahil değil)
         return getStoredVal(fdId, 'ebt')
       }
 
+      // Dönem Karı = Olağan Kar + 67 - 68 (her zaman hesaplanır)
       case 'donemKari': {
         const ordProfit = g('ordinaryProfit')
         if (ordProfit == null) return null
@@ -337,7 +314,6 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     }
   }
 
-  // ── Normal mod display ─────────────────────────────────────
   function getDisplayStr(fdId: string, field: string): string {
     const localStr = inputStrings[fdId]?.[field]
     if (localStr !== undefined) return localStr
@@ -377,7 +353,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     }
   }
 
-  // ── Trend hesaplama ────────────────────────────────────────
+  // ── Trend hesaplama (belirli bir field için) ────────────
   function trendCells(field: string) {
     const vals = cols.map(col => getEffectiveVal(col.id, field))
     const son2   = cols.length >= 2 ? calcPct(vals[cols.length - 2], vals[cols.length - 1]) : null
@@ -398,147 +374,9 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     )
   }
 
-  // ── Düzeltme modu fonksiyonları ────────────────────────────
-  const loadAdjustments = useCallback(async (scenario: string) => {
-    if (cols.length === 0) return
-    setLoadingAdj(true)
-    try {
-      const results = await Promise.all(
-        cols.map(col =>
-          fetch(`/api/entities/${entityId}/financial-data/${col.id}/adjustments?scenario=${encodeURIComponent(scenario)}`)
-            .then(r => r.json())
-            .then((d: { adjustments?: Array<{ id: string; fieldName: string; adjustedValue: number; originalValue: number | null; note?: string | null }> }) => ({ fdId: col.id, adjs: d.adjustments ?? [] }))
-        )
-      )
-      const map: Record<string, Record<string, AdjEntry>> = {}
-      for (const { fdId, adjs } of results) {
-        map[fdId] = {}
-        for (const adj of adjs) {
-          map[fdId][adj.fieldName] = {
-            id: adj.id,
-            value: adj.adjustedValue,
-            originalValue: adj.originalValue,
-            note: adj.note,
-          }
-        }
-      }
-      setAdjustments(map)
-    } finally {
-      setLoadingAdj(false)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityId, cols.map(c => c.id).join(',')])
-
-  async function toggleAdjustMode() {
-    if (!adjustMode) {
-      setAdjustMode(true)
-      await loadAdjustments(activeScenario)
-    } else {
-      setAdjustMode(false)
-      setAdjustments({})
-      setAdjInputs({})
-    }
-  }
-
-  async function handleScenarioChange(scenario: string) {
-    setActiveScenario(scenario)
-    setAdjInputs({})
-    if (adjustMode) await loadAdjustments(scenario)
-  }
-
-  // Düzeltme hücresi display string
-  function getAdjDisplayStr(fdId: string, field: string): string {
-    const localStr = adjInputs[fdId]?.[field]
-    if (localStr !== undefined) return localStr
-    const adj = adjustments[fdId]?.[field]
-    if (adj !== undefined) return fmtTR(adj.value)
-    const v = getStoredVal(fdId, field)
-    return v != null ? fmtTR(v) : ''
-  }
-
-  function handleAdjFocus(fdId: string, field: string, e: React.FocusEvent<HTMLInputElement>) {
-    const adj = adjustments[fdId]?.[field]
-    const raw = adj !== undefined ? fmtTR(adj.value) : (getStoredVal(fdId, field) != null ? fmtTR(getStoredVal(fdId, field)) : '')
-    setAdjInputs(prev => ({ ...prev, [fdId]: { ...(prev[fdId] ?? {}), [field]: raw } }))
-    e.target.value = raw
-    e.target.select()
-  }
-
-  function handleAdjChange(fdId: string, field: string, value: string) {
-    setAdjInputs(prev => ({ ...prev, [fdId]: { ...(prev[fdId] ?? {}), [field]: value } }))
-  }
-
-  async function handleAdjBlur(fdId: string, field: string) {
-    const rawStr = adjInputs[fdId]?.[field] ?? ''
-    const parsed = parseTR(rawStr)
-
-    // Input string'i temizle (display için)
-    setAdjInputs(prev => {
-      const next = { ...prev, [fdId]: { ...(prev[fdId] ?? {}) } }
-      delete next[fdId][field]
-      return next
-    })
-
-    const originalVal = getStoredVal(fdId, field)
-    const existingAdj = adjustments[fdId]?.[field]
-
-    // Değer orijinale eşit veya null ise düzeltmeyi sil
-    if (parsed == null || (originalVal != null && Math.abs(parsed - originalVal) < 0.005)) {
-      if (existingAdj) {
-        await fetch(`/api/entities/${entityId}/financial-data/${fdId}/adjustments`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fieldName: field, scenarioName: activeScenario }),
-        })
-        setAdjustments(prev => {
-          const next = { ...prev, [fdId]: { ...(prev[fdId] ?? {}) } }
-          delete next[fdId][field]
-          return next
-        })
-      }
-      return
-    }
-
-    // Kaydet / güncelle
-    setSavingAdj(`${fdId}:${field}`)
-    try {
-      const res = await fetch(`/api/entities/${entityId}/financial-data/${fdId}/adjustments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fieldName: field,
-          adjustedValue: parsed,
-          originalValue: originalVal,
-          scenarioName: activeScenario,
-        }),
-      })
-      const d = await res.json() as { adjustment?: { id: string; adjustedValue: number; originalValue: number | null; note?: string | null } }
-      if (res.ok && d.adjustment) {
-        setAdjustments(prev => ({
-          ...prev,
-          [fdId]: {
-            ...(prev[fdId] ?? {}),
-            [field]: {
-              id: d.adjustment!.id,
-              value: d.adjustment!.adjustedValue,
-              originalValue: d.adjustment!.originalValue,
-              note: d.adjustment!.note,
-            },
-          },
-        }))
-      }
-    } finally {
-      setSavingAdj(null)
-    }
-  }
-
-  // Bir dönemin kaç düzeltmesi var
-  function adjCount(fdId: string): number {
-    return Object.keys(adjustments[fdId] ?? {}).length
-  }
-
-  // ── Uyarı satırları ────────────────────────────────────────
+  // ── Uyarı satırları ────────────────────────────────────
   function AktifPasifWarning() {
+    // Her sütun için aktif - pasif farkı
     const diffs = cols.map(col => {
       const aktif = getEffectiveVal(col.id, 'totalAssets')
       const pasif = getEffectiveVal(col.id, 'totalLiabilitiesAndEquity')
@@ -572,6 +410,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
   }
 
   function NetKarWarning() {
+    // Bilanço 59 (netProfitCurrentYear) vs GT net kar (netProfit)
     const diffs = cols.map(col => {
       const bilanco = getEffectiveVal(col.id, 'netProfitCurrentYear')
       const gt      = getEffectiveVal(col.id, 'netProfit')
@@ -604,7 +443,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
     )
   }
 
-  // ── Satır render ───────────────────────────────────────────
+  // ── Satır render ───────────────────────────────────────
   const renderedRows: React.ReactNode[] = []
 
   TDHP_ROWS.forEach((row, i) => {
@@ -676,25 +515,8 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             )
           }
 
-          // ── Subtotal / Total hücreleri ─────────────────────
           if (isCalc) {
             const v = getEffectiveVal(col.id, row.field!)
-
-            if (adjustMode) {
-              // Adjust modda calc satırları read-only, amber tint yok (sadece değer göster)
-              return (
-                <td key={col.id} className="px-2 py-1 text-right">
-                  <span className={clsx(
-                    'block text-right tabular-nums px-1',
-                    isTotal ? 'font-black text-[10px]' : 'font-bold text-[10px]',
-                    v != null && v < 0 ? 'text-red-600' : 'text-[#0B3C5D]',
-                  )}>
-                    {v != null ? fmtTR(v) : '0,00'}
-                  </span>
-                </td>
-              )
-            }
-
             return (
               <td key={col.id} className="px-2 py-1 text-right">
                 <input
@@ -714,59 +536,9 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             )
           }
 
-          // ── Account hücreleri ─────────────────────────────
-          const adjEntry  = adjustMode ? (adjustments[col.id]?.[row.field!]) : undefined
-          const hasAdj    = !!adjEntry
-          const storedVal = getStoredVal(col.id, row.field!)
-          const isNeg     = (adjustMode ? getEffectiveVal(col.id, row.field!) : storedVal) != null &&
-                            (adjustMode ? getEffectiveVal(col.id, row.field!)! : storedVal!) < 0
-          const isSavingThis = savingAdj === `${col.id}:${row.field!}`
+          const storedVal = getEffectiveVal(col.id, row.field!)
+          const isNeg     = storedVal != null && storedVal < 0
 
-          if (adjustMode) {
-            return (
-              <td key={col.id} className="px-2 py-1">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={getAdjDisplayStr(col.id, row.field!)}
-                    onFocus={(e) => handleAdjFocus(col.id, row.field!, e)}
-                    onChange={(e) => handleAdjChange(col.id, row.field!, e.target.value)}
-                    onBlur={() => handleAdjBlur(col.id, row.field!)}
-                    disabled={isSavingThis}
-                    className={clsx(
-                      'w-full rounded px-1.5 py-0.5',
-                      'text-right tabular-nums text-[10px] focus:outline-none',
-                      hasAdj
-                        ? 'border-2 border-amber-400 bg-amber-50 font-semibold text-amber-900'
-                        : 'border border-slate-200 bg-white',
-                      !hasAdj && (isNeg ? 'text-red-600' : 'text-slate-900'),
-                    )}
-                    placeholder="0,00"
-                  />
-                  {/* M badge */}
-                  {hasAdj && (
-                    <span className="absolute -top-1 -right-1 text-[7px] font-black bg-amber-500 text-white px-[3px] py-[1px] rounded leading-tight z-10">
-                      M
-                    </span>
-                  )}
-                  {/* Kaydetme göstergesi */}
-                  {isSavingThis && (
-                    <span className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 size={10} className="animate-spin text-amber-500" />
-                    </span>
-                  )}
-                  {/* Orijinal değer (düzeltme varsa) */}
-                  {hasAdj && storedVal != null && (
-                    <div className="text-[8px] text-slate-400 line-through text-right leading-tight mt-0.5">
-                      {fmtTR(storedVal)}
-                    </div>
-                  )}
-                </div>
-              </td>
-            )
-          }
-
-          // Normal mod
           return (
             <td key={col.id} className="px-2 py-1">
               <input
@@ -794,50 +566,19 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
       </tr>
     )
 
-    // Aktif-Pasif uyarısı
+    // Aktif-Pasif uyarısı: pasif toplam'dan hemen sonra
     if (row.field === 'totalLiabilitiesAndEquity' && row.type === 'total') {
       renderedRows.push(<AktifPasifWarning key={`ap-warn-${i}`} />)
     }
 
-    // Bilanço-GT K/Z uyarısı
+    // Bilanço-GT K/Z uyarısı: dönem net karından hemen sonra
     if (row.field === 'netProfit' && row.type === 'total') {
       renderedRows.push(<NetKarWarning key={`nk-warn-${i}`} />)
     }
   })
 
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="rounded-xl overflow-hidden border border-[#E5E9F0] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-
-      {/* Araç çubuğu */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-white">
-        <span className="text-xs font-semibold text-[#0B3C5D]">TDHP Bilanço &amp; Gelir Tablosu</span>
-        <div className="flex items-center gap-2">
-          {adjustMode && (
-            <select
-              value={activeScenario}
-              onChange={e => handleScenarioChange(e.target.value)}
-              className="text-[11px] px-2 py-1 border border-amber-300 rounded bg-amber-50 text-amber-800 focus:outline-none focus:border-amber-400"
-            >
-              {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          )}
-          {loadingAdj && <Loader2 size={13} className="animate-spin text-amber-500" />}
-          <button
-            onClick={toggleAdjustMode}
-            className={clsx(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all',
-              adjustMode
-                ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
-                : 'bg-white text-slate-500 border-slate-200 hover:text-[#0B3C5D] hover:border-slate-300',
-            )}
-          >
-            {adjustMode ? <X size={11} /> : <Edit3 size={11} />}
-            {adjustMode ? 'Düzeltme Modu: Aktif' : 'Düzeltme Modu'}
-          </button>
-        </div>
-      </div>
-
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
@@ -854,30 +595,22 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
               >
                 HESAP ADI
               </th>
-              {cols.map(col => {
-                const cnt = adjustMode ? adjCount(col.id) : 0
-                return (
-                  <th key={col.id} className="text-right px-3 py-2 min-w-[130px]">
-                    <div className="text-slate-800 font-bold">{col.year}</div>
-                    <div className="mt-1 flex justify-end items-center gap-1">
-                      <span
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                        style={{ background: '#0B3C5D', color: '#ffffff' }}
-                      >
-                        {PERIOD_LABEL[col.period] ?? col.period}
-                      </span>
-                      {cnt > 0 && (
-                        <span className="text-[8px] font-black bg-amber-500 text-white px-1 py-[1px] rounded">
-                          {cnt}M
-                        </span>
-                      )}
-                    </div>
-                    {saving[col.id] && (
-                      <div className="text-[8px] text-[#1FA4A9] mt-0.5 animate-pulse">kaydediliyor</div>
-                    )}
-                  </th>
-                )
-              })}
+              {cols.map(col => (
+                <th key={col.id} className="text-right px-3 py-2 min-w-[130px]">
+                  <div className="text-slate-800 font-bold">{col.year}</div>
+                  <div className="mt-1 flex justify-end">
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{ background: '#0B3C5D', color: '#ffffff' }}
+                    >
+                      {PERIOD_LABEL[col.period] ?? col.period}
+                    </span>
+                  </div>
+                  {saving[col.id] && (
+                    <div className="text-[8px] text-[#1FA4A9] mt-0.5 animate-pulse">kaydediliyor</div>
+                  )}
+                </th>
+              ))}
               {/* Trend başlıkları */}
               <th className="text-center px-2 py-2 min-w-[52px]">
                 <div className="text-[9px] text-slate-500 font-medium leading-tight">Son 2<br />Dönem</div>
@@ -892,20 +625,6 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
           </tbody>
         </table>
       </div>
-
-      {/* Düzeltme modu altbilgi */}
-      {adjustMode && (
-        <div className="px-4 py-2 border-t border-amber-100 bg-amber-50 flex items-center justify-between">
-          <span className="text-[10px] text-amber-700">
-            <span className="font-bold">M</span> rozetli hücreler düzeltilmiş değer içerir.
-            Senaryo: <span className="font-semibold">{activeScenario}</span>.
-            Orijinal değere dönmek için hücreyi boş bırakın.
-          </span>
-          <span className="text-[10px] text-amber-600 font-medium">
-            {Object.values(adjustments).reduce((sum, fd) => sum + Object.keys(fd).length, 0)} düzeltme
-          </span>
-        </div>
-      )}
     </div>
   )
 }

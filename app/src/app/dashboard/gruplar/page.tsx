@@ -22,7 +22,7 @@ interface Group {
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  STANDALONE: 'Bağımsız', PARENT: 'Ana', SUBSIDIARY: 'Bağlı', JV: 'Grup Şirketi',
+  STANDALONE: 'Bağımsız', PARENT: 'Ana', SUBSIDIARY: 'Bağlı', JV: 'OG',
 }
 
 export default function GruplarPage() {
@@ -80,10 +80,11 @@ export default function GruplarPage() {
   return (
     <DashboardShell>
     <div className="space-y-6">
+      {/* Başlık */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Gruplar</h1>
-          <p className="text-white/50 text-sm mt-0.5">Konsolide analiz için şirket grupları</p>
+          <h1 className="text-2xl font-bold text-[#0B3C5D]">Gruplar</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Konsolide analiz için şirket grupları</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -104,7 +105,7 @@ export default function GruplarPage() {
             onKeyDown={(e) => e.key === 'Enter' && createGroup()}
             placeholder="Grup adı (örn: ABC Holding)"
             autoFocus
-            className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50"
+            className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-slate-400"
           />
           <button
             onClick={createGroup}
@@ -116,7 +117,7 @@ export default function GruplarPage() {
           </button>
           <button
             onClick={() => setShowForm(false)}
-            className="px-3 py-2 text-white/40 hover:text-white transition-colors text-sm"
+            className="px-3 py-2 text-gray-400 hover:text-[#0B3C5D] transition-colors text-sm"
           >
             İptal
           </button>
@@ -126,39 +127,40 @@ export default function GruplarPage() {
       {/* Grup listesi */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-cyan-400" />
+          <Loader2 size={24} className="animate-spin text-[#2EC4B6]" />
         </div>
       ) : error ? (
         <div className="glass-card rounded-xl p-6">
-          <p className="text-sm text-red-300">{error}</p>
+          <p className="text-sm text-red-500">{error}</p>
         </div>
       ) : groups.length === 0 ? (
         <div className="glass-card rounded-xl p-10 text-center">
-          <GitBranch size={32} className="text-white/20 mx-auto mb-3" />
-          <p className="text-white/40 text-sm">Henüz grup oluşturulmadı.</p>
+          <GitBranch size={32} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Henüz grup oluşturulmadı.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {groups.map((group) => (
             <div key={group.id} className="glass-card rounded-xl overflow-hidden">
               {/* Grup başlığı */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                  <GitBranch size={16} className="text-cyan-400" />
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+                  <GitBranch size={16} style={{ color: '#2EC4B6' }} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-white">{group.name}</p>
-                  <p className="text-xs text-white/40">{group._count.entities} şirket · {group.baseCurrency}</p>
+                  <p className="text-sm font-semibold text-[#0B3C5D]">{group.name}</p>
+                  <p className="text-xs text-gray-400">{group._count.entities} şirket · {group.baseCurrency}</p>
                 </div>
                 <Link
                   href={`/dashboard/gruplar/${group.id}`}
-                  className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
+                  className="text-xs flex items-center gap-1 font-medium transition-colors"
+                  style={{ color: '#2EC4B6' }}
                 >
                   Yönet <ChevronRight size={12} />
                 </Link>
                 <button
                   onClick={() => deleteGroup(group.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
                 >
                   <Trash2 size={15} />
                 </button>
@@ -171,20 +173,22 @@ export default function GruplarPage() {
                     <Link
                       key={e.id}
                       href={`/dashboard/sirketler/${e.id}`}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
                     >
-                      <Building2 size={12} className="text-white/40" />
-                      <span className="text-xs text-white/70">{e.name}</span>
-                      <span className="text-xs text-white/30">{ENTITY_TYPE_LABELS[e.entityType]}</span>
+                      <Building2 size={12} className="text-gray-400" />
+                      <span className="text-xs text-[#1E293B]">{e.name}</span>
+                      <span className="text-xs text-gray-400">{ENTITY_TYPE_LABELS[e.entityType]}</span>
                       {e.ownershipPct != null && (
-                        <span className="text-xs text-cyan-400">{(Number(e.ownershipPct) * 100).toFixed(0)}%</span>
+                        <span className="text-xs font-medium" style={{ color: '#2EC4B6' }}>
+                          {(Number(e.ownershipPct) * 100).toFixed(0)}%
+                        </span>
                       )}
                     </Link>
                   ))}
                 </div>
               ) : (
                 <div className="px-4 py-3">
-                  <p className="text-xs text-white/30">Henüz şirket eklenmedi.</p>
+                  <p className="text-xs text-gray-400">Henüz şirket eklenmedi.</p>
                 </div>
               )}
             </div>

@@ -1,89 +1,121 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
-import { calcSubjectiveScore } from '@/lib/scoring/subjective'
+import { calcSubjectiveScore, combineScores, SubjectiveInputData } from '@/lib/scoring/subjective'
+import { scoreToRating } from '@/lib/scoring/score'
 
-// GET /api/entities/[id]/subjective
+// ─── GET: mevcut subjektif girdiyi ve skoru döndür ────────────────────────────
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id: entityId } = await params
   const entity = await prisma.entity.findFirst({ where: { id: entityId, userId } })
-  if (!entity) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
+  if (!entity) return jsonUtf8({ error: 'Şirket bulunamadı.' }, { status: 404 })
 
-  const sub = await prisma.subjectiveInput.findUnique({ where: { entityId } })
-  const score = sub ? calcSubjectiveScore(sub) : null
+  const row = await prisma.subjectiveInput.findUnique({ where: { entityId } })
+  if (!row) return jsonUtf8({ subjectiveInput: null, score: null })
 
-  return jsonUtf8({ subjectiveInput: sub, score })
+  const input: SubjectiveInputData = {
+    kkbCategory:        row.kkbCategory,
+    activeDelayDays:    row.activeDelayDays,
+    checkProtest:       row.checkProtest,
+    enforcementFile:    row.enforcementFile,
+    creditLimitUtilPct: row.creditLimitUtilPct,
+    hasMultipleBanks:   row.hasMultipleBanks,
+    avgMaturityMonths:  row.avgMaturityMonths,
+    companyAgeYears:    row.companyAgeYears,
+    auditLevel:         row.auditLevel,
+    ownershipClarity:   row.ownershipClarity,
+    hasTaxDebt:         row.hasTaxDebt,
+    hasSgkDebt:         row.hasSgkDebt,
+    activeLawsuitCount: row.activeLawsuitCount,
+  }
+
+  const score = calcSubjectiveScore(input)
+  return jsonUtf8({ subjectiveInput: input, score })
 }
 
-// POST /api/entities/[id]/subjective
+// ─── POST: kaydet + birleşik skoru analiz tablosuna yaz ──────────────────────
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id: entityId } = await params
   const entity = await prisma.entity.findFirst({ where: { id: entityId, userId } })
-  if (!entity) return jsonUtf8({ error: 'Bulunamadı.' }, { status: 404 })
+  if (!entity) return jsonUtf8({ error: 'Şirket bulunamadı.' }, { status: 404 })
 
-  try {
-    const body = await req.json()
-    const {
-      kkbCategory, activeDelayDays, checkProtest, enforcementFile,
-      creditLimitUtilPct, hasMultipleBanks, avgMaturityMonths,
-      companyAgeYears, auditLevel, ownershipClarity,
-      hasTaxDebt, hasSgkDebt, activeLawsuitCount,
-    } = body
+  const body = await req.json() as SubjectiveInputData
 
-    // Input aralık doğrulaması
-    const VALID_KKB = ['iyi', 'orta', 'kotu', 'cok_kotu']
-    const VALID_AUDIT = ['bagimsiz', 'ymm', 'smmm', 'none']
-    if (kkbCategory != null && !VALID_KKB.includes(kkbCategory))
-      return jsonUtf8({ error: 'Geçersiz KKB kategorisi.' }, { status: 400 })
-    if (auditLevel != null && !VALID_AUDIT.includes(auditLevel))
-      return jsonUtf8({ error: 'Geçersiz denetim seviyesi.' }, { status: 400 })
-    if (creditLimitUtilPct != null && (creditLimitUtilPct < 0 || creditLimitUtilPct > 100))
-      return jsonUtf8({ error: 'Kredi limit kullanımı 0-100 arasında olmalıdır.' }, { status: 400 })
-    if (companyAgeYears != null && (companyAgeYears < 0 || companyAgeYears > 200))
-      return jsonUtf8({ error: 'Firma yaşı geçersiz.' }, { status: 400 })
-    if (activeLawsuitCount != null && (activeLawsuitCount < 0 || activeLawsuitCount > 9999))
-      return jsonUtf8({ error: 'Dava sayısı geçersiz.' }, { status: 400 })
-    if (activeDelayDays != null && activeDelayDays < 0)
-      return jsonUtf8({ error: 'Gecikme günü negatif olamaz.' }, { status: 400 })
+  // SubjectiveInput kaydet / güncelle
+  const saved = await prisma.subjectiveInput.upsert({
+    where:  { entityId },
+    create: {
+      entityId,
+      kkbCategory:        body.kkbCategory        ?? 'orta',
+      activeDelayDays:    body.activeDelayDays     ?? 0,
+      checkProtest:       body.checkProtest        ?? false,
+      enforcementFile:    body.enforcementFile     ?? false,
+      creditLimitUtilPct: body.creditLimitUtilPct  ?? 70,
+      hasMultipleBanks:   body.hasMultipleBanks    ?? false,
+      avgMaturityMonths:  body.avgMaturityMonths   ?? 6,
+      companyAgeYears:    body.companyAgeYears     ?? 3,
+      auditLevel:         body.auditLevel          ?? 'ymm',
+      ownershipClarity:   body.ownershipClarity    ?? true,
+      hasTaxDebt:         body.hasTaxDebt          ?? false,
+      hasSgkDebt:         body.hasSgkDebt          ?? false,
+      activeLawsuitCount: body.activeLawsuitCount  ?? 0,
+    },
+    update: {
+      kkbCategory:        body.kkbCategory        ?? 'orta',
+      activeDelayDays:    body.activeDelayDays     ?? 0,
+      checkProtest:       body.checkProtest        ?? false,
+      enforcementFile:    body.enforcementFile     ?? false,
+      creditLimitUtilPct: body.creditLimitUtilPct  ?? 70,
+      hasMultipleBanks:   body.hasMultipleBanks    ?? false,
+      avgMaturityMonths:  body.avgMaturityMonths   ?? 6,
+      companyAgeYears:    body.companyAgeYears     ?? 3,
+      auditLevel:         body.auditLevel          ?? 'ymm',
+      ownershipClarity:   body.ownershipClarity    ?? true,
+      hasTaxDebt:         body.hasTaxDebt          ?? false,
+      hasSgkDebt:         body.hasSgkDebt          ?? false,
+      activeLawsuitCount: body.activeLawsuitCount  ?? 0,
+    },
+  })
 
-    const subjectiveInput = await prisma.subjectiveInput.upsert({
-      where: { entityId },
-      update: {
-        kkbCategory, activeDelayDays, checkProtest, enforcementFile,
-        creditLimitUtilPct, hasMultipleBanks, avgMaturityMonths,
-        companyAgeYears, auditLevel, ownershipClarity,
-        hasTaxDebt, hasSgkDebt, activeLawsuitCount,
-        updatedAt: new Date(),
-      },
-      create: {
-        entityId,
-        kkbCategory: kkbCategory ?? 'orta',
-        activeDelayDays: activeDelayDays ?? 0,
-        checkProtest: checkProtest ?? false,
-        enforcementFile: enforcementFile ?? false,
-        creditLimitUtilPct: creditLimitUtilPct ?? 70,
-        hasMultipleBanks: hasMultipleBanks ?? false,
-        avgMaturityMonths: avgMaturityMonths ?? 6,
-        companyAgeYears: companyAgeYears ?? 3,
-        auditLevel: auditLevel ?? 'ymm',
-        ownershipClarity: ownershipClarity ?? true,
-        hasTaxDebt: hasTaxDebt ?? false,
-        hasSgkDebt: hasSgkDebt ?? false,
-        activeLawsuitCount: activeLawsuitCount ?? 0,
+  // Subjektif skor hesapla
+  const score = calcSubjectiveScore(saved)
+
+  // Bu şirketin tüm analizlerinde finalScore'u güncelle (birleşik skor)
+  const analyses = await prisma.analysis.findMany({
+    where: { entityId, mode: 'SOLO' },
+    select: { id: true, finalScore: true, ratios: true },
+  })
+
+  for (const a of analyses) {
+    const ratios = a.ratios ? JSON.parse(a.ratios) : {}
+    // __financialScore varsa kullan (daha önce kaydedilmiş), yoksa mevcut finalScore
+    const financialScore = ratios.__financialScore ?? a.finalScore ?? 0
+    const combined       = combineScores(financialScore, score.total)
+    const combinedRating = scoreToRating(combined)
+
+    const updatedRatios = {
+      ...ratios,
+      __financialScore:  financialScore,
+      __subjectiveTotal: score.total,
+    }
+
+    await prisma.analysis.update({
+      where: { id: a.id },
+      data: {
+        finalScore:  combined,
+        finalRating: combinedRating,
+        ratios:      JSON.stringify(updatedRatios),
+        updatedAt:   new Date(),
       },
     })
-
-    const score = calcSubjectiveScore(subjectiveInput)
-    return jsonUtf8({ subjectiveInput, score })
-  } catch (err) {
-    console.error(err)
-    return jsonUtf8({ error: 'Sunucu hatası.' }, { status: 500 })
   }
+
+  return jsonUtf8({ subjectiveInput: saved, score, updatedAnalyses: analyses.length })
 }

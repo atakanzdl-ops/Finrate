@@ -441,40 +441,6 @@ const Page_BilançoTable = ({ entity, data, num, title, fields, pageNum }: any) 
 }
 
 /* ─── Main Component ─── */
-// TDHP Alan adları → okunabilir etiket
-const FIELD_LABELS: Record<string, string> = {
-  cash: 'Hazir Degerler', shortTermInvestments: 'Menkul Kiymetler',
-  tradeReceivables: 'Ticari Alacaklar', otherReceivables: 'Diger Alacaklar',
-  inventory: 'Stoklar', constructionCosts: 'Ins. Maliyetleri',
-  prepaidExpenses: 'Pesinat Giderler', prepaidSuppliers: 'Siparis Avanslari',
-  otherCurrentAssets: 'Diger Donen V.', longTermTradeReceivables: 'UV Ticari Alacaklar',
-  longTermOtherReceivables: 'UV Diger Alacaklar', longTermInvestments: 'Mali Duran V.',
-  tangibleAssets: 'Maddi Duran V.', intangibleAssets: 'Maddi Olmayan V.',
-  depletableAssets: 'Tukenebilir V.', longTermPrepaidExpenses: 'UV Pesinat G.',
-  otherNonCurrentAssets: 'Diger Duran V.', shortTermFinancialDebt: 'KV Mali Borclar',
-  tradePayables: 'Ticari Borclar', otherShortTermPayables: 'Diger KV Borclar',
-  advancesReceived: 'Alinan Avanslar', constructionProgress: 'Ins. Hakedisleri',
-  taxPayables: 'Vergi Borclar', shortTermProvisions: 'KV Karsililar',
-  deferredRevenue: 'Ertelenm. Gelir', otherCurrentLiabilities: 'Diger KV Kaynaklar',
-  longTermFinancialDebt: 'UV Mali Borclar', longTermTradePayables: 'UV Ticari Borclar',
-  longTermOtherPayables: 'UV Diger Borclar', longTermAdvancesReceived: 'UV Alinan Avanslar',
-  longTermProvisions: 'UV Karsililar', otherNonCurrentLiabilities: 'Diger UV Kaynaklar',
-  paidInCapital: 'Odenmis Sermaye', capitalReserves: 'Sermaye Yedekleri',
-  profitReserves: 'Kar Yedekleri', retainedEarnings: 'Gecmis Yil Karlari',
-  retainedLosses: 'Gecmis Yil Zararlari', netProfitCurrentYear: 'Donem Net Kari',
-  grossSales: 'Brut Satislar', salesDiscounts: 'Satis Indirimleri',
-  revenue: 'Net Satislar', cogs: 'Satislarin Maliyeti',
-  operatingExpenses: 'Faaliyet Giderleri', ebit: 'Faaliyet Kari',
-  otherIncome: 'Diger Olagan Gelir', otherExpense: 'Diger Olagan Gider',
-  interestExpense: 'Finansman Gideri', extraordinaryIncome: 'Olagandisi Gelir',
-  extraordinaryExpense: 'Olagandisi Gider', taxExpense: 'Vergi Karsiligi',
-  netProfit: 'Donem Net Kari',
-}
-
-function numFmt(v: number): string {
-  return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(v)
-}
-
 function UltraPremiumRaporContent() {
   const params = useSearchParams()
   const id     = params.get('id')
@@ -483,7 +449,6 @@ function UltraPremiumRaporContent() {
   const [selected, setSelected] = useState<any | null>(null)
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [manualAdj, setManualAdj] = useState<any[]>([])
 
   useEffect(() => {
     // 15 Sayfalık Harika Numune Modu ('demo' id'si veya id yoksa demo üretilir)
@@ -508,28 +473,18 @@ function UltraPremiumRaporContent() {
     }
 
     // Normal flow...
-    fetch('/api/analyses').then(r => r.json()).then(async d => {
+    fetch('/api/analyses').then(r => r.json()).then(d => {
       const list = d.analyses ?? []
       setAnalyses(list)
       const found = list.find((a: any) => a.id === id)
       setSelected(found ?? null)
       if (found?.entity?.id) {
         fetch(`/api/entities/${found.entity.id}`).then(r => r.ok ? r.json() : null)
-          .then(res => {
+          .then(res => { 
             const hist = res?.entity?.financialData || []
             hist.forEach((h:any, i:number) => { h._tmpYear = 2024 - i })
             setHistoricalData(hist.reverse())
           })
-      }
-      // Manuel düzeltme verilerini çek
-      if (found?.financialDataId && found?.entityId) {
-        try {
-          const adjRes = await fetch(`/api/entities/${found.entityId}/financial-data/${found.financialDataId}/adjustments?scenario=Varsayilan`)
-          if (adjRes.ok) {
-            const adjData = await adjRes.json()
-            setManualAdj(adjData.adjustments ?? [])
-          }
-        } catch { /* sessizce geç */ }
       }
     }).finally(() => setLoading(false))
   }, [id])
@@ -604,64 +559,6 @@ function UltraPremiumRaporContent() {
             { label: 'DÖNEM NET KÂRI', key: 'netProfit', mega: true }
           ]}/>
           
-          {/* Manuel Düzeltme Notları Sayfası — yalnızca düzeltme varsa */}
-          {manualAdj.length > 0 && (
-            <div className="pdf-page bg-white">
-              <PHeader num="14" title="Analitik Duzeltme Notlari" entity={entityName} page={15} />
-              <div style={{padding:'30px 50px', position:'relative', zIndex:10}}>
-                <div style={{background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:12, padding:'16px 20px', marginBottom:24, display:'flex', alignItems:'center', gap:12}}>
-                  <div style={{fontSize:20}}>⚠</div>
-                  <div>
-                    <div style={{fontWeight:700, fontSize:12, color:'#92400e'}}>Manuel Analitik Duzeltme Uygulanmistir</div>
-                    <div style={{fontSize:11, color:'#b45309', marginTop:4}}>
-                      Bu rapordaki finansal tablolar, asagida listelenen {manualAdj.length} manuel analitik duzeltmeyi yansitmaktadir.
-                      Duzeltmeler ham muhasebe verisi uzerinde degil; analitik degerlendirme amacli uygulanmistir.
-                    </div>
-                  </div>
-                </div>
-                <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
-                  <thead>
-                    <tr style={{background:'#f1f5f9'}}>
-                      <th style={{padding:'10px 12px', textAlign:'left', fontWeight:700, color:'#334155', borderBottom:'2px solid #e2e8f0'}}>Finansal Kalem</th>
-                      <th style={{padding:'10px 12px', textAlign:'right', fontWeight:700, color:'#334155', borderBottom:'2px solid #e2e8f0'}}>Orijinal Deger (TL)</th>
-                      <th style={{padding:'10px 12px', textAlign:'right', fontWeight:700, color:'#334155', borderBottom:'2px solid #e2e8f0'}}>Duzeltilmis Deger (TL)</th>
-                      <th style={{padding:'10px 12px', textAlign:'right', fontWeight:700, color:'#334155', borderBottom:'2px solid #e2e8f0'}}>Fark (TL)</th>
-                      <th style={{padding:'10px 12px', textAlign:'left', fontWeight:700, color:'#334155', borderBottom:'2px solid #e2e8f0'}}>Not</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {manualAdj.map((adj: any, idx: number) => {
-                      const diff = adj.adjustedValue - (adj.originalValue ?? 0)
-                      return (
-                        <tr key={idx} style={{borderBottom:'1px solid #f1f5f9'}}>
-                          <td style={{padding:'10px 12px', fontWeight:600, color:'#0f172a'}}>
-                            {FIELD_LABELS[adj.fieldName] || adj.fieldName} *
-                          </td>
-                          <td style={{padding:'10px 12px', textAlign:'right', color:'#64748b', fontFamily:'monospace'}}>
-                            {adj.originalValue != null ? numFmt(adj.originalValue) : '—'}
-                          </td>
-                          <td style={{padding:'10px 12px', textAlign:'right', fontWeight:700, color:'#0284c7', fontFamily:'monospace'}}>
-                            {numFmt(adj.adjustedValue)}
-                          </td>
-                          <td style={{padding:'10px 12px', textAlign:'right', fontWeight:600, fontFamily:'monospace', color: diff >= 0 ? '#16a34a' : '#dc2626'}}>
-                            {diff >= 0 ? '+' : ''}{numFmt(diff)}
-                          </td>
-                          <td style={{padding:'10px 12px', color:'#64748b', fontSize:10}}>
-                            {adj.note || '—'}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                <div style={{marginTop:24, padding:'12px 16px', background:'#f8fafc', borderRadius:8, fontSize:10, color:'#64748b', lineHeight:1.6}}>
-                  * Bu rapordaki duzeltmeler {selected?.year || ''} yili {selected?.period || ''} donemi icin &quot;Varsayilan&quot; senaryosu kapsaminda uygulanmistir.
-                  Ham finansal veriler degistirilmemis olup orijinal muhasebe kayitlari gecerliligini korumaktadir.
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="pdf-page" style={{ background: '#0a192f', color: 'white', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' }}>
             <div className="glow-blob" style={{width:600, height:600, background: 'radial-gradient(circle, rgba(45, 212, 191, 0.1) 0%, rgba(10, 37, 64, 0) 70%)'}}></div>
             <div className="outfit" style={{fontSize:48, fontWeight:800, letterSpacing:4, zIndex:10, marginBottom:20}}>FINRATE.</div>

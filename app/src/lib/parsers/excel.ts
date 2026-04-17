@@ -353,32 +353,21 @@ function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<s
 }
 
 function extractMizanYear(rows: unknown[][]): { year: number | null; period: string } {
-  // Birden fazla tarih aralığı olabilir (karşılaştırmalı dönem + cari dönem).
-  // Tüm aralıkları topla, en son olanı (en büyük endYear * 100 + endMonth) döndür.
-  const candidates: { year: number; month: number }[] = []
-
   for (let i = 0; i < Math.min(6, rows.length); i++) {
-    for (const cell of rows[i] as unknown[]) {
+    for (const cell of rows[i] as (unknown)[]) {
       if (!cell) continue
-      const s = String(cell)
-      const re = /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-–—]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/g
-      let m: RegExpExecArray | null
-      while ((m = re.exec(s)) !== null) {
+      const m = String(cell).match(
+        /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-–—]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/
+      )
+      if (m) {
         const endMonth = parseInt(m[5])
         const endYear  = parseInt(m[6])
-        candidates.push({ year: endYear, month: endMonth })
+        const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
+        return { year: endYear, period }
       }
     }
   }
-
-  if (candidates.length === 0) return { year: null, period: 'ANNUAL' }
-
-  // En son tarihi seç (endYear * 100 + endMonth maksimum)
-  const latest = candidates.reduce((best, c) =>
-    c.year * 100 + c.month > best.year * 100 + best.month ? c : best
-  )
-  const period = latest.month <= 3 ? 'Q1' : latest.month <= 6 ? 'Q2' : latest.month <= 9 ? 'Q3' : 'Q4'
-  return { year: latest.year, period }
+  return { year: null, period: 'ANNUAL' }
 }
 
 // ─── Mizan satır eşlemesi ─────────────────────────────────────────────────────
@@ -401,15 +390,15 @@ const MIZAN_SPLIT: Record<string, { bb: string; ba: string }> = {
 // MAP: suffix yok = bakBorç, _A = bakAlacak, _CA = -bakAlacak (contra), _CB = -bakBorç (contra)
 const MIZAN_MAP: Record<string, string> = {
   // Aktif – bakBorç
-  '100': 'cash',             '101': 'cash',             '102': 'cash',
+  '100': 'cash',             '101': 'cash',             '102': 'cash',             '108': 'cash',
   '121': 'tradeReceivables', '126': 'tradeReceivables',
   '136': 'otherReceivables',
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
   '159': 'prepaidSuppliers',
   '180': 'prepaidExpenses',
   '190': 'otherCurrentAssets', '193': 'otherCurrentAssets',
-  '252': 'tangibleAssets',   '253': 'tangibleAssets',   '254': 'tangibleAssets', '255': 'tangibleAssets',
-  '260': 'intangibleAssets',
+  '250': 'tangibleAssets',   '252': 'tangibleAssets',   '253': 'tangibleAssets',   '254': 'tangibleAssets', '255': 'tangibleAssets',
+  '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets',
   '280': 'longTermPrepaidExpenses',
   '580': 'retainedLosses',
   // Gelir tablosu – 64x/65x/67x/68x (mizan'da görünebilir)
@@ -440,12 +429,15 @@ const MIZAN_MAP: Record<string, string> = {
   '335': 'otherShortTermPayables_A', '336': 'otherShortTermPayables_A',
   '340': 'advancesReceived_A',
   '358': 'constructionProgress_A',
-  '360': 'taxPayables_A',            '361': 'taxPayables_A',
+  '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
   '381': 'deferredRevenue_A',
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
-  '500': 'paidInCapital_A',          '502': 'paidInCapital_A',
+  '500': 'paidInCapital_A',
+  '502': 'capitalReserves_A',        // Sermaye Düzeltmesi → capitalReserves (NOT paidInCapital)
   '529': 'capitalReserves_A',
   '570': 'retainedEarnings_A',
+  '590': 'netProfitCurrentYear_A',   // Dönem Net Karı (bakAlacak = pozitif)
+  '591': 'netProfitCurrentYear_CB',  // Dönem Net Zararı (bakBorç = zarar → negatif)
   // Contra – bakAlacak çıkarılır (_CA), bakBorç çıkarılır (_CB)
   '257': 'tangibleAssets_CA',
   '268': 'intangibleAssets_CA',

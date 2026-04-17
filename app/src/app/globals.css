@@ -369,10 +369,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-gradient {
-    background: linear-gradient(135deg, #2EC4B6 0%, #0ea5e9 100%);
+    background: #0B3C5D;
+    color: #ffffff;
     border: none;
     cursor: pointer;
-    width: 100%;
     transition: opacity 0.2s, transform 0.1s;
 }
 

@@ -448,7 +448,8 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
  */
 export function getSectorBenchmark(sector: string | null | undefined): SectorBenchmark {
   if (!sector) return SECTOR_BENCHMARKS['Genel']
-  const s = sector.toLowerCase()
+  // toLocaleLowerCase('tr') → "İ"→"i", "I"→"ı" (Türkçe büyük-küçük dönüşümü doğru)
+  const s = sector.toLocaleLowerCase('tr')
 
   if (s.includes('gayrimenkul') || s.includes('emlak') || s.includes('kiralama') || s.includes('kira gelir'))
     return SECTOR_BENCHMARKS['Gayrimenkul']

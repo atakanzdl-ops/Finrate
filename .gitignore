@@ -7,7 +7,28 @@ dev-out.txt
 dev-err.txt
 npm2-out.txt
 npm2-err.txt
+
+# Environment — asla commit edilmez
 .env
+.env.local
+.env*.local
 app/.env
+app/.env.local
+
+# Build artifacts
 app/tsconfig.tsbuildinfo
 app/.next/
+app/tmp/
+app/backups/
+
+# Debug scripts — hardcoded DB bağlantısı içeriyor
+app/scripts/
+
+# Dev log dosyaları
+app/dev-*.log
+app/dev-*.err.log
+app/dev-*.out.log
+
+# Claude worktree
+app/.claude/
+.claude/
