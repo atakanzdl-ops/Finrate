@@ -12,7 +12,7 @@ interface Entity {
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  STANDALONE: 'Bağımsız', PARENT: 'Ana Şirket', SUBSIDIARY: 'Bağlı Ortaklık', JV: 'Ortak Girişim',
+  STANDALONE: 'Bağımsız', PARENT: 'Ana Şirket', SUBSIDIARY: 'Bağlı Ortaklık', JV: 'Grup Şirketi',
 }
 
 const ENTITY_TYPE_COLORS: Record<string, string> = {

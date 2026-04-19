@@ -53,7 +53,7 @@ interface ConsolidateResult {
 const ENTITY_TYPES = [
   { value: 'PARENT',     label: 'Ana Şirket' },
   { value: 'SUBSIDIARY', label: 'Bağlı Ortaklık' },
-  { value: 'JV',         label: 'Ortak Girişim' },
+  { value: 'JV',         label: 'Grup Şirketi' },
 ]
 
 const TENZILAT_FIELDS: { group: string; fields: { value: string; label: string }[] }[] = [
@@ -465,7 +465,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                       {e.sector && <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>{e.sector}</p>}
                     </div>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: '#F1F5F9', color: '#64748B' }}>
-                      {e.entityType === 'PARENT' ? 'Ana' : e.entityType === 'JV' ? 'OG' : 'Bağlı'}
+                      {e.entityType === 'PARENT' ? 'Ana' : e.entityType === 'JV' ? 'GŞ' : 'Bağlı'}
                     </span>
                     {e.ownershipPct != null && (
                       <span className="text-xs font-medium" style={{ color: '#2EC4B6' }}>

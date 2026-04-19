@@ -144,10 +144,11 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowUpload(!showUpload)}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-800 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-80"
+            style={{ background: '#0B3C5D' }}
           >
             <Upload size={14} />
-            Excel / PDF
+            Excel / PDF Yükle
           </button>
         </div>
       </div>
