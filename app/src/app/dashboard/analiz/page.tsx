@@ -977,18 +977,18 @@ function AnalizPageContent() {
                       {/* Sağ sidebar: Kredi Derecelendirme */}
                       {(() => {
                         const ratingColor: Record<string, { bg: string; text: string; border: string; glow: string }> = {
-                          AAA: { bg: '#ecfdf5', text: '#059669', border: '#6ee7b7', glow: 'rgba(5,150,105,0.15)' },
-                          AA:  { bg: '#ecfdf5', text: '#059669', border: '#6ee7b7', glow: 'rgba(5,150,105,0.15)' },
-                          A:   { bg: '#eff6ff', text: '#2563eb', border: '#93c5fd', glow: 'rgba(37,99,235,0.12)' },
-                          BBB: { bg: '#f0f9ff', text: '#0891b2', border: '#67e8f9', glow: 'rgba(8,145,178,0.12)' },
-                          BB:  { bg: '#fffbeb', text: '#d97706', border: '#fcd34d', glow: 'rgba(217,119,6,0.15)' },
-                          B:   { bg: '#fff7ed', text: '#ea580c', border: '#fdba74', glow: 'rgba(234,88,12,0.15)' },
-                          CCC: { bg: '#fef2f2', text: '#dc2626', border: '#fca5a5', glow: 'rgba(220,38,38,0.15)' },
+                          AAA: { bg: '#e4f6f5', text: '#0B7A72', border: '#2EC4B6', glow: 'rgba(46,196,182,0.25)' },
+                          AA:  { bg: '#e9f7f6', text: '#1aab9e', border: '#4ECFC4', glow: 'rgba(46,196,182,0.20)' },
+                          A:   { bg: '#edf8f7', text: '#2EC4B6', border: '#7de0d9', glow: 'rgba(46,196,182,0.15)' },
+                          BBB: { bg: '#e8f0f6', text: '#0B3C5D', border: '#7BA8C4', glow: 'rgba(11,60,93,0.18)' },
+                          BB:  { bg: '#f0f5f8', text: '#5A7A96', border: '#9BB5C8', glow: 'rgba(11,60,93,0.10)' },
+                          B:   { bg: '#fef2f2', text: '#dc2626', border: '#fca5a5', glow: 'rgba(220,38,38,0.15)' },
+                          CCC: { bg: '#fef2f2', text: '#b91c1c', border: '#f87171', glow: 'rgba(185,28,28,0.20)' },
                         }
                         const rc = ratingColor[activeRating] ?? ratingColor['BB']
                         const riskColor = activeRating === 'AAA' || activeRating === 'AA' || activeRating === 'A'
-                          ? '#059669' : activeRating === 'BBB' ? '#0891b2'
-                          : activeRating === 'BB' ? '#d97706'
+                          ? '#2EC4B6' : activeRating === 'BBB' ? '#0B3C5D'
+                          : activeRating === 'BB' ? '#5A7A96'
                           : '#dc2626'
                         return (
                         <div className="sidebar-stack">
