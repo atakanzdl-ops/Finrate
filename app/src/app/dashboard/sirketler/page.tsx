@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Plus, Search, ChevronRight, Loader2, Trash2 } from 'lucide-react'
+import { Building2, Plus, Search, ChevronRight, Loader2, Trash2, X } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
 
 interface Entity {
@@ -22,12 +23,60 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
   JV:         'bg-amber-50 text-amber-600 border-amber-200',
 }
 
+const ENTITY_TYPES = [
+  { value: 'STANDALONE', label: 'Bağımsız Şirket' },
+  { value: 'PARENT',     label: 'Ana Şirket' },
+  { value: 'SUBSIDIARY', label: 'Bağlı Ortaklık' },
+  { value: 'JV',         label: 'Grup Şirketi' },
+]
+
+const SECTORS = [
+  'Üretim', 'Ticaret', 'Hizmet', 'İnşaat', 'Turizm', 'Tarım',
+  'Enerji', 'Sağlık', 'Eğitim', 'Finans', 'Teknoloji', 'Diğer',
+]
+
 export default function SirketlerPage() {
+  const router = useRouter()
   const [entities, setEntities]   = useState<Entity[]>([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+
+  // Yeni şirket modal
+  const [showModal, setShowModal] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError, setFormError]     = useState('')
+  const [form, setForm] = useState({ name: '', taxNumber: '', sector: '', entityType: 'STANDALONE' })
+
+  const setField = (field: string, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }))
+
+  function openModal() {
+    setForm({ name: '', taxNumber: '', sector: '', entityType: 'STANDALONE' })
+    setFormError('')
+    setShowModal(true)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError('')
+    if (!form.name.trim()) { setFormError('Şirket adı zorunludur.'); return }
+    setFormLoading(true)
+    try {
+      const res = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) { setFormError(data.error ?? 'Hata oluştu.'); return }
+      setShowModal(false)
+      router.push(`/dashboard/sirketler/${data.entity.id}`)
+    } finally {
+      setFormLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/entities').then(r => r.json()).then(d => setEntities(d.entities ?? [])).finally(() => setLoading(false))
@@ -58,13 +107,13 @@ export default function SirketlerPage() {
               {entities.length} kayıtlı şirket
             </p>
           </div>
-          <Link
-            href="/dashboard/sirketler/yeni"
+          <button
+            onClick={openModal}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{ background: '#0B3C5D' }}
           >
             <Plus size={15} /> Yeni Şirket
-          </Link>
+          </button>
         </div>
 
         {/* Arama */}
@@ -180,6 +229,110 @@ export default function SirketlerPage() {
           </div>
         )}
       </div>
+
+      {/* Yeni Şirket Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(11,60,93,0.35)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false) }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {/* Başlık */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: '#0B3C5D' }}>Yeni Şirket</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Şirket bilgilerini girin</p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Ad */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Şirket Adı <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setField('name', e.target.value)}
+                  placeholder="Örn: ABC Tekstil A.Ş."
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {/* VKN */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Vergi Kimlik No</label>
+                <input
+                  type="text"
+                  value={form.taxNumber}
+                  onChange={(e) => setField('taxNumber', e.target.value)}
+                  placeholder="10 haneli VKN"
+                  maxLength={11}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {/* Sektör */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Sektör</label>
+                <select
+                  value={form.sector}
+                  onChange={(e) => setField('sector', e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">— Seçiniz —</option>
+                  {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Şirket Tipi */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Şirket Tipi</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ENTITY_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setField('entityType', value)}
+                      className="px-3 py-2.5 rounded-lg text-xs font-medium text-left transition-all border"
+                      style={form.entityType === value
+                        ? { borderColor: 'rgba(46,196,182,0.4)', background: '#EFF9F8', color: '#0B3C5D' }
+                        : { borderColor: '#e5e7eb', background: '#ffffff', color: '#5A7A96' }
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {formError && (
+                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-500">
+                  {formError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={formLoading}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-opacity"
+                style={{ background: '#0B3C5D' }}
+              >
+                {formLoading && <Loader2 size={16} className="animate-spin" />}
+                Şirket Oluştur
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardShell>
   )
 }
