@@ -20,7 +20,7 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
   STANDALONE: 'bg-slate-100 text-slate-500 border-slate-200',
   PARENT:     'bg-[#0B3C5D]/8 text-[#0B3C5D] border-[#0B3C5D]/20',
   SUBSIDIARY: 'bg-cyan-50 text-[#2EC4B6] border-cyan-200',
-  JV:         'bg-amber-50 text-amber-600 border-amber-200',
+  JV:         'bg-cyan-50 text-[#2EC4B6] border-cyan-200',
 }
 
 const ENTITY_TYPES = [

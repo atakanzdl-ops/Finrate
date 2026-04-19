@@ -22,7 +22,7 @@ interface Group {
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  STANDALONE: 'Bağımsız', PARENT: 'Ana', SUBSIDIARY: 'Bağlı', JV: 'GŞ',
+  STANDALONE: 'Bağımsız', PARENT: 'Ana Şirket', SUBSIDIARY: 'Bağlı Ortaklık', JV: 'Grup Şirketi',
 }
 
 export default function GruplarPage() {
@@ -144,8 +144,8 @@ export default function GruplarPage() {
             <div key={group.id} className="glass-card rounded-xl overflow-hidden">
               {/* Grup başlığı */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
-                  <GitBranch size={16} style={{ color: '#2EC4B6' }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(11,60,93,0.08)' }}>
+                  <GitBranch size={16} style={{ color: '#0B3C5D' }} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#0B3C5D]">{group.name}</p>
@@ -153,8 +153,8 @@ export default function GruplarPage() {
                 </div>
                 <Link
                   href={`/dashboard/gruplar/${group.id}`}
-                  className="text-xs flex items-center gap-1 font-medium transition-colors"
-                  style={{ color: '#2EC4B6' }}
+                  className="text-xs flex items-center gap-1 font-medium transition-colors hover:opacity-75"
+                  style={{ color: '#0B3C5D' }}
                 >
                   Yönet <ChevronRight size={12} />
                 </Link>
