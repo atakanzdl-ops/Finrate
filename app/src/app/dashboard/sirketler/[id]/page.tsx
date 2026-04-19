@@ -197,7 +197,10 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
                       >{PERIOD_LABELS[fd.period]}</span>
                     </td>
                     <td className="px-4 py-3 text-right text-slate-700">{fmt(fd.revenue)}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">
+                    <td className={clsx('px-4 py-3 text-right',
+                      (fd.ebitda != null && fd.ebitda < 0) || (fd.ebitda == null && fd.ebit != null && fd.ebit < 0)
+                        ? 'text-red-500' : 'text-slate-700'
+                    )}>
                       {fd.ebitda != null
                         ? <>{fmt(fd.ebitda)} <span className="text-[10px] text-slate-400">FAVÖK</span></>
                         : fd.ebit != null
