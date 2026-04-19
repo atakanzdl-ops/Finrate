@@ -229,6 +229,7 @@ function matchBilField(label: string, sec: EkSection): string | null {
     if (/^c[\s.\-]\s*diger\s*bor/.test(n))          return 'otherShortTermPayables'
     if (/^d[\s.\-]\s*alinan\s*avans/.test(n))       return 'advancesReceived'
     if (/^e[\s.\-]\s*yillara\s*yaygin/.test(n))     return 'constructionProgress'
+    if (n.includes('yillara yaygin'))                return 'constructionProgress'
     if (/^f[\s.\-]\s*odenecek\s*vergi/.test(n))     return 'taxPayables'
     if (/^g[\s.\-]\s*bor.?\s*ve\s*gider/.test(n))   return 'shortTermProvisions'
     if (/^h[\s.\-]\s*gelecek\s*ay.*gelir/.test(n))  return 'deferredRevenue'
