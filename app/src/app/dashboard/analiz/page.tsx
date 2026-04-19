@@ -975,50 +975,88 @@ function AnalizPageContent() {
                       })()}
 
                       {/* Sağ sidebar: Kredi Derecelendirme */}
-                      <div className="sidebar-stack">
-                        <div className="card card-rating">
-                          <div className="card-head">
-                            <h2 className="card-title">Kredi Derecelendirme</h2>
-                          </div>
-                          <div className="card-body">
-                            <div className="rating-scale">
-                              {RATING_SCALE.map(rt => (
-                                <div key={rt}
-                                  className={clsx('rating-pill', (activeRating === rt || cr === rt) && 'active')}
-                                  data-rating={rt}>
-                                  {rt === activeRating ? cr : rt}
-                                </div>
-                              ))}
+                      {(() => {
+                        const ratingColor: Record<string, { bg: string; text: string; border: string; glow: string }> = {
+                          AAA: { bg: '#ecfdf5', text: '#059669', border: '#6ee7b7', glow: 'rgba(5,150,105,0.15)' },
+                          AA:  { bg: '#ecfdf5', text: '#059669', border: '#6ee7b7', glow: 'rgba(5,150,105,0.15)' },
+                          A:   { bg: '#eff6ff', text: '#2563eb', border: '#93c5fd', glow: 'rgba(37,99,235,0.12)' },
+                          BBB: { bg: '#f0f9ff', text: '#0891b2', border: '#67e8f9', glow: 'rgba(8,145,178,0.12)' },
+                          BB:  { bg: '#fffbeb', text: '#d97706', border: '#fcd34d', glow: 'rgba(217,119,6,0.15)' },
+                          B:   { bg: '#fff7ed', text: '#ea580c', border: '#fdba74', glow: 'rgba(234,88,12,0.15)' },
+                          CCC: { bg: '#fef2f2', text: '#dc2626', border: '#fca5a5', glow: 'rgba(220,38,38,0.15)' },
+                        }
+                        const rc = ratingColor[activeRating] ?? ratingColor['BB']
+                        const riskColor = activeRating === 'AAA' || activeRating === 'AA' || activeRating === 'A'
+                          ? '#059669' : activeRating === 'BBB' ? '#0891b2'
+                          : activeRating === 'BB' ? '#d97706'
+                          : '#dc2626'
+                        return (
+                        <div className="sidebar-stack">
+                          <div className="card card-rating" style={{ overflow: 'hidden' }}>
+                            {/* Renkli üst şerit */}
+                            <div style={{ height: 4, background: `linear-gradient(90deg, ${rc.text}, ${rc.border})`, margin: '-1px -1px 0' }} />
+                            <div className="card-head" style={{ paddingBottom: 10 }}>
+                              <h2 className="card-title">Kredi Derecelendirme</h2>
                             </div>
-                            <div className="rating-info">
-                              <div className="rating-detail">
-                                <span className="rating-detail-label">Risk Seviyesi</span>
-                                <span className={clsx('rating-detail-value', cs >= 68 && 'low')}>
-                                  {RISK_LABEL[activeRating] ?? '—'}
-                                </span>
+                            <div className="card-body" style={{ paddingTop: 0 }}>
+                              {/* Büyük derecelendirme badge */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                                <div style={{
+                                  background: rc.bg, color: rc.text, border: `2px solid ${rc.border}`,
+                                  borderRadius: 12, padding: '6px 18px',
+                                  fontSize: 26, fontWeight: 800, letterSpacing: 1,
+                                  boxShadow: `0 4px 16px ${rc.glow}`,
+                                  lineHeight: 1.2,
+                                }}>
+                                  {cr}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Risk Seviyesi</div>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: riskColor }}>
+                                    {RISK_LABEL[activeRating] ?? '—'}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="rating-detail">
-                                <span className="rating-detail-label">EBITDA Marjı</span>
-                                <span className="rating-detail-value">
-                                  {r.ebitdaMargin != null ? fmtPct(r.ebitdaMargin) : '—'}
-                                </span>
+
+                              {/* Rating ölçeği */}
+                              <div className="rating-scale" style={{ marginBottom: 14, marginTop: 0 }}>
+                                {RATING_SCALE.map(rt => (
+                                  <div key={rt}
+                                    className={clsx('rating-pill', (activeRating === rt || cr === rt) && 'active')}
+                                    data-rating={rt}>
+                                    {rt === activeRating ? cr : rt}
+                                  </div>
+                                ))}
                               </div>
-                              <div className="rating-detail">
-                                <span className="rating-detail-label">Net Kâr Marjı</span>
-                                <span className="rating-detail-value">
-                                  {r.netProfitMargin != null ? fmtPct(r.netProfitMargin) : '—'}
-                                </span>
-                              </div>
-                              <div className="rating-detail">
-                                <span className="rating-detail-label">Faiz Karşılama</span>
-                                <span className="rating-detail-value">
-                                  {r.interestCoverage != null ? `${r.interestCoverage.toFixed(1)}x` : '—'}
-                                </span>
+
+                              {/* Detaylar */}
+                              <div className="rating-info">
+                                {[
+                                  { label: 'EBITDA Marjı',   val: r.ebitdaMargin,     fmt: (v: number) => fmtPct(v) },
+                                  { label: 'Net Kâr Marjı',  val: r.netProfitMargin,  fmt: (v: number) => fmtPct(v) },
+                                  { label: 'Faiz Karşılama', val: r.interestCoverage === Infinity ? null : r.interestCoverage, fmt: (v: number) => `${v.toFixed(1)}x`, special: r.interestCoverage === Infinity ? '∞x' : null },
+                                ].map(({ label, val, fmt, special }) => {
+                                  const display = special ?? (val != null ? fmt(val) : '—')
+                                  const isNeg   = val != null && val < 0
+                                  const isPos   = special != null || (val != null && val > 0)
+                                  return (
+                                    <div key={label} className="rating-detail">
+                                      <span className="rating-detail-label">{label}</span>
+                                      <span className="rating-detail-value" style={{
+                                        color: isNeg ? '#dc2626' : isPos ? '#059669' : '#0B3C5D',
+                                        fontSize: 13,
+                                      }}>
+                                        {display}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                        )
+                      })()}
 
                     </div>{/* /content-grid */}
 
