@@ -458,7 +458,9 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               <div className="divide-y divide-[#E5E9F0]">
                 {group.entities.map((e) => (
                   <div key={e.id} className="flex items-center gap-3 px-5 py-3">
-                    <Building2 size={15} style={{ color: '#2EC4B6', flexShrink: 0 }} />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(11,60,93,0.07)' }}>
+                      <Building2 size={15} style={{ color: '#0B3C5D' }} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <Link href={`/dashboard/sirketler/${e.id}`}
                         className="text-sm font-medium text-[#0B3C5D] hover:underline">{e.name}</Link>
