@@ -35,11 +35,10 @@ export const Logo: React.FC<LogoProps> = ({ className = '', showSubtext = true, 
             fontSize: 10,
             fontWeight: 600,
             color: '#64748B',
-            textTransform: 'uppercase',
             letterSpacing: '0.15em',
             marginTop: 4,
           }}>
-            Bankadan Önce Finrate
+            BANKADAN ÖNCE FINRATE
           </span>
         )}
       </div>
