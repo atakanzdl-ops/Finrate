@@ -231,11 +231,11 @@ export default function Page() {
             <div className="footer-col">
               <h4>Hukuki</h4>
               <ul>
-                <li><Link href="/yasal#gizlilik">Gizlilik Politikası</Link></li>
-                <li><Link href="/yasal#kosullar">Kullanım Koşulları</Link></li>
-                <li><Link href="/yasal#kvkk">KVKK Aydınlatma</Link></li>
-                <li><Link href="/yasal#cerez">Çerez Politikası</Link></li>
                 <li><Link href="/yasal#sorumluluk">Sorumluluk Reddi</Link></li>
+                <li><Link href="/yasal#kvkk">KVKK Aydınlatma</Link></li>
+                <li><Link href="/yasal#gizlilik">Gizlilik Politikası</Link></li>
+                <li><Link href="/yasal#cerez">Çerez Politikası</Link></li>
+                <li><Link href="/yasal#kosullar">Kullanım Koşulları</Link></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -250,9 +250,9 @@ export default function Page() {
           <div className="footer-bottom">
             <div className="footer-copy">© 2026 Finrate. Tüm hakları saklıdır.</div>
             <div className="footer-legal">
-              <Link href="/yasal#gizlilik">Gizlilik</Link>
-              <Link href="/yasal#kosullar">Koşullar</Link>
+              <Link href="/yasal#sorumluluk">Sorumluluk</Link>
               <Link href="/yasal#kvkk">KVKK</Link>
+              <Link href="/yasal#gizlilik">Gizlilik</Link>
             </div>
           </div>
         </div>
