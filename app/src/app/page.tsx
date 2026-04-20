@@ -235,6 +235,7 @@ export default function Page() {
                 <li><Link href="/yasal#kosullar">Kullanım Koşulları</Link></li>
                 <li><Link href="/yasal#kvkk">KVKK Aydınlatma</Link></li>
                 <li><Link href="/yasal#cerez">Çerez Politikası</Link></li>
+                <li><Link href="/yasal#sorumluluk">Sorumluluk Reddi</Link></li>
               </ul>
             </div>
             <div className="footer-col">
