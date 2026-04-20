@@ -240,7 +240,7 @@ export default function Page() {
             <div className="footer-col">
               <h4>İletişim</h4>
               <ul>
-                <li><Link href="mailto:info@finrate.com.tr">info@finrate.com</Link></li>
+                <li><Link href="mailto:info@finrate.com.tr">info@finrate.com.tr</Link></li>
                 <li><Link href="#sss">SSS</Link></li>
                 <li><Link href="#">Destek</Link></li>
               </ul>
