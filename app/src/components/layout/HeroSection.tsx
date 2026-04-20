@@ -57,7 +57,7 @@ export default function HeroSection() {
 
                   {/* Finrate Skoru */}
                   <div style={{ background: C.card, borderRadius: 12, padding: '10px 9px', border: `1px solid ${C.cardBorder}`, boxShadow: '0 2px 8px rgba(0,49,83,0.06)' }}>
-                    <div style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label, letterSpacing: '0.06em', marginBottom: 7 }}>FİNRATE SKORU</div>
+                    <div style={{ fontSize: '0.42rem', fontWeight: 700, color: C.label, letterSpacing: '0.06em', marginBottom: 7 }}>FINRATE SKORU</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <svg width="42" height="42" viewBox="0 0 42 42" style={{ flexShrink: 0 }}>
                         <circle cx="21" cy="21" r="16" fill="none" stroke={C.track} strokeWidth="5"/>

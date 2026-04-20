@@ -100,7 +100,7 @@ export default function LandingConversionPage() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                  <div>
-                    <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-1">FİNRATE SKORU</div>
+                    <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-1">FINRATE SKORU</div>
                     <div className="text-3xl font-black text-[#0B3C5D]">74<span className="text-sm text-slate-300">/100</span></div>
                  </div>
                  <div>
