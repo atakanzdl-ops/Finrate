@@ -749,7 +749,7 @@ function AnalizPageContent() {
                 {/* Sektör benchmark etiketi */}
                 {selected.entity?.sector && (
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-semibold text-slate-600">
-                    {bm.label} · TCMB 2024
+                    {bm.label} · TCMB Sektör Ort.
                   </span>
                 )}
                 {/* Yıl seçici */}
@@ -1122,7 +1122,7 @@ function AnalizPageContent() {
                         <p className="card-desc">{ratioSections.reduce((s, sec) => s + sec.rows.length, 0)} rasyo · Tümü</p>
                       </div>
                       <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
-                        Sektör: {bm.label} · TCMB 2024
+                        Sektör: {bm.label} · TCMB Sektör Ort.
                       </span>
                     </div>
 

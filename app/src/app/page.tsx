@@ -52,7 +52,7 @@ const pricingItems = [
     amount: 'İletişime Geçin',
     period: 'Sınırsız kullanım · kuruma özel',
     features: ['Profesyonel paketteki tüm özellikler', 'Sınırsız analiz', 'Kredi dosyası hazırlama', 'Kredi danışmanlığı', 'Forecast & nakit akış analizi', 'Kurumsal raporlama', '1 yıllık finansal danışmanlık'],
-    href: 'mailto:info@finrate.com',
+    href: 'mailto:info@finrate.com.tr',
     button: 'İletişime Geçin',
     featured: false,
   },
@@ -117,7 +117,7 @@ export default function Page() {
       </section>
 
       <div className="trust-bar">
-        <div className="trust-item"><span className="trust-dot"><span className="trust-dot-inner" /></span>TCMB 2024 benchmark</div>
+        <div className="trust-item"><span className="trust-dot"><span className="trust-dot-inner" /></span>TCMB Sektör Ortalamaları</div>
         <div className="trust-item"><span className="trust-dot"><span className="trust-dot-inner" /></span>KVKK uyumlu</div>
         <div className="trust-item"><span className="trust-dot"><span className="trust-dot-inner" /></span>256-bit SSL</div>
       </div>
@@ -146,7 +146,7 @@ export default function Page() {
             <div className="feature-card"><h3>Guardrail Sistemi</h3><p>Yapay not şişmesini engelleyen güvenlik katmanı.</p></div>
             <div className="feature-card"><h3>Senaryo Motoru</h3><p>“BB’den BBB’ye nasıl çıkarım?” sorusuna sayısal cevap.</p></div>
             <div className="feature-card"><h3>Bankaya Hazır PDF</h3><p>Yönetici özeti, skor breakdown, aksiyon planı.</p></div>
-            <div className="feature-card"><h3>TCMB Benchmark</h3><p>2024 sektör verisi ile kıyaslama.</p></div>
+            <div className="feature-card"><h3>TCMB Benchmark</h3><p>TCMB sektör ortalamaları ile kıyaslama.</p></div>
             <div className="feature-card"><h3>Çoklu Dönem</h3><p>2021-2025 trend takibi ve dönem karşılaştırması.</p></div>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function Page() {
           <p>Kredi notunuzu önceden öğrenin, zayıf noktaları güçlendirin.</p>
           <div className="cta-btns">
             <Link href="/kayit" className="btn-hero btn-hero-primary">Ücretsiz Analiz Başlat</Link>
-            <Link href="mailto:info@finrate.com" className="btn-hero btn-hero-secondary">Bize Yazın</Link>
+            <Link href="mailto:info@finrate.com.tr" className="btn-hero btn-hero-secondary">Bize Yazın</Link>
           </div>
         </div>
       </section>
@@ -240,14 +240,14 @@ export default function Page() {
             <div className="footer-col">
               <h4>İletişim</h4>
               <ul>
-                <li><Link href="mailto:info@finrate.com">info@finrate.com</Link></li>
+                <li><Link href="mailto:info@finrate.com.tr">info@finrate.com</Link></li>
                 <li><Link href="#sss">SSS</Link></li>
                 <li><Link href="#">Destek</Link></li>
               </ul>
             </div>
           </div>
           <div className="footer-bottom">
-            <div className="footer-copy">© 2025 Finrate. Tüm hakları saklıdır.</div>
+            <div className="footer-copy">© 2026 Finrate. Tüm hakları saklıdır.</div>
             <div className="footer-legal">
               <Link href="#">Gizlilik</Link>
               <Link href="#">Koşullar</Link>
