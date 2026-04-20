@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { FinrateLogoCanvas } from '@/components/ui/FinrateLogoCanvas'
 import {
   LayoutDashboard,
   Building2,
@@ -34,9 +35,23 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="app-brand flex items-center gap-3">
-          <div className="brand-mark">F</div>
+          <FinrateLogoCanvas size={40} />
           <div>
-            <div className="brand-title">FINRATE</div>
+            <div style={{
+              fontFamily: "'Sora', sans-serif",
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: '0.5px',
+              lineHeight: 1.2,
+            }}>
+              <span style={{ color: '#0B1F3A' }}>FIN</span>
+              <span style={{
+                background: 'linear-gradient(90deg, #0284c7, #0DC4A0)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>RATE</span>
+            </div>
             <div className="brand-subtitle">BANKACI KALİTESİ DEĞERLENDİRME</div>
           </div>
         </div>

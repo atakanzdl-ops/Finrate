@@ -91,7 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     include: {
       entities: {
         where: { isActive: true },
-        select: { id: true, name: true },
+        select: { id: true, name: true, sector: true },
       },
     },
   })
@@ -145,9 +145,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Tenzilat sonrası toplamları tekrar hesapla (tenzilat alt-kalemleri etkileyebilir)
   recalcBilancoTotals(consolidatedAfterTenzilat)
 
+  // Grup sektörünü belirle: tüm şirketler İnşaat ise inşaat metodolojisi devreye girer
+  const groupSector = group.entities.every((e: { sector: string | null }) => e.sector?.includes('İnşaat'))
+    ? 'İnşaat'
+    : group.entities.some((e: { sector: string | null }) => e.sector?.includes('İnşaat'))
+      ? 'İnşaat'
+      : null
+
   // Oran ve finansal skor hesapla
-  const ratios   = calculateRatios(consolidatedAfterTenzilat)
-  const scoring  = calculateScore(ratios, null)
+  const ratios   = calculateRatios({ ...consolidatedAfterTenzilat, sector: groupSector })
+  const scoring  = calculateScore(ratios, groupSector)
 
   // Şirketlerin subjektif puanlarını totalAssets ağırlığıyla ortala
   const subjectiveInputs = await prisma.subjectiveInput.findMany({

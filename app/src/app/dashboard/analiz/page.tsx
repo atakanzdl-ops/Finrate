@@ -437,11 +437,15 @@ function AnalizPageContent() {
     }
     // Recalculate en fazla 3 dakikada bir (sayfa geçişlerini yavaşlatmamak için)
     // Race condition önlemi: timestamp'i fetch ÖNCE yaz, böylece paralel sekme de tetiklemez
-    const RECALC_KEY = 'finrate_recalc_ts'
-    const lastTs = sessionStorage.getItem(RECALC_KEY)
-    const stale  = !lastTs || Date.now() - parseInt(lastTs) > 3 * 60 * 1000
+    const RECALC_KEY    = 'finrate_recalc_ts'
+    const RECALC_VER    = 'finrate_recalc_ver'
+    const CURRENT_VER   = '2'  // Rasyo motoru değiştiğinde artır → önbellek temizlenir
+    const lastTs        = sessionStorage.getItem(RECALC_KEY)
+    const lastVer       = sessionStorage.getItem(RECALC_VER)
+    const stale         = !lastTs || Date.now() - parseInt(lastTs) > 3 * 60 * 1000 || lastVer !== CURRENT_VER
     if (stale) {
       sessionStorage.setItem(RECALC_KEY, Date.now().toString())
+      sessionStorage.setItem(RECALC_VER, CURRENT_VER)
       fetch('/api/analyses/recalculate', { method: 'POST' })
         .catch(() => { sessionStorage.removeItem(RECALC_KEY) }) // Hata olursa kilit kaldır
         .finally(() => doLoad())
@@ -476,7 +480,7 @@ function AnalizPageContent() {
   if (analyses.length === 0) return (
     <FinrateShell>
       <div className="space-y-5">
-        <h1 className="text-2xl font-bold text-slate-900">Analizler</h1>
+        <h1 className="text-2xl font-bold text-[#0B3C5D]">Analizler</h1>
         <div className="card rounded-xl p-10 text-center">
           <p className="text-sm text-slate-500">Henüz analiz yok. Bir şirkete finansal veri girerek başlayın.</p>
         </div>
@@ -543,7 +547,11 @@ function AnalizPageContent() {
         { id: 'Asit-Test (Hızlı)',      desc: '(Dönen varlıklar − Stoklar) / kısa vadeli borçlar. Stok satışına gerek kalmadan anlık yükümlülükleri karşılama gücü. 1.0x üzeri iyi sayılır.',                               val: fmtN(r.quickRatio),               avg: fmtN(bm.quickRatio),                good: r.quickRatio != null && r.quickRatio >= bm.quickRatio * 0.85 },
         { id: 'Nakit Oran',             desc: 'Nakit & benzerleri / kısa vadeli borçlar. En katı likidite ölçüsüdür; yalnızca eldeki nakitle borç karşılanabilirliğini gösterir.',                                           val: fmtN(r.cashRatio),                avg: fmtN(bm.cashRatio),                 good: r.cashRatio != null && r.cashRatio >= 0.10 },
         { id: 'Net Çal. Ser. / Aktif',  desc: 'Net çalışma sermayesi (dönen − kısa vadeli borç) / toplam aktif. Pozitif olması, işletmenin kendi kendini finanse edebildiğine işaret eder.',                                 val: fmtN(r.netWorkingCapitalRatio),   avg: fmtN(bm.netWorkingCapitalRatio),    good: r.netWorkingCapitalRatio != null && r.netWorkingCapitalRatio > 0 },
-        { id: 'Nakit Dönüşüm Süresi',  desc: 'Stok devir + alacak tahsil − borç ödeme süresi (gün). Paranın hammaddeden nakit olarak geri dönüş süresi. Düşük (0-60 gün) iyidir.',                                         val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: fmtN(bm.cashConversionCycle, 0) + ' gün', good: r.cashConversionCycle != null && r.cashConversionCycle < 60 },
+        { id: 'Nakit İhtiyaç Süresi',   desc: 'Stok devir + alacak tahsil − borç ödeme süresi (gün). Düşük değer daha hızlı nakit döngüsü anlamına gelir.',                                                                   val: r.cashConversionCycle != null ? fmtN(r.cashConversionCycle, 0) + ' gün' : '—', avg: fmtN(bm.cashConversionCycle, 0) + ' gün', good: r.cashConversionCycle != null && r.cashConversionCycle < 120 },
+        ...(r.customerAdvanceDays != null ? [
+          { id: 'Alınan Avans Süresi (İnş.)',   desc: 'Müşteri avanslarının (340) net satışlara oranı × 365. İnşaat şirketlerinde müşteri ön ödemesinin işletme döngüsüne katkısını gösterir.',                                val: fmtN(r.customerAdvanceDays, 0) + ' gün',             avg: '—', good: r.customerAdvanceDays != null && r.customerAdvanceDays > 0 },
+          { id: 'Düzeltilmiş NDS (İnş.)',       desc: 'Nakit İhtiyaç Süresi − Alınan Avans Süresi. Müşteri avansları indirilmiş gerçek finansman ihtiyacı. İnşaat sektörüne özel gösterge.',                                  val: r.adjustedCashConversionCycle != null ? fmtN(r.adjustedCashConversionCycle, 0) + ' gün' : '—', avg: '—', good: r.adjustedCashConversionCycle != null && r.adjustedCashConversionCycle < 90 },
+        ] : []),
       ]
     },
     {
@@ -599,7 +607,7 @@ function AnalizPageContent() {
             <Filter className="absolute left-3 top-2.5 text-slate-400" size={14} />
             <input
               type="text" placeholder="Şirket, Dönem Ara..."
-              className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
+              className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-[#1E293B] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
             />
           </div>
           <button
@@ -680,7 +688,7 @@ function AnalizPageContent() {
                         <Building2 size={14} className={isActive ? "text-[#0B3C5D]" : "text-slate-400"} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={clsx("truncate text-[11px] font-semibold", isActive ? "text-slate-900" : "text-slate-700")}>
+                        <p className={clsx("truncate text-[11px] font-semibold", isActive ? "text-[#0B3C5D]" : "text-slate-600")}>
                           {best.entity?.name ?? 'Şirket'}
                         </p>
                         <p className="mt-0.5 font-mono text-[9px] font-semibold text-slate-400">
@@ -688,10 +696,10 @@ function AnalizPageContent() {
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-black font-mono" style={{ color: RATING_COLOR[rating] ?? '#8da4bf' }}>
+                        <div className="text-sm font-black font-mono" style={{ color: RATING_COLOR[rating] ?? '#94A3B8' }}>
                           {score}
                         </div>
-                        <div className="text-[9px] font-black" style={{ color: RATING_COLOR[rating] ?? '#8da4bf' }}>{rating}</div>
+                        <div className="text-[9px] font-black" style={{ color: RATING_COLOR[rating] ?? '#94A3B8' }}>{rating}</div>
                       </div>
                     </div>
                   </button>
@@ -749,7 +757,7 @@ function AnalizPageContent() {
                   <div className="relative">
                     <button
                       onClick={() => setYearOpen(v => !v)}
-                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-semibold text-[#0B3C5D] transition-colors hover:bg-slate-50"
                     >
                       {selected.year} · {selected.period}
                       <ChevronDown size={12} className={clsx("transition-transform", yearOpen && "rotate-180")} />

@@ -199,9 +199,8 @@ function matchBilField(label: string, sec: EkSection): string | null {
     if (n.includes('sozlesme') && (n.includes('varlik') || n.includes('alacak'))) return 'constructionCosts'
     if (n.includes('hakedis') && n.includes('alacak')) return 'constructionCosts'
     if (n.includes('devam eden') && (n.includes('is') || n.includes('proje') || n.includes('insaat'))) return 'constructionCosts'
-    // Verilen sipariş/peşin avanslar (aktif taraf)
-    // NOT: "7. Verilen Sipariş Avansları" gibi rakam-prefix'li satırlar Stoklar'ın (15x)
-    // alt kalemidir — E. Stoklar toplamı bunları zaten içerir, çift sayımı önle.
+    // 159 Verilen Sipariş Avansları — TDHP'de Stoklar grubu (15x) alt hesabı.
+    // Rasyo motorunda ayrı tutulur: inşaat DIO=sadece 151+153, diğer sektörler inventory+prepaidSuppliers kullanır.
     if (n.includes('verilen') && (n.includes('avansi') || n.includes('avans')) && !/^\d/.test(n)) return 'prepaidSuppliers'
     if ((n.includes('siparis avansi') || n.includes('is avansi')) && !/^\d/.test(n)) return 'prepaidSuppliers'
     if (n.includes('pesin odenen') || n.includes('pesin odenmis')) return 'prepaidExpenses'
@@ -279,7 +278,7 @@ function matchBilField(label: string, sec: EkSection): string | null {
     return 'constructionCosts'
   if (n.includes('hakedis') && n.includes('alacak'))
     return 'constructionCosts'
-  // Digit-prefix = Stoklar (15x) alt kalemi → zaten E.Stoklar toplamında var, çift sayma
+  // 159 Verilen Sipariş Avansları — prepaidSuppliers'da tutulur (inşaat DIO için ayrı)
   if (n.includes('verilen') && (n.includes('siparis') || n.includes('avansi')) && !n.includes('bor') && !/^\d/.test(n))
     return 'prepaidSuppliers'
   if (n.includes('hazir deger') || n.includes('nakit ve nakit benzeri'))
@@ -462,11 +461,12 @@ function parsePdfMizan(text: string): ParsedRow[] {
   const CODE_MAP: Record<string, string> = {
     '100': 'cash', '101': 'cash', '102': 'cash',
     '120': 'tradeReceivables', '121': 'tradeReceivables',
-    '150': 'inventory', '151': 'inventory', '153': 'inventory',
+    '150': 'inventory', '151': 'inventory', '153': 'inventory', '159': 'prepaidSuppliers',
     '252': 'tangibleAssets', '253': 'tangibleAssets', '254': 'tangibleAssets', '255': 'tangibleAssets',
     '260': 'intangibleAssets',
     '300': 'shortTermFinancialDebt', '301': 'shortTermFinancialDebt',
     '320': 'tradePayables', '321': 'tradePayables',
+    '340': 'advancesReceived',
     '400': 'longTermFinancialDebt', '401': 'longTermFinancialDebt',
     '500': 'paidInCapital', '570': 'retainedEarnings',
   }

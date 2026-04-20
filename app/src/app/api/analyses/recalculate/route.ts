@@ -29,22 +29,24 @@ export async function POST(req: NextRequest) {
     // Önce aynı period'u dene, bulamazsan ANNUAL'ı kullan (Q4 → ANNUAL fallback)
     let prevYearData = await prisma.financialData.findFirst({
       where: { entityId: fd.entityId, year: fd.year - 1, period: fd.period },
-      select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true },
+      select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
     })
     if (!prevYearData) {
       prevYearData = await prisma.financialData.findFirst({
         where: { entityId: fd.entityId, year: fd.year - 1 },
-        orderBy: { period: 'desc' },   // ANNUAL > Q4 > Q3 …
-        select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true },
+        orderBy: { period: 'desc' },
+        select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
       })
     }
 
     const enriched = {
       ...fields,
+      sector:                fd.entity.sector,
       prevRevenue:           prevYearData?.revenue           ?? null,
       prevInventory:         prevYearData?.inventory         ?? null,
       prevTradeReceivables:  prevYearData?.tradeReceivables  ?? null,
       prevTradePayables:     prevYearData?.tradePayables     ?? null,
+      prevAdvancesReceived:  prevYearData?.advancesReceived  ?? null,
       ppiRate: TURKEY_PPI[fd.year] ?? TURKEY_PPI[2024],
     }
 

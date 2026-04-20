@@ -173,7 +173,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs">Dönem</th>
-                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Ciro</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Satışlar</th>
                 <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">FAVÖK / FVÖK</th>
                 <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Net Kar</th>
                 <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Toplam Varlık</th>
@@ -191,7 +191,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
               ) : entity.financialData.map((fd) => (
                   <tr key={fd.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-semibold text-slate-800">{fd.year}</span>
+                      <span className="font-semibold text-[#0B3C5D]">{fd.year}</span>
                       <span
                         className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded"
                         style={{ background: '#0B3C5D', color: '#ffffff' }}

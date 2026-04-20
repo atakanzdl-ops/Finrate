@@ -56,21 +56,15 @@ body {
 .brand-mark {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--fr-primary);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
+  flex-shrink: 0;
+  display: block;
 }
 
 .brand-title {
+  font-family: 'Sora', sans-serif;
   font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--fr-primary);
+  font-weight: 800;
+  letter-spacing: 0.5px;
 }
 
 .brand-subtitle {

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FinrateLogoCanvas } from '@/components/ui/FinrateLogoCanvas'
 
 const LINKS = {
   Ürün: ['Platform', 'Özellikler', 'Fiyatlar', 'Güncellemeler'],
@@ -14,9 +15,22 @@ export default function Footer() {
 
           {/* Logo & Açıklama */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-1 text-xl font-bold mb-4">
-              <span className="text-gradient">Fin</span>
-              <span className="text-white">rate</span>
+            <Link href="/" className="flex items-center gap-3 mb-4">
+              <FinrateLogoCanvas size={36} />
+              <span style={{
+                fontFamily: "'Sora', sans-serif",
+                fontWeight: 800,
+                fontSize: 15,
+                letterSpacing: '0.5px',
+              }}>
+                <span style={{ color: '#ffffff' }}>FIN</span>
+                <span style={{
+                  background: 'linear-gradient(90deg, #0284c7, #0DC4A0)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}>RATE</span>
+              </span>
             </Link>
             <p className="text-white/40 text-sm leading-relaxed max-w-[200px]">
               Banka standardında finansal analiz ve kredi skorlama platformu.

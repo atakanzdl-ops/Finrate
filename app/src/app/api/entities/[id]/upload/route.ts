@@ -373,15 +373,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           (${uploadId}, ${entityId}, ${financialData.id}, ${row.year}, ${period}, ${source}, ${file.name}, ${Object.keys(row.fields ?? {}).length}, ${unmappedJson}, ${parseWarningsJson}, NOW())
       `
 
-      // Önceki yıl cirosunu sorgula (reel büyüme hesabı için)
+      // Önceki yıl verisini sorgula (büyüme + dönem ortalamaları için)
       const prevYearData = await prisma.financialData.findFirst({
         where: { entityId, year: row.year - 1, period },
-        select: { revenue: true },
+        select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
       })
       const ppiRate = TURKEY_PPI[row.year] ?? TURKEY_PPI[2024]
       const enrichedFields = {
         ...mergedFields,
-        prevRevenue: prevYearData?.revenue ?? null,
+        sector:               entity.sector,
+        prevRevenue:          prevYearData?.revenue          ?? null,
+        prevInventory:        prevYearData?.inventory        ?? null,
+        prevTradeReceivables: prevYearData?.tradeReceivables ?? null,
+        prevTradePayables:    prevYearData?.tradePayables    ?? null,
+        prevAdvancesReceived: prevYearData?.advancesReceived ?? null,
         ppiRate,
       }
 

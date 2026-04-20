@@ -1,30 +1,31 @@
 /**
  * Finrate — 25 Finansal Oran Hesaplama Modülü
- * 4 kategori: Likidite (6), Karlılık (7), Kaldıraç (6), Faaliyet (6)
+ * 4 kategori: Likidite (6), Karlılık (9), Kaldıraç (6), Faaliyet (6)
+ * İnşaat/Taahhüt sektörü için otomatik özel metodoloji.
  */
 
-/**
- * Türkiye kurumlar vergisi oranı (ROIC/NOPAT hesabı için).
- * 2024 itibarıyla %25'e yükseltildi. Değişirse buradan güncelle.
- * Kaynak: 7456 Sayılı Kanun (Resmi Gazete: 02.08.2023)
- */
 export const CORPORATE_TAX_RATE = 0.25
 
 export interface FinancialInput {
+  // Sektör — İnşaat/Taahhüt için özel metodoloji otomatik devreye girer
+  sector?: string | null
+
   // Büyüme hesabı için
-  prevRevenue?: number | null          // Önceki yıl cirosu (reel büyüme için)
+  prevRevenue?: number | null          // Önceki yıl cirosu
   ppiRate?: number | null              // ÜFE oranı (0.43 = %43)
 
   // Önceki dönem karşılaştırma kalemleri (ortalama hesabı için)
-  prevInventory?: number | null        // Önceki yıl stok (DIO ortalama için)
-  prevTradeReceivables?: number | null // Önceki yıl ticari alacak (DSO ortalama için)
-  prevTradePayables?: number | null    // Önceki yıl ticari borç (DPO ortalama için)
+  prevInventory?: number | null        // Önceki yıl stok
+  prevTradeReceivables?: number | null // Önceki yıl ticari alacak
+  prevTradePayables?: number | null    // Önceki yıl ticari borç
+  prevAdvancesReceived?: number | null // Önceki yıl alınan avanslar (340)
 
   // Dönen Varlıklar
   cash?: number | null
   shortTermInvestments?: number | null
   tradeReceivables?: number | null
   inventory?: number | null
+  prepaidSuppliers?: number | null     // 159 Verilen Sipariş Avansları (Stoklar alt hesabı)
   otherCurrentAssets?: number | null
   totalCurrentAssets?: number | null
 
@@ -39,6 +40,7 @@ export interface FinancialInput {
   // Kısa Vadeli Borçlar
   shortTermFinancialDebt?: number | null
   tradePayables?: number | null
+  advancesReceived?: number | null     // 340 Alınan Sipariş/Müşteri Avansları
   otherCurrentLiabilities?: number | null
   totalCurrentLiabilities?: number | null
 
@@ -73,39 +75,43 @@ export interface FinancialInput {
 
 export interface RatioResult {
   // LİKİDİTE (6)
-  currentRatio: number | null          // Cari Oran
-  quickRatio: number | null            // Asit-Test Oranı
-  cashRatio: number | null             // Nakit Oranı
-  netWorkingCapital: number | null     // Net Çalışma Sermayesi
-  netWorkingCapitalRatio: number | null // NÇS / Toplam Varlık
-  cashConversionCycle: number | null   // Nakit Dönüşüm Süresi (gün)
+  currentRatio: number | null
+  quickRatio: number | null
+  cashRatio: number | null
+  netWorkingCapital: number | null
+  netWorkingCapitalRatio: number | null
+  cashConversionCycle: number | null       // Nakit İhtiyaç Süresi — Standart (gün)
 
   // KARLILIK (9)
-  grossMargin: number | null           // Brüt Kar Marjı
-  ebitdaMargin: number | null          // FAVÖK Marjı
-  ebitMargin: number | null            // FVÖK Marjı (EBIT Marjı)
-  netProfitMargin: number | null       // Net Kar Marjı
-  roa: number | null                   // Aktif Karlılığı (ROA)
-  roe: number | null                   // Öz Kaynak Karlılığı (ROE)
-  roic: number | null                  // Yatırım Getirisi (ROIC)
-  revenueGrowth: number | null         // Nominal Gelir Büyümesi
-  realGrowth: number | null            // Reel Büyüme (ÜFE Arındırılmış)
+  grossMargin: number | null
+  ebitdaMargin: number | null
+  ebitMargin: number | null
+  netProfitMargin: number | null
+  roa: number | null
+  roe: number | null
+  roic: number | null
+  revenueGrowth: number | null
+  realGrowth: number | null
 
   // KALDIRAC (6)
-  debtToEquity: number | null          // Borç / Öz Kaynak
-  debtToAssets: number | null          // Borç / Varlık
-  debtToEbitda: number | null          // Net Finansal Borç / FAVÖK
-  interestCoverage: number | null      // Faiz Karşılama Oranı
-  equityRatio: number | null           // Öz Kaynak Oranı
-  shortTermDebtRatio: number | null    // KV Borç / Toplam Borç
+  debtToEquity: number | null
+  debtToAssets: number | null
+  debtToEbitda: number | null
+  interestCoverage: number | null
+  equityRatio: number | null
+  shortTermDebtRatio: number | null
 
   // FAALİYET (6)
-  assetTurnover: number | null         // Varlık Devir Hızı
-  inventoryTurnoverDays: number | null // Stok Devir Süresi (gün)
-  receivablesTurnoverDays: number | null // Alacak Tahsil Süresi (gün)
-  payablesTurnoverDays: number | null  // Borç Ödeme Süresi (gün)
-  fixedAssetTurnover: number | null    // Duran Varlık Devir Hızı
-  operatingExpenseRatio: number | null // Faaliyet Gideri / Gelir
+  assetTurnover: number | null
+  inventoryTurnoverDays: number | null     // Stok Taşıma Süresi (gün)
+  receivablesTurnoverDays: number | null   // Alacak Tahsil Süresi (gün)
+  payablesTurnoverDays: number | null      // Ticari Borç Ödeme Süresi (gün)
+  fixedAssetTurnover: number | null
+  operatingExpenseRatio: number | null
+
+  // İNŞAAT SEKTÖRÜ EK RASYOLAR
+  customerAdvanceDays: number | null       // Alınan Avans Süresi — 340 / (Net Satışlar/365)
+  adjustedCashConversionCycle: number | null // Düzeltilmiş NDS = Stok + Alacak - Borç - Avans
 }
 
 function safe(a: number | null | undefined, b: number | null | undefined): number | null {
@@ -117,7 +123,6 @@ function n(v: number | null | undefined): number | null {
   return v == null ? null : Number(v)
 }
 
-// Türkiye ÜFE (Üretici Fiyat Endeksi) yıllık oranları — TCMB verisine dayalı
 export const TURKEY_PPI: Record<number, number> = {
   2025: 0.30,
   2024: 0.43,
@@ -130,7 +135,11 @@ export const TURKEY_PPI: Record<number, number> = {
 }
 
 export function calculateRatios(d: FinancialInput): RatioResult {
-  // Türetilmiş değerler
+  // ─── Sektör tespiti ─────────────────────────────────────────
+  const isConstruction = typeof d.sector === 'string' &&
+    (d.sector.includes('İnşaat') || d.sector.includes('Insaat') || d.sector.includes('Taahhüt'))
+
+  // ─── Türetilmiş değerler ─────────────────────────────────────
   const totalFinancialDebt =
     (n(d.shortTermFinancialDebt) ?? 0) + (n(d.longTermFinancialDebt) ?? 0)
 
@@ -139,34 +148,43 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const totalDebt =
     (n(d.totalCurrentLiabilities) ?? 0) + (n(d.totalNonCurrentLiabilities) ?? 0)
 
-  // Hesaplanan ama schema'da olmayan alanlar için fallback
   const grossProfit = n(d.grossProfit) ?? (
     d.revenue != null && d.cogs != null ? n(d.revenue)! - n(d.cogs)! : null
   )
   const ebitda = n(d.ebitda) ?? (
     d.ebit != null && d.depreciation != null ? n(d.ebit)! + n(d.depreciation)! : null
   )
-  const totalEquity = n(d.totalEquity)
-  const revenue = n(d.revenue)
-  const totalAssets = n(d.totalAssets)
-  const totalCurrentAssets = n(d.totalCurrentAssets)
-  const totalCurrentLiabilities = n(d.totalCurrentLiabilities)
-  const inventory = n(d.inventory)
-  const cash = n(d.cash)
-  const shortTermInvestments = n(d.shortTermInvestments)
-  const ebit = n(d.ebit)
-  const netProfit = n(d.netProfit)
-  const interestExpense = n(d.interestExpense)
-  const tangibleAssets = n(d.tangibleAssets)
-  const tradeReceivables = n(d.tradeReceivables)
-  const tradePayables = n(d.tradePayables)
-  const purchases = n(d.purchases)
-  const operatingExpenses = n(d.operatingExpenses)
-  const longTermFinancialDebt = n(d.longTermFinancialDebt)
 
-  // ─── LİKİDİTE ───────────────────────────────────────────
+  const totalEquity            = n(d.totalEquity)
+  const revenue                = n(d.revenue)
+  const totalAssets            = n(d.totalAssets)
+  const totalCurrentAssets     = n(d.totalCurrentAssets)
+  const totalCurrentLiabilities= n(d.totalCurrentLiabilities)
+  const cash                   = n(d.cash)
+  const shortTermInvestments   = n(d.shortTermInvestments)
+  const ebit                   = n(d.ebit)
+  const netProfit              = n(d.netProfit)
+  const interestExpense        = n(d.interestExpense)
+  const tangibleAssets         = n(d.tangibleAssets)
+  const tradeReceivables       = n(d.tradeReceivables)
+  const tradePayables          = n(d.tradePayables)
+  const purchases              = n(d.purchases)
+  const operatingExpenses      = n(d.operatingExpenses)
+  const longTermFinancialDebt  = n(d.longTermFinancialDebt)
+  const cogs                   = n(d.cogs)
+
+  // ─── Stok hesabı ─────────────────────────────────────────────
+  // Tüm sektörler: 151+153+159 birlikte DIO hesabına girer.
+  // (İnşaat dahil — verilen sipariş avansları/159 stokların parçasıdır.)
+  // İnşaata özgü ek metrikler: customerAdvanceDays & adjustedCashConversionCycle
+  const _inv = n(d.inventory)
+  const _ps  = n(d.prepaidSuppliers)
+  const inventory = (_inv != null || _ps != null) ? ((_inv ?? 0) + (_ps ?? 0)) : null
+
+  // ─── LİKİDİTE ────────────────────────────────────────────────
   const currentRatio = safe(totalCurrentAssets, totalCurrentLiabilities)
 
+  // Hızlı Oran: Dönen Varlıklar - Stok (merged ya da ham inventory)
   const quickAssets =
     totalCurrentAssets != null && inventory != null ? totalCurrentAssets - inventory : null
   const quickRatio = safe(quickAssets, totalCurrentLiabilities)
@@ -182,16 +200,14 @@ export function calculateRatios(d: FinancialInput): RatioResult {
 
   const netWorkingCapitalRatio = safe(netWorkingCapital, totalAssets)
 
-  // NDS = Stok Devir + Alacak Tahsil - Borç Ödeme (gün)
-  // purchases yoksa cogs kullan, o da yoksa revenue fallback
-  const cogs = n(d.cogs)
-  const costBase = purchases ?? cogs  // revenue fallback kaldırıldı: DIO/DPO maliyet bazlı olmalı
+  // ─── FAALİYET — Ortalama bakiye hesabı ───────────────────────
+  const costBase = purchases ?? cogs
 
-  // Ortalama bakiye hesabı: önceki dönem verisi varsa (başlangıç+bitiş)/2,
-  // yoksa sadece dönem sonu kullanılır (standart muhasebe pratiği)
-  const prevInventory        = n(d.prevInventory)
-  const prevTradeReceivables = n(d.prevTradeReceivables)
-  const prevTradePayables    = n(d.prevTradePayables)
+  const prevInventory         = n(d.prevInventory)
+  const prevTradeReceivables  = n(d.prevTradeReceivables)
+  const prevTradePayables     = n(d.prevTradePayables)
+  const advancesReceived      = n(d.advancesReceived)
+  const prevAdvancesReceived  = n(d.prevAdvancesReceived)
 
   const avgInventory =
     inventory != null && prevInventory != null
@@ -208,17 +224,27 @@ export function calculateRatios(d: FinancialInput): RatioResult {
       ? (tradePayables + prevTradePayables) / 2
       : tradePayables
 
-  // DSO: Alacak Tahsil Süresi — payda: net satışlar (standart)
+  // Alınan avanslar ortalaması (340)
+  const avgAdvancesReceived =
+    advancesReceived != null && prevAdvancesReceived != null
+      ? (advancesReceived + prevAdvancesReceived) / 2
+      : advancesReceived
+
+  // ─── DIO / DSO / DPO ─────────────────────────────────────────
+  // İnşaat metodolojisi:
+  //   DIO: Ortalama Stok (151+153) / (Ortalama SMM / 365)
+  //   DSO: Ortalama Alacak (120+121) / (Net Satışlar / 365)
+  //   DPO: Ortalama Borç (320+321+329≈tradePayables) / (Ortalama SMM / 365)
+  // Diğer sektörler: aynı formüller, inventory+prepaidSuppliers dahil
+
   const dso = revenue != null && avgReceivables != null
     ? (avgReceivables / revenue) * 365
     : null
 
-  // DPO: Borç Ödeme Süresi — payda: maliyet bazı (COGS veya alımlar)
   const dpo = costBase != null && avgPayables != null
     ? (avgPayables / costBase) * 365
     : null
 
-  // DIO: Stok Devir Süresi — ortalama stok / maliyet bazı
   const dio = avgInventory != null && costBase != null
     ? (avgInventory / costBase) * 365
     : null
@@ -226,70 +252,67 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const cashConversionCycle =
     dio != null && dso != null && dpo != null ? dio + dso - dpo : null
 
-  // ─── KARLILIK ─────────────────────────────────────────────
-  const grossMargin = safe(grossProfit, revenue)
-  const ebitdaMargin = safe(ebitda, revenue)
-  const ebitMargin = safe(ebit, revenue)
-  const netProfitMargin = safe(netProfit, revenue)
-  const roa = safe(netProfit, totalAssets)
-
-  const roe = safe(netProfit, totalEquity)
-
-  // ROIC: EBIT*(1-0.22) / (Toplam Varlık - KV Borçlar)
-  const investedCapital =
-    totalAssets != null && totalCurrentLiabilities != null
-      ? totalAssets - totalCurrentLiabilities
+  // ─── İnşaat — Alınan Avans Süresi & Düzeltilmiş NDS ─────────
+  // Alınan Avans Süresi = Ortalama 340 / (Net Satışlar / 365)
+  const customerAdvanceDays =
+    isConstruction && avgAdvancesReceived != null && revenue != null && revenue > 0
+      ? (avgAdvancesReceived / revenue) * 365
       : null
-  const nopat = ebit != null ? ebit * (1 - CORPORATE_TAX_RATE) : null
-  const roic = safe(nopat, investedCapital)
 
-  // Büyüme rasyoları
+  // Düzeltilmiş NDS = Standart NDS - Alınan Avans Süresi
+  const adjustedCashConversionCycle =
+    cashConversionCycle != null && customerAdvanceDays != null
+      ? cashConversionCycle - customerAdvanceDays
+      : null
+
+  // ─── KARLILIK ─────────────────────────────────────────────────
+  const grossMargin      = safe(grossProfit, revenue)
+  const ebitdaMargin     = safe(ebitda, revenue)
+  const ebitMargin       = safe(ebit, revenue)
+  const netProfitMargin  = safe(netProfit, revenue)
+  const roa              = safe(netProfit, totalAssets)
+  const roe              = safe(netProfit, totalEquity)
+
+  const investedCapital  =
+    totalAssets != null && totalCurrentLiabilities != null
+      ? totalAssets - totalCurrentLiabilities : null
+  const nopat  = ebit != null ? ebit * (1 - CORPORATE_TAX_RATE) : null
+  const roic   = safe(nopat, investedCapital)
+
   const prevRevenue = n(d.prevRevenue)
   const revenueGrowth =
     prevRevenue != null && prevRevenue !== 0 && revenue != null
-      ? (revenue - prevRevenue) / prevRevenue
-      : null
+      ? (revenue - prevRevenue) / prevRevenue : null
 
-  const ppiRate = n(d.ppiRate)
+  const ppiRate   = n(d.ppiRate)
   const realGrowth =
     revenueGrowth != null && ppiRate != null
-      ? (1 + revenueGrowth) / (1 + ppiRate) - 1
-      : null
+      ? (1 + revenueGrowth) / (1 + ppiRate) - 1 : null
 
-  // ─── KALDIRAC ─────────────────────────────────────────────
-  // totalDebt=0 (borçsuz şirket) → 0 döndür, null değil (pozitif sinyal olarak skorlanmalı)
-  const debtToEquity = safe(totalDebt, totalEquity)
-  const debtToAssets = safe(totalDebt, totalAssets)
-  const debtToEbitda = ebitda != null && ebitda !== 0 ? netFinancialDebt / ebitda : null
-  const equityRatio = safe(totalEquity, totalAssets)
+  // ─── KALDIRAC ─────────────────────────────────────────────────
+  const debtToEquity   = safe(totalDebt, totalEquity)
+  const debtToAssets   = safe(totalDebt, totalAssets)
+  const debtToEbitda   = ebitda != null && ebitda !== 0 ? netFinancialDebt / ebitda : null
+  const equityRatio    = safe(totalEquity, totalAssets)
 
-  /**
-   * Faiz Karşılama Oranı — 3 durum:
-   *
-   * 1. interestExpense girilmemiş (null/undefined) → null döner (veri yok, hesaplanamaz)
-   * 2. interestExpense = 0 → 9999 döner (sentinel; JSON'da Infinity bozulur)
-   *    score.ts'de >= 9999 kontrolüyle muhafazakâr puanlama yapılır
-   * 3. interestExpense > 0 → EBIT / interestExpense (normal hesap)
-   */
   const interestExpenseVal = n(d.interestExpense)
   const interestCoverage: number | null =
-    interestExpenseVal == null  ? null   // veri girilmemiş
-    : interestExpenseVal === 0  ? 9999  // faiz yükü yok → borç düzeyine göre puan
-    : ebit != null              ? ebit / interestExpenseVal
+    interestExpenseVal == null ? null
+    : interestExpenseVal === 0 ? 9999
+    : ebit != null             ? ebit / interestExpenseVal
     : null
 
   const shortTermDebtRatio =
     totalFinancialDebt > 0 && d.shortTermFinancialDebt != null
-      ? (n(d.shortTermFinancialDebt)! / totalFinancialDebt)
-      : null
+      ? (n(d.shortTermFinancialDebt)! / totalFinancialDebt) : null
 
-  // ─── FAALİYET ─────────────────────────────────────────────
-  const assetTurnover = safe(revenue, totalAssets)
-  const inventoryTurnoverDays = dio
-  const receivablesTurnoverDays = dso
-  const payablesTurnoverDays = dpo
-  const fixedAssetTurnover = safe(revenue, tangibleAssets)
-  const operatingExpenseRatio = safe(operatingExpenses, revenue)
+  // ─── FAALİYET ─────────────────────────────────────────────────
+  const assetTurnover          = safe(revenue, totalAssets)
+  const inventoryTurnoverDays  = dio
+  const receivablesTurnoverDays= dso
+  const payablesTurnoverDays   = dpo
+  const fixedAssetTurnover     = safe(revenue, tangibleAssets)
+  const operatingExpenseRatio  = safe(operatingExpenses, revenue)
 
   return {
     currentRatio,
@@ -322,5 +345,8 @@ export function calculateRatios(d: FinancialInput): RatioResult {
     payablesTurnoverDays,
     fixedAssetTurnover,
     operatingExpenseRatio,
+
+    customerAdvanceDays,
+    adjustedCashConversionCycle,
   }
 }
