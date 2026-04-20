@@ -125,8 +125,8 @@ const TABLE_ROWS: TableRowDef[] = [
   { type: 'data',      label: 'Hazır Değerler',              field: 'cash' },
   { type: 'data',      label: 'Ticari Alacaklar',            field: 'tradeReceivables' },
   { type: 'data',      label: 'Diğer Alacaklar',             field: 'otherReceivables' },
-  { type: 'data',      label: 'Stoklar',                     field: 'inventory' },
-  { type: 'data',      label: 'Verilen Sipariş Avansları',   field: 'prepaidSuppliers' },
+  { type: 'data',      label: 'Stoklar (151+153)',             field: 'inventory' },
+  { type: 'data',      label: 'Verilen Sipariş Avansları (159)', field: 'prepaidSuppliers' },
   { type: 'data',      label: 'Diğer Dönen Varlıklar',       field: 'otherCurrentAssets' },
   { type: 'data',      label: 'DÖNEN VARLIK TOPLAMI',        field: 'totalCurrentAssets',     variant: 'bold' },
   { type: 'separator' },
@@ -179,9 +179,11 @@ const TABLE_ROWS: TableRowDef[] = [
 
 function fmtTRY(v: number | null | undefined): string {
   if (v == null) return '—'
-  const abs = Math.abs(v)
+  const rounded = Math.round(v)
+  if (rounded === 0) return '0'
+  const abs = Math.abs(rounded)
   const s = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(abs)
-  return v < 0 ? `-${s}` : s
+  return rounded < 0 ? `-${s}` : s
 }
 
 function periodLabel(p: PeriodInfo): string {
@@ -814,7 +816,9 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                       { key: 'quickRatio',              label: 'Hızlı Oran',                                  bmKey: 'quickRatio' },
                       { key: 'cashRatio',               label: 'Nakit Oranı',                                 bmKey: 'cashRatio' },
                       { key: 'netWorkingCapitalRatio',  label: 'NÇS / Aktif',                                 bmKey: 'netWorkingCapitalRatio' },
-                      { key: 'cashConversionCycle',     label: 'Nakit Dönüşüm Süresi (gün)', lowerIsBetter: true, isDays: true, bmKey: 'cashConversionCycle' },
+                      { key: 'cashConversionCycle',          label: 'Nakit İhtiyaç Süresi (gün)',           lowerIsBetter: true, isDays: true, bmKey: 'cashConversionCycle' },
+                      { key: 'customerAdvanceDays',          label: 'Alınan Avans Süresi (gün) — İnş.',    lowerIsBetter: false, isDays: true },
+                      { key: 'adjustedCashConversionCycle',  label: 'Düzeltilmiş NDS (gün) — İnş.',        lowerIsBetter: true,  isDays: true },
                       // ── Karlılık ─────────────────────────────────────────
                       { key: 'ebitdaMargin',            label: 'FAVÖK Marjı',                    isPct: true,  bmKey: 'ebitdaMargin' },
                       { key: 'ebitMargin',              label: 'Faaliyet Kâr Marjı (EBIT)',       isPct: true,  bmKey: 'ebitMargin' },

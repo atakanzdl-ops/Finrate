@@ -34,10 +34,9 @@ const TDHP_ROWS: RowDef[] = [
   { type: 'account', code: '11', label: 'Menkul Kıymetler',                           field: 'shortTermInvestments' },
   { type: 'account', code: '12', label: 'Ticari Alacaklar',                           field: 'tradeReceivables' },
   { type: 'account', code: '13', label: 'Diğer Alacaklar',                            field: 'otherReceivables' },
-  { type: 'account', code: '15', label: 'Stoklar',                                    field: 'inventory' },
+  { type: 'account', code: '15+159', label: 'Stoklar (Verilen Sipariş Avansları dahil)', field: 'inventory' },
   { type: 'account', code: '17', label: 'Yıllara Yaygın İnş. ve Onarım Maliyetleri', field: 'constructionCosts' },
   { type: 'account', code: '18', label: 'Gelecek Aylara Ait Giderler',                field: 'prepaidExpenses' },
-  { type: 'account', code: '159', label: 'Verilen Sipariş Avansları',                 field: 'prepaidSuppliers' },
   { type: 'account', code: '19', label: 'Diğer Dönen Varlıklar',                      field: 'otherCurrentAssets' },
   { type: 'subtotal',            label: '▶ DÖNEN VARLIK TOPLAMI',                     field: 'totalCurrentAssets' },
 
@@ -550,7 +549,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                 className={clsx(
                   'w-full bg-white border border-slate-200 rounded px-1.5 py-0.5',
                   'text-right tabular-nums text-[10px] focus:outline-none focus:border-[#1FA4A9]/50',
-                  isNeg ? 'text-red-600' : 'text-slate-900',
+                  isNeg ? 'text-red-600' : 'text-[#1E293B]',
                 )}
                 placeholder="0,00"
               />
@@ -597,7 +596,7 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
               </th>
               {cols.map(col => (
                 <th key={col.id} className="text-right px-3 py-2 min-w-[130px]">
-                  <div className="text-slate-800 font-bold">{col.year}</div>
+                  <div className="text-[#0B3C5D] font-bold">{col.year}</div>
                   <div className="mt-1 flex justify-end">
                     <span
                       className="text-[9px] font-semibold px-1.5 py-0.5 rounded"

@@ -15,8 +15,8 @@ function ScoreBar({ label, value, max, color }: { label: string; value: number; 
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-[11px] font-bold">
-        <span className="text-[#3d5a80]">{label}</span>
-        <span className="text-[#0a1727] font-mono">{value} / {max}</span>
+        <span className="text-[#5A7A96]">{label}</span>
+        <span className="text-[#0B3C5D] font-mono">{value} / {max}</span>
       </div>
       <div className="ratio-bar-track">
         <div className="ratio-bar-fill transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
@@ -29,7 +29,7 @@ function SwitchField({ label, desc, value, onChange }: { label: string; desc?: s
   return (
     <div className="flex items-center justify-between py-3 border-b border-black/5 last:border-0">
       <div>
-        <div className="text-xs font-bold text-[#0a1727]">{label}</div>
+        <div className="text-xs font-bold text-[#0B3C5D]">{label}</div>
         {desc && <div className="card-desc mt-0.5">{desc}</div>}
       </div>
       <button
@@ -61,7 +61,7 @@ function SelectField({ label, value, options, onChange }: { label: string; value
               "px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all",
               value === opt.val
                 ? "bg-cyan-500 border-cyan-500 text-white shadow-md"
-                : "border-black/10 text-[#3d5a80] hover:border-cyan-400/50 hover:text-cyan-600"
+                : "border-slate-200 text-[#5A7A96] hover:border-cyan-400/50 hover:text-cyan-600"
             )}
           >
             {opt.label}
@@ -79,7 +79,7 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
     <div className="space-y-2">
       <div className="flex justify-between">
         <label className="card-desc uppercase tracking-widest">{label}</label>
-        <span className="text-xs font-black text-[#0a1727] font-mono">{value}{unit}</span>
+        <span className="text-xs font-black text-[#0B3C5D] font-mono">{value}{unit}</span>
       </div>
       <input
         type="range"
@@ -90,7 +90,7 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
         onChange={e => onChange(Number(e.target.value))}
         className="w-full accent-cyan-500 h-1.5 rounded-full cursor-pointer"
       />
-      <div className="flex justify-between text-[9px] text-[#8da4bf]">
+      <div className="flex justify-between text-[9px] text-[#94A3B8]">
         <span>{min}{unit}</span>
         <span>{max}{unit}</span>
       </div>
@@ -165,7 +165,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
     ? score.percentage >= 70 ? '#10b981'
     : score.percentage >= 40 ? '#94a3b8'
     : '#f87171'
-    : '#8da4bf'
+    : '#94A3B8'
 
   return (
     <div className="space-y-6">
@@ -209,7 +209,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard size={14} className="text-cyan-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">KKB & Kredi Sicili</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#5A7A96]">KKB & Kredi Sicili</span>
               <span className="ml-auto text-[9px] font-bold text-cyan-500">{score?.kkbScore ?? '–'} / 10</span>
             </div>
             <SelectField
@@ -253,7 +253,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <Building2 size={14} className="text-blue-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">Banka İlişkileri</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#5A7A96]">Banka İlişkileri</span>
               <span className="ml-auto text-[9px] font-bold text-blue-500">{score?.bankScore ?? '–'} / 10</span>
             </div>
             <SliderField
@@ -281,7 +281,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <Shield size={14} className="text-indigo-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">Kurumsal Yapı</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#5A7A96]">Kurumsal Yapı</span>
               <span className="ml-auto text-[9px] font-bold text-indigo-500">{score?.corpScore ?? '–'} / 5</span>
             </div>
             <SliderField
@@ -315,7 +315,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle size={14} className="text-sky-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#3d5a80]">Uyum & Risk</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#5A7A96]">Uyum & Risk</span>
               <span className="ml-auto text-[9px] font-bold text-sky-500">{score?.complianceScore ?? '–'} / 5</span>
             </div>
             <div className="rounded-xl p-4 space-y-0" style={{ background: 'rgba(0,0,0,0.03)' }}>

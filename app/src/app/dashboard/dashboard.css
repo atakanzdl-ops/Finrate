@@ -700,7 +700,7 @@
 /* ─── TABS ────────────────────────────────────── */
 .tab-group {
     display: flex;
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(11, 60, 93, 0.06);
     border-radius: var(--radius-sm);
     padding: 3px;
 }
@@ -719,12 +719,10 @@
 }
 
 .tab.active {
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    color: #0a1727;
-    border-color: rgba(255, 255, 255, 0.65);
-    box-shadow: 0 2px 8px rgba(10, 30, 60, 0.14);
+    background: #ffffff;
+    color: #0B3C5D;
+    border-color: rgba(11, 60, 93, 0.12);
+    box-shadow: 0 1px 4px rgba(11, 60, 93, 0.10);
 }
 
 .tab:hover:not(.active) {

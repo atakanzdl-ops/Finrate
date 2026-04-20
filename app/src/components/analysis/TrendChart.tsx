@@ -65,28 +65,28 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
         boxShadow: '0 8px 24px rgba(10,30,60,0.12)',
       }}
     >
-      <div className="font-black text-[#0a1727] mb-2">{label}</div>
+      <div className="font-black text-[#0B3C5D] mb-2">{label}</div>
       <div className="space-y-1">
         <div className="flex justify-between gap-4">
-          <span className="text-[#3d5a80]">Finrate Skoru</span>
-          <span className="font-black" style={{ color: RATING_COLOR[rating] ?? '#8da4bf' }}>
+          <span className="text-[#5A7A96]">Finrate Skoru</span>
+          <span className="font-black" style={{ color: RATING_COLOR[rating] ?? '#94A3B8' }}>
             {Math.round(d?.combinedScore ?? 0)} — {rating}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#3d5a80]">Likidite</span>
+          <span className="text-[#5A7A96]">Likidite</span>
           <span className="font-bold text-cyan-500">{Math.round(d?.liquidityScore ?? 0)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#3d5a80]">Karlılık</span>
+          <span className="text-[#5A7A96]">Karlılık</span>
           <span className="font-bold text-indigo-400">{Math.round(d?.profitabilityScore ?? 0)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#3d5a80]">Kaldıraç</span>
+          <span className="text-[#5A7A96]">Kaldıraç</span>
           <span className="font-bold text-sky-400">{Math.round(d?.leverageScore ?? 0)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#3d5a80]">Faaliyet</span>
+          <span className="text-[#5A7A96]">Faaliyet</span>
           <span className="font-bold text-indigo-400">{Math.round(d?.activityScore ?? 0)}</span>
         </div>
       </div>
@@ -192,12 +192,12 @@ export default function TrendChart({ analyses, entityName, subjectiveScores, ent
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10, fill: '#8da4bf', fontWeight: 700 }}
+              tick={{ fontSize: 10, fill: '#94A3B8', fontWeight: 700 }}
               axisLine={false} tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 10, fill: '#8da4bf', fontWeight: 700 }}
+              tick={{ fontSize: 10, fill: '#94A3B8', fontWeight: 700 }}
               axisLine={false} tickLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -219,18 +219,18 @@ export default function TrendChart({ analyses, entityName, subjectiveScores, ent
 
       {/* Kategori Alt Grafik */}
       <div className="px-6 pt-2 pb-6">
-        <p className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf] mb-3">Kategori Trendleri</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-[#94A3B8] mb-3">Kategori Trendleri</p>
         <ResponsiveContainer width="100%" height={130}>
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9, fill: '#8da4bf', fontWeight: 700 }}
+              tick={{ fontSize: 9, fill: '#94A3B8', fontWeight: 700 }}
               axisLine={false} tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 9, fill: '#8da4bf', fontWeight: 700 }}
+              tick={{ fontSize: 9, fill: '#94A3B8', fontWeight: 700 }}
               axisLine={false} tickLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -250,7 +250,7 @@ export default function TrendChart({ analyses, entityName, subjectiveScores, ent
           ].map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
               <div className="w-3 h-0.5 rounded-full" style={{ background: l.color }} />
-              <span className="text-[9px] font-bold text-[#8da4bf]">{l.label}</span>
+              <span className="text-[9px] font-bold text-[#94A3B8]">{l.label}</span>
             </div>
           ))}
         </div>

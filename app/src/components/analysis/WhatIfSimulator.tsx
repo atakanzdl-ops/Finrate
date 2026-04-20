@@ -339,12 +339,12 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
       >
         <div className="flex items-center gap-2">
           <Sliders size={16} className="text-cyan-600" />
-          <p className="text-sm font-semibold text-[#0a1727]">Senaryo Simülatörü & Optimizasyon</p>
+          <p className="text-sm font-semibold text-[#0B3C5D]">Senaryo Simülatörü & Optimizasyon</p>
           {hasChanges && (
             <span className="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-700 font-bold uppercase tracking-wider border border-cyan-500/20">Aktif</span>
           )}
         </div>
-        {expanded ? <ChevronUp size={16} className="text-[#8da4bf]" /> : <ChevronDown size={16} className="text-[#8da4bf]" />}
+        {expanded ? <ChevronUp size={16} className="text-[#94A3B8]" /> : <ChevronDown size={16} className="text-[#94A3B8]" />}
       </button>
 
       {expanded && (
@@ -354,12 +354,12 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-white/10 border border-white/5 backdrop-blur-sm">
             <div className="text-center">
               <p className="card-desc uppercase tracking-wider mb-1">Mevcut</p>
-              <p className="text-2xl font-black text-[#0a1727] font-mono">{Math.round(baseScore)}</p>
+              <p className="text-2xl font-black text-[#0B3C5D] font-mono">{Math.round(baseScore)}</p>
               <p className={clsx('text-xs font-bold font-mono', RATING_COLOR[currentRating])}>{currentRating}</p>
             </div>
             <div className="flex items-center justify-center">
               <div className="text-center">
-                <div className={clsx('text-lg font-black font-mono', delta > 0.5 ? 'text-emerald-600' : delta < -0.5 ? 'text-red-500' : 'text-[#8da4bf]')}>
+                <div className={clsx('text-lg font-black font-mono', delta > 0.5 ? 'text-emerald-600' : delta < -0.5 ? 'text-red-500' : 'text-[#94A3B8]')}>
                   {delta > 0 ? '+' : ''}{delta.toFixed(1)}
                 </div>
                 {simCombinedRating !== currentRating && (
@@ -370,20 +370,20 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
               </div>
             </div>
             <div className="text-center">
-              <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider mb-1">Simülasyon</p>
-              <p className="text-2xl font-black text-[#0a1727]" style={{ fontFamily: 'Outfit,sans-serif' }}>{simCombinedScore}</p>
+              <p className="text-[9px] text-[#94A3B8] uppercase tracking-wider mb-1">Simülasyon</p>
+              <p className="text-2xl font-black text-[#0B3C5D]" style={{ fontFamily: 'Outfit,sans-serif' }}>{simCombinedScore}</p>
               <p className={clsx('text-xs font-bold', RATING_COLOR[simCombinedRating])}>{simCombinedRating}</p>
             </div>
           </div>
 
           {nextTarget && (
             <div className="px-3 py-2 rounded-lg bg-black/[0.03] border border-black/[0.05] flex items-center justify-between">
-              <p className="text-xs text-[#3d5a80]">
+              <p className="text-xs text-[#5A7A96]">
                 <span className={clsx('font-bold', RATING_COLOR[nextTarget.label])}>{nextTarget.label}</span>
-                {' '}için <span className="text-[#0a1727] font-bold">+{neededPoints.toFixed(1)} puan</span> gerekiyor
+                {' '}için <span className="text-[#0B3C5D] font-bold">+{neededPoints.toFixed(1)} puan</span> gerekiyor
               </p>
               {hasChanges && (
-                <button onClick={resetAll} className="flex items-center gap-1 text-[10px] text-[#8da4bf] hover:text-[#3d5a80] transition-colors">
+                <button onClick={resetAll} className="flex items-center gap-1 text-[10px] text-[#94A3B8] hover:text-[#5A7A96] transition-colors">
                   <RefreshCw size={10} /> Sıfırla
                 </button>
               )}
@@ -416,19 +416,19 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           {activeTab === 'auto' && (
             <div className="space-y-5">
               {allAutoPaths.length === 0 ? (
-                <p className="text-xs text-[#8da4bf] text-center py-4">Zaten maksimum notadasınız (AAA).</p>
+                <p className="text-xs text-[#94A3B8] text-center py-4">Zaten maksimum notadasınız (AAA).</p>
               ) : (
                 allAutoPaths.map(({ target, singlePaths, combo }) => (
                   <div key={target.label} className="space-y-2">
                     {/* Başlık */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf]">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-[#94A3B8]">
                         +{target.levels} Not:
                       </span>
                       <span className={clsx('text-xs font-black', RATING_COLOR[target.label])}>
                         {currentRating} → {target.label}
                       </span>
-                      <span className="text-[9px] text-[#8da4bf] ml-auto">
+                      <span className="text-[9px] text-[#94A3B8] ml-auto">
                         +{(target.targetScore - baseScore).toFixed(1)} puan
                       </span>
                     </div>
@@ -436,7 +436,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                     {singlePaths.length > 0 ? (
                       /* Tek kaldıraç yeterli */
                       <div className="space-y-1.5">
-                        <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
+                        <p className="text-[9px] text-[#94A3B8] uppercase tracking-wider">Tek adımda ulaşmak için (herhangi birini seçin):</p>
                         {singlePaths.map(({ lever, minPct }, i) => {
                           const tl = tlAmount(lever.key, minPct)
                           const isHigh = minPct > 100
@@ -446,17 +446,17 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                               onClick={() => { setChange(lever.key, Math.min(minPct, MAX_SINGLE_PCT)); setActiveTab('custom') }}
                               className="w-full flex items-center gap-3 p-3 rounded-xl border border-black/[0.08] hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all text-left group"
                             >
-                              <div className="w-5 h-5 rounded-full bg-black/5 flex items-center justify-center text-[9px] font-black text-[#8da4bf] group-hover:text-[#0a1727] flex-shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-black text-[#94A3B8] group-hover:text-[#0B3C5D] flex-shrink-0">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-cyan-700 transition-colors">{lever.label}</p>
-                                <p className="text-[10px] text-[#8da4bf] mt-0.5">
+                                <p className="text-xs font-bold text-[#0B3C5D] group-hover:text-cyan-700 transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-[#94A3B8] mt-0.5">
                                   <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-emerald-600')}>
                                     %{minPct} iyileştirme
                                     {isHigh && <span className="ml-1 opacity-70">(×{(minPct/100).toFixed(1)} kat)</span>}
                                   </span>
-                                  {tl && <span className="ml-1.5 text-[#8da4bf]">{tl}</span>}
+                                  {tl && <span className="ml-1.5 text-[#94A3B8]">{tl}</span>}
                                   <span className="ml-1.5">→ {lever.primaryLabel}</span>
                                 </p>
                               </div>
@@ -470,7 +470,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                     ) : combo.length > 0 ? (
                       /* Kombinasyon gerekiyor */
                       <div className="space-y-1.5">
-                        <p className="text-[9px] text-[#8da4bf] uppercase tracking-wider">Birlikte uygulandığında hedefe ulaşılır:</p>
+                        <p className="text-[9px] text-[#94A3B8] uppercase tracking-wider">Birlikte uygulandığında hedefe ulaşılır:</p>
                         {combo.map(({ lever, pct }, i) => {
                           const tl = tlAmount(lever.key, pct)
                           const isHigh = pct > 100
@@ -484,13 +484,13 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-[#0a1727] group-hover:text-[#0B3C5D] transition-colors">{lever.label}</p>
-                                <p className="text-[10px] text-[#8da4bf] mt-0.5">
+                                <p className="text-xs font-bold text-[#0B3C5D] group-hover:text-[#0B3C5D] transition-colors">{lever.label}</p>
+                                <p className="text-[10px] text-[#94A3B8] mt-0.5">
                                   <span className={clsx('font-bold', isHigh ? 'text-sky-500' : 'text-[#0B3C5D]')}>
                                     %{pct} iyileştirme
                                     {isHigh && <span className="ml-1 opacity-70">(×{(pct/100).toFixed(1)} kat)</span>}
                                   </span>
-                                  {tl && <span className="ml-1.5 text-[#8da4bf]">{tl}</span>}
+                                  {tl && <span className="ml-1.5 text-[#94A3B8]">{tl}</span>}
                                   <span className="ml-1.5">→ {lever.primaryLabel}</span>
                                 </p>
                               </div>
@@ -500,7 +500,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                         })}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-[#8da4bf] pl-2">
+                      <p className="text-[10px] text-[#94A3B8] pl-2">
                         Mevcut verilerle bu hedefe ulaşmak mümkün görünmüyor. Finansal verilerinizi tamamlayın.
                       </p>
                     )}
@@ -530,17 +530,17 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-bold text-[#0a1727]">{scenario.label}</p>
+                        <p className="text-sm font-bold text-[#0B3C5D]">{scenario.label}</p>
                         {ratingChanged && (
                           <span className={clsx('text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border', scenario.color)}>
                             {presetResult.finalRating}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-[#8da4bf]">{scenario.desc}</p>
+                      <p className="text-[10px] text-[#94A3B8]">{scenario.desc}</p>
                       <div className="flex gap-2 mt-2 flex-wrap">
                         {Object.entries(scenario.changes).map(([k, v]) => (
-                          <span key={k} className="text-[9px] px-2 py-0.5 rounded bg-black/5 text-[#3d5a80] border border-black/[0.06]">
+                          <span key={k} className="text-[9px] px-2 py-0.5 rounded bg-slate-100 text-[#5A7A96] border border-slate-200">
                             {LEVERS.find(l => l.key === k)?.label} {v > 0 ? '+' : ''}{v}%
                           </span>
                         ))}
@@ -550,7 +550,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                       <p className={clsx('text-sm font-black', presetDelta > 0 ? 'text-emerald-600' : 'text-red-500')}>
                         {presetDelta > 0 ? '+' : ''}{presetDelta.toFixed(1)}
                       </p>
-                      <p className="text-[10px] text-[#8da4bf]">{Math.round(presetResult.finalScore)}</p>
+                      <p className="text-[10px] text-[#94A3B8]">{Math.round(presetResult.finalScore)}</p>
                     </div>
                   </button>
                 )
@@ -581,15 +581,15 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                         return (
                           <div key={lever.key} className="space-y-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-xs text-[#3d5a80]">{lever.label}</p>
+                              <p className="text-xs text-[#5A7A96]">{lever.label}</p>
                               <div className="flex items-center gap-1.5 text-xs">
                                 {before != null ? (
                                   <>
-                                    <span className="text-[#8da4bf]">{lever.primaryLabel}:</span>
-                                    <span className="text-[#3d5a80]">{fmtRatio(before, lever.primaryRatio)}</span>
+                                    <span className="text-[#94A3B8]">{lever.primaryLabel}:</span>
+                                    <span className="text-[#5A7A96]">{fmtRatio(before, lever.primaryRatio)}</span>
                                     {after !== null && pct !== 0 && (
                                       <>
-                                        <span className="text-[#8da4bf]">→</span>
+                                        <span className="text-[#94A3B8]">→</span>
                                         <span className={clsx('font-bold', after > before ? 'text-emerald-600' : 'text-red-500')}>
                                           {fmtRatio(after, lever.primaryRatio)}
                                         </span>
@@ -597,11 +597,11 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                                     )}
                                   </>
                                 ) : (
-                                  <span className={clsx('font-semibold', pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-red-500' : 'text-[#8da4bf]')}>
+                                  <span className={clsx('font-semibold', pct > 0 ? 'text-emerald-600' : pct < 0 ? 'text-red-500' : 'text-[#94A3B8]')}>
                                     {pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}%` : '—'}
                                   </span>
                                 )}
-                                {tl && <span className="text-[#8da4bf] ml-1">{tl}</span>}
+                                {tl && <span className="text-[#94A3B8] ml-1">{tl}</span>}
                               </div>
                             </div>
                               <input
@@ -617,7 +617,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                 )
               })}
               {hasChanges && (
-                <button onClick={resetAll} className="flex items-center gap-1.5 text-xs text-[#8da4bf] hover:text-[#3d5a80] transition-colors">
+                <button onClick={resetAll} className="flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#5A7A96] transition-colors">
                   <RefreshCw size={12} /> Tümünü sıfırla
                 </button>
               )}
@@ -627,7 +627,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
           {/* ── TAB: Hassasiyet Analizi ──────────────────── */}
           {activeTab === 'sensitivity' && (
             <div className="space-y-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#8da4bf]">
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#94A3B8]">
                 Her kaldıracın %10 değişiminde kazandırılan puan (en etkili → az etkili):
               </p>
               {sensitivity.map(({ lever, gain }, i) => {
@@ -638,13 +638,13 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                   <div key={lever.key} className={clsx('space-y-1', noData && 'opacity-40')}>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-[#8da4bf] w-4">{i + 1}</span>
-                        <span className="text-[#3d5a80]">{lever.label}</span>
+                        <span className="text-[9px] text-[#94A3B8] w-4">{i + 1}</span>
+                        <span className="text-[#5A7A96]">{lever.label}</span>
                         {noData && (
-                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-black/5 text-[#8da4bf] font-bold border border-black/5">Veri eksik</span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-slate-100 text-[#94A3B8] font-bold border border-slate-200">Veri eksik</span>
                         )}
                       </div>
-                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-600' : gain >= 0.5 ? 'text-sky-500' : 'text-[#8da4bf]')}>
+                      <span className={clsx('font-bold tabular-nums', gain >= 1 ? 'text-emerald-600' : gain >= 0.5 ? 'text-sky-500' : 'text-[#94A3B8]')}>
                         {noData ? '—' : `+${gain.toFixed(2)} puan`}
                       </span>
                     </div>
@@ -657,7 +657,7 @@ export function WhatIfSimulator({ baseData, baseScore, rawFinancialData }: Props
                   </div>
                 )
               })}
-              <p className="text-[9px] text-[#8da4bf] pt-1">
+              <p className="text-[9px] text-[#94A3B8] pt-1">
                 &quot;Veri eksik&quot; — bu kaldıraçlar için hesaplanamayan oranlar mevcut. Finansal verilerinizi tamamlayın.
               </p>
             </div>
