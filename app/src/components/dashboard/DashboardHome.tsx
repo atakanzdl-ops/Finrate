@@ -160,7 +160,7 @@ export default function DashboardHome() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="card p-6 md:col-span-2">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Skor / Rating</p>
+                <p className="text-xs text-slate-500 tracking-widest font-bold">SKOR / RATING</p>
                 <div className="mt-3 flex items-end gap-3">
                   <span className="text-5xl font-black text-[#0B3C5D]">{latest ? Math.round(latest.finalScore) : '-'}</span>
                   <span className={`text-sm font-bold px-3 py-1 rounded-full border ${latest ? ratingTone(latest.finalRating) : 'text-slate-500 bg-slate-50 border-slate-200'}`}>

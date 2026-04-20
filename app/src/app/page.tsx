@@ -83,7 +83,7 @@ export default function Page() {
 
       <section className="hero">
         <div>
-          <div className="hero-badge"><span className="hero-badge-dot" />Bankacılık standartlarında finansal rating</div>
+          <div className="hero-badge"><span className="hero-badge-dot" />BANKACILIK STANDARTLARINDA FINANSAL RATING</div>
           <h1 className="outfit">Bankadan Önce<br /><em>Finrate.</em></h1>
           <p className="hero-sub">Türk KOBİ, mali müşavir ve finans müdürleri için bankacılık metodolojisinde finansal rating platformu.</p>
           <div className="hero-btns">
