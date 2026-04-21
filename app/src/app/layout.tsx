@@ -2,9 +2,24 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Finrate — Finansal Gücünüzü Veriye Dökün',
-  description: 'Gelişmiş kredi skorlama ve finansal analiz platformu. 25 finansal oran, grup konsolide analiz ve senaryo simülasyonu.',
+  title: 'Finrate — Bankacılık Standartlarında Finansal Rating',
+  description: 'KOBİ\'ler ve mali müşavirler için bankacılık kalitesinde finansal analiz ve kredi rating platformu. 25 metrik, TCMB benchmark, senaryo motoru.',
   keywords: 'kredi skoru, finansal analiz, kredi rating, konsolide analiz, finans',
+  metadataBase: new URL('https://www.finrate.com.tr'),
+  openGraph: {
+    title: 'Finrate — Bankacılık Standartlarında Finansal Rating',
+    description: 'Bankaya gitmeden önce kredi notunuzu öğrenin. KOBİ\'ler ve mali müşavirler için finansal analiz platformu.',
+    url: 'https://www.finrate.com.tr',
+    siteName: 'Finrate',
+    locale: 'tr_TR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Finrate — Bankacılık Standartlarında Finansal Rating',
+    description: 'Bankaya gitmeden önce kredi notunuzu öğrenin.',
+  },
+  robots: { index: true, follow: true },
 }
 
 export default function RootLayout({
