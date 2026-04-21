@@ -2,13 +2,13 @@
  * Finrate — Bilanço Mutasyon Motoru
  *
  * applyMutation():
- *   Verilen BalanceSheet üzerine bir Partial<BalanceSheet> değişikliği uygular,
- *   öncesi/sonrası rasyo ve skorları hesaplar, farkı döner.
+ *   Verilen BalanceSheet üzerine bir Partial<BalanceSheet> delta'sı uygular.
+ *   mutation içindeki her alan DELTA'dır (artış pozitif, azalış negatif).
+ *   after[key] = before[key] + delta[key]
  *
  * Kullanım alanları:
- *   - WhatIfSimulator: "Borç %20 azalırsa skor ne olur?"
  *   - Senaryo analizi: peşin ödeme, sermaye artırımı, varlık satışı vb.
- *   - API endpoint'i: /api/groups/[id]/mutate
+ *   - API endpoint'i: /api/scenarios
  */
 
 import { calculateRatios, type RatioResult } from './ratios'
@@ -79,22 +79,8 @@ function sumOrNull(...vals: (number | null)[]): number | null {
 
 /**
  * BalanceSheet'ten FinancialInput üretir.
- *
- * Türetilen toplamlar:
- *   totalCurrentAssets    = dönen varlık bileşenleri toplamı
- *   totalNonCurrentAssets = duran varlık bileşenleri toplamı
- *   totalAssets           = dönen + duran
- *   totalCurrentLiabilities  = KV borç bileşenleri
- *   totalNonCurrentLiabilities = UV borç bileşenleri
- *   totalEquity           = totalAssets − totalCurrentLiabilities − totalNonCurrentLiabilities
- *
- * Gelir tablosu türetmeleri:
- *   grossProfit = revenue − costOfSales
- *   ebit        = grossProfit − operatingExpenses
- *   (ebitda = null — depreciation bilinmiyorsa hesaplanamaz)
  */
 function sheetToInput(s: BalanceSheet, sector: string) {
-  // ── Bilanço toplamları ────────────────────────────────────────────────────
   const totalCurrentAssets = nn(s.cash) + nn(s.tradeReceivables) + nn(s.otherReceivables)
     + nn(s.inventory) + nn(s.advancesPaid) + nn(s.otherCurrentAssets)
 
@@ -108,61 +94,43 @@ function sheetToInput(s: BalanceSheet, sector: string) {
 
   const totalNonCurrentLiabilities = nn(s.longTermFinancialDebt) + nn(s.otherLongTermLiabilities)
 
-  // Özkaynak: bilanço denklemi (aktif − borçlar)
   const totalEquity = totalAssets - totalCurrentLiabilities - totalNonCurrentLiabilities
 
-  // ── Gelir tablosu türetmeleri ─────────────────────────────────────────────
   const cogs        = nn(s.costOfSales)
   const grossProfit = nn(s.revenue) - cogs
   const ebit        = grossProfit - nn(s.operatingExpenses)
 
   return {
-    // Meta
     sector,
-
-    // Dönen varlıklar
     cash:               s.cash,
     tradeReceivables:   s.tradeReceivables,
     inventory:          s.inventory,
     prepaidSuppliers:   s.advancesPaid,
-    // otherReceivables + otherCurrentAssets birleştirildi (FinancialInput tek field)
     otherCurrentAssets: sumOrNull(s.otherReceivables, s.otherCurrentAssets),
     totalCurrentAssets: totalCurrentAssets || null,
-
-    // Duran varlıklar
     tangibleAssets:        s.tangibleAssets,
     intangibleAssets:      s.intangibleAssets,
     otherNonCurrentAssets: s.otherNonCurrentAssets,
     totalNonCurrentAssets: totalNonCurrentAssets || null,
     totalAssets:           totalAssets || null,
-
-    // KV borçlar
     shortTermFinancialDebt: s.shortTermFinancialDebt,
     tradePayables:          s.tradePayables,
     advancesReceived:       s.advancesReceived,
-    // otherShortTermLiabilities + taxPayables birleştirildi
     otherCurrentLiabilities: sumOrNull(s.otherShortTermLiabilities, s.taxPayables),
     totalCurrentLiabilities: totalCurrentLiabilities || null,
-
-    // UV borçlar
     longTermFinancialDebt:      s.longTermFinancialDebt,
     otherNonCurrentLiabilities: s.otherLongTermLiabilities,
     totalNonCurrentLiabilities: totalNonCurrentLiabilities || null,
-
-    // Özkaynak
     paidInCapital:             s.paidInCapital,
     retainedEarnings:          s.retainedEarnings,
     netProfitCurrentYear:      s.netProfit,
     totalEquity:               totalEquity !== 0 ? totalEquity : null,
     totalLiabilitiesAndEquity: totalAssets || null,
-
-    // Gelir tablosu
     revenue:           s.revenue,
     cogs:              s.costOfSales,
     grossProfit:       grossProfit !== 0 ? grossProfit : null,
     operatingExpenses: s.operatingExpenses,
     ebit:              ebit !== 0 ? ebit : null,
-    // ebitda: null — depreciation bilinmeden hesaplanamaz
     ebitda:            null as null,
     interestExpense:   s.interestExpense,
     netProfit:         s.netProfit,
@@ -171,13 +139,24 @@ function sheetToInput(s: BalanceSheet, sector: string) {
 
 // ─── ANA FONKSİYON ────────────────────────────────────────────────────────────
 
+/**
+ * mutation = DELTA değerleri (artış pozitif, azalış negatif).
+ * after[key] = before[key] + mutation[key]
+ */
 export function applyMutation(
   sheet:    BalanceSheet,
   mutation: Partial<BalanceSheet>,
   sector:   string,
 ): MutationResult {
-  // 1. Mutasyon uygulandıktan sonraki bilanço
-  const after: BalanceSheet = { ...sheet, ...mutation }
+  // 1. Delta uygula: her alan için before + delta
+  const after: BalanceSheet = { ...sheet }
+  for (const key of Object.keys(mutation) as (keyof BalanceSheet)[]) {
+    const delta = mutation[key]
+    if (delta != null) {
+      const base = (sheet[key] as number | null) ?? 0
+      ;(after as unknown as Record<string, number | null>)[key] = base + (delta as number)
+    }
+  }
 
   // 2. Her ikisini FinancialInput'a dönüştür
   const inputBefore = sheetToInput(sheet, sector)
@@ -192,7 +171,6 @@ export function applyMutation(
   const scoreAfter  = calculateScore(ratiosAfter,  sector)
 
   // 5. Bilanço denge kontrolü (after bilanço üzerinden)
-  //    balanceCheck = totalAssets − (KV borçlar + UV borçlar + özkaynak kalemleri toplamı)
   const totalCurrentLiabilitiesAfter    = nn(after.shortTermFinancialDebt) + nn(after.tradePayables)
     + nn(after.otherShortTermLiabilities) + nn(after.advancesReceived) + nn(after.taxPayables)
   const totalNonCurrentLiabilitiesAfter = nn(after.longTermFinancialDebt) + nn(after.otherLongTermLiabilities)

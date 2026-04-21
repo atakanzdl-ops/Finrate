@@ -2,8 +2,9 @@
  * Finrate — Aksiyon Kataloğu
  *
  * 14 finansal iyileştirme aksiyonu:
- *   - mutate()       : TL tutarını alır, BalanceSheet üzerindeki delta'yı döner
- *   - calcRange()    : Gerçek bilanço verilerinden min/max/suggested hesaplar
+ *   - mutate()          : TL tutarını alır, BalanceSheet'e uygulanacak DELTA döner
+ *                         (artış = pozitif, azalış = negatif)
+ *   - calcRange()       : Gerçek bilanço verilerinden min/max/suggested TL aralığını hesaplar
  *   - sectorFeasibility : Sektör yapılabilirlik katsayısı (0–1, <0.3 önerilmez)
  */
 
@@ -36,7 +37,7 @@ export interface Action {
   description: string         // Kısa açıklama
   timeHorizon: TimeHorizon
   difficulty:  Difficulty
-  /** TL tutarı alır, BalanceSheet'te değişecek alanların YENİ değerlerini döner */
+  /** TL tutarını alır, BalanceSheet'e uygulanacak DELTA değerlerini döner */
   mutate: (sheet: BalanceSheet, amount: number) => Partial<BalanceSheet>
   /** Bilançodan min/max/suggested TL aralığını hesaplar */
   calcRange: (sheet: BalanceSheet) => { min: number; max: number; suggested: number }
@@ -83,9 +84,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'medium',
     difficulty:  'medium',
 
-    mutate: (s, amount) => ({
-      shortTermFinancialDebt: nn(s.shortTermFinancialDebt) - amount,
-      longTermFinancialDebt:  nn(s.longTermFinancialDebt)  + amount,
+    mutate: (_s, amount) => ({
+      shortTermFinancialDebt: -amount,
+      longTermFinancialDebt:  +amount,
     }),
 
     calcRange: (s) => pctRange(s.shortTermFinancialDebt, 0.10, 0.60, 0.30),
@@ -105,9 +106,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'medium',
 
-    mutate: (s, amount) => ({
-      tradeReceivables: nn(s.tradeReceivables) - amount,
-      cash:             nn(s.cash)             + amount,
+    mutate: (_s, amount) => ({
+      tradeReceivables: -amount,
+      cash:             +amount,
     }),
 
     calcRange: (s) => pctRange(s.tradeReceivables, 0.10, 0.50, 0.25),
@@ -120,16 +121,18 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 3. ATIL STOK ERİT ────────────────────────────────────────────────────────
+  // Muhafazakâr: maliyetinde satış → bilanço etkisi stok ↓, kasa ↑, kâr değişmez
   liquidate_inventory: {
     id:          'liquidate_inventory',
     label:       'Atıl Stok Eritme',
-    description: 'Hareketsiz veya yavaş dönen stokları piyasa değerinin altında satarak nakde çevir.',
+    description: 'Hareketsiz veya yavaş dönen stokları maliyetinde satarak nakde çevir.',
     timeHorizon: 'short',
     difficulty:  'medium',
 
-    mutate: (s, amount) => ({
-      inventory: nn(s.inventory) - amount,
-      cash:      nn(s.cash)      + amount,
+    mutate: (_s, amount) => ({
+      inventory: -amount,
+      cash:      +amount,
+      // netProfit değişmez — satış = maliyet fiyatı
     }),
 
     calcRange: (s) => pctRange(s.inventory, 0.05, 0.30, 0.15),
@@ -149,12 +152,12 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'easy',
 
-    mutate: (s, amount) => ({
-      cash:                  nn(s.cash)                  - amount,
-      shortTermFinancialDebt: nn(s.shortTermFinancialDebt) - amount,
+    mutate: (_s, amount) => ({
+      cash:                   -amount,
+      shortTermFinancialDebt: -amount,
     }),
 
-    // Kasa sıfıra düşmemeli; ayrıca KV borç üst sınırı da geçilemez
+    // Kasa sıfıra düşmemeli; KV borç üst sınırı da geçilemez
     calcRange: (s) => {
       const base = Math.min(nn(s.cash), nn(s.shortTermFinancialDebt))
       return pctRange(base, 0.10, 0.50, 0.25)
@@ -168,6 +171,8 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 5. FAALİYET GİDERİ AZALT ─────────────────────────────────────────────────
+  // Gider tasarrufu kâra yansır; nakit çıkışı olmaz (gider henüz ödenmemişti)
+  // Vergi koşulu: zararda firma (%100), kârlı firma (%75 vergi sonrası)
   reduce_opex: {
     id:          'reduce_opex',
     label:       'Faaliyet Gideri Azalt',
@@ -176,7 +181,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     difficulty:  'hard',
 
     mutate: (s, amount) => ({
-      operatingExpenses: nn(s.operatingExpenses) - amount,
+      operatingExpenses: -amount,
+      netProfit:         +amount * (nn(s.netProfit) > 0 ? 0.75 : 1.0),
+      // cash değişmez
     }),
 
     calcRange: (s) => pctRange(s.operatingExpenses, 0.03, 0.15, 0.08),
@@ -189,6 +196,7 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 6. BRÜT MARJ İYİLEŞTİR ───────────────────────────────────────────────────
+  // Vergi koşulu: zararda firma tam geçer, kârlı firma %75
   improve_margin: {
     id:          'improve_margin',
     label:       'Brüt Marj İyileştir',
@@ -197,8 +205,8 @@ export const ACTIONS: Record<ActionId, Action> = {
     difficulty:  'hard',
 
     mutate: (s, amount) => ({
-      costOfSales: nn(s.costOfSales) - amount,
-      netProfit:   nn(s.netProfit)   + amount,
+      costOfSales: -amount,
+      netProfit:   +amount * (nn(s.netProfit) > 0 ? 0.75 : 1.0),
     }),
 
     calcRange: (s) => pctRange(s.costOfSales, 0.02, 0.10, 0.05),
@@ -211,22 +219,29 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 7. REFİNANSE ET ───────────────────────────────────────────────────────────
+  // amount = yıllık faiz TASARRUFU (toplam borç × faiz farkı × refinanse oranı)
+  // Bilanço değişmez; sadece gelir tablosu iyileşir
   refinance: {
     id:          'refinance',
     label:       'Kredi Refinansmanı',
-    description: 'Yüksek faizli kredileri daha düşük maliyetli yapıya taşı; yıllık faiz tasarrufu %14 varsayımıyla hesaplanır.',
+    description: 'Yüksek faizli kredileri daha düşük maliyetli yapıya taşı; yıllık faiz tasarrufu sağla.',
     timeHorizon: 'medium',
     difficulty:  'medium',
 
-    // amount = refinanse edilen anapara; faiz tasarrufu = amount × 0.14 (yıllık)
+    // amount = faiz tasarrufu (nakit), anapara değil
     mutate: (s, amount) => ({
-      interestExpense: nn(s.interestExpense) - amount * 0.14,
-      netProfit:       nn(s.netProfit)       + amount * 0.14,
+      interestExpense: -amount,
+      netProfit:       +amount * (nn(s.netProfit) > 0 ? 0.75 : 1.0),
+      // Bilanço değişmez
     }),
 
+    // suggested = toplam borcun %20'sini %14 faiz farkıyla refinanse etmenin yıllık tasarrufu
     calcRange: (s) => {
       const totalDebt = nn(s.shortTermFinancialDebt) + nn(s.longTermFinancialDebt)
-      return pctRange(totalDebt, 0.10, 0.40, 0.20)
+      const suggested = Math.round(totalDebt * 0.20 * 0.14)
+      const min       = Math.round(totalDebt * 0.10 * 0.14)
+      const max       = Math.round(totalDebt * 0.50 * 0.14)
+      return { min, max, suggested }
     },
 
     sectorFeasibility: {
@@ -244,13 +259,12 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'long',
     difficulty:  'very_hard',
 
-    mutate: (s, amount) => ({
-      cash:         nn(s.cash)         + amount,
-      paidInCapital: nn(s.paidInCapital) + amount,
+    mutate: (_s, amount) => ({
+      cash:          +amount,
+      paidInCapital: +amount,
     }),
 
     calcRange: (s) => {
-      // Mevcut özkaynak tabanına göre makul artış aralığı
       const equity = nn(s.paidInCapital) + nn(s.retainedEarnings) + nn(s.netProfit)
       return pctRange(Math.max(equity, 0), 0.10, 0.50, 0.25)
     },
@@ -263,6 +277,8 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 9. KÂR DAĞITIMINI DURDUR ──────────────────────────────────────────────────
+  // Kâr dağıtım kararı alınmış ama ödeme iptal → özkaynak güçlenir
+  // netProfit değişmez (kâr zaten kazanıldı), cash değişmez (ödeme yapılmadı)
   retain_profit: {
     id:          'retain_profit',
     label:       'Kâr Dağıtımını Durdur',
@@ -270,9 +286,10 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'easy',
 
-    mutate: (s, amount) => ({
-      retainedEarnings: nn(s.retainedEarnings) + amount,
-      netProfit:        nn(s.netProfit)        - amount,
+    mutate: (_s, amount) => ({
+      retainedEarnings: +amount,
+      // netProfit değişmez — kâr zaten mevcut
+      // cash değişmez — ödeme iptal edildi
     }),
 
     calcRange: (s) => {
@@ -289,6 +306,7 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 10. ATIL DURAN VARLIK SAT ────────────────────────────────────────────────
+  // Muhafazakâr: defter değerinden satış → kâr/zarar yok, vergi yok
   sell_asset: {
     id:          'sell_asset',
     label:       'Atıl Duran Varlık Sat',
@@ -296,9 +314,10 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'medium',
     difficulty:  'hard',
 
-    mutate: (s, amount) => ({
-      tangibleAssets: nn(s.tangibleAssets) - amount,
-      cash:           nn(s.cash)           + amount,
+    mutate: (_s, amount) => ({
+      tangibleAssets: -amount,
+      cash:           +amount,
+      // netProfit değişmez — satış = defter değeri
     }),
 
     calcRange: (s) => pctRange(s.tangibleAssets, 0.05, 0.25, 0.10),
@@ -318,9 +337,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'medium',
 
-    mutate: (s, amount) => ({
-      tradeReceivables: nn(s.tradeReceivables) - amount,
-      cash:             nn(s.cash)             + amount,
+    mutate: (_s, amount) => ({
+      tradeReceivables: -amount,
+      cash:             +amount,
     }),
 
     calcRange: (s) => pctRange(s.tradeReceivables, 0.10, 0.40, 0.20),
@@ -333,6 +352,8 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 12. TEDARİKÇİ VADESİNİ UZAT (DPO) ──────────────────────────────────────
+  // Vade uzatma = nakit çıkışı ertelendi. Ticari borç artar, kasa değişmez.
+  // Rasyo etkisi: DPO ↑, cari oran iyileşir (dönen varlıklar / kısa vade borç)
   extend_dpo: {
     id:          'extend_dpo',
     label:       'Tedarikçi Vadesi Uzat',
@@ -340,8 +361,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'medium',
 
-    mutate: (s, amount) => ({
-      tradePayables: nn(s.tradePayables) + amount,
+    mutate: (_s, amount) => ({
+      tradePayables: +amount,
+      // cash değişmez — nakit çıkışı ertelendi
     }),
 
     calcRange: (s) => pctRange(s.tradePayables, 0.05, 0.20, 0.10),
@@ -354,18 +376,27 @@ export const ACTIONS: Record<ActionId, Action> = {
   },
 
   // ── 13. CİRO ARTIR ──────────────────────────────────────────────────────────
+  // COGS gross marjdan türetilir; alacaklar DSO varsayımıyla artar
+  // Vergi koşulu: zararda firma tam geçer
   increase_revenue: {
     id:          'increase_revenue',
     label:       'Ciro Artışı',
-    description: 'Atıl kapasite devreye alınarak veya yeni müşteri kazanımıyla net satışları artır. Net kâr katkısı %8 alınmıştır.',
+    description: 'Atıl kapasite devreye alınarak veya yeni müşteri kazanımıyla net satışları artır.',
     timeHorizon: 'medium',
     difficulty:  'hard',
 
-    // Ek gelirin %8'i net kâra dönüşür (ortalama katkı marjı varsayımı)
-    mutate: (s, amount) => ({
-      revenue:   nn(s.revenue)   + amount,
-      netProfit: nn(s.netProfit) + amount * 0.08,
-    }),
+    mutate: (s, amount) => {
+      const grossMargin = nn(s.revenue) > 0
+        ? (nn(s.revenue) - nn(s.costOfSales)) / nn(s.revenue)
+        : 0.25
+      const taxFactor = nn(s.netProfit) > 0 ? 0.75 : 1.0
+      return {
+        revenue:          +amount,
+        costOfSales:      +(amount * (1 - grossMargin)),
+        netProfit:        +(amount * grossMargin * taxFactor),
+        tradeReceivables: +(amount * 0.164),   // ~60 gün DSO varsayımı
+      }
+    },
 
     calcRange: (s) => pctRange(s.revenue, 0.03, 0.15, 0.08),
 
@@ -384,9 +415,9 @@ export const ACTIONS: Record<ActionId, Action> = {
     timeHorizon: 'short',
     difficulty:  'easy',
 
-    mutate: (s, amount) => ({
-      cash:                  nn(s.cash)                  - amount,
-      shortTermFinancialDebt: nn(s.shortTermFinancialDebt) - amount,
+    mutate: (_s, amount) => ({
+      cash:                   -amount,
+      shortTermFinancialDebt: -amount,
     }),
 
     calcRange: (s) => {
