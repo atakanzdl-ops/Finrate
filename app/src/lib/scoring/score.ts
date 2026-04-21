@@ -431,7 +431,7 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
 
     // Faaliyet Gideri Oranı — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.operatingExpenseRatio,
-      { bad: 0.5, good: 0.22, lowerIsBetter: true, sf: 0.15 },
+      { bad: 0.5, good: 0.20, lowerIsBetter: true, sf: 0.15 },
       bm?.operatingExpenseRatio,
       HYBRID_BM_HEAVY), 1.0],
   ])
