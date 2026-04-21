@@ -119,6 +119,8 @@ export async function POST(req: NextRequest) {
     const subjectiveBonus = combinedScore - financialScore
     const currentScore    = combinedScore
 
+    console.log('[scenarios] analysisId:', analysisId, '| combinedScore:', combinedScore, '| financialScore:', financialScore, '| subjectiveBonus:', subjectiveBonus, '| currentScore:', currentScore)
+
     const sheet = fdToSheet(fd)
     try {
       const scenarios = runScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
