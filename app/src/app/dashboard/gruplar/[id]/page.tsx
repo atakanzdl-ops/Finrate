@@ -1,13 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, use, useCallback } from 'react'
+import React, { useState, useEffect, use, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Building2, Plus, X, Loader2,
-  AlertTriangle, BarChart3, Save, GitBranch, Sliders,
+  AlertTriangle, BarChart3, Save, GitBranch, Sliders, TrendingDown,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
 import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
+import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
+import type { SectorBenchmark } from '@/lib/scoring/benchmarks'
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -83,59 +85,81 @@ const ELIM_FIELDS: { key: keyof EliminationsData; label: string; hint: string }[
   { key: 'intercompanyProfit',           label: 'Grup İçi Gerçekleşmemiş Kâr',  hint: 'Stok/aktif ve özkaynak düşülür' },
 ]
 
-// 25-rasyo grupları — kategori bazlı
-const RATIO_GROUPS = [
+// ── 25-rasyo meta verisi — benchmark eşleştirmesi, yön ve ağırlık ──────────────
+// direction: 'higher' → büyük olmalı | 'lower' → küçük olmalı | 'none' → karşılaştırma yok
+// catWeight: kategori'nin nihai skordaki ağırlığı (%) / kategori içi rasyo sayısı
+type RatioDir = 'higher' | 'lower' | 'none'
+interface RatioMeta {
+  key:       string
+  label:     string
+  bmKey:     keyof SectorBenchmark | null
+  direction: RatioDir
+  catWeight: number   // tahmini ağırlık (% final score)
+}
+interface RatioGroup {
+  label:  string
+  color:  string
+  ratios: RatioMeta[]
+}
+
+const RATIO_GROUPS: RatioGroup[] = [
   {
-    label: 'Likidite',
-    color: '#2EC4B6',
+    label: 'Likidite', color: '#2EC4B6',
     ratios: [
-      { key: 'currentRatio',           label: 'Cari Oran' },
-      { key: 'quickRatio',             label: 'Asit-Test Oranı' },
-      { key: 'cashRatio',              label: 'Nakit Oranı' },
-      { key: 'netWorkingCapital',      label: 'Net İşletme Sermayesi' },
-      { key: 'netWorkingCapitalRatio', label: 'NİS Oranı' },
-      { key: 'cashConversionCycle',    label: 'Nakit Döngüsü' },
+      { key: 'currentRatio',           label: 'Cari Oran',              bmKey: 'currentRatio',          direction: 'higher', catWeight: 25/5 },
+      { key: 'quickRatio',             label: 'Asit-Test Oranı',        bmKey: 'quickRatio',            direction: 'higher', catWeight: 25/5 },
+      { key: 'cashRatio',              label: 'Nakit Oranı',            bmKey: 'cashRatio',             direction: 'higher', catWeight: 25/5 },
+      { key: 'netWorkingCapital',      label: 'Net İşletme Sermayesi',  bmKey: null,                    direction: 'none',   catWeight: 0 },
+      { key: 'netWorkingCapitalRatio', label: 'NİS Oranı',              bmKey: 'netWorkingCapitalRatio',direction: 'higher', catWeight: 25/5 },
+      { key: 'cashConversionCycle',    label: 'Nakit Döngüsü (gün)',    bmKey: 'cashConversionCycle',   direction: 'lower',  catWeight: 25/5 },
     ],
   },
   {
-    label: 'Kârlılık',
-    color: '#0B3C5D',
+    label: 'Kârlılık', color: '#0B3C5D',
     ratios: [
-      { key: 'grossMargin',      label: 'Brüt Kâr Marjı' },
-      { key: 'ebitdaMargin',     label: 'FAVÖK Marjı' },
-      { key: 'ebitMargin',       label: 'FVÖK Marjı' },
-      { key: 'netProfitMargin',  label: 'Net Kâr Marjı' },
-      { key: 'roa',              label: 'ROA' },
-      { key: 'roe',              label: 'ROE' },
-      { key: 'roic',             label: 'ROIC' },
-      { key: 'revenueGrowth',    label: 'Ciro Büyümesi' },
-      { key: 'realGrowth',       label: 'Reel Büyüme' },
+      { key: 'grossMargin',     label: 'Brüt Kâr Marjı',  bmKey: 'grossMargin',     direction: 'higher', catWeight: 30/7 },
+      { key: 'ebitdaMargin',    label: 'FAVÖK Marjı',      bmKey: 'ebitdaMargin',    direction: 'higher', catWeight: 30/7 },
+      { key: 'ebitMargin',      label: 'FVÖK Marjı',       bmKey: 'ebitMargin',      direction: 'higher', catWeight: 30/7 },
+      { key: 'netProfitMargin', label: 'Net Kâr Marjı',    bmKey: 'netProfitMargin', direction: 'higher', catWeight: 30/7 },
+      { key: 'roa',             label: 'ROA',              bmKey: 'roa',             direction: 'higher', catWeight: 30/7 },
+      { key: 'roe',             label: 'ROE',              bmKey: 'roe',             direction: 'higher', catWeight: 30/7 },
+      { key: 'roic',            label: 'ROIC',             bmKey: 'roic',            direction: 'higher', catWeight: 30/7 },
+      { key: 'revenueGrowth',   label: 'Ciro Büyümesi',    bmKey: 'revenueGrowth',   direction: 'higher', catWeight: 30/7 },
+      { key: 'realGrowth',      label: 'Reel Büyüme',      bmKey: null,              direction: 'none',   catWeight: 0 },
     ],
   },
   {
-    label: 'Kaldıraç',
-    color: '#D97706',
+    label: 'Kaldıraç', color: '#D97706',
     ratios: [
-      { key: 'debtToEquity',       label: 'Borç / Özkaynak' },
-      { key: 'debtToAssets',       label: 'Borç / Aktif' },
-      { key: 'debtToEbitda',       label: 'Net Borç / FAVÖK' },
-      { key: 'interestCoverage',   label: 'Faiz Karşılama' },
-      { key: 'equityRatio',        label: 'Özkaynak Oranı' },
-      { key: 'shortTermDebtRatio', label: 'KV Borç Oranı' },
+      { key: 'debtToEquity',       label: 'Borç / Özkaynak',  bmKey: 'debtToEquity',       direction: 'lower',  catWeight: 30/5 },
+      { key: 'debtToAssets',       label: 'Borç / Aktif',     bmKey: 'debtToAssets',       direction: 'lower',  catWeight: 30/5 },
+      { key: 'debtToEbitda',       label: 'Net Borç / FAVÖK', bmKey: 'debtToEbitda',       direction: 'lower',  catWeight: 30/5 },
+      { key: 'interestCoverage',   label: 'Faiz Karşılama',   bmKey: 'interestCoverage',   direction: 'higher', catWeight: 30/5 },
+      { key: 'equityRatio',        label: 'Özkaynak Oranı',   bmKey: null,                 direction: 'none',   catWeight: 0 },
+      { key: 'shortTermDebtRatio', label: 'KV Borç Oranı',    bmKey: 'shortTermDebtRatio', direction: 'lower',  catWeight: 30/5 },
     ],
   },
   {
-    label: 'Faaliyet',
-    color: '#7C3AED',
+    label: 'Faaliyet', color: '#7C3AED',
     ratios: [
-      { key: 'assetTurnover',            label: 'Aktif Devir Hızı' },
-      { key: 'inventoryTurnoverDays',    label: 'Stok Devir Süresi' },
-      { key: 'receivablesTurnoverDays',  label: 'Alacak Tahsil Süresi' },
-      { key: 'payablesTurnoverDays',     label: 'Borç Ödeme Süresi' },
-      { key: 'fixedAssetTurnover',       label: 'Duran Varlık Devir' },
-      { key: 'operatingExpenseRatio',    label: 'Faaliyet Gideri Oranı' },
+      { key: 'assetTurnover',           label: 'Aktif Devir Hızı',       bmKey: 'assetTurnover',        direction: 'higher', catWeight: 15/5 },
+      { key: 'inventoryTurnoverDays',   label: 'Stok Devir Süresi',      bmKey: 'inventoryDays',        direction: 'lower',  catWeight: 15/5 },
+      { key: 'receivablesTurnoverDays', label: 'Alacak Tahsil Süresi',   bmKey: 'receivablesDays',      direction: 'lower',  catWeight: 15/5 },
+      { key: 'payablesTurnoverDays',    label: 'Borç Ödeme Süresi',      bmKey: 'payablesTurnoverDays', direction: 'none',   catWeight: 0 },
+      { key: 'fixedAssetTurnover',      label: 'Duran Varlık Devir',     bmKey: 'fixedAssetTurnover',   direction: 'higher', catWeight: 15/5 },
+      { key: 'operatingExpenseRatio',   label: 'Faaliyet Gideri Oranı',  bmKey: 'operatingExpenseRatio',direction: 'lower',  catWeight: 15/5 },
     ],
   },
+]
+
+// Kritik eşikler — benchmark bağımsız uyarılar
+const CRITICAL_CHECKS: { key: string; label: string; check: (v: number) => boolean; impact: number }[] = [
+  { key: 'currentRatio',     label: 'Cari oran 1\'in altında — kısa vadeli yükümlülükler karşılanamıyor',    check: v => v < 1.0,  impact: 7 },
+  { key: 'interestCoverage', label: 'Faiz karşılama oranı kritik — faiz yükü altında ezilme riski',          check: v => v < 1.5,  impact: 8 },
+  { key: 'netProfitMargin',  label: 'Net kâr marjı negatif — zarar eden konsolide grup',                     check: v => v < 0,    impact: 6 },
+  { key: 'equityRatio',      label: 'Özkaynak oranı %10\'un altında — aşırı kaldıraç / finansal kırılganlık',check: v => v < 0.10, impact: 7 },
+  { key: 'debtToEbitda',     label: 'Net Borç/FAVÖK 8\'in üzerinde — sürdürülemez borç yükü',               check: v => v > 8,    impact: 6 },
+  { key: 'quickRatio',       label: 'Asit-test oranı 0.5\'in altında — nakit döngüsü baskıda',              check: v => v < 0.5,  impact: 5 },
 ]
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -148,6 +172,17 @@ function fmtAsset(v: number | null | undefined): string {
   return new Intl.NumberFormat('tr-TR').format(Math.round(n))
 }
 
+function fmtSigned(v: number | null | undefined): { text: string; neg: boolean } {
+  const n = v ?? 0
+  const neg = n < 0
+  const abs = Math.abs(n)
+  let text = '—'
+  if (abs >= 1e9) text = `${(abs / 1e9).toFixed(1)} Mr`
+  else if (abs >= 1e6) text = `${(abs / 1e6).toFixed(1)} Mn`
+  else if (abs > 0) text = new Intl.NumberFormat('tr-TR').format(Math.round(abs))
+  return { text, neg }
+}
+
 function gradeColor(grade: string): string {
   if (['AAA', 'AA', 'A'].includes(grade)) return '#16a34a'
   if (['BBB', 'BB'].includes(grade)) return '#0B3C5D'
@@ -155,24 +190,35 @@ function gradeColor(grade: string): string {
   return '#DC2626'
 }
 
-// Oran değerini göster: gün formatı, % formatı veya multiplier
+const DAY_KEYS = new Set([
+  'inventoryTurnoverDays', 'receivablesTurnoverDays', 'payablesTurnoverDays',
+  'cashConversionCycle', 'adjustedCashConversionCycle', 'customerAdvanceDays',
+])
+const PCT_KEYS = new Set([
+  'grossMargin','ebitdaMargin','ebitMargin','netProfitMargin',
+  'roa','roe','roic','revenueGrowth','realGrowth',
+  'debtToAssets','equityRatio','shortTermDebtRatio','operatingExpenseRatio',
+  'netWorkingCapitalRatio',
+])
+
 function fmtRatio(val: number | null | undefined, key: string): string {
   if (val == null) return '—'
-  const DAY_KEYS = [
-    'inventoryTurnoverDays', 'receivablesTurnoverDays', 'payablesTurnoverDays',
-    'cashConversionCycle', 'adjustedCashConversionCycle', 'customerAdvanceDays',
-  ]
-  if (DAY_KEYS.includes(key)) return `${Math.round(val)} gün`
+  if (DAY_KEYS.has(key)) return `${Math.round(val)} gün`
   if (key === 'netWorkingCapital') return fmtAsset(val)
-  // Marjlar, oran tabanlı değerler (mutlak değer ≤ 5 → yüzde göster)
-  const PCT_KEYS = [
-    'grossMargin','ebitdaMargin','ebitMargin','netProfitMargin',
-    'roa','roe','roic','revenueGrowth','realGrowth',
-    'debtToAssets','equityRatio','shortTermDebtRatio','operatingExpenseRatio',
-    'netWorkingCapitalRatio',
-  ]
-  if (PCT_KEYS.includes(key)) return `${(val * 100).toFixed(1)}%`
+  if (PCT_KEYS.has(key)) return `${(val * 100).toFixed(1)}%`
   return val.toFixed(2)
+}
+
+// Benchmark ile karşılaştırma: +N% veya -N%
+function benchmarkDelta(actual: number, bm: number, direction: RatioDir): {
+  good: boolean; label: string; pct: number
+} {
+  if (direction === 'none') return { good: true, label: '', pct: 0 }
+  const pct = ((actual - bm) / Math.abs(bm)) * 100
+  const good = direction === 'higher' ? pct >= 0 : pct <= 0
+  const absPct = Math.abs(pct)
+  const sign = pct >= 0 ? '+' : '−'
+  return { good, label: `${sign}${absPct.toFixed(0)}%`, pct }
 }
 
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
@@ -181,7 +227,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   const { id } = use(params)
   const [activeTab, setActiveTab] = useState<'firmalar' | 'rating' | 'eliminasyonlar' | 'senaryo'>('firmalar')
 
-  // Veri
   const [group,        setGroup]        = useState<GroupInfo | null>(null)
   const [entities,     setEntities]     = useState<EntityInfo[]>([])
   const [consolidated, setConsolidated] = useState<ConsolidatedResult | null>(null)
@@ -189,18 +234,15 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   const [allEntities,  setAll]          = useState<AllEntity[]>([])
   const [loading,      setLoading]      = useState(true)
 
-  // Şirket ekleme formu
   const [addId,   setAddId]   = useState('')
   const [addType, setAddType] = useState('SUBSIDIARY')
   const [addOwn,  setAddOwn]  = useState('100')
   const [adding,  setAdding]  = useState(false)
 
-  // Eliminasyon formu
   const [elimForm,   setElimForm]   = useState<EliminationsData>(ZERO_ELIM)
   const [savingElim, setSavingElim] = useState(false)
   const [elimSaved,  setElimSaved]  = useState(false)
 
-  // ── Yükle ────────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     const [groupRes, allRes] = await Promise.all([
       fetch(`/api/groups/${id}`).then(r => r.json()),
@@ -220,7 +262,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
 
   useEffect(() => { loadData() }, [loadData])
 
-  // ── Şirket işlemleri ─────────────────────────────────────────────────────
   const available = allEntities.filter(
     e => !e.groupId && !entities.some(ge => ge.id === e.id)
   )
@@ -247,7 +288,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     await loadData()
   }
 
-  // ── Eliminasyon kaydet ────────────────────────────────────────────────────
   async function saveEliminations() {
     setSavingElim(true)
     const res = await fetch(`/api/groups/${id}/eliminations`, {
@@ -262,6 +302,53 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     }
     setSavingElim(false)
   }
+
+  // ── Benchmark & skoru düşüren faktörler (rating sekmesi için) ─────────────
+  const sectorBenchmark = useMemo(
+    () => getSectorBenchmark(group?.sector),
+    [group?.sector]
+  )
+
+  const draggingFactors = useMemo(() => {
+    if (!consolidated) return []
+    const ratios = consolidated.consolidatedRatios
+
+    // 1) Kritik eşik ihlalleri
+    const critical = CRITICAL_CHECKS
+      .map(c => {
+        const v = ratios[c.key]
+        if (v == null || !c.check(v as number)) return null
+        return { label: c.label, impact: c.impact, isCritical: true, key: c.key }
+      })
+      .filter(Boolean) as { label: string; impact: number; isCritical: boolean; key: string }[]
+
+    // 2) Benchmark altındaki rasyolar
+    const belowBm = RATIO_GROUPS.flatMap(g =>
+      g.ratios
+        .filter(r => r.bmKey && r.direction !== 'none')
+        .map(r => {
+          const actual = ratios[r.key]
+          if (actual == null) return null
+          const bmVal = sectorBenchmark[r.bmKey!] as number | undefined
+          if (!bmVal) return null
+          const { good, pct } = benchmarkDelta(actual as number, bmVal, r.direction)
+          if (good) return null
+          const shortfall = Math.min(1, Math.abs(pct) / 100)
+          if (shortfall < 0.08) return null   // 8% altında önemsiz
+          const impact = Math.min(8, r.catWeight * shortfall)
+          const sign = pct >= 0 ? '+' : '−'
+          const absPct = Math.abs(pct).toFixed(0)
+          const label = `${r.label}: TCMB ortalamasının ${sign}${absPct}% ${r.direction === 'higher' ? 'altında' : 'üstünde'}`
+          return { label, impact, isCritical: false, key: r.key }
+        })
+        .filter(Boolean)
+    ) as { label: string; impact: number; isCritical: boolean; key: string }[]
+
+    // Kritik olanlar önce, sonra etki büyüklüğüne göre sırala; duplikasyonları kaldır
+    const criticalKeys = new Set(critical.map(c => c.key))
+    const uniqueBelowBm = belowBm.filter(b => !criticalKeys.has(b.key))
+    return [...critical, ...uniqueBelowBm].sort((a, b) => b.impact - a.impact).slice(0, 8)
+  }, [consolidated, sectorBenchmark])
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -278,6 +365,18 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     </DashboardShell>
   )
 
+  // ── Gelir tablosu satırları ──────────────────────────────────────────────
+  const ef = consolidated?.eliminatedFinancials ?? {}
+  const IS_ROWS = [
+    { label: 'Ciro (Net Satışlar)',           key: 'revenue',           indent: false, bold: false, separator: false },
+    { label: '(-) Satışların Maliyeti',       key: 'cogs',              indent: true,  bold: false, separator: false, negative: true },
+    { label: 'Brüt Kâr',                      key: 'grossProfit',       indent: false, bold: true,  separator: true  },
+    { label: '(-) Faaliyet Giderleri',        key: 'operatingExpenses', indent: true,  bold: false, separator: false, negative: true },
+    { label: 'FVÖK (EBIT)',                   key: 'ebit',              indent: false, bold: true,  separator: true  },
+    { label: '(-) Faiz Giderleri',            key: 'interestExpense',   indent: true,  bold: false, separator: false, negative: true },
+    { label: 'Net Kâr / Zarar',               key: 'netProfit',         indent: false, bold: true,  separator: true  },
+  ]
+
   return (
     <DashboardShell>
     <div className="space-y-6">
@@ -293,7 +392,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
             {entities.length} şirket{group.sector ? ` · ${group.sector}` : ''}
           </p>
         </div>
-        {/* Mini skor özeti sağda */}
         {consolidated && (
           <div className="text-right flex-shrink-0">
             <p style={{ fontSize: 28, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
@@ -310,10 +408,10 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       {/* ── Ana sekmeler ───────────────────────────────────────────────────── */}
       <div className="tab-group inline-flex">
         {([
-          { key: 'firmalar',       label: 'Firmalar',          Icon: Building2    },
-          { key: 'rating',         label: 'Konsolide Rating',  Icon: BarChart3    },
-          { key: 'eliminasyonlar', label: 'Eliminasyonlar',    Icon: GitBranch    },
-          { key: 'senaryo',        label: 'Senaryo',           Icon: Sliders      },
+          { key: 'firmalar',       label: 'Firmalar',         Icon: Building2 },
+          { key: 'rating',         label: 'Konsolide Rating', Icon: BarChart3  },
+          { key: 'eliminasyonlar', label: 'Eliminasyonlar',   Icon: GitBranch  },
+          { key: 'senaryo',        label: 'Senaryo',          Icon: Sliders    },
         ] as const).map(({ key, label, Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`tab flex items-center gap-1.5 px-4 py-2 text-sm${activeTab === key ? ' active' : ''}`}>
@@ -327,8 +425,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'firmalar' && (
         <div className="max-w-2xl space-y-4">
-
-          {/* Şirket ekleme formu — sadece uygun şirket varsa */}
           {available.length > 0 && (
             <div className="card overflow-hidden">
               <div className="card-head"><h2 className="card-title text-sm">Şirket Ekle</h2></div>
@@ -357,8 +453,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               </div>
             </div>
           )}
-
-          {/* Firma listesi */}
           <div className="card overflow-hidden">
             <div className="card-head"><h2 className="card-title text-sm">Grup Firmaları</h2></div>
             {entities.length === 0 ? (
@@ -368,75 +462,38 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               </div>
             ) : (
               <>
-                {/* Tablo başlığı */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 72px 100px 88px 32px',
+                  display: 'grid', gridTemplateColumns: '1fr 72px 100px 88px 32px',
                   gap: 8, padding: '8px 20px',
-                  borderBottom: '1px solid #F1F5F9',
-                  background: '#F8FAFC',
+                  borderBottom: '1px solid #F1F5F9', background: '#F8FAFC',
                 }}>
                   {['FİRMA', 'SKOR', 'DERECELENDİRME', 'AKTİF', ''].map((h, i) => (
-                    <span key={i} style={{
-                      fontSize: 10, fontWeight: 600, color: '#94A3B8',
-                      textAlign: i > 0 ? 'right' : 'left',
-                      letterSpacing: '0.06em',
-                    }}>{h}</span>
+                    <span key={i} style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8',
+                      textAlign: i > 0 ? 'right' : 'left', letterSpacing: '0.06em' }}>{h}</span>
                   ))}
                 </div>
-
                 <div className="divide-y divide-[#F1F5F9]">
                   {entities.map(e => (
                     <div key={e.id} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 72px 100px 88px 32px',
-                      gap: 8, padding: '10px 20px',
-                      alignItems: 'center',
+                      display: 'grid', gridTemplateColumns: '1fr 72px 100px 88px 32px',
+                      gap: 8, padding: '10px 20px', alignItems: 'center',
                     }}>
-                      {/* Firma adı */}
                       <div className="min-w-0">
                         <Link href={`/dashboard/sirketler/${e.id}`}
-                          className="text-sm font-medium text-[#0B3C5D] hover:underline block truncate">
-                          {e.name}
-                        </Link>
-                        <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                          %{Math.round(e.ownershipPct)} sahiplik
-                        </p>
+                          className="text-sm font-medium text-[#0B3C5D] hover:underline block truncate">{e.name}</Link>
+                        <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>%{Math.round(e.ownershipPct)} sahiplik</p>
                       </div>
-
-                      {/* Skor */}
                       <div style={{ textAlign: 'right' }}>
-                        {e.latestAnalysis ? (
-                          <span style={{
-                            fontSize: 18, fontWeight: 900,
-                            fontFamily: 'Outfit, sans-serif', color: '#0B3C5D',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}>
-                            {Math.round(e.latestAnalysis.finalScore)}
-                          </span>
-                        ) : <span style={{ fontSize: 12, color: '#CBD5E1' }}>—</span>}
+                        {e.latestAnalysis
+                          ? <span style={{ fontSize: 18, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', fontVariantNumeric: 'tabular-nums' }}>{Math.round(e.latestAnalysis.finalScore)}</span>
+                          : <span style={{ fontSize: 12, color: '#CBD5E1' }}>—</span>}
                       </div>
-
-                      {/* Grade badge */}
                       <div style={{ textAlign: 'right' }}>
-                        {e.latestAnalysis ? (
-                          <span style={{
-                            display: 'inline-flex', padding: '2px 8px', borderRadius: 6,
-                            fontSize: 11, fontWeight: 700,
-                            background: `${gradeColor(e.latestAnalysis.grade)}18`,
-                            color: gradeColor(e.latestAnalysis.grade),
-                          }}>
-                            {e.latestAnalysis.grade}
-                          </span>
-                        ) : <span style={{ fontSize: 12, color: '#CBD5E1' }}>—</span>}
+                        {e.latestAnalysis
+                          ? <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: `${gradeColor(e.latestAnalysis.grade)}18`, color: gradeColor(e.latestAnalysis.grade) }}>{e.latestAnalysis.grade}</span>
+                          : <span style={{ fontSize: 12, color: '#CBD5E1' }}>—</span>}
                       </div>
-
-                      {/* Toplam Aktif */}
-                      <div style={{ textAlign: 'right', fontSize: 12, color: '#64748B', fontVariantNumeric: 'tabular-nums' }}>
-                        {fmtAsset(e.totalAssets)}
-                      </div>
-
-                      {/* Çıkar */}
+                      <div style={{ textAlign: 'right', fontSize: 12, color: '#64748B', fontVariantNumeric: 'tabular-nums' }}>{fmtAsset(e.totalAssets)}</div>
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button onClick={() => removeEntity(e.id)}
                           style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#CBD5E1', transition: 'color 0.15s' }}
@@ -458,20 +515,220 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           SEKME 2 — KONSOLİDE RATING
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'rating' && (
-        <div className="max-w-2xl space-y-4">
-
+        <div className="max-w-3xl space-y-5">
           {!consolidated ? (
             <div className="card p-10 text-center">
               <BarChart3 size={32} className="mx-auto mb-3" style={{ color: '#CBD5E1' }} />
-              <p className="text-sm" style={{ color: '#94A3B8' }}>
-                Konsolide skor hesaplanamadı.
-              </p>
-              <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>
-                Gruba analizi tamamlanmış şirket ekleyin.
-              </p>
+              <p className="text-sm" style={{ color: '#94A3B8' }}>Konsolide skor hesaplanamadı.</p>
+              <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>Gruba analizi tamamlanmış şirket ekleyin.</p>
             </div>
           ) : (
             <>
+
+              {/* ────────────────────────────────────────────────────────────
+                  1. KONSOLİDE BİLANÇO
+              ──────────────────────────────────────────────────────────── */}
+              <div className="card overflow-hidden">
+                <div className="card-head" style={{ background: '#F8FAFC' }}>
+                  <div className="flex items-center justify-between">
+                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                      KONSOLİDE BİLANÇO
+                    </h2>
+                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>
+                      Eliminasyon sonrası • {group.sector || 'Konsolide'}
+                    </span>
+                  </div>
+                </div>
+                <div className="card-body">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+
+                    {/* AKTİF */}
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#2EC4B6', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                        AKTİF
+                      </p>
+                      {[
+                        { label: 'Dönen Varlıklar',  key: 'totalCurrentAssets',    sub: true  },
+                        { label: 'Duran Varlıklar',  key: 'totalNonCurrentAssets', sub: true  },
+                        { label: 'TOPLAM AKTİF',     key: 'totalAssets',           sub: false },
+                      ].map(({ label, key, sub }) => {
+                        const { text, neg } = fmtSigned(ef[key])
+                        return (
+                          <div key={key} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: sub ? '5px 0 5px 12px' : '8px 0 0 0',
+                            borderTop: !sub ? '1px solid #E5E9F0' : undefined,
+                            marginTop: !sub ? 4 : 0,
+                          }}>
+                            <span style={{ fontSize: sub ? 12 : 12, fontWeight: sub ? 400 : 700, color: sub ? '#64748B' : '#0B3C5D' }}>{label}</span>
+                            <span style={{ fontSize: 12, fontWeight: sub ? 500 : 700, color: neg ? '#DC2626' : sub ? '#1E293B' : '#0B3C5D', fontVariantNumeric: 'tabular-nums', fontFamily: 'Outfit, sans-serif' }}>
+                              {neg ? '-' : ''}{text}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* PASİF + ÖZKAYNAK */}
+                    <div style={{ borderLeft: '1px solid #F1F5F9', paddingLeft: 24 }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#D97706', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                        PASİF + ÖZKAYNAK
+                      </p>
+                      {[
+                        { label: 'Kısa Vadeli Borçlar', key: 'totalCurrentLiabilities',    sub: true  },
+                        { label: 'Uzun Vadeli Borçlar', key: 'totalNonCurrentLiabilities',  sub: true  },
+                        { label: 'Özkaynak',             key: 'totalEquity',                sub: true  },
+                        { label: 'TOPLAM PASİF+ÖZK',    key: 'totalLiabilitiesAndEquity',  sub: false },
+                      ].map(({ label, key, sub }) => {
+                        const { text, neg } = fmtSigned(ef[key])
+                        return (
+                          <div key={key} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: sub ? '5px 0 5px 12px' : '8px 0 0 0',
+                            borderTop: !sub ? '1px solid #E5E9F0' : undefined,
+                            marginTop: !sub ? 4 : 0,
+                          }}>
+                            <span style={{ fontSize: 12, fontWeight: sub ? 400 : 700, color: sub ? '#64748B' : '#0B3C5D' }}>{label}</span>
+                            <span style={{ fontSize: 12, fontWeight: sub ? 500 : 700, color: neg ? '#DC2626' : sub ? '#1E293B' : '#0B3C5D', fontVariantNumeric: 'tabular-nums', fontFamily: 'Outfit, sans-serif' }}>
+                              {neg ? '-' : ''}{text}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Azınlık payı notu */}
+                  {(ef['minorityInterest'] ?? 0) !== 0 && (
+                    <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 12, paddingTop: 8, borderTop: '1px solid #F1F5F9' }}>
+                      * Azınlık payına düşen net kâr/zarar: {fmtSigned(ef['minorityInterest']).text} TL
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ────────────────────────────────────────────────────────────
+                  2. KONSOLİDE GELİR TABLOSU
+              ──────────────────────────────────────────────────────────── */}
+              <div className="card overflow-hidden">
+                <div className="card-head" style={{ background: '#F8FAFC' }}>
+                  <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                    KONSOLİDE GELİR TABLOSU
+                  </h2>
+                </div>
+                <div style={{ padding: '0 0 4px' }}>
+                  {IS_ROWS.map(({ label, key, indent, bold, separator, negative }) => {
+                    const { text, neg } = fmtSigned(ef[key])
+                    const displayNeg = neg !== Boolean(negative)   // negative row with positive value → show red
+                    return (
+                      <div key={key} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '7px 20px 7px ' + (indent ? '32px' : '20px'),
+                        borderTop: separator ? '1px solid #E5E9F0' : '1px solid #F8FAFC',
+                        background: bold && !indent ? '#FAFAFA' : 'white',
+                      }}>
+                        <span style={{ fontSize: 12, fontWeight: bold ? 700 : 400, color: bold ? '#0B3C5D' : '#64748B' }}>
+                          {label}
+                        </span>
+                        <span style={{
+                          fontSize: 12, fontWeight: bold ? 700 : 500,
+                          fontFamily: 'Outfit, sans-serif',
+                          color: displayNeg ? '#DC2626' : bold ? '#0B3C5D' : '#1E293B',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {negative && !neg && text !== '—' ? '-' : ''}{neg && !negative ? '-' : ''}{text}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ────────────────────────────────────────────────────────────
+                  3. 25-RASYO TABLOSU — TCMB BENCHMARK
+              ──────────────────────────────────────────────────────────── */}
+              <div className="card overflow-hidden">
+                <div className="card-head" style={{ background: '#F8FAFC' }}>
+                  <div className="flex items-center justify-between">
+                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                      KONSOLİDE FİNANSAL RASYOLAR
+                    </h2>
+                    <span style={{ fontSize: 10, color: '#94A3B8' }}>
+                      TCMB kıyaslaması: {sectorBenchmark.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="card-body space-y-5">
+                  {/* Tablo başlık satırı */}
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr 80px 80px 72px',
+                    padding: '0 0 6px', borderBottom: '1px solid #E5E9F0',
+                  }}>
+                    {['RASYO', 'DEĞER', 'TCMB', 'DURUM'].map((h, i) => (
+                      <span key={h} style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textAlign: i > 0 ? 'right' : 'left' }}>{h}</span>
+                    ))}
+                  </div>
+
+                  {RATIO_GROUPS.map(g => (
+                    <div key={g.label}>
+                      {/* Kategori başlık */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{ width: 3, height: 14, borderRadius: 2, background: g.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: g.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                          {g.label}
+                        </span>
+                      </div>
+                      {/* Rasyo satırları */}
+                      <div style={{ borderRadius: 8, border: '1px solid #F1F5F9', overflow: 'hidden' }}>
+                        {g.ratios.map((r, idx) => {
+                          const val = consolidated.consolidatedRatios[r.key]
+                          const fmtVal = fmtRatio(val as number | null, r.key)
+                          const bmVal = r.bmKey ? sectorBenchmark[r.bmKey] as number : null
+                          const fmtBm = bmVal != null ? fmtRatio(bmVal, r.key) : '—'
+                          const delta = (val != null && bmVal != null && r.direction !== 'none')
+                            ? benchmarkDelta(val as number, bmVal, r.direction)
+                            : null
+
+                          return (
+                            <div key={r.key} style={{
+                              display: 'grid', gridTemplateColumns: '1fr 80px 80px 72px',
+                              alignItems: 'center', padding: '6px 14px',
+                              background: idx % 2 === 0 ? '#FAFAFA' : '#FFFFFF',
+                              borderTop: idx > 0 ? '1px solid #F1F5F9' : 'none',
+                            }}>
+                              <span style={{ fontSize: 12, color: '#1E293B' }}>{r.label}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'Outfit, sans-serif', color: val == null ? '#CBD5E1' : '#0B3C5D', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                {fmtVal}
+                              </span>
+                              <span style={{ fontSize: 11, color: '#94A3B8', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                {fmtBm}
+                              </span>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                {delta ? (
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5,
+                                    background: delta.good ? '#DCFCE7' : '#FEE2E2',
+                                    color: delta.good ? '#16a34a' : '#DC2626',
+                                  }}>
+                                    {delta.label}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, color: '#E2E8F0' }}>—</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ────────────────────────────────────────────────────────────
+                  4. KONSOLİDE SKOR KARTI
+              ──────────────────────────────────────────────────────────── */}
+
               {/* En zayıf halka uyarısı */}
               {consolidated.weakestLinkApplied === true && (
                 <div style={{
@@ -486,7 +743,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
 
-              {/* Ana skor kartı */}
               <div className="card overflow-hidden">
                 <div className="card-head" style={{ background: '#F8FAFC' }}>
                   <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
@@ -495,51 +751,31 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 </div>
                 <div className="card-body">
                   <div className="flex items-end gap-6">
-                    {/* Büyük skor */}
                     <div>
-                      <p style={{
-                        fontSize: 80, fontWeight: 900,
-                        fontFamily: 'Outfit, sans-serif',
-                        color: '#0B3C5D', lineHeight: 1,
-                      }}>
+                      <p style={{ fontSize: 80, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
                         {Math.round(consolidated.consolidatedScore)}
                       </p>
                       <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>/100</p>
                     </div>
-
-                    {/* Grade */}
                     <div style={{ paddingBottom: 16 }}>
-                      <div style={{
-                        display: 'inline-flex', padding: '4px 14px', borderRadius: 8,
-                        fontSize: 16, fontWeight: 800, background: '#0B3C5D', color: '#fff',
-                      }}>
+                      <div style={{ display: 'inline-flex', padding: '4px 14px', borderRadius: 8, fontSize: 16, fontWeight: 800, background: '#0B3C5D', color: '#fff' }}>
                         {consolidated.consolidatedGrade}
                       </div>
-                      <p style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                        {RATING_LABEL[consolidated.consolidatedGrade] ?? ''}
-                      </p>
+                      <p style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{RATING_LABEL[consolidated.consolidatedGrade] ?? ''}</p>
                     </div>
                   </div>
-
-                  {/* Ağırlıklı ortalama */}
-                  <div style={{
-                    marginTop: 16, paddingTop: 16,
-                    borderTop: '1px solid #F1F5F9',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}>
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <p style={{ fontSize: 12, color: '#64748B' }}>Ağırlıklı ortalama (aktif bazlı):</p>
-                    <span style={{
-                      fontSize: 16, fontWeight: 800,
-                      fontFamily: 'Outfit, sans-serif', color: '#5A7A96',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, fontFamily: 'Outfit, sans-serif', color: '#5A7A96', fontVariantNumeric: 'tabular-nums' }}>
                       {consolidated.weightedAverageScore.toFixed(1)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* 4 Kategori skoru */}
+              {/* ────────────────────────────────────────────────────────────
+                  5. KATEGORİ SKORLARI
+              ──────────────────────────────────────────────────────────── */}
               <div className="card overflow-hidden">
                 <div className="card-head" style={{ background: '#F8FAFC' }}>
                   <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
@@ -549,33 +785,21 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 <div className="card-body">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {([
-                      { label: 'Likidite',  value: consolidated.liquidityScore,     weight: '%25' },
-                      { label: 'Kârlılık',  value: consolidated.profitabilityScore, weight: '%30' },
-                      { label: 'Kaldıraç',  value: consolidated.leverageScore,      weight: '%30' },
-                      { label: 'Faaliyet',  value: consolidated.activityScore,      weight: '%15' },
-                    ] as const).map(({ label, value, weight }) => (
-                      <div key={label} style={{
-                        borderRadius: 12, padding: '14px 16px',
-                        background: '#F8FAFC', border: '1px solid #E5E9F0',
-                      }}>
+                      { label: 'Likidite',  value: consolidated.liquidityScore,     weight: '%25', color: '#2EC4B6' },
+                      { label: 'Kârlılık',  value: consolidated.profitabilityScore, weight: '%30', color: '#0B3C5D' },
+                      { label: 'Kaldıraç',  value: consolidated.leverageScore,      weight: '%30', color: '#D97706' },
+                      { label: 'Faaliyet',  value: consolidated.activityScore,      weight: '%15', color: '#7C3AED' },
+                    ] as const).map(({ label, value, weight, color }) => (
+                      <div key={label} style={{ borderRadius: 12, padding: '14px 16px', background: '#F8FAFC', border: '1px solid #E5E9F0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>{label}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
                           <span style={{ fontSize: 10, color: '#CBD5E1' }}>{weight}</span>
                         </div>
-                        <p style={{
-                          fontSize: 34, fontWeight: 900,
-                          fontFamily: 'Outfit, sans-serif',
-                          color: '#0B3C5D', lineHeight: 1,
-                        }}>
+                        <p style={{ fontSize: 34, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
                           {Math.round(value)}
                         </p>
-                        {/* Progress bar */}
                         <div style={{ marginTop: 8, height: 5, borderRadius: 99, background: '#E5E9F0' }}>
-                          <div style={{
-                            height: '100%', borderRadius: 99,
-                            width: `${Math.min(100, Math.max(0, value))}%`,
-                            background: 'linear-gradient(90deg, #2EC4B6 0%, #0B3C5D 100%)',
-                          }} />
+                          <div style={{ height: '100%', borderRadius: 99, width: `${Math.min(100, Math.max(0, value))}%`, background: `linear-gradient(90deg, ${color} 0%, #0B3C5D 100%)` }} />
                         </div>
                       </div>
                     ))}
@@ -583,108 +807,79 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 </div>
               </div>
 
-              {/* ── Konsolide Bilanço Özeti ─────────────────────────────────── */}
-              {consolidated.eliminatedFinancials && (
+              {/* ────────────────────────────────────────────────────────────
+                  6. SKORU DÜŞÜREN FAKTÖRLER
+              ──────────────────────────────────────────────────────────── */}
+              {draggingFactors.length > 0 && (
                 <div className="card overflow-hidden">
-                  <div className="card-head" style={{ background: '#F8FAFC' }}>
-                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                      KONSOLİDE BİLANÇO ÖZETİ
-                    </h2>
-                    <p style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>Eliminasyonlar uygulandıktan sonra</p>
-                  </div>
-                  <div className="card-body">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-                      {([
-                        { label: 'Toplam Aktif',  key: 'totalAssets'  },
-                        { label: 'Özkaynak',       key: 'totalEquity'  },
-                        { label: 'Toplam Borç',    key: 'totalDebt'    },
-                        { label: 'Net Kâr/Zarar',  key: 'netProfit'    },
-                        { label: 'Ciro',           key: 'revenue'      },
-                      ]).map(({ label, key }) => {
-                        const raw = consolidated.eliminatedFinancials[key]
-                        const v = typeof raw === 'number' ? raw : 0
-                        const isNegative = v < 0
-                        return (
-                          <div key={key} style={{
-                            borderRadius: 10, padding: '12px 14px',
-                            background: '#F8FAFC', border: '1px solid #E5E9F0',
-                          }}>
-                            <p style={{ fontSize: 10, color: '#94A3B8', marginBottom: 4, fontWeight: 500 }}>{label}</p>
-                            <p style={{
-                              fontSize: 15, fontWeight: 800,
-                              fontFamily: 'Outfit, sans-serif',
-                              color: isNegative ? '#DC2626' : '#0B3C5D',
-                              lineHeight: 1.2,
-                            }}>
-                              {isNegative ? '-' : ''}{fmtAsset(Math.abs(v))}
-                            </p>
-                          </div>
-                        )
-                      })}
+                  <div className="card-head" style={{ background: '#FFF7ED' }}>
+                    <div className="flex items-center gap-2">
+                      <TrendingDown size={13} style={{ color: '#D97706' }} />
+                      <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400E' }}>
+                        SKORU DÜŞÜREN FAKTÖRLER
+                      </h2>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* ── Konsolide 25-Rasyo Tablosu ──────────────────────────────── */}
-              {consolidated.consolidatedRatios && (
-                <div className="card overflow-hidden">
-                  <div className="card-head" style={{ background: '#F8FAFC' }}>
-                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                      KONSOLİDE FİNANSAL RASYOLAR
-                    </h2>
-                  </div>
-                  <div className="card-body space-y-5">
-                    {RATIO_GROUPS.map(group => (
-                      <div key={group.label}>
-                        {/* Kategori başlığı */}
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
-                        }}>
-                          <div style={{
-                            width: 3, height: 16, borderRadius: 2,
-                            background: group.color, flexShrink: 0,
-                          }} />
-                          <span style={{ fontSize: 11, fontWeight: 700, color: group.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                            {group.label}
-                          </span>
+                  <div style={{ padding: '4px 0' }}>
+                    {draggingFactors.map((f, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+                        padding: '9px 20px',
+                        borderTop: i > 0 ? '1px solid #FEF3C7' : 'none',
+                        background: f.isCritical ? '#FFFBEB' : 'white',
+                      }}>
+                        <div className="flex items-start gap-2 min-w-0">
+                          {f.isCritical && (
+                            <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
+                          )}
+                          <p style={{ fontSize: 12, color: f.isCritical ? '#B45309' : '#1E293B', margin: 0, lineHeight: 1.5 }}>
+                            {f.label}
+                          </p>
                         </div>
-                        {/* Rasyo satırları */}
-                        <div style={{
-                          borderRadius: 8,
-                          border: '1px solid #F1F5F9',
-                          overflow: 'hidden',
-                        }}>
-                          {group.ratios.map((r, idx) => {
-                            const val = consolidated.consolidatedRatios[r.key]
-                            const formatted = fmtRatio(val as number | null, r.key)
-                            const isNull = val == null
-                            return (
-                              <div key={r.key} style={{
-                                display: 'flex', justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '7px 14px',
-                                background: idx % 2 === 0 ? '#FAFAFA' : '#FFFFFF',
-                                borderTop: idx > 0 ? '1px solid #F1F5F9' : 'none',
-                              }}>
-                                <span style={{ fontSize: 12, color: '#1E293B' }}>{r.label}</span>
-                                <span style={{
-                                  fontSize: 12, fontWeight: 700,
-                                  fontFamily: 'Outfit, sans-serif',
-                                  color: isNull ? '#CBD5E1' : '#0B3C5D',
-                                  fontVariantNumeric: 'tabular-nums',
-                                }}>
-                                  {formatted}
-                                </span>
-                              </div>
-                            )
-                          })}
+                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                            background: f.impact >= 5 ? '#FEE2E2' : '#FEF3C7',
+                            color: f.impact >= 5 ? '#DC2626' : '#B45309',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            −{f.impact.toFixed(1)} puan
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
+                  <div style={{ padding: '8px 20px 10px', borderTop: '1px solid #FEF3C7', background: '#FFFBEB' }}>
+                    <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>
+                      * Puan tahmini yaklaşıktır; kategori ağırlığı × benchmark sapması formülüyle hesaplanır.
+                      TCMB kıyaslaması: {sectorBenchmark.label}
+                    </p>
+                  </div>
                 </div>
               )}
+
+              {/* ────────────────────────────────────────────────────────────
+                  7. SENARYO MOTORU
+              ──────────────────────────────────────────────────────────── */}
+              <div style={{ paddingTop: 4 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12,
+                  padding: '10px 16px', borderRadius: 12,
+                  background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)',
+                }}>
+                  <Sliders size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
+                    Konsolide rasyolar başlangıç noktası olarak kullanılmaktadır.
+                    Kaldıraç değişikliklerinin grup skoru üzerindeki etkisini simüle edin.
+                  </p>
+                </div>
+                <WhatIfSimulator
+                  baseData={consolidated.consolidatedRatios}
+                  baseScore={consolidated.consolidatedScore}
+                  rawFinancialData={consolidated.eliminatedFinancials}
+                />
+              </div>
+
             </>
           )}
         </div>
@@ -695,8 +890,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'eliminasyonlar' && (
         <div className="max-w-xl space-y-4">
-
-          {/* Bilgi banner */}
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             padding: '10px 16px', borderRadius: 12,
@@ -708,75 +901,39 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               Kaydedildiğinde konsolide skor otomatik olarak yeniden hesaplanır.
             </p>
           </div>
-
-          {/* Form */}
           <div className="card overflow-hidden">
-            <div className="card-head">
-              <h2 className="card-title text-sm">Grup İçi Eliminasyonlar</h2>
-            </div>
+            <div className="card-head"><h2 className="card-title text-sm">Grup İçi Eliminasyonlar</h2></div>
             <div className="card-body space-y-4">
               {ELIM_FIELDS.map(({ key, label, hint }) => (
-                <div key={key} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 160px',
-                  gap: 12, alignItems: 'center',
-                }}>
+                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 12, alignItems: 'center' }}>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 500, color: '#1E293B', margin: 0 }}>{label}</p>
                     <p style={{ fontSize: 11, color: '#94A3B8', margin: '2px 0 0' }}>{hint}</p>
                   </div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={elimForm[key]}
+                  <input type="number" min={0} value={elimForm[key]}
                     onChange={ev => setElimForm(prev => ({ ...prev, [key]: Number(ev.target.value) || 0 }))}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-right text-[#1E293B] tabular-nums focus:outline-none focus:border-cyan-500"
-                  />
+                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-right text-[#1E293B] tabular-nums focus:outline-none focus:border-cyan-500" />
                 </div>
               ))}
-
-              {/* Kaydet */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                paddingTop: 12, borderTop: '1px solid #F1F5F9',
-              }}>
-                {elimSaved ? (
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>
-                    ✓ Kaydedildi — konsolide skor yeniden hesaplandı
-                  </p>
-                ) : (
-                  <p style={{ fontSize: 12, color: '#94A3B8' }}>
-                    Tüm alanlar TL cinsinden girilmelidir.
-                  </p>
-                )}
-                <button
-                  onClick={saveEliminations}
-                  disabled={savingElim}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
+                {elimSaved
+                  ? <p style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>✓ Kaydedildi — konsolide skor yeniden hesaplandı</p>
+                  : <p style={{ fontSize: 12, color: '#94A3B8' }}>Tüm alanlar TL cinsinden girilmelidir.</p>}
+                <button onClick={saveEliminations} disabled={savingElim}
                   className="btn btn-primary flex items-center gap-2 disabled:opacity-50">
-                  {savingElim
-                    ? <Loader2 size={14} className="animate-spin" />
-                    : <Save size={14} />
-                  }
-                  Kaydet
+                  {savingElim ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Mevcut eliminasyon özeti */}
           {Object.values(eliminations).some(v => v > 0) && (
             <div className="card overflow-hidden">
               <div className="card-head" style={{ background: '#F8FAFC' }}>
-                <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                  KAYITLI ELİMİNASYONLAR
-                </h2>
+                <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>KAYITLI ELİMİNASYONLAR</h2>
               </div>
               <div className="divide-y divide-[#F1F5F9]">
                 {ELIM_FIELDS.filter(f => eliminations[f.key] > 0).map(({ key, label }) => (
-                  <div key={key} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '8px 20px',
-                  }}>
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px' }}>
                     <span style={{ fontSize: 12, color: '#1E293B' }}>{label}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#DC2626', fontVariantNumeric: 'tabular-nums' }}>
                       -{fmtAsset(eliminations[key])} TL
@@ -797,16 +954,11 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           {!consolidated ? (
             <div className="card p-10 text-center">
               <Sliders size={32} className="mx-auto mb-3" style={{ color: '#CBD5E1' }} />
-              <p className="text-sm" style={{ color: '#94A3B8' }}>
-                Senaryo analizi için önce konsolide skor hesaplanmalıdır.
-              </p>
-              <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>
-                Gruba analizi tamamlanmış şirket ekleyin.
-              </p>
+              <p className="text-sm" style={{ color: '#94A3B8' }}>Senaryo analizi için önce konsolide skor hesaplanmalıdır.</p>
+              <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>Gruba analizi tamamlanmış şirket ekleyin.</p>
             </div>
           ) : (
             <>
-              {/* Bilgi banner */}
               <div style={{
                 display: 'flex', alignItems: 'flex-start', gap: 8,
                 padding: '10px 16px', borderRadius: 12,
@@ -817,7 +969,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   Konsolide rasyo başlangıç noktası olarak kullanılmaktadır. Kaldıraç değişikliklerinin grup skoru üzerindeki etkisini simüle edin.
                 </p>
               </div>
-
               <WhatIfSimulator
                 baseData={consolidated.consolidatedRatios}
                 baseScore={consolidated.consolidatedScore}
