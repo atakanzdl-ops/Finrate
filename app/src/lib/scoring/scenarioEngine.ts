@@ -40,6 +40,7 @@ export interface ScenarioResult {
   gradeAfter:       string
   totalTLMovement:  number      // Toplam TL hareketi
   goalReached:      boolean     // Hedef nota ulaşıldı mı
+  error?:           string      // Validasyon hatası (opsiyonel)
 }
 
 // ─── SABİTLER ─────────────────────────────────────────────────────────────────
@@ -216,14 +217,24 @@ export function runScenarios(
   currentScore: number,
   targetGrade:  string,
 ): ScenarioResult[] {
-  const targetScore = GRADE_SCORES[targetGrade]
+  const targetScore  = GRADE_SCORES[targetGrade]
+  const currentGrade = scoreToRating(currentScore)
 
-  // Hedef not bilinmiyorsa veya mevcut skordan düşük/eşitse hata fırlat
-  if (targetScore === undefined) {
-    throw new Error(`Geçersiz hedef not: ${targetGrade}`)
-  }
-  if (targetScore <= currentScore) {
-    throw new Error('Hedef not mevcut nottan yüksek olmalı')
+  // Hedef not bilinmiyorsa veya mevcut skordan düşük/eşitse erken dön
+  if (targetScore === undefined || targetScore <= currentScore) {
+    return [{
+      horizon:         'short',
+      horizonLabel:    'Hedef Not Geçersiz',
+      targetGrade,
+      actions:         [],
+      scoreBefore:     currentScore,
+      scoreAfter:      currentScore,
+      gradeBefore:     currentGrade,
+      gradeAfter:      currentGrade,
+      totalTLMovement: 0,
+      goalReached:     false,
+      error:           'Hedef not mevcut nottan yüksek olmalı',
+    }]
   }
 
   const horizons: TimeHorizon[] = ['short', 'medium', 'long']

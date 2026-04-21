@@ -101,15 +101,13 @@ export async function POST(req: NextRequest) {
     const fd           = analysis.financialData as unknown as Record<string, number | null>
     const sector       = analysis.entity?.sector ?? 'Diğer'
     const currentScore = analysis.finalScore ?? 0
-    const sheet        = fdToSheet(fd)
-    const scenarios    = runScenarios(sheet, sector, currentScore, targetGrade)
-
-    return jsonUtf8({
-      scenarios,
-      currentScore,
-      currentGrade: scoreToRating(currentScore),
-      sector,
-    })
+    const sheet = fdToSheet(fd)
+    try {
+      const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)
+      return jsonUtf8({ scenarios, currentScore, currentGrade: scoreToRating(currentScore), sector })
+    } catch (error) {
+      return jsonUtf8({ error: String(error) }, { status: 400 })
+    }
   }
 
   // ── GROUP PATH ─────────────────────────────────────────────────────────────
@@ -217,15 +215,13 @@ export async function POST(req: NextRequest) {
       aggNullable[k] = v !== 0 ? v : null
     }
 
-    const sheet     = fdToSheet(aggNullable)
-    const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)
-
-    return jsonUtf8({
-      scenarios,
-      currentScore,
-      currentGrade: scoreToRating(currentScore),
-      sector,
-    })
+    const sheet = fdToSheet(aggNullable)
+    try {
+      const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)
+      return jsonUtf8({ scenarios, currentScore, currentGrade: scoreToRating(currentScore), sector })
+    } catch (error) {
+      return jsonUtf8({ error: String(error) }, { status: 400 })
+    }
   }
 
   return jsonUtf8({ error: 'Geçersiz istek.' }, { status: 400 })
