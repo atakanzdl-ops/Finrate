@@ -98,6 +98,49 @@ export function getRatingMinimum(label: string): number {
   return RATING_BANDS.find((band) => band.label === label)?.min ?? 0
 }
 
+// ─── BELL CURVE SKORU ────────────────────────────────────────────────────
+/**
+ * İki yönlü optimum bölgeli bell curve skorlayıcı.
+ *
+ * Yükselen taraf (badLow → optimalMin):
+ *   badLow                                  → 0
+ *   badLow + (optimalMin − badLow) / 3      → 60   (riseMid)
+ *   optimalMin                              → 100
+ *
+ * Optimum bölge (optimalMin → optimalMax)   → 100
+ *
+ * Düşen taraf (optimalMax → badHigh):
+ *   optimalMax                              → 100
+ *   optimalMax × 1.5                        → 70   (fall1)
+ *   optimalMax × 2.0                        → 40   (fall2)
+ *   badHigh                                 → 0
+ *
+ * DPO örneği — bellCurveScore(value, 45, 60, 0, 200):
+ *   riseMid = 15 gün, fall1 = 90 gün, fall2 = 120 gün ✓
+ */
+function bellCurveScore(
+  value:      number | null,
+  optimalMin: number,
+  optimalMax: number,
+  badLow:     number,
+  badHigh:    number,
+): number | null {
+  if (value == null) return null
+
+  const riseMid = badLow + (optimalMin - badLow) / 3   // yükselen kırılım, skor 60
+  const fall1   = optimalMax * 1.5                      // düşen 1. kırılım,  skor 70
+  const fall2   = optimalMax * 2.0                      // düşen 2. kırılım,  skor 40
+
+  if (value <= badLow)     return 0
+  if (value <  riseMid)    return ((value - badLow)     / (riseMid    - badLow))     * 60
+  if (value <  optimalMin) return 60 + ((value - riseMid) / (optimalMin - riseMid)) * 40
+  if (value <= optimalMax) return 100
+  if (value <  fall1)      return 100 - ((value - optimalMax) / (fall1 - optimalMax)) * 30
+  if (value <  fall2)      return 70  - ((value - fall1)      / (fall2 - fall1))      * 30
+  if (value <  badHigh)    return 40  - ((value - fall2)      / (badHigh - fall2))    * 40
+  return 0
+}
+
 // ─── TEMEL SKORLAMA FONKSİYONLARI ────────────────────────────────────────
 
 /**
@@ -377,11 +420,8 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
       bm?.receivablesDays,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Borç Ödeme Süresi (DPO) — artık sektör benchmark'ı var (DEFAULT)
-    [hybridMetricScore(r.payablesTurnoverDays,
-      { bad: 15, good: 60, sf: 0.15 },
-      bm?.payablesTurnoverDays,
-      HYBRID_DEFAULT), 1.0],
+    // Borç Ödeme Süresi (DPO) — bell curve: 0→15→45–60→90→120→200+ gün
+    [bellCurveScore(r.payablesTurnoverDays, 45, 60, 0, 200), 1.0],
 
     // Duran Varlık Devir — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.fixedAssetTurnover,
