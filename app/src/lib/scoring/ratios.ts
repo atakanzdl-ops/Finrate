@@ -271,7 +271,13 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const ebitMargin       = safe(ebit, revenue)
   const netProfitMargin  = safe(netProfit, revenue)
   const roa              = safe(netProfit, totalAssets)
-  const roe              = safe(netProfit, totalEquity)
+  const roe              = totalEquity == null || totalEquity === 0
+    ? null
+    : totalEquity > 0
+      ? safe(netProfit, totalEquity)
+      : netProfit == null
+        ? null
+        : netProfit > 0 ? -1 : null   // özkaynak < 0 && kar > 0 → teknik iflas; zarar → null
 
   const investedCapital  =
     totalAssets != null && totalCurrentLiabilities != null
