@@ -38,12 +38,25 @@ interface Scoring {
   subjectiveBreakdown?: Record<string, number>
 }
 
+interface IndividualBreakdown {
+  entityId: string; entityName: string; sector: string | null
+  finalScore: number
+  liquidityScore: number; profitabilityScore: number
+  leverageScore: number; activityScore: number
+}
+
+interface ScoreComparison {
+  consolidated: { finalScore: number; liquidityScore: number; profitabilityScore: number; leverageScore: number; activityScore: number }
+  individual: IndividualBreakdown[]
+}
+
 interface ConsolidateResult {
   year: number; period: string
   consolidated: Record<string, number>
   tenzilatEntries: TenzilatEntry[]
   scoring: Scoring
   ratios?: RatioResult
+  scoreComparison?: ScoreComparison
   included: { id: string; name: string }[]
   missing:  { id: string; name: string }[]
 }
@@ -796,6 +809,86 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                       </div>
                     </div>
                   </div>
+                  {/* ── SKOR KARŞILAŞTIRMA ───────────────────────────────────── */}
+                  {latestKey && allConData[latestKey]?.scoreComparison && (() => {
+                    const cmp = allConData[latestKey].scoreComparison!
+                    const cats: { key: keyof typeof cmp.consolidated; label: string }[] = [
+                      { key: 'liquidityScore',     label: 'Likidite'  },
+                      { key: 'profitabilityScore', label: 'Karlılık'  },
+                      { key: 'leverageScore',      label: 'Borçluluk' },
+                      { key: 'activityScore',      label: 'Faaliyet'  },
+                      { key: 'finalScore',         label: 'TOPLAM'    },
+                    ]
+                    return (
+                      <div className="card overflow-hidden">
+                        <div className="card-head" style={{ background: '#F8FAFC' }}>
+                          <div>
+                            <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                              Konsolide vs Bireysel Skor Kırılımı
+                            </h2>
+                            <p className="text-[10px] mt-0.5" style={{ color: '#94A3B8' }}>
+                              Hangi kategori konsolidede düşüyor?
+                            </p>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E5E9F0' }}>
+                                <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#94A3B8', minWidth: 110 }}>KATEGORİ</th>
+                                {cmp.individual.map((ind) => (
+                                  <th key={ind.entityId} style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748B', minWidth: 90 }}>
+                                    {ind.entityName}
+                                  </th>
+                                ))}
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#0B3C5D', minWidth: 90, background: '#EDF4F8' }}>
+                                  KONSOLİDE
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#94A3B8', minWidth: 70 }}>
+                                  FARK
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {cats.map(({ key, label }) => {
+                                const conVal = Math.round(cmp.consolidated[key] * 10) / 10
+                                const indAvg = cmp.individual.length > 0
+                                  ? cmp.individual.reduce((s, i) => s + i[key as keyof IndividualBreakdown] as unknown as number, 0) / cmp.individual.length
+                                  : null
+                                const diff = indAvg != null ? conVal - Math.round(indAvg * 10) / 10 : null
+                                const isFinal = key === 'finalScore'
+                                const diffColor = diff == null ? '#94A3B8' : diff >= 0 ? '#16a34a' : '#DC2626'
+                                return (
+                                  <tr key={key} style={{
+                                    borderBottom: '1px solid #F1F5F9',
+                                    background: isFinal ? '#EDF4F8' : undefined,
+                                  }}>
+                                    <td style={{ padding: '8px 16px', fontWeight: isFinal ? 700 : 500, color: '#0B3C5D', fontSize: isFinal ? 13 : 12 }}>
+                                      {label}
+                                    </td>
+                                    {cmp.individual.map((ind) => {
+                                      const v = Math.round((ind[key as keyof IndividualBreakdown] as number) * 10) / 10
+                                      return (
+                                        <td key={ind.entityId} style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#1E293B', fontWeight: isFinal ? 700 : 400 }}>
+                                          {v.toFixed(1)}
+                                        </td>
+                                      )
+                                    })}
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0B3C5D', background: '#EDF4F8', fontSize: isFinal ? 14 : 12 }}>
+                                      {conVal.toFixed(1)}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: diffColor, fontSize: 12 }}>
+                                      {diff == null ? '—' : `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}`}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </>
               )}
 

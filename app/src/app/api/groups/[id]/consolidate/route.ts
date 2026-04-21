@@ -156,6 +156,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const ratios   = calculateRatios({ ...consolidatedAfterTenzilat, sector: groupSector })
   const scoring  = calculateScore(ratios, groupSector)
 
+  // Her şirketin bireysel skor kırılımını hesapla (karşılaştırma için)
+  const individualBreakdowns = financialDataList.map((fd) => {
+    const entity  = group.entities.find((e) => e.id === fd.entityId)
+    const fdObj   = fd as Record<string, unknown>
+    const indRatios  = calculateRatios({ ...fdObj, sector: entity?.sector ?? null })
+    const indScoring = calculateScore(indRatios, entity?.sector ?? null)
+    return {
+      entityId:   fd.entityId,
+      entityName: entity?.name ?? fd.entityId,
+      sector:     entity?.sector ?? null,
+      finalScore:          indScoring.finalScore,
+      liquidityScore:      indScoring.liquidityScore,
+      profitabilityScore:  indScoring.profitabilityScore,
+      leverageScore:       indScoring.leverageScore,
+      activityScore:       indScoring.activityScore,
+    }
+  })
+
   // Şirketlerin subjektif puanlarını totalAssets ağırlığıyla ortala
   const subjectiveInputs = await prisma.subjectiveInput.findMany({
     where: { entityId: { in: group.entities.map(e => e.id) } },
@@ -199,6 +217,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       weightedSubjTotal: Math.round(weightedSubjTotal * 10) / 10,
       subjectiveBreakdown,   // entityId → subjektif puan
       hasSubjective: subjectiveInputs.length > 0,
+    },
+    // Konsolide vs bireysel skor karşılaştırması
+    scoreComparison: {
+      consolidated: {
+        finalScore:         scoring.finalScore,
+        liquidityScore:     scoring.liquidityScore,
+        profitabilityScore: scoring.profitabilityScore,
+        leverageScore:      scoring.leverageScore,
+        activityScore:      scoring.activityScore,
+      },
+      individual: individualBreakdowns,
     },
     included,
     missing,
