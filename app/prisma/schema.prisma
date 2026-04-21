@@ -111,8 +111,25 @@ model Group {
   icTransactions   IcTransaction[]
   eliminationLogs  EliminationLog[]
   tenzilatEntries  TenzilatEntry[]
+  groupElimination GroupElimination?
 
   @@map("groups")
+}
+
+model GroupElimination {
+  id                           String   @id @default(cuid())
+  groupId                      String   @unique
+  group                        Group    @relation(fields: [groupId], references: [id])
+  intercompanySales            Float    @default(0)
+  intercompanyPurchases        Float    @default(0)
+  intercompanyReceivables      Float    @default(0)
+  intercompanyPayables         Float    @default(0)
+  intercompanyAdvancesGiven    Float    @default(0)
+  intercompanyAdvancesReceived Float    @default(0)
+  intercompanyProfit           Float    @default(0)
+  updatedAt                    DateTime @updatedAt
+
+  @@map("group_eliminations")
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -209,6 +226,7 @@ model FinancialData {
   entity              Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
   analysis            Analysis?
   uploads             FinancialDataUpload[]
+  manualAdjustments   ManualAdjustment[]
 
   @@unique([entityId, year, period])
   @@map("financial_data")
@@ -366,6 +384,23 @@ model TenzilatAuditLog {
   user           User          @relation(fields: [userId], references: [id])
 
   @@map("tenzilat_audit_logs")
+}
+
+model ManualAdjustment {
+  id              String   @id @default(cuid())
+  financialDataId String
+  fieldName       String
+  adjustedValue   Float
+  originalValue   Float?
+  note            String?
+  scenarioName    String   @default("Varsayilan")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  financialData   FinancialData @relation(fields: [financialDataId], references: [id], onDelete: Cascade)
+
+  @@unique([financialDataId, fieldName, scenarioName])
+  @@map("manual_adjustments")
 }
 
 

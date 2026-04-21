@@ -25,7 +25,7 @@
  */
 
 import { RatioResult } from './ratios'
-import { getSectorBenchmark, getSectorWeights, SectorBenchmark } from './benchmarks'
+import { getSectorBenchmark, getSectorWeights, getSectorThresholds, SectorBenchmark } from './benchmarks'
 
 export interface CategoryScores {
   liquidityScore:     number
@@ -285,7 +285,7 @@ function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: num
 // ─── KARLILIK ─────────────────────────────────────────────────────────────
 // FAVÖK, net kar, ROA, ROE → sektöre bağımlı (BM_HEAVY), ama mutlak sıfır eşiği kritik
 // Brüt kar, FVÖK, ROIC → dengeli (DEFAULT)
-function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
+function calcProfitability(r: RatioResult, bm: SectorBenchmark | null, sector?: string | null): { score: number; coverage: number; insufficient: boolean } {
   // Büyüme: en iyi mevcut metriği seç
   const growthScore = r.realGrowth != null
     ? linearScore(r.realGrowth,    -0.20, 0.20, false, 0.08)
@@ -400,7 +400,8 @@ function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: numb
 // ─── FAALİYET ─────────────────────────────────────────────────────────────
 // DSO, DIO, aktif devir, faaliyet gideri oranı → sektöre bağımlı (BM_HEAVY)
 // Duran varlık devir, DPO → dengeli (benchmark eksik veya sektör bağımsız)
-function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
+function calcActivity(r: RatioResult, bm: SectorBenchmark | null, sector?: string | null): { score: number; coverage: number; insufficient: boolean } {
+  const t = getSectorThresholds(sector)
   return weightedAvgCov([
     // Aktif Devir Hızı — sektöre bağımlı
     [hybridMetricScore(r.assetTurnover,
@@ -420,8 +421,8 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
       bm?.receivablesDays,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Borç Ödeme Süresi (DPO) — bell curve: 0→15→45–60→90→120→200+ gün
-    [bellCurveScore(r.payablesTurnoverDays, 45, 60, 0, 200), 1.0],
+    // Borç Ödeme Süresi (DPO) — sektöre özgü bell curve
+    [bellCurveScore(r.payablesTurnoverDays, t.dpoOptimalMin, t.dpoOptimalMax, 0, t.dpoBadHigh), 1.0],
 
     // Duran Varlık Devir — artık sektör benchmark'ı var (BM_HEAVY)
     [hybridMetricScore(r.fixedAssetTurnover,
@@ -429,11 +430,8 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: numb
       bm?.fixedAssetTurnover,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Faaliyet Gideri Oranı — artık sektör benchmark'ı var (BM_HEAVY)
-    [hybridMetricScore(r.operatingExpenseRatio,
-      { bad: 0.5, good: 0.20, lowerIsBetter: true, sf: 0.15 },
-      bm?.operatingExpenseRatio,
-      HYBRID_BM_HEAVY), 1.0],
+    // Faaliyet Gideri Oranı — sektöre özgü mutlak eşik
+    [linearScore(r.operatingExpenseRatio, t.opexBad, t.opexGood, true), 1.0],
   ])
 }
 
@@ -496,9 +494,9 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
   const w  = getSectorWeights(sector)   // sektöre özgü ağırlık profili
 
   const liqResult  = calcLiquidity(ratios, bm)
-  const profResult = calcProfitability(ratios, bm)
+  const profResult = calcProfitability(ratios, bm, sector)
   const levResult  = calcLeverage(ratios, bm)
-  const actResult  = calcActivity(ratios, bm)
+  const actResult  = calcActivity(ratios, bm, sector)
 
   const rawLiq  = clamp(liqResult.score)
   const rawProf = clamp(profResult.score)

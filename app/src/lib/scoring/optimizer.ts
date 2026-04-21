@@ -283,21 +283,44 @@ export function findOptimalPath(
     if (g > 0.3) pushCandidate('assetTurnover', 'Aktif Devir Hızı', 'Faaliyet', at, target, 'x', 'up', g, `Aktif devir hızını ${fmtVal(at, 'x')}'den ${fmtVal(target, 'x')}'e çıkarın. ① Mevcut müşterilere çapraz satış veya yeni müşteri kazanımıyla ciroyu artırın. ② Kapasite kullanım oranını yükseltin — aynı varlıkla daha fazla satış yapın. ③ Atıl makine, araç veya gayrimenkulü satın ya da kiraya verin; aktif tabanını sadeleştirin.`)
   }
 
+  // ─── Çapraz etki matrisi ─────────────────────────────────────────────────
+  // Aynı anda önerilen birbirine bağlı aksiyonlarda toplam etki azalır.
+  const CROSS_EFFECTS: Record<string, string[]> = {
+    'leverage':      ['liquidity'],    // KV→UV borç çevirme hem kaldıraç hem likiditesi etkiler
+    'liquidity':     ['leverage'],
+    'profitability': ['activity'],     // kârlılık artışı faaliyet rasyolarını da etkiler
+    'activity':      ['profitability'],
+  }
+
   const familyCounts = new Map<RatioSuggestion['actionFamily'], number>()
+  const usedFamilies  = new Set<string>()
   const rankedCandidates = [...candidates].sort((a, b) => b.scoreGain - a.scoreGain)
   const suggestions: RatioSuggestion[] = []
 
   for (const candidate of rankedCandidates) {
     const count = familyCounts.get(candidate.actionFamily) ?? 0
-    if (count >= 2) continue
-    const diminishedGain = candidate.scoreGain * (count === 0 ? 1 : 0.6)
+
+    // Diminishing returns — 3. öneri artık engellenmez, %40'a düşürülür
+    const diminishFactor = count === 0 ? 1.0
+      : count === 1 ? 0.60
+      : count === 2 ? 0.40
+      : 0.25
+    let diminishedGain = candidate.scoreGain * diminishFactor
+
+    // Çapraz etki: bu aksiyon zaten seçilmiş bir ailenin çapraz etkisindeyse %80'e düş
+    const crossFamilies = [...usedFamilies].flatMap(f => CROSS_EFFECTS[f] ?? [])
+    if (crossFamilies.includes(candidate.actionFamily)) {
+      diminishedGain *= 0.80
+    }
+
     const adjustedCandidate = {
       ...candidate,
       marginalScoreGain: Math.round(diminishedGain * 100) / 100,
-      scoreGain: Math.round(diminishedGain * 100) / 100,
+      scoreGain:         Math.round(diminishedGain * 100) / 100,
     }
     suggestions.push(adjustedCandidate)
     familyCounts.set(candidate.actionFamily, count + 1)
+    usedFamilies.add(candidate.actionFamily)
     if (suggestions.length >= 5) break
   }
 

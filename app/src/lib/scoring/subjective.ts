@@ -32,9 +32,26 @@ export interface SubjectiveBreakdown {
   complianceScore: number // /5
   total: number           // /30
   percentage: number      // 0-100
+  subjectiveDataMissing: boolean
 }
 
 export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown {
+  // Tüm alanlar boşsa veri girilmemiş sayılır
+  const subjectiveDataMissing =
+    s.kkbCategory == null &&
+    s.activeDelayDays == null &&
+    s.checkProtest == null &&
+    s.enforcementFile == null &&
+    s.creditLimitUtilPct == null &&
+    s.hasMultipleBanks == null &&
+    s.avgMaturityMonths == null &&
+    s.companyAgeYears == null &&
+    s.auditLevel == null &&
+    s.ownershipClarity == null &&
+    s.hasTaxDebt == null &&
+    s.hasSgkDebt == null &&
+    s.activeLawsuitCount == null
+
   // ─── KKB & Kredi Sicili (max 10) ──────────────────────────
   let kkb = 0
 
@@ -43,7 +60,7 @@ export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown
   kkb += kkbMap[s.kkbCategory ?? 'orta'] ?? 4
 
   // Gecikme durumu (3 puan)
-  const delay = s.activeDelayDays ?? 0
+  const delay = s.activeDelayDays ?? 30
   kkb += delay === 0 ? 3 : delay <= 30 ? 1 : 0
 
   // Çek protestosu ve icra cezaları
@@ -98,39 +115,50 @@ export function calcSubjectiveScore(s: SubjectiveInputData): SubjectiveBreakdown
   const total = kkbScore + bankScore + corpScore + complianceScore
   const percentage = (total / 30) * 100
 
-  return { kkbScore, bankScore, corpScore, complianceScore, total, percentage }
+  return { kkbScore, bankScore, corpScore, complianceScore, total, percentage, subjectiveDataMissing }
 }
 
 /**
- * Finansal skor (0-100) + subjektif skor (0-30) → birleşik final skor (0-100)
- * Ağırlık: Finansal %70 (max 70 puan), Subjektif max 30 puan → toplam max 100
- */
-/**
  * Finansal skor (0-100) + Subjektif (0-30) → Birleşik skor (0-100)
  *
- * CEILING (tavan): Zayıf finansal, subjektifle şişirilemesin
- *   finansal < 35  → birleşik max 43  (B altı — en fazla CCC+)
- *   finansal < 48  → birleşik max 59  (BBB altı — en fazla BB+)
- *   finansal < 60  → birleşik max 67  (A altı — en fazla BBB+)
+ * CEILING (tavan) — lineer interpolasyon:
+ *   finansal  0–35  → ceiling = 43 + (f / 35) × 9          (43 → 52)
+ *   finansal 35–55  → ceiling = 52 + ((f − 35) / 20) × 15  (52 → 67)
+ *   finansal 55+    → ceiling yok
  *
- * FLOOR (taban): Güçlü finansal, subjektif sıfırken çökmemeli
- *   finansal ≥ 80  → birleşik min 64  (BB ortası, güçlü tampon)
- *   finansal ≥ 68  → birleşik min 52  (en az BB)
+ * FLOOR (taban) — lineer interpolasyon:
+ *   finansal 55–65  → floor = 44 + ((f − 55) / 10) × 8     (44 → 52)
+ *   finansal 65–68  → floor = 52 + ((f − 65) / 3)  × 8     (52 → 60)
+ *   finansal 68–80  → floor = 60  (sabit)
+ *   finansal 80+    → floor = 64
+ *   finansal 55 altı → floor yok
  */
 export function combineScores(financialScore: number, subjectiveTotal: number): number {
   let combined = Math.min(100, Math.round(financialScore * 0.70 + subjectiveTotal))
 
-  // Ceiling kuralları — erken return yok, floor ile çakışmayı önlemek için
-  if      (financialScore < 35) combined = Math.min(combined, 43)
-  else if (financialScore < 43) combined = Math.min(combined, 52)
-  else if (financialScore < 55) combined = Math.min(combined, 59)
-  else if (financialScore < 65) combined = Math.min(combined, 67)
+  // ── Ceiling (lineer) ────────────────────────────────────────
+  if (financialScore <= 35) {
+    const ceiling = 43 + (financialScore / 35) * 9
+    combined = Math.min(combined, Math.round(ceiling))
+  } else if (financialScore < 55) {
+    const ceiling = 52 + ((financialScore - 35) / 20) * 15
+    combined = Math.min(combined, Math.round(ceiling))
+  }
+  // finansalScore >= 55 → ceiling yok
 
-  // Floor kuralları (guardrail v5) — ceiling sonrası uygulanır
-  if      (financialScore >= 80) combined = Math.max(combined, 64)
-  else if (financialScore >= 68) combined = Math.max(combined, 60)
-  else if (financialScore >= 60) combined = Math.max(combined, 52)
-  else if (financialScore >= 55) combined = Math.max(combined, 44)
+  // ── Floor (lineer) — ceiling sonrası uygulanır ──────────────
+  if (financialScore >= 80) {
+    combined = Math.max(combined, 64)
+  } else if (financialScore >= 68) {
+    combined = Math.max(combined, 60)
+  } else if (financialScore >= 65) {
+    const floor = 52 + ((financialScore - 65) / 3) * 8
+    combined = Math.max(combined, Math.round(floor))
+  } else if (financialScore >= 55) {
+    const floor = 44 + ((financialScore - 55) / 10) * 8
+    combined = Math.max(combined, Math.round(floor))
+  }
+  // finansalScore < 55 → floor yok
 
   return combined
 }

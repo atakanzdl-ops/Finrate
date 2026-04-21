@@ -1,0 +1,145 @@
+{
+  "testTarihi": "2026-04-21T08:36:15.901Z",
+  "sonuclar": [
+    {
+      "firma": "DEKA TAAHHÜT YAPI GIDA LTD.ŞTİ.",
+      "entityId": "16e495fb-09ca-4056-978a-5dca47c70f73",
+      "yil": 2025,
+      "donem": "Q4",
+      "kategoriSkorlar": {
+        "likidite": 24.22,
+        "karlılık": 8.33,
+        "kaldıraç": 45,
+        "faaliyet": 94.12
+      },
+      "dbFinalScore": 37.76,
+      "dbFinalRating": "C",
+      "finansalSkorRaw": 37.76,
+      "subjektifTotal": 24,
+      "combinedHesapli": 50,
+      "combinedRaw": 50,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": false,
+      "hata": null
+    },
+    {
+      "firma": "DEKA TAAHHÜT YAPI GIDA LTD.ŞTİ.",
+      "entityId": "88a853cf-a0c4-4f03-88d2-a1c86a16f726",
+      "yil": 2025,
+      "donem": "Q4",
+      "kategoriSkorlar": {
+        "likidite": 22.27,
+        "karlılık": 8.33,
+        "kaldıraç": 45,
+        "faaliyet": 89.76
+      },
+      "dbFinalScore": 49,
+      "dbFinalRating": "CC",
+      "finansalSkorRaw": 36.43,
+      "subjektifTotal": 23,
+      "combinedHesapli": 49,
+      "combinedRaw": 49,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": false,
+      "hata": null
+    },
+    {
+      "firma": "deka yapı",
+      "entityId": "1d9ab409-15e6-45a0-bf2e-5ba6976c2dce",
+      "yil": 2024,
+      "donem": "ANNUAL",
+      "kategoriSkorlar": {
+        "likidite": 18.17,
+        "karlılık": 8.33,
+        "kaldıraç": 40,
+        "faaliyet": 77.33
+      },
+      "dbFinalScore": 30.64,
+      "dbFinalRating": "C",
+      "finansalSkorRaw": 30.64,
+      "subjektifTotal": 0,
+      "combinedHesapli": 21,
+      "combinedRaw": 21,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": true,
+      "hata": null
+    },
+    {
+      "firma": "DEKAM YAPI A.Ş.",
+      "entityId": "ba4556ec-567a-4d32-b91b-8a26b0560236",
+      "yil": 2025,
+      "donem": "Q4",
+      "kategoriSkorlar": {
+        "likidite": 63.93,
+        "karlılık": 40.95,
+        "kaldıraç": 45,
+        "faaliyet": 80.98
+      },
+      "dbFinalScore": 56.21,
+      "dbFinalRating": "B",
+      "finansalSkorRaw": 56.21,
+      "subjektifTotal": 24,
+      "combinedHesapli": 63,
+      "combinedRaw": 63,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": false,
+      "hata": null
+    },
+    {
+      "firma": "DEKAM YAPI A.Ş.",
+      "entityId": "24eacf7c-ed68-4ef9-82b0-7bbd58072b9d",
+      "yil": 2025,
+      "donem": "Q4",
+      "kategoriSkorlar": {
+        "likidite": 38.08,
+        "karlılık": 40.95,
+        "kaldıraç": 45,
+        "faaliyet": 80.62
+      },
+      "dbFinalScore": 56,
+      "dbFinalRating": "B",
+      "finansalSkorRaw": 47.11,
+      "subjektifTotal": 23,
+      "combinedHesapli": 56,
+      "combinedRaw": 56,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": false,
+      "hata": null
+    },
+    {
+      "firma": "dekam yapı",
+      "entityId": "892cfd26-b6a1-4a22-b980-03fc35947225",
+      "yil": 2024,
+      "donem": "ANNUAL",
+      "kategoriSkorlar": {
+        "likidite": 14.97,
+        "karlılık": 87.79,
+        "kaldıraç": 30.23,
+        "faaliyet": 32.18
+      },
+      "dbFinalScore": 43.97,
+      "dbFinalRating": "CC",
+      "finansalSkorRaw": 43.97,
+      "subjektifTotal": 0,
+      "combinedHesapli": 31,
+      "combinedRaw": 31,
+      "guardrailDevrede": false,
+      "guardrailYukseltti": false,
+      "insufficientCategories": [],
+      "subjectiveDataMissing": true,
+      "hata": null
+    }
+  ],
+  "hatalar": [],
+  "genel": "BAŞARILI"
+}

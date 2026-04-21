@@ -279,11 +279,11 @@ export function calculateRatios(d: FinancialInput): RatioResult {
         ? null
         : netProfit > 0 ? -1 : null   // özkaynak < 0 && kar > 0 → teknik iflas; zarar → null
 
-  const investedCapital  =
-    totalAssets != null && totalCurrentLiabilities != null
-      ? totalAssets - totalCurrentLiabilities : null
+  // Standart ROIC = NOPAT / (Özkaynak + Net Finansal Borç)
+  // netFinancialDebt yukarıda hesaplandı: totalFinancialDebt − nakit − kısa vadeli yatırımlar
+  const investedCapital2 = (totalEquity ?? 0) + netFinancialDebt
   const nopat  = ebit != null ? ebit * (1 - CORPORATE_TAX_RATE) : null
-  const roic   = safe(nopat, investedCapital)
+  const roic   = nopat != null && investedCapital2 !== 0 ? nopat / investedCapital2 : null
 
   const prevRevenue = n(d.prevRevenue)
   const revenueGrowth =

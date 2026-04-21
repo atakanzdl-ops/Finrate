@@ -534,3 +534,31 @@ export function getSectorWeights(sector: string | null | undefined): SectorWeigh
 }
 
 export const SECTOR_NAMES = Object.keys(SECTOR_BENCHMARKS)
+
+// ─── SEKTÖRE ÖZGÜ EŞİKLER ────────────────────────────────────────────────────
+
+export const SECTOR_THRESHOLDS: Record<string, {
+  opexGood: number
+  opexBad: number
+  dpoOptimalMin: number
+  dpoOptimalMax: number
+  dpoBadHigh: number
+}> = {
+  'İmalat':    { opexGood: 0.18, opexBad: 0.55, dpoOptimalMin: 45, dpoOptimalMax: 75,  dpoBadHigh: 200 },
+  'İnşaat':    { opexGood: 0.15, opexBad: 0.50, dpoOptimalMin: 60, dpoOptimalMax: 90,  dpoBadHigh: 250 },
+  'Ticaret':   { opexGood: 0.20, opexBad: 0.55, dpoOptimalMin: 30, dpoOptimalMax: 60,  dpoBadHigh: 180 },
+  'Hizmet':    { opexGood: 0.30, opexBad: 0.65, dpoOptimalMin: 30, dpoOptimalMax: 60,  dpoBadHigh: 150 },
+  'Perakende': { opexGood: 0.22, opexBad: 0.55, dpoOptimalMin: 20, dpoOptimalMax: 45,  dpoBadHigh: 120 },
+  'Tarım':     { opexGood: 0.20, opexBad: 0.55, dpoOptimalMin: 45, dpoOptimalMax: 90,  dpoBadHigh: 200 },
+  'Enerji':    { opexGood: 0.15, opexBad: 0.50, dpoOptimalMin: 45, dpoOptimalMax: 75,  dpoBadHigh: 200 },
+  'Ulaştırma': { opexGood: 0.25, opexBad: 0.60, dpoOptimalMin: 30, dpoOptimalMax: 60,  dpoBadHigh: 150 },
+  'Sağlık':    { opexGood: 0.28, opexBad: 0.60, dpoOptimalMin: 30, dpoOptimalMax: 60,  dpoBadHigh: 150 },
+  'Bilişim':   { opexGood: 0.35, opexBad: 0.70, dpoOptimalMin: 15, dpoOptimalMax: 45,  dpoBadHigh: 120 },
+  'Turizm':    { opexGood: 0.30, opexBad: 0.65, dpoOptimalMin: 30, dpoOptimalMax: 60,  dpoBadHigh: 150 },
+}
+
+const DEFAULT_THRESHOLDS = { opexGood: 0.20, opexBad: 0.50, dpoOptimalMin: 45, dpoOptimalMax: 60, dpoBadHigh: 200 }
+
+export function getSectorThresholds(sector?: string | null) {
+  return (sector ? SECTOR_THRESHOLDS[sector] : undefined) ?? DEFAULT_THRESHOLDS
+}

@@ -356,6 +356,25 @@ function InsufficientBanner({ categories }: { categories?: string[] }) {
   )
 }
 
+/* ─── SubjectiveMissingBanner ───────────────────────── */
+function SubjectiveMissingBanner({ missing }: { missing?: boolean }) {
+  if (!missing) return null
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+      background: 'rgba(99,102,241,0.07)',
+      border: '1px solid rgba(99,102,241,0.30)',
+    }}>
+      <span style={{ fontSize: 16, lineHeight: 1.4 }}>ℹ️</span>
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#3730a3' }}>
+        Niteliksel veriler girilmedi — skor güvenilirliği düşük.{' '}
+        Subjektif sekmesindan KKB, banka ilişkileri ve kurumsal yapı bilgilerini doldurun.
+      </p>
+    </div>
+  )
+}
+
 /* ─── CoverageBanner ─────────────────────────────── */
 function CoverageBanner({ coverage }: { coverage: number | null | undefined }) {
   if (coverage == null || coverage >= 0.5) return null
@@ -425,7 +444,8 @@ function AnalizPageContent() {
   const [loading,         setLoading]         = useState(true)
   const [activeTab,       setActiveTab]       = useState<TabId>('overview')
   const [chartTab,        setChartTab]        = useState<'gelir' | 'borc'>('gelir')
-  const [subjectiveScores, setSubjectiveScores] = useState<Record<string, number>>({})
+  const [subjectiveScores,  setSubjectiveScores]  = useState<Record<string, number>>({})
+  const [subjectiveMissing, setSubjectiveMissing] = useState<Record<string, boolean>>({})
   const [yearOpen,        setYearOpen]        = useState(false)
   const searchParams = useSearchParams()
   const entityId     = searchParams.get('entityId')
@@ -451,8 +471,12 @@ function AnalizPageContent() {
             fetch(`/api/entities/${eid}/subjective`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
-                if (d?.score?.total != null)
+                if (d?.score?.total != null) {
                   setSubjectiveScores(prev => ({ ...prev, [eid]: d.score.total }))
+                  setSubjectiveMissing(prev => ({ ...prev, [eid]: false }))
+                } else {
+                  setSubjectiveMissing(prev => ({ ...prev, [eid]: true }))
+                }
               })
           })
         })
@@ -1093,6 +1117,7 @@ function AnalizPageContent() {
 
                     <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
+                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} />
 
                     {/* ── Row 3: Aktif & Pasif Dağılımı ──────────────── */}
                     {fd && (
@@ -1140,6 +1165,7 @@ function AnalizPageContent() {
                   <div className="card" style={{ overflow: 'visible' }}>
                     <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
+                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} />
                     {/* Başlık */}
                     <div className="card-head">
                       <div className="card-head-left">
@@ -1242,10 +1268,12 @@ function AnalizPageContent() {
                 {activeTab === 'subjective' && selected.entity?.id && (
                   <SubjectiveForm
                     entityId={selected.entity.id}
-                    onScoreChange={(total) =>
-                      selected.entity?.id &&
-                      setSubjectiveScores(prev => ({ ...prev, [selected.entity!.id]: total }))
-                    }
+                    onScoreChange={(total) => {
+                      if (selected.entity?.id) {
+                        setSubjectiveScores(prev => ({ ...prev, [selected.entity!.id]: total }))
+                        setSubjectiveMissing(prev => ({ ...prev, [selected.entity!.id]: false }))
+                      }
+                    }}
                   />
                 )}
 
