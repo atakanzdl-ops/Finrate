@@ -304,9 +304,10 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   const interestExpenseVal = n(d.interestExpense)
   const interestCoverage: number | null =
     interestExpenseVal == null ? null
-    : interestExpenseVal === 0 ? 9999
-    : ebit != null             ? ebit / interestExpenseVal
-    : null
+    : interestExpenseVal === 0
+      ? (ebit == null || ebit < 0 ? null : 9999)   // EBIT negatif + faiz sıfır → null
+      : ebit != null ? ebit / interestExpenseVal
+      : null
 
   const shortTermDebtRatio =
     totalFinancialDebt > 0 && d.shortTermFinancialDebt != null
