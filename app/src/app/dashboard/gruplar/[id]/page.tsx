@@ -4,9 +4,10 @@ import React, { useState, useEffect, use, useCallback } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Building2, Plus, X, Loader2,
-  AlertTriangle, BarChart3, Save, GitBranch,
+  AlertTriangle, BarChart3, Save, GitBranch, Sliders,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
+import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,8 @@ interface ConsolidatedResult {
   profitabilityScore:   number
   leverageScore:        number
   activityScore:        number
+  eliminatedFinancials: Record<string, number | null>
+  consolidatedRatios:   Record<string, number | null>
 }
 
 interface EliminationsData {
@@ -80,13 +83,69 @@ const ELIM_FIELDS: { key: keyof EliminationsData; label: string; hint: string }[
   { key: 'intercompanyProfit',           label: 'Grup İçi Gerçekleşmemiş Kâr',  hint: 'Stok/aktif ve özkaynak düşülür' },
 ]
 
+// 25-rasyo grupları — kategori bazlı
+const RATIO_GROUPS = [
+  {
+    label: 'Likidite',
+    color: '#2EC4B6',
+    ratios: [
+      { key: 'currentRatio',           label: 'Cari Oran' },
+      { key: 'quickRatio',             label: 'Asit-Test Oranı' },
+      { key: 'cashRatio',              label: 'Nakit Oranı' },
+      { key: 'netWorkingCapital',      label: 'Net İşletme Sermayesi' },
+      { key: 'netWorkingCapitalRatio', label: 'NİS Oranı' },
+      { key: 'cashConversionCycle',    label: 'Nakit Döngüsü' },
+    ],
+  },
+  {
+    label: 'Kârlılık',
+    color: '#0B3C5D',
+    ratios: [
+      { key: 'grossMargin',      label: 'Brüt Kâr Marjı' },
+      { key: 'ebitdaMargin',     label: 'FAVÖK Marjı' },
+      { key: 'ebitMargin',       label: 'FVÖK Marjı' },
+      { key: 'netProfitMargin',  label: 'Net Kâr Marjı' },
+      { key: 'roa',              label: 'ROA' },
+      { key: 'roe',              label: 'ROE' },
+      { key: 'roic',             label: 'ROIC' },
+      { key: 'revenueGrowth',    label: 'Ciro Büyümesi' },
+      { key: 'realGrowth',       label: 'Reel Büyüme' },
+    ],
+  },
+  {
+    label: 'Kaldıraç',
+    color: '#D97706',
+    ratios: [
+      { key: 'debtToEquity',       label: 'Borç / Özkaynak' },
+      { key: 'debtToAssets',       label: 'Borç / Aktif' },
+      { key: 'debtToEbitda',       label: 'Net Borç / FAVÖK' },
+      { key: 'interestCoverage',   label: 'Faiz Karşılama' },
+      { key: 'equityRatio',        label: 'Özkaynak Oranı' },
+      { key: 'shortTermDebtRatio', label: 'KV Borç Oranı' },
+    ],
+  },
+  {
+    label: 'Faaliyet',
+    color: '#7C3AED',
+    ratios: [
+      { key: 'assetTurnover',            label: 'Aktif Devir Hızı' },
+      { key: 'inventoryTurnoverDays',    label: 'Stok Devir Süresi' },
+      { key: 'receivablesTurnoverDays',  label: 'Alacak Tahsil Süresi' },
+      { key: 'payablesTurnoverDays',     label: 'Borç Ödeme Süresi' },
+      { key: 'fixedAssetTurnover',       label: 'Duran Varlık Devir' },
+      { key: 'operatingExpenseRatio',    label: 'Faaliyet Gideri Oranı' },
+    ],
+  },
+]
+
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
 
-function fmtAsset(v: number): string {
-  if (v <= 0) return '—'
-  if (v >= 1e9) return `${(v / 1e9).toFixed(1)} Mr`
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)} Mn`
-  return new Intl.NumberFormat('tr-TR').format(Math.round(v))
+function fmtAsset(v: number | null | undefined): string {
+  const n = v ?? 0
+  if (n <= 0) return '—'
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} Mr`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)} Mn`
+  return new Intl.NumberFormat('tr-TR').format(Math.round(n))
 }
 
 function gradeColor(grade: string): string {
@@ -96,11 +155,31 @@ function gradeColor(grade: string): string {
   return '#DC2626'
 }
 
+// Oran değerini göster: gün formatı, % formatı veya multiplier
+function fmtRatio(val: number | null | undefined, key: string): string {
+  if (val == null) return '—'
+  const DAY_KEYS = [
+    'inventoryTurnoverDays', 'receivablesTurnoverDays', 'payablesTurnoverDays',
+    'cashConversionCycle', 'adjustedCashConversionCycle', 'customerAdvanceDays',
+  ]
+  if (DAY_KEYS.includes(key)) return `${Math.round(val)} gün`
+  if (key === 'netWorkingCapital') return fmtAsset(val)
+  // Marjlar, oran tabanlı değerler (mutlak değer ≤ 5 → yüzde göster)
+  const PCT_KEYS = [
+    'grossMargin','ebitdaMargin','ebitMargin','netProfitMargin',
+    'roa','roe','roic','revenueGrowth','realGrowth',
+    'debtToAssets','equityRatio','shortTermDebtRatio','operatingExpenseRatio',
+    'netWorkingCapitalRatio',
+  ]
+  if (PCT_KEYS.includes(key)) return `${(val * 100).toFixed(1)}%`
+  return val.toFixed(2)
+}
+
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function GrupDetayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [activeTab, setActiveTab] = useState<'firmalar' | 'rating' | 'eliminasyonlar'>('firmalar')
+  const [activeTab, setActiveTab] = useState<'firmalar' | 'rating' | 'eliminasyonlar' | 'senaryo'>('firmalar')
 
   // Veri
   const [group,        setGroup]        = useState<GroupInfo | null>(null)
@@ -234,6 +313,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           { key: 'firmalar',       label: 'Firmalar',          Icon: Building2    },
           { key: 'rating',         label: 'Konsolide Rating',  Icon: BarChart3    },
           { key: 'eliminasyonlar', label: 'Eliminasyonlar',    Icon: GitBranch    },
+          { key: 'senaryo',        label: 'Senaryo',           Icon: Sliders      },
         ] as const).map(({ key, label, Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`tab flex items-center gap-1.5 px-4 py-2 text-sm${activeTab === key ? ' active' : ''}`}>
@@ -378,7 +458,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           SEKME 2 — KONSOLİDE RATING
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'rating' && (
-        <div className="max-w-xl space-y-4">
+        <div className="max-w-2xl space-y-4">
 
           {!consolidated ? (
             <div className="card p-10 text-center">
@@ -393,7 +473,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           ) : (
             <>
               {/* En zayıf halka uyarısı */}
-              {consolidated.weakestLinkApplied && (
+              {consolidated.weakestLinkApplied === true && (
                 <div style={{
                   display: 'flex', alignItems: 'flex-start', gap: 8,
                   padding: '10px 16px', borderRadius: 12,
@@ -502,6 +582,109 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   </div>
                 </div>
               </div>
+
+              {/* ── Konsolide Bilanço Özeti ─────────────────────────────────── */}
+              {consolidated.eliminatedFinancials && (
+                <div className="card overflow-hidden">
+                  <div className="card-head" style={{ background: '#F8FAFC' }}>
+                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                      KONSOLİDE BİLANÇO ÖZETİ
+                    </h2>
+                    <p style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>Eliminasyonlar uygulandıktan sonra</p>
+                  </div>
+                  <div className="card-body">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                      {([
+                        { label: 'Toplam Aktif',  key: 'totalAssets'  },
+                        { label: 'Özkaynak',       key: 'totalEquity'  },
+                        { label: 'Toplam Borç',    key: 'totalDebt'    },
+                        { label: 'Net Kâr/Zarar',  key: 'netProfit'    },
+                        { label: 'Ciro',           key: 'revenue'      },
+                      ]).map(({ label, key }) => {
+                        const raw = consolidated.eliminatedFinancials[key]
+                        const v = typeof raw === 'number' ? raw : 0
+                        const isNegative = v < 0
+                        return (
+                          <div key={key} style={{
+                            borderRadius: 10, padding: '12px 14px',
+                            background: '#F8FAFC', border: '1px solid #E5E9F0',
+                          }}>
+                            <p style={{ fontSize: 10, color: '#94A3B8', marginBottom: 4, fontWeight: 500 }}>{label}</p>
+                            <p style={{
+                              fontSize: 15, fontWeight: 800,
+                              fontFamily: 'Outfit, sans-serif',
+                              color: isNegative ? '#DC2626' : '#0B3C5D',
+                              lineHeight: 1.2,
+                            }}>
+                              {isNegative ? '-' : ''}{fmtAsset(Math.abs(v))}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Konsolide 25-Rasyo Tablosu ──────────────────────────────── */}
+              {consolidated.consolidatedRatios && (
+                <div className="card overflow-hidden">
+                  <div className="card-head" style={{ background: '#F8FAFC' }}>
+                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                      KONSOLİDE FİNANSAL RASYOLAR
+                    </h2>
+                  </div>
+                  <div className="card-body space-y-5">
+                    {RATIO_GROUPS.map(group => (
+                      <div key={group.label}>
+                        {/* Kategori başlığı */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                        }}>
+                          <div style={{
+                            width: 3, height: 16, borderRadius: 2,
+                            background: group.color, flexShrink: 0,
+                          }} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: group.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                            {group.label}
+                          </span>
+                        </div>
+                        {/* Rasyo satırları */}
+                        <div style={{
+                          borderRadius: 8,
+                          border: '1px solid #F1F5F9',
+                          overflow: 'hidden',
+                        }}>
+                          {group.ratios.map((r, idx) => {
+                            const val = consolidated.consolidatedRatios[r.key]
+                            const formatted = fmtRatio(val as number | null, r.key)
+                            const isNull = val == null
+                            return (
+                              <div key={r.key} style={{
+                                display: 'flex', justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '7px 14px',
+                                background: idx % 2 === 0 ? '#FAFAFA' : '#FFFFFF',
+                                borderTop: idx > 0 ? '1px solid #F1F5F9' : 'none',
+                              }}>
+                                <span style={{ fontSize: 12, color: '#1E293B' }}>{r.label}</span>
+                                <span style={{
+                                  fontSize: 12, fontWeight: 700,
+                                  fontFamily: 'Outfit, sans-serif',
+                                  color: isNull ? '#CBD5E1' : '#0B3C5D',
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}>
+                                  {formatted}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -602,6 +785,45 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SEKME 4 — SENARYO ANALİZİ
+      ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'senaryo' && (
+        <div className="space-y-4">
+          {!consolidated ? (
+            <div className="card p-10 text-center">
+              <Sliders size={32} className="mx-auto mb-3" style={{ color: '#CBD5E1' }} />
+              <p className="text-sm" style={{ color: '#94A3B8' }}>
+                Senaryo analizi için önce konsolide skor hesaplanmalıdır.
+              </p>
+              <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>
+                Gruba analizi tamamlanmış şirket ekleyin.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Bilgi banner */}
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: '10px 16px', borderRadius: 12,
+                background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)',
+              }}>
+                <Sliders size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
+                  Konsolide rasyo başlangıç noktası olarak kullanılmaktadır. Kaldıraç değişikliklerinin grup skoru üzerindeki etkisini simüle edin.
+                </p>
+              </div>
+
+              <WhatIfSimulator
+                baseData={consolidated.consolidatedRatios}
+                baseScore={consolidated.consolidatedScore}
+                rawFinancialData={consolidated.eliminatedFinancials}
+              />
+            </>
           )}
         </div>
       )}

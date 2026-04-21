@@ -119,6 +119,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Kategori skorlarını consolidatedRatios'dan hesapla
     const catScores = calculateScore(result.consolidatedRatios, sector)
+
+    // Debug: kârlılık rasyoları sıfır çıkıyorsa sebebini bul
+    console.log('[consolidation] kârlılık rasyoları:', {
+      grossMargin:     result.consolidatedRatios.grossMargin,
+      ebitdaMargin:    result.consolidatedRatios.ebitdaMargin,
+      ebitMargin:      result.consolidatedRatios.ebitMargin,
+      netProfitMargin: result.consolidatedRatios.netProfitMargin,
+      roa:             result.consolidatedRatios.roa,
+      roe:             result.consolidatedRatios.roe,
+      roic:            result.consolidatedRatios.roic,
+      profitabilityScore: catScores.profitabilityScore,
+    })
+    console.log('[consolidation] eliminasyon sonrası finansallar:', {
+      revenue:    result.eliminatedFinancials.revenue,
+      ebit:       result.eliminatedFinancials.ebit,
+      ebitda:     result.eliminatedFinancials.ebitda,
+      netProfit:  result.eliminatedFinancials.netProfit,
+      totalAssets: result.eliminatedFinancials.totalAssets,
+      totalEquity: result.eliminatedFinancials.totalEquity,
+    })
+
     consolidated = {
       consolidatedScore:    result.consolidatedScore,
       consolidatedGrade:    result.consolidatedGrade,
@@ -128,6 +149,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       profitabilityScore:   catScores.profitabilityScore,
       leverageScore:        catScores.leverageScore,
       activityScore:        catScores.activityScore,
+      eliminatedFinancials: result.eliminatedFinancials,
+      consolidatedRatios:   result.consolidatedRatios,
     }
   }
 
