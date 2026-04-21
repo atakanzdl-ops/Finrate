@@ -52,6 +52,14 @@ interface EliminationsData {
 
 interface AllEntity { id: string; name: string; groupId: string | null }
 
+interface PeriodFinancials { [key: string]: number }
+interface PeriodData {
+  year:       number
+  period:     string
+  label:      string
+  financials: PeriodFinancials
+}
+
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
 
 const ZERO_ELIM: EliminationsData = {
@@ -152,14 +160,17 @@ const RATIO_GROUPS: RatioGroup[] = [
   },
 ]
 
-// Kritik eşikler — benchmark bağımsız uyarılar
+// Kritik eşikler — benchmark bağımsız uyarılar (10 kontrol)
 const CRITICAL_CHECKS: { key: string; label: string; check: (v: number) => boolean; impact: number }[] = [
-  { key: 'currentRatio',     label: 'Cari oran 1\'in altında — kısa vadeli yükümlülükler karşılanamıyor',    check: v => v < 1.0,  impact: 7 },
-  { key: 'interestCoverage', label: 'Faiz karşılama oranı kritik — faiz yükü altında ezilme riski',          check: v => v < 1.5,  impact: 8 },
-  { key: 'netProfitMargin',  label: 'Net kâr marjı negatif — zarar eden konsolide grup',                     check: v => v < 0,    impact: 6 },
-  { key: 'equityRatio',      label: 'Özkaynak oranı %10\'un altında — aşırı kaldıraç / finansal kırılganlık',check: v => v < 0.10, impact: 7 },
-  { key: 'debtToEbitda',     label: 'Net Borç/FAVÖK 8\'in üzerinde — sürdürülemez borç yükü',               check: v => v > 8,    impact: 6 },
-  { key: 'quickRatio',       label: 'Asit-test oranı 0.5\'in altında — nakit döngüsü baskıda',              check: v => v < 0.5,  impact: 5 },
+  { key: 'currentRatio',    label: 'Cari oran kritik — kısa vadeli borçlar dönen varlıkları aşıyor',      check: v => v < 1.0,  impact: 8 },
+  { key: 'quickRatio',      label: 'Asit-test oranı düşük — stok hariç likidite yetersiz',                check: v => v < 0.5,  impact: 5 },
+  { key: 'interestCoverage',label: 'Faiz karşılama oranı kritik — faiz yükü altında ezilme riski',        check: v => v < 1.5,  impact: 8 },
+  { key: 'netProfitMargin', label: 'Net kâr marjı negatif — zarar eden konsolide grup',                   check: v => v < 0,    impact: 6 },
+  { key: 'equityRatio',     label: 'Özkaynak oranı düşük — finansal kaldıraç riski yüksek',              check: v => v < 0.10, impact: 5 },
+  { key: 'debtToEbitda',    label: 'Borç/FAVÖK oranı kritik — borç geri ödeme kapasitesi zayıf',         check: v => v > 8,    impact: 4 },
+  { key: 'equityRatio',     label: 'Özkaynak negatif — teknik iflas riski',                               check: v => v < 0,    impact: 10 },
+  { key: 'grossMargin',     label: 'Brüt kâr marjı negatif — satış maliyeti geliri aşıyor',              check: v => v < 0,    impact: 7 },
+  { key: 'roe',             label: 'Özkaynak kârlılığı negatif — sermaye eriyiyor',                      check: v => v < 0,    impact: 4 },
 ]
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -182,6 +193,71 @@ function fmtSigned(v: number | null | undefined): { text: string; neg: boolean }
   else if (abs > 0) text = new Intl.NumberFormat('tr-TR').format(Math.round(abs))
   return { text, neg }
 }
+
+function fmtTbl(v: number | null | undefined): { display: string; neg: boolean } {
+  if (v == null || Math.abs(v) < 1) return { display: '—', neg: false }
+  const neg = v < 0
+  const abs = Math.abs(v)
+  let text: string
+  if (abs >= 1e9) text = `${(abs / 1e9).toFixed(1)} Mr`
+  else if (abs >= 1e6) text = `${(abs / 1e6).toFixed(1)} Mn`
+  else text = new Intl.NumberFormat('tr-TR').format(Math.round(abs))
+  return { display: (neg ? '−' : '') + text, neg }
+}
+
+// ─── Dönem bazlı tablo satır tanımları ───────────────────────────────────────
+interface TableRow {
+  label:     string
+  key:       string
+  indent:    boolean
+  total:     boolean
+  grand?:    boolean
+  allowNeg?: boolean
+  compute?:  (f: PeriodFinancials) => number
+}
+
+const AKTIF_ROWS: TableRow[] = [
+  { label: 'Hazır Değerler',             key: 'cash',                    indent: true,  total: false },
+  { label: 'Ticari Alacaklar',           key: 'tradeReceivables',         indent: true,  total: false },
+  { label: 'Diğer Alacaklar',            key: 'otherReceivables',         indent: true,  total: false },
+  { label: 'Stoklar',                    key: 'inventory',                indent: true,  total: false },
+  { label: 'Verilen Sipariş Avansları',  key: 'prepaidSuppliers',         indent: true,  total: false },
+  { label: 'Diğer Dönen Varlıklar',      key: 'otherCurrentAssets',       indent: true,  total: false },
+  { label: 'DÖNEN VARLIK TOPLAMI',       key: 'totalCurrentAssets',       indent: false, total: true  },
+  { label: 'Maddi Duran Varlıklar',      key: 'tangibleAssets',           indent: true,  total: false },
+  { label: 'Mad. Olmayan Duran Var.',    key: 'intangibleAssets',         indent: true,  total: false },
+  { label: 'Gelecek Yıllara Giderler',   key: 'longTermPrepaidExpenses',  indent: true,  total: false },
+  { label: 'DURAN VARLIK TOPLAMI',       key: 'totalNonCurrentAssets',    indent: false, total: true  },
+  { label: 'AKTİF TOPLAM',              key: 'totalAssets',              indent: false, total: true,  grand: true },
+]
+
+const PASIF_ROWS: TableRow[] = [
+  { label: 'Mali Borçlar (KV)',          key: 'shortTermFinancialDebt',      indent: true,  total: false },
+  { label: 'Ticari Borçlar',             key: 'tradePayables',               indent: true,  total: false },
+  { label: 'Diğer KV Borçlar',          key: 'otherShortTermPayables',      indent: true,  total: false },
+  { label: 'Alınan Avanslar',            key: 'advancesReceived',            indent: true,  total: false },
+  { label: 'Ödenecek Vergi ve Yük.',     key: 'taxPayables',                 indent: true,  total: false },
+  { label: 'KISA VADELİ TOPLAM',        key: 'totalCurrentLiabilities',     indent: false, total: true  },
+  { label: 'Mali Borçlar (UV)',          key: 'longTermFinancialDebt',       indent: true,  total: false },
+  { label: 'Diğer UV Borçlar',          key: 'otherNonCurrentLiabilities',  indent: true,  total: false },
+  { label: 'UZUN VADELİ TOPLAM',        key: 'totalNonCurrentLiabilities',  indent: false, total: true  },
+  { label: 'Ödenmiş Sermaye',           key: 'paidInCapital',               indent: true,  total: false },
+  { label: 'Geçmiş Yıl Kâr/Zarar',     key: '__retainedNet',               indent: true,  total: false, allowNeg: true,
+    compute: (f) => (f.retainedEarnings ?? 0) - (f.retainedLosses ?? 0) },
+  { label: 'Dönem Net Kâr/Zarar',       key: 'netProfitCurrentYear',        indent: true,  total: false, allowNeg: true },
+  { label: 'ÖZKAYNAK TOPLAMI',          key: 'totalEquity',                 indent: false, total: true,  allowNeg: true },
+  { label: 'PASİF + ÖZKAYNAK TOPLAMI',  key: 'totalLiabilitiesAndEquity',   indent: false, total: true,  grand: true },
+]
+
+const IS_TABLE_ROWS: TableRow[] = [
+  { label: 'Satış Gelirleri',           key: 'revenue',           indent: false, total: false },
+  { label: '(−) Satışların Maliyeti',   key: 'cogs',              indent: true,  total: false },
+  { label: 'Brüt Kâr/Zarar',           key: 'grossProfit',       indent: false, total: true,  allowNeg: true },
+  { label: '(−) Faaliyet Giderleri',    key: 'operatingExpenses', indent: true,  total: false },
+  { label: 'FVÖK (EBIT)',              key: 'ebit',              indent: false, total: true,  allowNeg: true },
+  { label: '(−) Finansman Giderleri',   key: 'interestExpense',   indent: true,  total: false },
+  { label: 'Net Kâr/Zarar',            key: 'netProfit',         indent: false, total: true,  grand: true, allowNeg: true },
+]
 
 function gradeColor(grade: string): string {
   if (['AAA', 'AA', 'A'].includes(grade)) return '#16a34a'
@@ -229,8 +305,9 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
 
   const [group,        setGroup]        = useState<GroupInfo | null>(null)
   const [entities,     setEntities]     = useState<EntityInfo[]>([])
-  const [consolidated, setConsolidated] = useState<ConsolidatedResult | null>(null)
-  const [eliminations, setEliminations] = useState<EliminationsData>(ZERO_ELIM)
+  const [consolidated,        setConsolidated]        = useState<ConsolidatedResult | null>(null)
+  const [consolidatedPeriods, setConsolidatedPeriods] = useState<PeriodData[]>([])
+  const [eliminations,        setEliminations]        = useState<EliminationsData>(ZERO_ELIM)
   const [allEntities,  setAll]          = useState<AllEntity[]>([])
   const [loading,      setLoading]      = useState(true)
 
@@ -252,6 +329,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       setGroup(groupRes.group)
       setEntities(groupRes.entities ?? [])
       setConsolidated(groupRes.consolidated ?? null)
+      setConsolidatedPeriods(groupRes.consolidatedPeriods ?? [])
       const elim: EliminationsData = groupRes.eliminations ?? ZERO_ELIM
       setEliminations(elim)
       setElimForm(elim)
@@ -364,18 +442,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       <p style={{ color: '#94A3B8' }}>Grup bulunamadı.</p>
     </DashboardShell>
   )
-
-  // ── Gelir tablosu satırları ──────────────────────────────────────────────
-  const ef = consolidated?.eliminatedFinancials ?? {}
-  const IS_ROWS = [
-    { label: 'Ciro (Net Satışlar)',           key: 'revenue',           indent: false, bold: false, separator: false },
-    { label: '(-) Satışların Maliyeti',       key: 'cogs',              indent: true,  bold: false, separator: false, negative: true },
-    { label: 'Brüt Kâr',                      key: 'grossProfit',       indent: false, bold: true,  separator: true  },
-    { label: '(-) Faaliyet Giderleri',        key: 'operatingExpenses', indent: true,  bold: false, separator: false, negative: true },
-    { label: 'FVÖK (EBIT)',                   key: 'ebit',              indent: false, bold: true,  separator: true  },
-    { label: '(-) Faiz Giderleri',            key: 'interestExpense',   indent: true,  bold: false, separator: false, negative: true },
-    { label: 'Net Kâr / Zarar',               key: 'netProfit',         indent: false, bold: true,  separator: true  },
-  ]
 
   return (
     <DashboardShell>
@@ -540,165 +606,247 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               )}
 
               {/* ────────────────────────────────────────────────────────────
-                  1. KONSOLİDE BİLANÇO
+                  1. KONSOLİDE BİLANÇO — AKTİF (yıl bazlı sütunlar)
               ──────────────────────────────────────────────────────────── */}
-              <div className="card overflow-hidden">
-                <div className="card-head" style={{ background: '#F8FAFC' }}>
-                  <div className="flex items-center justify-between">
-                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                      KONSOLİDE BİLANÇO
-                    </h2>
-                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>
-                      Eliminasyon sonrası • {group.sector || 'Konsolide'}
-                    </span>
-                  </div>
-                </div>
-                <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-
-                    {/* AKTİF */}
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 700, color: '#2EC4B6', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                        AKTİF
-                      </p>
-                      {[
-                        { label: 'Dönen Varlıklar',  key: 'totalCurrentAssets',    sub: true  },
-                        { label: 'Duran Varlıklar',  key: 'totalNonCurrentAssets', sub: true  },
-                        { label: 'TOPLAM AKTİF',     key: 'totalAssets',           sub: false },
-                      ].map(({ label, key, sub }) => {
-                        const { text, neg } = fmtSigned(ef[key])
-                        return (
-                          <div key={key} style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: sub ? '5px 0 5px 12px' : '8px 0 0 0',
-                            borderTop: !sub ? '1px solid #E5E9F0' : undefined,
-                            marginTop: !sub ? 4 : 0,
-                          }}>
-                            <span style={{ fontSize: sub ? 12 : 12, fontWeight: sub ? 400 : 700, color: sub ? '#64748B' : '#0B3C5D' }}>{label}</span>
-                            <span style={{ fontSize: 12, fontWeight: sub ? 500 : 700, color: neg ? '#DC2626' : sub ? '#1E293B' : '#0B3C5D', fontVariantNumeric: 'tabular-nums', fontFamily: 'Outfit, sans-serif' }}>
-                              {neg ? '-' : ''}{text}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* PASİF + ÖZKAYNAK */}
-                    <div style={{ borderLeft: '1px solid #F1F5F9', paddingLeft: 24 }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, color: '#D97706', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                        PASİF + ÖZKAYNAK
-                      </p>
-                      {[
-                        { label: 'Kısa Vadeli Borçlar', key: 'totalCurrentLiabilities',    sub: true  },
-                        { label: 'Uzun Vadeli Borçlar', key: 'totalNonCurrentLiabilities',  sub: true  },
-                        { label: 'Özkaynak',             key: 'totalEquity',                sub: true  },
-                        { label: 'TOPLAM PASİF+ÖZK',    key: 'totalLiabilitiesAndEquity',  sub: false },
-                      ].map(({ label, key, sub }) => {
-                        const { text, neg } = fmtSigned(ef[key])
-                        return (
-                          <div key={key} style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: sub ? '5px 0 5px 12px' : '8px 0 0 0',
-                            borderTop: !sub ? '1px solid #E5E9F0' : undefined,
-                            marginTop: !sub ? 4 : 0,
-                          }}>
-                            <span style={{ fontSize: 12, fontWeight: sub ? 400 : 700, color: sub ? '#64748B' : '#0B3C5D' }}>{label}</span>
-                            <span style={{ fontSize: 12, fontWeight: sub ? 500 : 700, color: neg ? '#DC2626' : sub ? '#1E293B' : '#0B3C5D', fontVariantNumeric: 'tabular-nums', fontFamily: 'Outfit, sans-serif' }}>
-                              {neg ? '-' : ''}{text}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Azınlık payı notu */}
-                  {(ef['minorityInterest'] ?? 0) !== 0 && (
-                    <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 12, paddingTop: 8, borderTop: '1px solid #F1F5F9' }}>
-                      * Azınlık payına düşen net kâr/zarar: {fmtSigned(ef['minorityInterest']).text} TL
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* ────────────────────────────────────────────────────────────
-                  2. KONSOLİDE GELİR TABLOSU
-              ──────────────────────────────────────────────────────────── */}
-              <div className="card overflow-hidden">
-                <div className="card-head" style={{ background: '#F8FAFC' }}>
-                  <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                    KONSOLİDE GELİR TABLOSU
-                  </h2>
-                </div>
-                <div style={{ padding: '0 0 4px' }}>
-                  {IS_ROWS.map(({ label, key, indent, bold, separator, negative }) => {
-                    const { text, neg } = fmtSigned(ef[key])
-                    const displayNeg = neg !== Boolean(negative)   // negative row with positive value → show red
-                    return (
-                      <div key={key} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '7px 20px 7px ' + (indent ? '32px' : '20px'),
-                        borderTop: separator ? '1px solid #E5E9F0' : '1px solid #F8FAFC',
-                        background: bold && !indent ? '#FAFAFA' : 'white',
-                      }}>
-                        <span style={{ fontSize: 12, fontWeight: bold ? 700 : 400, color: bold ? '#0B3C5D' : '#64748B' }}>
-                          {label}
-                        </span>
-                        <span style={{
-                          fontSize: 12, fontWeight: bold ? 700 : 500,
-                          fontFamily: 'Outfit, sans-serif',
-                          color: displayNeg ? '#DC2626' : bold ? '#0B3C5D' : '#1E293B',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}>
-                          {negative && !neg && text !== '—' ? '-' : ''}{neg && !negative ? '-' : ''}{text}
-                        </span>
+              {consolidatedPeriods.length > 0 && (() => {
+                const lastIdx = consolidatedPeriods.length - 1
+                const thStyle: React.CSSProperties = {
+                  fontSize: 11, fontWeight: 700, fontFamily: 'Outfit, sans-serif',
+                  padding: '7px 12px', textAlign: 'right', whiteSpace: 'nowrap',
+                  borderBottom: '2px solid #E5E9F0', color: '#0B3C5D',
+                  letterSpacing: '0.04em',
+                }
+                const renderTable = (rows: TableRow[], sectionColor: string, sectionLabel: string) => (
+                  <div className="card overflow-hidden" style={{ marginBottom: 0 }}>
+                    <div className="card-head" style={{ background: '#F8FAFC' }}>
+                      <div className="flex items-center justify-between">
+                        <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: sectionColor }}>
+                          KONSOLİDE BİLANÇO — {sectionLabel}
+                        </h2>
+                        <span style={{ fontSize: 10, color: '#94A3B8' }}>{group.sector || 'Konsolide'} · Eliminasyon sonrası</span>
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+                        <thead>
+                          <tr style={{ background: '#F8FAFC' }}>
+                            <th style={{ ...thStyle, textAlign: 'left', width: '34%', paddingLeft: 20 }}>KALEM</th>
+                            {consolidatedPeriods.map((p, i) => (
+                              <th key={i} style={{
+                                ...thStyle,
+                                background: i === lastIdx ? '#EEF4FB' : undefined,
+                                color: i === lastIdx ? '#0B3C5D' : '#5A7A96',
+                              }}>
+                                {p.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row, ri) => (
+                            <tr key={`${row.key}-${ri}`} style={{
+                              background: row.grand ? '#EEF4FB' : row.total ? '#F8FAFC' : 'white',
+                              borderTop: row.total ? '1.5px solid #E5E9F0' : '1px solid #F8FAFC',
+                            }}>
+                              <td style={{
+                                fontSize: 12, fontWeight: row.total ? 700 : 400,
+                                color: row.total ? '#0B3C5D' : '#64748B',
+                                paddingLeft: row.indent ? 28 : 20, paddingRight: 12,
+                                paddingTop: 6, paddingBottom: 6,
+                              }}>
+                                {row.label}
+                              </td>
+                              {consolidatedPeriods.map((p, ci) => {
+                                const raw = row.compute ? row.compute(p.financials) : (p.financials[row.key] ?? null)
+                                const { display, neg } = fmtTbl(raw)
+                                return (
+                                  <td key={ci} style={{
+                                    textAlign: 'right', fontSize: 12,
+                                    fontWeight: row.total ? 700 : 500,
+                                    fontFamily: 'Outfit, sans-serif',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    padding: '6px 12px',
+                                    color: (neg && row.allowNeg) ? '#DC2626' : row.total ? '#0B3C5D' : '#1E293B',
+                                    background: ci === lastIdx ? '#EEF4FB' : undefined,
+                                  }}>
+                                    {display}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+                return (
+                  <div className="space-y-3">
+                    {renderTable(AKTIF_ROWS, '#2EC4B6', 'AKTİF')}
+                    {renderTable(PASIF_ROWS, '#D97706', 'PASİF + ÖZKAYNAK')}
+                  </div>
+                )
+              })()}
 
               {/* ────────────────────────────────────────────────────────────
-                  3. KRİTİK FAKTÖRLER
+                  2. KONSOLİDE GELİR TABLOSU (yıl bazlı sütunlar)
+              ──────────────────────────────────────────────────────────── */}
+              {consolidatedPeriods.length > 0 && (
+                <div className="card overflow-hidden">
+                  <div className="card-head" style={{ background: '#F8FAFC' }}>
+                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
+                      KONSOLİDE GELİR TABLOSU
+                    </h2>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+                      <thead>
+                        <tr style={{ background: '#F8FAFC' }}>
+                          <th style={{ fontSize: 11, fontWeight: 700, textAlign: 'left', padding: '7px 12px 7px 20px', borderBottom: '2px solid #E5E9F0', color: '#0B3C5D', width: '34%' }}>KALEM</th>
+                          {consolidatedPeriods.map((p, i) => (
+                            <th key={i} style={{
+                              fontSize: 11, fontWeight: 700, textAlign: 'right', padding: '7px 12px',
+                              borderBottom: '2px solid #E5E9F0', whiteSpace: 'nowrap',
+                              fontFamily: 'Outfit, sans-serif', letterSpacing: '0.04em',
+                              color: i === consolidatedPeriods.length - 1 ? '#0B3C5D' : '#5A7A96',
+                              background: i === consolidatedPeriods.length - 1 ? '#EEF4FB' : undefined,
+                            }}>
+                              {p.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {IS_TABLE_ROWS.map((row, ri) => (
+                          <tr key={`${row.key}-${ri}`} style={{
+                            background: row.grand ? '#EEF4FB' : row.total ? '#F8FAFC' : 'white',
+                            borderTop: row.total ? '1.5px solid #E5E9F0' : '1px solid #F8FAFC',
+                          }}>
+                            <td style={{
+                              fontSize: 12, fontWeight: row.total ? 700 : 400,
+                              color: row.total ? '#0B3C5D' : '#64748B',
+                              paddingLeft: row.indent ? 28 : 20, paddingRight: 12,
+                              paddingTop: 6, paddingBottom: 6,
+                            }}>
+                              {row.label}
+                            </td>
+                            {consolidatedPeriods.map((p, ci) => {
+                              const raw = p.financials[row.key] ?? null
+                              const { display, neg } = fmtTbl(raw)
+                              return (
+                                <td key={ci} style={{
+                                  textAlign: 'right', fontSize: 12,
+                                  fontWeight: row.total ? 700 : 500,
+                                  fontFamily: 'Outfit, sans-serif',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  padding: '6px 12px',
+                                  color: (neg && row.allowNeg) ? '#DC2626' : row.total ? '#0B3C5D' : '#1E293B',
+                                  background: ci === consolidatedPeriods.length - 1 ? '#EEF4FB' : undefined,
+                                }}>
+                                  {display}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ────────────────────────────────────────────────────────────
+                  3. KRİTİK FAKTÖRLER (10 eşik + benchmark sapmaları)
               ──────────────────────────────────────────────────────────── */}
               {(() => {
-                const violations = CRITICAL_CHECKS.filter(c => {
-                  const v = consolidated.consolidatedRatios[c.key]
-                  return v != null && c.check(v as number)
-                })
-                if (violations.length === 0) return null
+                const ratios = consolidated.consolidatedRatios
+
+                // 1) Kritik eşik ihlalleri
+                type ViolationItem = { label: string; impact: number; isCritical: boolean; uid: string }
+                const thresholdViolations: ViolationItem[] = CRITICAL_CHECKS
+                  .map((c, idx) => {
+                    const v = ratios[c.key]
+                    if (v == null || !c.check(v as number)) return null
+                    return { label: c.label, impact: c.impact, isCritical: true, uid: `${c.key}-${idx}` }
+                  })
+                  .filter(Boolean) as ViolationItem[]
+
+                // 2) Benchmark'tan %15'ten fazla sapan rasyolar
+                const bmViolations: ViolationItem[] = []
+                if (sectorBenchmark) {
+                  for (const g of RATIO_GROUPS) {
+                    for (const r of g.ratios) {
+                      if (!r.bmKey || r.direction === 'none') continue
+                      const actual = ratios[r.key]
+                      if (actual == null) continue
+                      const bmVal = sectorBenchmark[r.bmKey] as number | undefined
+                      if (!bmVal) continue
+                      const { good, pct } = benchmarkDelta(actual as number, bmVal, r.direction)
+                      if (good || Math.abs(pct) < 15) continue
+                      bmViolations.push({
+                        label: `${r.label} sektör ortalamasının çok altında`,
+                        impact: 2,
+                        isCritical: false,
+                        uid: `bm-${r.key}`,
+                      })
+                    }
+                  }
+                }
+
+                const allViolations = [...thresholdViolations, ...bmViolations]
+
                 return (
                   <div className="card overflow-hidden">
-                    <div className="card-head" style={{ background: '#FFF7ED' }}>
+                    <div className="card-head" style={{ background: allViolations.length > 0 ? '#FFF7ED' : '#F0FDF4' }}>
                       <div className="flex items-center gap-2">
-                        <TrendingDown size={13} style={{ color: '#D97706' }} />
-                        <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400E' }}>
+                        <TrendingDown size={13} style={{ color: allViolations.length > 0 ? '#D97706' : '#16a34a' }} />
+                        <h2 className="card-title" style={{
+                          fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
+                          color: allViolations.length > 0 ? '#92400E' : '#166534',
+                        }}>
                           KRİTİK FAKTÖRLER
                         </h2>
                       </div>
                     </div>
-                    <div style={{ padding: '4px 0' }}>
-                      {violations.map((c, i) => (
-                        <div key={c.key} style={{
-                          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
-                          padding: '9px 20px',
-                          borderTop: i > 0 ? '1px solid #FEF3C7' : 'none',
-                          background: '#FFFBEB',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
-                            <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
-                            <p style={{ fontSize: 12, color: '#B45309', margin: 0, lineHeight: 1.5 }}>{c.label}</p>
-                          </div>
-                          <span style={{
-                            flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-                            background: c.impact >= 6 ? '#FEE2E2' : '#FEF3C7',
-                            color: c.impact >= 6 ? '#DC2626' : '#B45309',
-                            whiteSpace: 'nowrap',
+
+                    {allViolations.length === 0 ? (
+                      <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16, color: '#16a34a' }}>✓</span>
+                        <p style={{ fontSize: 12, color: '#166534', margin: 0 }}>Kritik faktör tespit edilmedi — tüm eşikler normal aralıkta.</p>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '4px 0' }}>
+                        {allViolations.map((v, i) => (
+                          <div key={v.uid} style={{
+                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+                            padding: '9px 20px',
+                            borderTop: i > 0 ? `1px solid ${v.isCritical ? '#FEF3C7' : '#E5E9F0'}` : 'none',
+                            background: v.isCritical ? '#FFFBEB' : 'white',
                           }}>
-                            −{c.impact.toFixed(0)} puan
-                          </span>
-                        </div>
-                      ))}
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                              <AlertTriangle size={13} style={{ color: v.isCritical ? '#D97706' : '#5A7A96', flexShrink: 0, marginTop: 2 }} />
+                              <p style={{ fontSize: 12, color: v.isCritical ? '#B45309' : '#1E293B', margin: 0, lineHeight: 1.5 }}>{v.label}</p>
+                            </div>
+                            <span style={{
+                              flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                              background: v.impact >= 6 ? '#FEE2E2' : v.impact >= 4 ? '#FEF3C7' : '#F1F5F9',
+                              color: v.impact >= 6 ? '#DC2626' : v.impact >= 4 ? '#B45309' : '#475569',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              −{v.impact} puan
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{
+                      padding: '8px 20px', borderTop: '1px solid #F1F5F9',
+                      background: '#F8FAFC',
+                    }}>
+                      <p style={{ fontSize: 10, color: '#94A3B8', margin: 0 }}>
+                        * Puan etkileri tahminidir, gerçek skor ağırlıklı hesaplamaya dayanır.
+                      </p>
                     </div>
                   </div>
                 )
