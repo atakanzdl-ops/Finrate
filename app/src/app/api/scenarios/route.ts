@@ -18,7 +18,8 @@ import { prisma }                from '@/lib/db'
 import { getUserIdFromRequest }  from '@/lib/auth'
 import type { BalanceSheet }     from '@/lib/scoring/mutation'
 import { runScenarios }          from '@/lib/scoring/scenarioEngine'
-import { scoreToRating }         from '@/lib/scoring/score'
+import { calculateScore, scoreToRating } from '@/lib/scoring/score'
+import type { RatioResult }      from '@/lib/scoring/ratios'
 
 // ─── Yardımcılar ─────────────────────────────────────────────────────────────
 
@@ -98,9 +99,22 @@ export async function POST(req: NextRequest) {
     if (!analysis)           return jsonUtf8({ error: 'Analiz bulunamadı.' },         { status: 404 })
     if (!analysis.financialData) return jsonUtf8({ error: 'Finansal veri bulunamadı.' }, { status: 422 })
 
-    const fd           = analysis.financialData as unknown as Record<string, number | null>
-    const sector       = analysis.entity?.sector ?? 'Diğer'
-    const currentScore = analysis.finalScore ?? 0
+    const fd     = analysis.financialData as unknown as Record<string, number | null>
+    const sector = analysis.entity?.sector ?? 'Diğer'
+
+    // Finansal skoru belirle: ratios.__financialScore → calculateScore → finalScore
+    let currentScore: number
+    if (analysis.ratios) {
+      const parsedRatios = JSON.parse(analysis.ratios as string) as RatioResult & { __financialScore?: number }
+      if (parsedRatios.__financialScore != null) {
+        currentScore = parsedRatios.__financialScore
+      } else {
+        currentScore = calculateScore(parsedRatios, sector).finalScore
+      }
+    } else {
+      currentScore = analysis.finalScore ?? 0
+    }
+
     const sheet = fdToSheet(fd)
     try {
       const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)

@@ -271,6 +271,11 @@ export default function ScenarioPanel({
       {/* ── 3 Senaryo Kartı ───────────────────────────────────────────────── */}
       {scenarios && !loading && (
         <>
+          {/* Bilgi notu */}
+          <p style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', marginBottom: 4 }}>
+            * Senaryo finansal skorunuz üzerinden hesaplanmaktadır. Subjektif faktörler dahil değildir.
+          </p>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
             {scenarios.map((sc, i) => (
               <button
