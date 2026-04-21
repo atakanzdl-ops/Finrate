@@ -7,7 +7,7 @@ import {
   AlertTriangle, BarChart3, Save, GitBranch, Sliders, TrendingDown,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
-import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
+import ScenarioPanel from '@/components/analysis/ScenarioPanel'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import type { SectorBenchmark } from '@/lib/scoring/benchmarks'
 
@@ -1007,23 +1007,11 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               <p className="text-xs mt-1" style={{ color: '#CBD5E1' }}>Gruba analizi tamamlanmış şirket ekleyin.</p>
             </div>
           ) : (
-            <>
-              <div style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8,
-                padding: '10px 16px', borderRadius: 12,
-                background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)',
-              }}>
-                <Sliders size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
-                <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
-                  Konsolide rasyo başlangıç noktası olarak kullanılmaktadır. Kaldıraç değişikliklerinin grup skoru üzerindeki etkisini simüle edin.
-                </p>
-              </div>
-              <WhatIfSimulator
-                baseData={consolidated.consolidatedRatios}
-                baseScore={consolidated.consolidatedScore}
-                rawFinancialData={consolidated.eliminatedFinancials}
-              />
-            </>
+            <ScenarioPanel
+              groupId={id}
+              currentGrade={consolidated.consolidatedGrade}
+              currentScore={consolidated.consolidatedScore}
+            />
           )}
         </div>
       )}

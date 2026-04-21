@@ -10,12 +10,10 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
-import { WhatIfSimulator } from '@/components/analysis/WhatIfSimulator'
 import SubjectiveForm from '@/components/analysis/SubjectiveForm'
-import OptimizationPanel from '@/components/analysis/OptimizationPanel'
 import TrendChart from '@/components/analysis/TrendChart'
+import ScenarioPanel from '@/components/analysis/ScenarioPanel'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
-import type { RatioResult } from '@/lib/scoring/ratios'
 import { combineScores } from '@/lib/scoring/subjective'
 import { scoreToRating } from '@/lib/scoring/score'
 
@@ -1229,39 +1227,11 @@ function AnalizPageContent() {
 
                 {/* ── SENARYO ─────────────────── */}
                 {activeTab === 'scenario' && (
-                  <div className="space-y-5">
-                    <div className="card overflow-hidden">
-                      <div className="card-head">
-                        <div className="card-head-left">
-                          <h4 className="card-title">Senaryo Simülatörü</h4>
-                          <p className="card-desc">Finansal kalemleri değiştirerek skor etkisini anlık görün</p>
-                        </div>
-                      </div>
-                      <div className="card-body">
-                        <WhatIfSimulator
-                          baseData={selected.ratios ?? {}}
-                          baseScore={cs}
-                          rawFinancialData={selected.financialData as Record<string, number | null> | undefined}
-                        />
-                      </div>
-                    </div>
-                    <div className="card overflow-hidden">
-                      <div className="card-head">
-                        <div className="card-head-left">
-                          <h4 className="card-title">Hedef Nota Ulaş</h4>
-                          <p className="card-desc">Hangi iyileştirme en çok puan kazandırır?</p>
-                        </div>
-                      </div>
-                      <div className="card-body">
-                        <OptimizationPanel
-                          ratios={selected.ratios as unknown as RatioResult}
-                          currentScore={cs}
-                          currentRating={cr}
-                          sector={selected.entity?.sector}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <ScenarioPanel
+                    analysisId={selected.id}
+                    currentGrade={cr}
+                    currentScore={cs}
+                  />
                 )}
 
                 {/* ── SUBJEKTİF ───────────────── */}
