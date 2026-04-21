@@ -43,12 +43,23 @@ export interface Action {
   calcRange: (sheet: BalanceSheet) => { min: number; max: number; suggested: number }
   /** Sektör yapılabilirlik katsayısı — 0.3 altı önerilmez */
   sectorFeasibility: Record<string, number>
+  /** Firma bilançosundan türetilmiş somut uygulama notu */
+  howTo: (sheet: BalanceSheet, amount: number) => string
 }
 
 // ─── YARDIMCI ─────────────────────────────────────────────────────────────────
 
 function nn(v: number | null | undefined): number {
   return v ?? 0
+}
+
+/** TL tutarını okunabilir formata çevirir: 1M+ → "X.XM TL", 1K+ → "XXK TL", altı → "X TL" */
+function formatTL(n: number | null | undefined): string {
+  const v = n ?? 0
+  const a = Math.abs(v)
+  if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M TL`
+  if (a >= 1_000)     return `${(v / 1_000).toFixed(0)}K TL`
+  return `${v.toFixed(0)} TL`
 }
 
 /** Pozitif sayıdan min/max/suggested üretir; kaynak 0 veya null ise hepsini 0 döner */
@@ -91,6 +102,11 @@ export const ACTIONS: Record<ActionId, Action> = {
 
     calcRange: (s) => pctRange(s.shortTermFinancialDebt, 0.10, 0.60, 0.30),
 
+    howTo: (s, amount) =>
+      `Kısa vadeli finansal borcunuz ${formatTL(s.shortTermFinancialDebt)}. `
+      + `Bunun ${formatTL(amount)}'sini uzun vadeye çevirirseniz cari oran iyileşir, `
+      + `kısa vadeli yükümlülükleriniz hafifler. Bankanızla yeniden yapılandırma müzakeresi başlatın.`,
+
     sectorFeasibility: {
       İnşaat: 0.75, İmalat: 0.70, Ticaret: 0.55, Hizmet: 0.65,
       Perakende: 0.50, Tarım: 0.60, Enerji: 0.90, Ulaştırma: 0.70,
@@ -112,6 +128,11 @@ export const ACTIONS: Record<ActionId, Action> = {
     }),
 
     calcRange: (s) => pctRange(s.tradeReceivables, 0.10, 0.50, 0.25),
+
+    howTo: (s, amount) =>
+      `Ticari alacak bakiyeniz ${formatTL(s.tradeReceivables)}. `
+      + `${formatTL(amount)} tahsil edilirse kasanız bu kadar güçlenir, DSO düşer. `
+      + `90+ gün gecikmiş alacaklara ihtar gönderin; erken ödeme için %2–3 iskonto teklif edin.`,
 
     sectorFeasibility: {
       İnşaat: 0.35, İmalat: 0.70, Ticaret: 0.75, Hizmet: 0.80,
@@ -136,6 +157,11 @@ export const ACTIONS: Record<ActionId, Action> = {
     }),
 
     calcRange: (s) => pctRange(s.inventory, 0.05, 0.30, 0.15),
+
+    howTo: (s, amount) =>
+      `Stok bakiyeniz ${formatTL(s.inventory)}. `
+      + `${formatTL(amount)}'lik hareketsiz stok maliyetinde satılırsa kasanız güçlenir, nakit döngüsü hızlanır. `
+      + `En az 6 aydır hareket görmeyen kalemleri belirleyip indirimli satışa açın.`,
 
     sectorFeasibility: {
       İnşaat: 0.15, İmalat: 0.55, Ticaret: 0.85, Hizmet: 0.10,
@@ -163,6 +189,11 @@ export const ACTIONS: Record<ActionId, Action> = {
       return pctRange(base, 0.10, 0.50, 0.25)
     },
 
+    howTo: (s, amount) =>
+      `Kasanız ${formatTL(s.cash)}, kısa vadeli finansal borcunuz ${formatTL(s.shortTermFinancialDebt)}. `
+      + `${formatTL(amount)} ile KV kredi erken kapatılırsa kaldıraç ve faiz yükü azalır. `
+      + `Kapatma işlemi öncesi bankayla erken kapama maliyetini sorgulayın.`,
+
     sectorFeasibility: {
       İnşaat: 0.70, İmalat: 0.75, Ticaret: 0.85, Hizmet: 0.85,
       Perakende: 0.80, Tarım: 0.65, Enerji: 0.80, Ulaştırma: 0.75,
@@ -188,6 +219,12 @@ export const ACTIONS: Record<ActionId, Action> = {
 
     calcRange: (s) => pctRange(s.operatingExpenses, 0.03, 0.15, 0.08),
 
+    howTo: (s, amount) =>
+      `Faaliyet giderleriniz ${formatTL(s.operatingExpenses)}. `
+      + `${formatTL(amount)} kısılırsa net kâra yaklaşık ${formatTL(amount * 0.75)} yansır. `
+      + `Genel yönetim, pazarlama ve idari gider kalemlerini tek tek gözden geçirin; `
+      + `ertelenebilir veya dışarıdan alınan hizmet maliyetlerini hedefleyin.`,
+
     sectorFeasibility: {
       İnşaat: 0.45, İmalat: 0.55, Ticaret: 0.70, Hizmet: 0.35,
       Perakende: 0.65, Tarım: 0.50, Enerji: 0.55, Ulaştırma: 0.45,
@@ -210,6 +247,20 @@ export const ACTIONS: Record<ActionId, Action> = {
     }),
 
     calcRange: (s) => pctRange(s.costOfSales, 0.02, 0.10, 0.05),
+
+    howTo: (s, amount) => {
+      const grossProfit = nn(s.revenue) - nn(s.costOfSales)
+      if (grossProfit < 0) {
+        return `Satışların maliyetiniz ${formatTL(s.costOfSales)}, geliriniz ${formatTL(s.revenue)} — `
+          + `brüt zarar ${formatTL(-grossProfit)}. `
+          + `${formatTL(amount)} maliyet düşüşü sağlanırsa brüt zarar ${formatTL(-grossProfit - amount)}'e iner. `
+          + `Maliyet kalemlerinizi inceleyin: işçilik, hammadde, taşeron giderleri. `
+          + `Hangi kalemde en fazla tasarruf mümkün?`
+      }
+      return `Satışların maliyetiniz ${formatTL(s.costOfSales)}, geliriniz ${formatTL(s.revenue)}. `
+        + `${formatTL(amount)} maliyet düşüşü brüt kârınızı ${formatTL(grossProfit + amount)}'e yükseltir. `
+        + `Tedarikçi fiyat müzakeresi, toplu alım indirimi veya süreç verimliliği öncelikli hedef olmalı.`
+    },
 
     sectorFeasibility: {
       İnşaat: 0.40, İmalat: 0.65, Ticaret: 0.55, Hizmet: 0.80,
@@ -244,6 +295,13 @@ export const ACTIONS: Record<ActionId, Action> = {
       return { min, max, suggested }
     },
 
+    howTo: (s, amount) => {
+      const totalDebt = nn(s.shortTermFinancialDebt) + nn(s.longTermFinancialDebt)
+      return `Toplam finansal borcunuz ${formatTL(totalDebt)}, mevcut faiz gideriniz ${formatTL(s.interestExpense)}. `
+        + `${formatTL(amount)} yıllık faiz tasarrufu için alternatif banka teklifleri alın. `
+        + `Özellikle KV kredilerin bir kısmını daha düşük faizli UV yapıya çekmeyi hedefleyin.`
+    },
+
     sectorFeasibility: {
       İnşaat: 0.65, İmalat: 0.75, Ticaret: 0.65, Hizmet: 0.70,
       Perakende: 0.55, Tarım: 0.50, Enerji: 0.90, Ulaştırma: 0.65,
@@ -267,6 +325,13 @@ export const ACTIONS: Record<ActionId, Action> = {
     calcRange: (s) => {
       const equity = nn(s.paidInCapital) + nn(s.retainedEarnings) + nn(s.netProfit)
       return pctRange(Math.max(equity, 0), 0.10, 0.50, 0.25)
+    },
+
+    howTo: (s, amount) => {
+      const equity = nn(s.paidInCapital) + nn(s.retainedEarnings) + nn(s.netProfit)
+      return `Mevcut özkaynak tabanınız yaklaşık ${formatTL(equity)}. `
+        + `${formatTL(amount)} nakit sermaye girişi kasanızı ve özkaynağınızı doğrudan artırır, özkaynak oranı iyileşir. `
+        + `Mevcut ortakların sermaye koyması en hızlı yol; yeni yatırımcı süreci 3–6 ay alır.`
     },
 
     sectorFeasibility: {
@@ -298,6 +363,11 @@ export const ACTIONS: Record<ActionId, Action> = {
       return pctRange(profit, 0.50, 1.00, 0.80)
     },
 
+    howTo: (s, amount) =>
+      `Dönem net kârınız ${formatTL(s.netProfit)}. `
+      + `${formatTL(amount)} kâr dağıtılmazsa bu tutar birikmiş kârlara aktarılır, özkaynak güçlenir. `
+      + `Genel Kurul kararıyla kâr dağıtımı bu yıl ertelenebilir veya iptal edilebilir.`,
+
     sectorFeasibility: {
       İnşaat: 0.60, İmalat: 0.65, Ticaret: 0.75, Hizmet: 0.80,
       Perakende: 0.70, Tarım: 0.55, Enerji: 0.70, Ulaştırma: 0.65,
@@ -322,6 +392,11 @@ export const ACTIONS: Record<ActionId, Action> = {
 
     calcRange: (s) => pctRange(s.tangibleAssets, 0.05, 0.25, 0.10),
 
+    howTo: (s, amount) =>
+      `Maddi duran varlık bakiyeniz ${formatTL(s.tangibleAssets)}. `
+      + `${formatTL(amount)} değerinde atıl makine, araç veya gayrimenkul satışı kasanızı doğrudan güçlendirir. `
+      + `Aktif kullanım oranı düşük varlıkları tespit edin; değerleme için bağımsız ekspertiz alın.`,
+
     sectorFeasibility: {
       İnşaat: 0.50, İmalat: 0.55, Ticaret: 0.40, Hizmet: 0.45,
       Perakende: 0.35, Tarım: 0.30, Enerji: 0.45, Ulaştırma: 0.55,
@@ -343,6 +418,11 @@ export const ACTIONS: Record<ActionId, Action> = {
     }),
 
     calcRange: (s) => pctRange(s.tradeReceivables, 0.10, 0.40, 0.20),
+
+    howTo: (s, amount) =>
+      `Ticari alacak bakiyeniz ${formatTL(s.tradeReceivables)}. `
+      + `${formatTL(amount)} daha hızlı tahsil edilirse kasa bu kadar güçlenir, nakit döngüsü kısalır. `
+      + `Müşteri ödeme vadelerini kısaltın; peşin veya erken ödemeye %1–2 iskonto sunun.`,
 
     sectorFeasibility: {
       İnşaat: 0.25, İmalat: 0.65, Ticaret: 0.70, Hizmet: 0.75,
@@ -367,6 +447,11 @@ export const ACTIONS: Record<ActionId, Action> = {
     }),
 
     calcRange: (s) => pctRange(s.tradePayables, 0.05, 0.20, 0.10),
+
+    howTo: (s, amount) =>
+      `Ticari borç bakiyeniz ${formatTL(s.tradePayables)}. `
+      + `${formatTL(amount)}'lik ödemeyi erteleyerek kasanızda bu tutar daha uzun kalır, nakit döngünüz iyileşir. `
+      + `Ana tedarikçilerinizle vade uzatma müzakeresine girin; karşılıklı hacim taahhüdü önerebilirsiniz.`,
 
     sectorFeasibility: {
       İnşaat: 0.40, İmalat: 0.70, Ticaret: 0.75, Hizmet: 0.45,
@@ -400,6 +485,16 @@ export const ACTIONS: Record<ActionId, Action> = {
 
     calcRange: (s) => pctRange(s.revenue, 0.03, 0.15, 0.08),
 
+    howTo: (s, amount) => {
+      const netMarginPct = nn(s.revenue) > 0
+        ? Math.max(0, nn(s.netProfit) / nn(s.revenue))
+        : 0.08
+      const netGain = amount * netMarginPct
+      return `Mevcut cironuz ${formatTL(s.revenue)}. `
+        + `${formatTL(amount)} ek gelir, mevcut net marj varsayımıyla ${formatTL(netGain)} net kâra dönüşür. `
+        + `Atıl kapasite için yeni müşteri veya sözleşme arayışına girin; mevcut müşterilere çapraz satış yapın.`
+    },
+
     sectorFeasibility: {
       İnşaat: 0.50, İmalat: 0.70, Ticaret: 0.70, Hizmet: 0.65,
       Perakende: 0.60, Tarım: 0.45, Enerji: 0.55, Ulaştırma: 0.65,
@@ -424,6 +519,11 @@ export const ACTIONS: Record<ActionId, Action> = {
       const base = Math.min(nn(s.cash), nn(s.shortTermFinancialDebt))
       return pctRange(base, 0.10, 0.40, 0.20)
     },
+
+    howTo: (s, amount) =>
+      `Kasanız ${formatTL(s.cash)}, kısa vadeli finansal borcunuz ${formatTL(s.shortTermFinancialDebt)}. `
+      + `${formatTL(amount)} ile mevcut kredi kapatılırsa yıllık faiz yükü ve kaldıraç azalır. `
+      + `Kullanılmayan kredi limitlerini öncelikle hedefleyin; erken kapatma komisyonunu önceden sorgulayın.`,
 
     sectorFeasibility: {
       İnşaat: 0.65, İmalat: 0.70, Ticaret: 0.75, Hizmet: 0.85,

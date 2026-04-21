@@ -59,27 +59,6 @@ const HORIZON_LABELS: Record<TimeHorizon, string> = {
   long:   'Uzun Vadeli Strateji (1–3 Yıl)',
 }
 
-/**
- * Her aksiyon için kısa uygulama notu.
- * actions.ts'i değiştirmeden burada tanımlandı (prompt gereksinimi).
- */
-const HOW_TO: Record<ActionId, string> = {
-  kv_to_uv:            'Mevcut KV kredileri için banka ile UV yapılandırma müzakeresi yapın',
-  collect_receivables: '90+ gün gecikmiş alacaklara ihtar gönderin, %2–3 iskonto teklif edin',
-  liquidate_inventory: 'Yavaş hareket eden stokları indirimli satışa çıkarın',
-  repay_kv_debt:       'Atıl kasadan KV kredi erken kapatın',
-  reduce_opex:         'Genel yönetim ve pazarlama giderlerini gözden geçirin',
-  improve_margin:      'Tedarikçi fiyat müzakeresi veya verimlilik artışı ile maliyet düşürün',
-  refinance:           'Yüksek faizli krediler için alternatif banka teklifleri alın',
-  capital_increase:    'Ortak sermaye koyması veya yeni ortak girişi ile özkaynak güçlendirin',
-  retain_profit:       'Bu yıl kâr dağıtımını durdurun, kârı işletmede bırakın',
-  sell_asset:          'Kullanılmayan makine, araç veya gayrimenkul satışı yapın',
-  shorten_dso:         'Müşteri ödeme vadelerini kısaltın, peşin ödemeye teşvik için iskonto sunun',
-  extend_dpo:          'Tedarikçilerle vade uzatma müzakeresi yapın',
-  increase_revenue:    'Atıl kapasite için yeni müşteri/sözleşme arayışına girin',
-  close_credit:        'Kullanılmayan kredi limitlerini kapatarak faiz yükünü azaltın',
-}
-
 /** Horizon bazlı izin verilen zaman aralıkları */
 const HORIZON_FILTER: Record<TimeHorizon, TimeHorizon[]> = {
   short:  ['short'],
@@ -185,7 +164,7 @@ function runSingleScenario(
       scoreDelta:      result.scoreDelta,
       difficulty:      bestAction.difficulty,
       timeHorizon:     bestAction.timeHorizon,
-      howTo:           HOW_TO[bestActionId],
+      howTo:           bestAction.howTo(currentSheet, bestAmount),
     })
 
     usedIds.add(bestActionId)
