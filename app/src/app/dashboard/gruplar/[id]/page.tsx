@@ -408,10 +408,10 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       {/* ── Ana sekmeler ───────────────────────────────────────────────────── */}
       <div className="tab-group inline-flex">
         {([
-          { key: 'firmalar',       label: 'Firmalar',         Icon: Building2 },
-          { key: 'rating',         label: 'Konsolide Rating', Icon: BarChart3  },
-          { key: 'eliminasyonlar', label: 'Eliminasyonlar',   Icon: GitBranch  },
-          { key: 'senaryo',        label: 'Senaryo',          Icon: Sliders    },
+          { key: 'firmalar',       label: 'Şirketler',  Icon: Building2 },
+          { key: 'rating',         label: 'Konsolide',  Icon: BarChart3  },
+          { key: 'eliminasyonlar', label: 'Tenzilat',   Icon: GitBranch  },
+          { key: 'senaryo',        label: 'Senaryo',    Icon: Sliders    },
         ] as const).map(({ key, label, Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`tab flex items-center gap-1.5 px-4 py-2 text-sm${activeTab === key ? ' active' : ''}`}>
@@ -524,6 +524,20 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
             </div>
           ) : (
             <>
+
+              {/* Tenzilat girilmediyse uyarı banner */}
+              {Object.values(eliminations).every(v => v === 0) && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  padding: '10px 16px', borderRadius: 12,
+                  background: '#FFFBEB', border: '1px solid #FDE68A',
+                }}>
+                  <AlertTriangle size={14} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ fontSize: 12, color: '#B45309', margin: 0 }}>
+                    Bu grup için henüz tenzilat girilmedi. Tablolar ham konsolide toplamını gösteriyor.
+                  </p>
+                </div>
+              )}
 
               {/* ────────────────────────────────────────────────────────────
                   1. KONSOLİDE BİLANÇO
@@ -645,88 +659,53 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               </div>
 
               {/* ────────────────────────────────────────────────────────────
-                  3. 25-RASYO TABLOSU — TCMB BENCHMARK
+                  3. KRİTİK FAKTÖRLER
               ──────────────────────────────────────────────────────────── */}
-              <div className="card overflow-hidden">
-                <div className="card-head" style={{ background: '#F8FAFC' }}>
-                  <div className="flex items-center justify-between">
-                    <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                      KONSOLİDE FİNANSAL RASYOLAR
-                    </h2>
-                    <span style={{ fontSize: 10, color: '#94A3B8' }}>
-                      TCMB kıyaslaması: {sectorBenchmark.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="card-body space-y-5">
-                  {/* Tablo başlık satırı */}
-                  <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 80px 80px 72px',
-                    padding: '0 0 6px', borderBottom: '1px solid #E5E9F0',
-                  }}>
-                    {['RASYO', 'DEĞER', 'TCMB', 'DURUM'].map((h, i) => (
-                      <span key={h} style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textAlign: i > 0 ? 'right' : 'left' }}>{h}</span>
-                    ))}
-                  </div>
-
-                  {RATIO_GROUPS.map(g => (
-                    <div key={g.label}>
-                      {/* Kategori başlık */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <div style={{ width: 3, height: 14, borderRadius: 2, background: g.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: g.color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                          {g.label}
-                        </span>
-                      </div>
-                      {/* Rasyo satırları */}
-                      <div style={{ borderRadius: 8, border: '1px solid #F1F5F9', overflow: 'hidden' }}>
-                        {g.ratios.map((r, idx) => {
-                          const val = consolidated.consolidatedRatios[r.key]
-                          const fmtVal = fmtRatio(val as number | null, r.key)
-                          const bmVal = r.bmKey ? sectorBenchmark[r.bmKey] as number : null
-                          const fmtBm = bmVal != null ? fmtRatio(bmVal, r.key) : '—'
-                          const delta = (val != null && bmVal != null && r.direction !== 'none')
-                            ? benchmarkDelta(val as number, bmVal, r.direction)
-                            : null
-
-                          return (
-                            <div key={r.key} style={{
-                              display: 'grid', gridTemplateColumns: '1fr 80px 80px 72px',
-                              alignItems: 'center', padding: '6px 14px',
-                              background: idx % 2 === 0 ? '#FAFAFA' : '#FFFFFF',
-                              borderTop: idx > 0 ? '1px solid #F1F5F9' : 'none',
-                            }}>
-                              <span style={{ fontSize: 12, color: '#1E293B' }}>{r.label}</span>
-                              <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'Outfit, sans-serif', color: val == null ? '#CBD5E1' : '#0B3C5D', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                                {fmtVal}
-                              </span>
-                              <span style={{ fontSize: 11, color: '#94A3B8', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                                {fmtBm}
-                              </span>
-                              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                {delta ? (
-                                  <span style={{
-                                    fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5,
-                                    background: delta.good ? '#DCFCE7' : '#FEE2E2',
-                                    color: delta.good ? '#16a34a' : '#DC2626',
-                                  }}>
-                                    {delta.label}
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: 10, color: '#E2E8F0' }}>—</span>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
+              {(() => {
+                const violations = CRITICAL_CHECKS.filter(c => {
+                  const v = consolidated.consolidatedRatios[c.key]
+                  return v != null && c.check(v as number)
+                })
+                if (violations.length === 0) return null
+                return (
+                  <div className="card overflow-hidden">
+                    <div className="card-head" style={{ background: '#FFF7ED' }}>
+                      <div className="flex items-center gap-2">
+                        <TrendingDown size={13} style={{ color: '#D97706' }} />
+                        <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400E' }}>
+                          KRİTİK FAKTÖRLER
+                        </h2>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div style={{ padding: '4px 0' }}>
+                      {violations.map((c, i) => (
+                        <div key={c.key} style={{
+                          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+                          padding: '9px 20px',
+                          borderTop: i > 0 ? '1px solid #FEF3C7' : 'none',
+                          background: '#FFFBEB',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                            <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
+                            <p style={{ fontSize: 12, color: '#B45309', margin: 0, lineHeight: 1.5 }}>{c.label}</p>
+                          </div>
+                          <span style={{
+                            flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                            background: c.impact >= 6 ? '#FEE2E2' : '#FEF3C7',
+                            color: c.impact >= 6 ? '#DC2626' : '#B45309',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            −{c.impact.toFixed(0)} puan
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* ────────────────────────────────────────────────────────────
-                  4. KONSOLİDE SKOR KARTI
+                  4. KONSOLİDE SKOR + KATEGORİ SKORLARI (tek kart)
               ──────────────────────────────────────────────────────────── */}
 
               {/* En zayıf halka uyarısı */}
@@ -750,6 +729,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   </h2>
                 </div>
                 <div className="card-body">
+                  {/* Büyük skor + not */}
                   <div className="flex items-end gap-6">
                     <div>
                       <p style={{ fontSize: 80, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
@@ -764,120 +744,41 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                       <p style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{RATING_LABEL[consolidated.consolidatedGrade] ?? ''}</p>
                     </div>
                   </div>
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Ağırlıklı ortalama */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <p style={{ fontSize: 12, color: '#64748B' }}>Ağırlıklı ortalama (aktif bazlı):</p>
                     <span style={{ fontSize: 16, fontWeight: 800, fontFamily: 'Outfit, sans-serif', color: '#5A7A96', fontVariantNumeric: 'tabular-nums' }}>
                       {consolidated.weightedAverageScore.toFixed(1)}
                     </span>
                   </div>
-                </div>
-              </div>
-
-              {/* ────────────────────────────────────────────────────────────
-                  5. KATEGORİ SKORLARI
-              ──────────────────────────────────────────────────────────── */}
-              <div className="card overflow-hidden">
-                <div className="card-head" style={{ background: '#F8FAFC' }}>
-                  <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                    KATEGORİ SKORLARI
-                  </h2>
-                </div>
-                <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    {([
-                      { label: 'Likidite',  value: consolidated.liquidityScore,     weight: '%25', color: '#2EC4B6' },
-                      { label: 'Kârlılık',  value: consolidated.profitabilityScore, weight: '%30', color: '#0B3C5D' },
-                      { label: 'Kaldıraç',  value: consolidated.leverageScore,      weight: '%30', color: '#D97706' },
-                      { label: 'Faaliyet',  value: consolidated.activityScore,      weight: '%15', color: '#7C3AED' },
-                    ] as const).map(({ label, value, weight, color }) => (
-                      <div key={label} style={{ borderRadius: 12, padding: '14px 16px', background: '#F8FAFC', border: '1px solid #E5E9F0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
-                          <span style={{ fontSize: 10, color: '#CBD5E1' }}>{weight}</span>
+                  {/* Kategori skorları grid */}
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F1F5F9' }}>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+                      KATEGORİ SKORLARI
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {([
+                        { label: 'Likidite',  value: consolidated.liquidityScore,     weight: '%25', color: '#2EC4B6' },
+                        { label: 'Kârlılık',  value: consolidated.profitabilityScore, weight: '%30', color: '#0B3C5D' },
+                        { label: 'Kaldıraç',  value: consolidated.leverageScore,      weight: '%30', color: '#D97706' },
+                        { label: 'Faaliyet',  value: consolidated.activityScore,      weight: '%15', color: '#7C3AED' },
+                      ] as const).map(({ label, value, weight, color }) => (
+                        <div key={label} style={{ borderRadius: 10, padding: '12px 14px', background: '#F8FAFC', border: '1px solid #E5E9F0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color }}>{label}</span>
+                            <span style={{ fontSize: 10, color: '#CBD5E1' }}>{weight}</span>
+                          </div>
+                          <p style={{ fontSize: 30, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
+                            {Math.round(value)}
+                          </p>
+                          <div style={{ marginTop: 7, height: 4, borderRadius: 99, background: '#E5E9F0' }}>
+                            <div style={{ height: '100%', borderRadius: 99, width: `${Math.min(100, Math.max(0, value))}%`, background: `linear-gradient(90deg, ${color} 0%, #0B3C5D 100%)` }} />
+                          </div>
                         </div>
-                        <p style={{ fontSize: 34, fontWeight: 900, fontFamily: 'Outfit, sans-serif', color: '#0B3C5D', lineHeight: 1 }}>
-                          {Math.round(value)}
-                        </p>
-                        <div style={{ marginTop: 8, height: 5, borderRadius: 99, background: '#E5E9F0' }}>
-                          <div style={{ height: '100%', borderRadius: 99, width: `${Math.min(100, Math.max(0, value))}%`, background: `linear-gradient(90deg, ${color} 0%, #0B3C5D 100%)` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* ────────────────────────────────────────────────────────────
-                  6. SKORU DÜŞÜREN FAKTÖRLER
-              ──────────────────────────────────────────────────────────── */}
-              {draggingFactors.length > 0 && (
-                <div className="card overflow-hidden">
-                  <div className="card-head" style={{ background: '#FFF7ED' }}>
-                    <div className="flex items-center gap-2">
-                      <TrendingDown size={13} style={{ color: '#D97706' }} />
-                      <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#92400E' }}>
-                        SKORU DÜŞÜREN FAKTÖRLER
-                      </h2>
+                      ))}
                     </div>
                   </div>
-                  <div style={{ padding: '4px 0' }}>
-                    {draggingFactors.map((f, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
-                        padding: '9px 20px',
-                        borderTop: i > 0 ? '1px solid #FEF3C7' : 'none',
-                        background: f.isCritical ? '#FFFBEB' : 'white',
-                      }}>
-                        <div className="flex items-start gap-2 min-w-0">
-                          {f.isCritical && (
-                            <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
-                          )}
-                          <p style={{ fontSize: 12, color: f.isCritical ? '#B45309' : '#1E293B', margin: 0, lineHeight: 1.5 }}>
-                            {f.label}
-                          </p>
-                        </div>
-                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-                            background: f.impact >= 5 ? '#FEE2E2' : '#FEF3C7',
-                            color: f.impact >= 5 ? '#DC2626' : '#B45309',
-                            whiteSpace: 'nowrap',
-                          }}>
-                            −{f.impact.toFixed(1)} puan
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ padding: '8px 20px 10px', borderTop: '1px solid #FEF3C7', background: '#FFFBEB' }}>
-                    <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>
-                      * Puan tahmini yaklaşıktır; kategori ağırlığı × benchmark sapması formülüyle hesaplanır.
-                      TCMB kıyaslaması: {sectorBenchmark.label}
-                    </p>
-                  </div>
                 </div>
-              )}
-
-              {/* ────────────────────────────────────────────────────────────
-                  7. SENARYO MOTORU
-              ──────────────────────────────────────────────────────────── */}
-              <div style={{ paddingTop: 4 }}>
-                <div style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12,
-                  padding: '10px 16px', borderRadius: 12,
-                  background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)',
-                }}>
-                  <Sliders size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
-                  <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
-                    Konsolide rasyolar başlangıç noktası olarak kullanılmaktadır.
-                    Kaldıraç değişikliklerinin grup skoru üzerindeki etkisini simüle edin.
-                  </p>
-                </div>
-                <WhatIfSimulator
-                  baseData={consolidated.consolidatedRatios}
-                  baseScore={consolidated.consolidatedScore}
-                  rawFinancialData={consolidated.eliminatedFinancials}
-                />
               </div>
 
             </>
