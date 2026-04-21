@@ -110,11 +110,12 @@ function extractKeyRatios(r: RatioResult): Partial<RatioResult> {
 // ─── TEK SENARYO ──────────────────────────────────────────────────────────────
 
 function runSingleScenario(
-  sheet:        BalanceSheet,
-  sector:       string,
-  horizon:      TimeHorizon,
-  targetGrade:  string,
-  currentScore: number,
+  sheet:           BalanceSheet,
+  sector:          string,
+  horizon:         TimeHorizon,
+  targetGrade:     string,
+  currentScore:    number,    // combined skor (display + goal karşılaştırması)
+  subjectiveBonus: number,    // combined - finansal; aksiyonlar boyunca sabit kalır
 ): ScenarioResult {
   const targetScore   = GRADE_SCORES[targetGrade] ?? 60
   const allowedTimes  = HORIZON_FILTER[horizon]
@@ -189,7 +190,8 @@ function runSingleScenario(
 
     usedIds.add(bestActionId)
     currentSheet      = result.after
-    currentScoreValue = result.scoreAfter.finalScore
+    // Finansal delta sabit subjektif bonus ile combined skora dönüşür
+    currentScoreValue = result.scoreAfter.finalScore + subjectiveBonus
   }
 
   return {
@@ -211,16 +213,18 @@ function runSingleScenario(
 /**
  * 3 senaryo döner: short → medium → long
  *
- * @param sheet        Mevcut bilanço
- * @param sector       Sektör adı (sectorFeasibility için)
- * @param currentScore Mevcut final skor
- * @param targetGrade  Hedef not ("BBB", "BB" vb.)
+ * @param sheet           Mevcut bilanço
+ * @param sector          Sektör adı (sectorFeasibility için)
+ * @param currentScore    Combined skor (finansal + subjektif)
+ * @param targetGrade     Hedef not ("BBB", "BB" vb.)
+ * @param subjectiveBonus Combined − finansal fark (varsayılan 0 — grup/subjektif yok)
  */
 export function runScenarios(
-  sheet:        BalanceSheet,
-  sector:       string,
-  currentScore: number,
-  targetGrade:  string,
+  sheet:            BalanceSheet,
+  sector:           string,
+  currentScore:     number,
+  targetGrade:      string,
+  subjectiveBonus = 0,
 ): ScenarioResult[] {
   const targetScore  = GRADE_SCORES[targetGrade]
   const currentGrade = scoreToRating(currentScore)
@@ -244,7 +248,7 @@ export function runScenarios(
 
   const horizons: TimeHorizon[] = ['short', 'medium', 'long']
   return horizons.map(h =>
-    runSingleScenario(sheet, sector, h, targetGrade, currentScore),
+    runSingleScenario(sheet, sector, h, targetGrade, currentScore, subjectiveBonus),
   )
 }
 

@@ -103,21 +103,25 @@ export async function POST(req: NextRequest) {
     const sector = analysis.entity?.sector ?? 'Diğer'
 
     // Finansal skoru belirle: ratios.__financialScore → calculateScore → finalScore
-    let currentScore: number
+    const combinedScore = analysis.finalScore ?? 0
+    let financialScore: number
     if (analysis.ratios) {
       const parsedRatios = JSON.parse(analysis.ratios as string) as RatioResult & { __financialScore?: number }
       if (parsedRatios.__financialScore != null) {
-        currentScore = parsedRatios.__financialScore
+        financialScore = parsedRatios.__financialScore
       } else {
-        currentScore = calculateScore(parsedRatios, sector).finalScore
+        financialScore = calculateScore(parsedRatios, sector).finalScore
       }
     } else {
-      currentScore = analysis.finalScore ?? 0
+      financialScore = combinedScore
     }
+    // Subjektif katkı sabit kalır — senaryo deltaları combined skora yansır
+    const subjectiveBonus = combinedScore - financialScore
+    const currentScore    = combinedScore
 
     const sheet = fdToSheet(fd)
     try {
-      const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)
+      const scenarios = runScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
       return jsonUtf8({ scenarios, currentScore, currentGrade: scoreToRating(currentScore), sector })
     } catch (error) {
       return jsonUtf8({ error: String(error) }, { status: 400 })
