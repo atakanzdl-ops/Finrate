@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
     const sector = analysis.entity?.sector ?? 'Diğer'
 
     // Finansal skoru belirle: ratios.__financialScore → calculateScore → finalScore
-    const combinedScore = analysis.finalScore ?? 0
+    // body.currentScore = frontend'den gelen combined skor (subjektif dahil); yoksa DB finalScore
+    const combinedScore = body.currentScore ?? analysis.finalScore ?? 0
     let financialScore: number
     if (analysis.ratios) {
       const parsedRatios = JSON.parse(analysis.ratios as string) as RatioResult & { __financialScore?: number }
@@ -118,8 +119,6 @@ export async function POST(req: NextRequest) {
     // Subjektif katkı sabit kalır — senaryo deltaları combined skora yansır
     const subjectiveBonus = combinedScore - financialScore
     const currentScore    = combinedScore
-
-    console.log('[scenarios] analysisId:', analysisId, '| combinedScore:', combinedScore, '| financialScore:', financialScore, '| subjectiveBonus:', subjectiveBonus, '| currentScore:', currentScore)
 
     const sheet = fdToSheet(fd)
     try {

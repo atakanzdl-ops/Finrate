@@ -162,7 +162,7 @@ export default function ScenarioPanel({
       const body: Record<string, unknown> = { targetGrade }
       if (analysisId)          body.analysisId   = analysisId
       if (groupId)             body.groupId      = groupId
-      if (groupId && csProp != null) body.currentScore = csProp
+      if (csProp != null) body.currentScore = csProp
 
       const res  = await fetch('/api/scenarios', {
         method:  'POST',
