@@ -119,12 +119,17 @@ function runSingleScenario(
   const targetScore   = GRADE_SCORES[targetGrade] ?? 60
   const allowedTimes  = HORIZON_FILTER[horizon]
 
-  // Horizon + sektör filtresi
-  const candidatePool = Object.values(ACTIONS).filter(a => {
+  // Horizon + sektör filtresi (eşik: 0.2; sıfır aksiyon kalırsa 0.1'e düşer)
+  let candidatePool = Object.values(ACTIONS).filter(a => {
     if (!allowedTimes.includes(a.timeHorizon)) return false
-    const feasibility = a.sectorFeasibility[sector] ?? 0.5
-    return feasibility >= 0.3
+    return (a.sectorFeasibility[sector] ?? 0.5) >= 0.2
   })
+  if (candidatePool.length === 0) {
+    candidatePool = Object.values(ACTIONS).filter(a => {
+      if (!allowedTimes.includes(a.timeHorizon)) return false
+      return (a.sectorFeasibility[sector] ?? 0.5) >= 0.1
+    })
+  }
 
   let currentSheet: BalanceSheet = { ...sheet }
   let currentScoreValue          = currentScore

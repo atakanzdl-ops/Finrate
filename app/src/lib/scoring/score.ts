@@ -75,14 +75,14 @@ const HYBRID_ABS_HEAVY = { abs: 0.70, bm: 0.30 } as const
  *   Gerçekten istisnai                                → ≥ 88             → AAA
  */
 export const RATING_BANDS = [
-  { min: 92, label: 'AAA' },
+  { min: 93, label: 'AAA' },
   { min: 84, label: 'AA'  },
   { min: 76, label: 'A'   },
   { min: 68, label: 'BBB' },
   { min: 60, label: 'BB'  },
-  { min: 54, label: 'B'   },
-  { min: 50, label: 'CCC' },
-  { min: 42, label: 'CC'  },
+  { min: 52, label: 'B'   },
+  { min: 44, label: 'CCC' },
+  { min: 36, label: 'CC'  },
   { min: 30, label: 'C'   },
   { min: 0,  label: 'D'   },
 ]
