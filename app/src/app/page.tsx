@@ -229,7 +229,7 @@ export default function Page() {
               </ul>
             </div>
             <div className="footer-col">
-              <h4>Hukuki</h4>
+              <h4>Yasal Metinler</h4>
               <ul>
                 <li><Link href="/yasal#sorumluluk">Sorumluluk Reddi</Link></li>
                 <li><Link href="/yasal#kvkk">KVKK Aydınlatma</Link></li>
