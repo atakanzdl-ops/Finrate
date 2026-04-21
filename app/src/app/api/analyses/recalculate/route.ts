@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
           activityScore:      score.activityScore,
-          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null }),
+          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null, __insufficientCategories: score.insufficientCategories }),
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),
         },

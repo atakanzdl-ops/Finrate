@@ -37,6 +37,7 @@ interface Analysis {
   liquidityScore: number; profitabilityScore: number
   leverageScore: number; activityScore: number
   overallCoverage?: number | null
+  insufficientCategories?: string[]
   ratios: Record<string, number | null>
   entity?: { id: string; name: string; sector?: string | null }
   financialData?: FinData
@@ -329,6 +330,28 @@ function DonutSegChart({ title, totalLabel, segments, displayTotal }: {
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ─── InsufficientBanner ─────────────────────────── */
+function InsufficientBanner({ categories }: { categories?: string[] }) {
+  if (!categories || categories.length === 0) return null
+  const labels: Record<string, string> = {
+    likidite: 'Likidite', karlılık: 'Karlılık', borçluluk: 'Borçluluk', faaliyet: 'Faaliyet',
+  }
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+      background: 'rgba(234,88,12,0.08)',
+      border: '1px solid rgba(234,88,12,0.35)',
+    }}>
+      <span style={{ fontSize: 16, lineHeight: 1.4 }}>⚠️</span>
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#9a3412' }}>
+        Bazı rasyolar hesaplanamadı — skor güvenilirliği düşük.{' '}
+        Yetersiz veri kategorisi: <strong>{categories.map(c => labels[c] ?? c).join(', ')}</strong>.
+      </p>
     </div>
   )
 }
@@ -1068,6 +1091,7 @@ function AnalizPageContent() {
 
                     </div>{/* /content-grid */}
 
+                    <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
 
                     {/* ── Row 3: Aktif & Pasif Dağılımı ──────────────── */}
@@ -1114,6 +1138,7 @@ function AnalizPageContent() {
                 {/* ── RASYOLAR ────────────────── */}
                 {activeTab === 'ratios' && (
                   <div className="card" style={{ overflow: 'visible' }}>
+                    <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
                     {/* Başlık */}
                     <div className="card-head">

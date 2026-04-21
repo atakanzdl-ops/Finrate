@@ -37,12 +37,14 @@ export interface CategoryScores {
 export interface ScoringResult extends CategoryScores {
   finalScore:  number
   finalRating: string
-  // Coverage (0–1): eksik veri kalitesi — UI'a henüz gösterilmiyor
+  // Coverage (0–1): eksik veri kalitesi
   liquidityCoverage?:     number
   profitabilityCoverage?: number
   leverageCoverage?:      number
   activityCoverage?:      number
   overallCoverage?:       number
+  // Coverage < 0.5 olan kategoriler — UI'da "Veri yetersiz" gösterilir
+  insufficientCategories: string[]
 }
 
 // ─── HİBRİT AĞIRLIK KONFİGÜRASYONU ──────────────────────────────────────
@@ -179,23 +181,21 @@ function hybridMetricScore(
  * Ağırlıklı ortalama — null metrikleri atlayarak coverage hesaplar.
  *
  * Coverage: mevcut metrik ağırlık toplamı / tüm metrik ağırlık toplamı
- * Coverage < 0.5 → skor 50'ye doğru çekilir (tek metrik hakimiyeti engeli).
- *   penalty = max(0, 0.5 - coverage) × 2
- *   adjustedScore = rawScore × (1 - penalty) + 50 × penalty
+ * Coverage < 0.5 → yetersiz veri; skor üretilmez (50 döner), insufficient: true.
+ * Coverage >= 0.5 → sadece mevcut metriklerin ağırlıklı ortalaması alınır.
  */
-function weightedAvgCov(items: [number | null, number][]): { score: number; coverage: number } {
+function weightedAvgCov(items: [number | null, number][]): { score: number; coverage: number; insufficient: boolean } {
   const valid = items.filter((x): x is [number, number] => x[0] != null)
-  if (!valid.length) return { score: 50, coverage: 0 }
+  if (!valid.length) return { score: 50, coverage: 0, insufficient: true }
 
   const totalWeightAll   = items.reduce((s, [, w]) => s + w, 0)
   const totalWeightValid = valid.reduce((s, [, w]) => s + w, 0)
   const coverage = totalWeightAll > 0 ? totalWeightValid / totalWeightAll : 0
 
-  const rawScore = valid.reduce((s, [v, w]) => s + v * w, 0) / totalWeightValid
-  const penalty  = Math.max(0, 0.5 - coverage) * 2
-  const score    = rawScore * (1 - penalty) + 50 * penalty
+  if (coverage < 0.5) return { score: 50, coverage, insufficient: true }
 
-  return { score, coverage }
+  const rawScore = valid.reduce((s, [v, w]) => s + v * w, 0) / totalWeightValid
+  return { score: rawScore, coverage, insufficient: false }
 }
 
 function clamp(v: number): number {
@@ -205,7 +205,7 @@ function clamp(v: number): number {
 // ─── LİKİDİTE ─────────────────────────────────────────────────────────────
 // Sektöre bağımlı metrikler (BM_HEAVY): cari, hızlı, nakit oran
 // Mutlak bazlı: NÇS/Aktif, NDS (benchmark yok)
-function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
+function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
   return weightedAvgCov([
     // Cari Oran — sektöre göre yorumlanır (BM_HEAVY)
     [hybridMetricScore(r.currentRatio,
@@ -242,7 +242,7 @@ function calcLiquidity(r: RatioResult, bm: SectorBenchmark | null): { score: num
 // ─── KARLILIK ─────────────────────────────────────────────────────────────
 // FAVÖK, net kar, ROA, ROE → sektöre bağımlı (BM_HEAVY), ama mutlak sıfır eşiği kritik
 // Brüt kar, FVÖK, ROIC → dengeli (DEFAULT)
-function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
+function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
   // Büyüme: en iyi mevcut metriği seç
   const growthScore = r.realGrowth != null
     ? linearScore(r.realGrowth,    -0.20, 0.20, false, 0.08)
@@ -300,7 +300,7 @@ function calcProfitability(r: RatioResult, bm: SectorBenchmark | null): { score:
 // ─── KALDIRAC ─────────────────────────────────────────────────────────────
 // D/E, D/A, faiz karşılama → sektörden bağımsız (ABS_HEAVY)
 // Özkaynak oranı → dengeli
-function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
+function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
   const items: [number | null, number][] = [
     // Borç / Özkaynak — ABS_HEAVY (sektörden bağımsız risk kriteri)
     [hybridMetricScore(r.debtToEquity,
@@ -357,7 +357,7 @@ function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: numb
 // ─── FAALİYET ─────────────────────────────────────────────────────────────
 // DSO, DIO, aktif devir, faaliyet gideri oranı → sektöre bağımlı (BM_HEAVY)
 // Duran varlık devir, DPO → dengeli (benchmark eksik veya sektör bağımsız)
-function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number } {
+function calcActivity(r: RatioResult, bm: SectorBenchmark | null): { score: number; coverage: number; insufficient: boolean } {
   return weightedAvgCov([
     // Aktif Devir Hızı — sektöre bağımlı
     [hybridMetricScore(r.assetTurnover,
@@ -478,6 +478,12 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
 
   const rating = scoreToRating(final)
 
+  const insufficientCategories: string[] = []
+  if (liqResult.insufficient)  insufficientCategories.push('likidite')
+  if (profResult.insufficient) insufficientCategories.push('karlılık')
+  if (levResult.insufficient)  insufficientCategories.push('borçluluk')
+  if (actResult.insufficient)  insufficientCategories.push('faaliyet')
+
   return {
     liquidityScore:        Math.round(liq  * 100) / 100,
     profitabilityScore:    Math.round(prof * 100) / 100,
@@ -490,5 +496,6 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
     leverageCoverage:      Math.round(levResult.coverage  * 100) / 100,
     activityCoverage:      Math.round(actResult.coverage  * 100) / 100,
     overallCoverage:       Math.round(overallCoverage * 100) / 100,
+    insufficientCategories,
   }
 }
