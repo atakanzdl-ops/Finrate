@@ -44,9 +44,11 @@ export interface ScenarioResult {
 
 // ─── SABİTLER ─────────────────────────────────────────────────────────────────
 
-/** Hedef not → minimum skor eşiği */
-const GRADE_TARGET_SCORE: Record<string, number> = {
-  AAA: 93, AA: 84, A: 76, BBB: 68, BB: 60, B: 52, CCC: 44, CC: 36, C: 30,
+/** Hedef not → minimum skor eşiği (küçükten büyüğe) */
+const GRADE_SCORES: Record<string, number> = {
+  D: 0, C: 30, CC: 36, CCC: 44,
+  B: 52, BB: 60, BBB: 68,
+  A: 76, AA: 84, AAA: 93,
 }
 
 /** Senaryo açıklama etiketleri */
@@ -113,7 +115,7 @@ function runSingleScenario(
   targetGrade:  string,
   currentScore: number,
 ): ScenarioResult {
-  const targetScore   = GRADE_TARGET_SCORE[targetGrade] ?? 60
+  const targetScore   = GRADE_SCORES[targetGrade] ?? 60
   const allowedTimes  = HORIZON_FILTER[horizon]
 
   // Horizon + sektör filtresi
@@ -194,7 +196,7 @@ function runSingleScenario(
     gradeBefore:     scoreToRating(currentScore),
     gradeAfter:      scoreToRating(currentScoreValue),
     totalTLMovement: selectedActions.reduce((s, a) => s + a.amountTL, 0),
-    goalReached:     currentScoreValue >= (GRADE_TARGET_SCORE[targetGrade] ?? 60),
+    goalReached:     currentScoreValue >= (GRADE_SCORES[targetGrade] ?? 60),
   }
 }
 
@@ -214,6 +216,16 @@ export function runScenarios(
   currentScore: number,
   targetGrade:  string,
 ): ScenarioResult[] {
+  const targetScore = GRADE_SCORES[targetGrade]
+
+  // Hedef not bilinmiyorsa veya mevcut skordan düşük/eşitse hata fırlat
+  if (targetScore === undefined) {
+    throw new Error(`Geçersiz hedef not: ${targetGrade}`)
+  }
+  if (targetScore <= currentScore) {
+    throw new Error('Hedef not mevcut nottan yüksek olmalı')
+  }
+
   const horizons: TimeHorizon[] = ['short', 'medium', 'long']
   return horizons.map(h =>
     runSingleScenario(sheet, sector, h, targetGrade, currentScore),
@@ -227,5 +239,5 @@ export function runScenarios(
  * Örn: getTargetScore("BBB") → 68
  */
 export function getTargetScore(grade: string): number {
-  return GRADE_TARGET_SCORE[grade] ?? 60
+  return GRADE_SCORES[grade] ?? 60
 }
