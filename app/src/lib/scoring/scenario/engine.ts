@@ -6,6 +6,8 @@ import { DEFAULT_THRESHOLDS } from './contracts'
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
+import { calculateRatiosFromAccounts } from '../ratios'
+import { calculateScore, scoreToRating } from '../score'
 
 export interface ScenarioHorizon {
   key: 'short' | 'medium' | 'long'
@@ -158,7 +160,7 @@ function buildScenario(
 ): ScenarioOutput {
   let currentAnalysis = analysis
   let scoreNow = currentScore
-  const gradeNow = currentGrade
+  let gradeNow = currentGrade
   let totalTL = 0
   const chosenActions: ActionEffect[] = []
 
@@ -216,11 +218,19 @@ function buildScenario(
       }
     )
 
-    // Skor güncelle
-    // Burada gerçek score.ts kullanılması gerekiyor — şimdilik priority score'un %10'unu ekle
-    // TODO: entegrasyon aşamasında calculateScore ile değiştir
-    const scoreIncrement = best.effect.scoreBreakdown.finalPriorityScore * 0.10
-    scoreNow = Math.min(100, scoreNow + scoreIncrement + subjectiveBonus * 0)
+    // Gerçek skor hesaplama — güncel bilanço state'inden
+    const updatedAccountsForScore = currentAnalysis.accounts.map(a => ({
+      accountCode: a.accountCode,
+      amount: a.amount,
+    }))
+
+    const newRatios = calculateRatiosFromAccounts(updatedAccountsForScore)
+    const newScoreResult = calculateScore(newRatios, sector)
+
+    // Subjektif bonus korunur — sadece finansal skor değişir
+    const newFinancialScore = newScoreResult.finalScore
+    scoreNow = Math.min(100, newFinancialScore + subjectiveBonus)
+    gradeNow = scoreToRating(scoreNow)
 
     chosenActions.push(best.effect)
     totalTL += best.effect.amountApplied
