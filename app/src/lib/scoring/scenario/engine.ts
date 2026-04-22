@@ -87,41 +87,74 @@ export interface ScenarioOutput {
 export interface EmergencyAssessment {
   required: boolean
   signals: string[]
+  skippedSignals: string[]  // Veri yetersizliği nedeniyle değerlendirilemeyen sinyaller
 }
 
 export function assessEmergencyNeed(analysis: SixGroupAnalysis): EmergencyAssessment {
   const signals: string[] = []
+  const skippedSignals: string[] = []
 
-  const currentRatio = analysis.ratios.CURRENT_RATIO?.value ?? 0
-  const cashRatio = analysis.ratios.CASH_RATIO?.value ?? 0
-  const interestCoverage = analysis.ratios.INTEREST_COVERAGE?.value ?? 0
+  const currentRatio = analysis.ratios.CURRENT_RATIO?.value
+  const cashRatio = analysis.ratios.CASH_RATIO?.value
+  const interestCoverage = analysis.ratios.INTEREST_COVERAGE?.value
 
   // Sinyal 1: Cari oran < 1.0
-  if (currentRatio > 0 && currentRatio < 1.0) {
-    signals.push(`Cari oran kritik seviyede: ${currentRatio.toFixed(2)} (< 1.0)`)
+  if (currentRatio !== undefined && currentRatio !== null && currentRatio > 0) {
+    if (currentRatio < 1.0) {
+      signals.push(`Cari oran kritik seviyede: ${currentRatio.toFixed(2)} (< 1.0)`)
+    }
+  } else {
+    skippedSignals.push('Cari oran verisi yok')
   }
 
   // Sinyal 2: Faiz karşılama oranı < 1.5
-  if (interestCoverage !== 0 && interestCoverage < 1.5) {
-    signals.push(`Faiz karşılama yetersiz: ${interestCoverage.toFixed(2)}x (< 1.5x)`)
+  // Faiz gideri yoksa (660/661 = 0) faiz karşılama hesaplanamaz — bu durumda sinyal tetiklenmesin
+  const hasInterestExpense = analysis.accounts.some(a =>
+    (a.accountCode.startsWith('660') || a.accountCode.startsWith('661')) &&
+    a.amount !== 0
+  )
+
+  if (hasInterestExpense && interestCoverage !== undefined && interestCoverage !== null) {
+    if (interestCoverage > 0 && interestCoverage < 1.5) {
+      signals.push(`Faiz karşılama yetersiz: ${interestCoverage.toFixed(2)}x (< 1.5x)`)
+    }
+  } else if (!hasInterestExpense) {
+    skippedSignals.push('Faiz gideri yok — faiz karşılama değerlendirilmedi')
+  } else {
+    skippedSignals.push('Faiz karşılama verisi yok')
   }
 
-  // Sinyal 3: Nakit oranı çok düşük (0.05'ten küçük)
-  if (cashRatio >= 0 && cashRatio < 0.05) {
-    signals.push(`Nakit oranı düşük: ${cashRatio.toFixed(2)} (< 0.05)`)
+  // Sinyal 3: Nakit oranı — VERİ KONTROLÜ
+  // Hazır değerler hesapları (100, 101, 102, 108) FinancialAccount'ta var mı?
+  const hasCashAccountData = analysis.accounts.some(a =>
+    ['100', '101', '102', '108'].includes(a.accountCode) && a.amount !== 0
+  )
+
+  if (hasCashAccountData && cashRatio !== undefined && cashRatio !== null) {
+    if (cashRatio >= 0 && cashRatio < 0.05) {
+      signals.push(`Nakit oranı düşük: ${cashRatio.toFixed(2)} (< 0.05)`)
+    }
+  } else {
+    skippedSignals.push('Hazır değerler verisi eksik — nakit oranı değerlendirilmedi')
   }
 
   // Sinyal 4: KVYK > Dönen Varlıklar (net işletme sermayesi negatif)
   const kvyk = analysis.groups.SHORT_TERM_LIABILITIES.total
   const donenVarliklar = analysis.groups.CURRENT_ASSETS.total
-  if (kvyk > donenVarliklar && donenVarliklar > 0) {
-    const pct = ((kvyk - donenVarliklar) / donenVarliklar * 100).toFixed(0)
-    signals.push(`KVYK dönen varlıkları %${pct} aşıyor (net işletme sermayesi negatif)`)
+
+  if (kvyk > 0 && donenVarliklar > 0) {
+    if (kvyk > donenVarliklar) {
+      const pct = ((kvyk - donenVarliklar) / donenVarliklar * 100).toFixed(0)
+      signals.push(`KVYK dönen varlıkları %${pct} aşıyor (net işletme sermayesi negatif)`)
+    }
+  } else {
+    skippedSignals.push('KVYK veya Dönen Varlık verisi yok')
   }
 
   return {
     required: signals.length > 0,
     signals,
+    skippedSignals,
   }
 }
 
