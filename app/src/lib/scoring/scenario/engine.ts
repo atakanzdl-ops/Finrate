@@ -74,6 +74,55 @@ export interface ScenarioOutput {
   totalTLMovement: number
   goalReached: boolean
   targetGrade: string
+  // Aşama 5a-2: horizon atlandıysa true
+  skipped?: boolean
+  skipReason?: string
+  watchlist?: string[]
+}
+
+/**
+ * Codex önerisine göre — acil müdahale gerekli mi?
+ * Aşağıdaki sinyallerden en az biri varsa Acil horizon aktif olur.
+ */
+export interface EmergencyAssessment {
+  required: boolean
+  signals: string[]
+}
+
+export function assessEmergencyNeed(analysis: SixGroupAnalysis): EmergencyAssessment {
+  const signals: string[] = []
+
+  const currentRatio = analysis.ratios.CURRENT_RATIO?.value ?? 0
+  const cashRatio = analysis.ratios.CASH_RATIO?.value ?? 0
+  const interestCoverage = analysis.ratios.INTEREST_COVERAGE?.value ?? 0
+
+  // Sinyal 1: Cari oran < 1.0
+  if (currentRatio > 0 && currentRatio < 1.0) {
+    signals.push(`Cari oran kritik seviyede: ${currentRatio.toFixed(2)} (< 1.0)`)
+  }
+
+  // Sinyal 2: Faiz karşılama oranı < 1.5
+  if (interestCoverage !== 0 && interestCoverage < 1.5) {
+    signals.push(`Faiz karşılama yetersiz: ${interestCoverage.toFixed(2)}x (< 1.5x)`)
+  }
+
+  // Sinyal 3: Nakit oranı çok düşük (0.05'ten küçük)
+  if (cashRatio >= 0 && cashRatio < 0.05) {
+    signals.push(`Nakit oranı düşük: ${cashRatio.toFixed(2)} (< 0.05)`)
+  }
+
+  // Sinyal 4: KVYK > Dönen Varlıklar (net işletme sermayesi negatif)
+  const kvyk = analysis.groups.SHORT_TERM_LIABILITIES.total
+  const donenVarliklar = analysis.groups.CURRENT_ASSETS.total
+  if (kvyk > donenVarliklar && donenVarliklar > 0) {
+    const pct = ((kvyk - donenVarliklar) / donenVarliklar * 100).toFixed(0)
+    signals.push(`KVYK dönen varlıkları %${pct} aşıyor (net işletme sermayesi negatif)`)
+  }
+
+  return {
+    required: signals.length > 0,
+    signals,
+  }
 }
 
 export interface EngineResult {
@@ -82,6 +131,7 @@ export interface EngineResult {
   currentScore: number
   currentGrade: string
   sector: string
+  emergencyAssessment: EmergencyAssessment
 }
 
 /**
@@ -280,8 +330,33 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     ratios: input.currentRatios as Parameters<typeof buildSixGroupAnalysis>[1]['ratios'],
   })
 
-  const scenarios: ScenarioOutput[] = HORIZONS.map(horizon =>
-    buildScenario(
+  const emergency = assessEmergencyNeed(analysis)
+
+  const scenarios: ScenarioOutput[] = HORIZONS.map(horizon => {
+    // Kısa horizon sadece acil durum varsa çalışsın
+    if (horizon.key === 'short' && !emergency.required) {
+      return {
+        horizon: 'short',
+        horizonLabel: horizon.label,
+        actions: [],
+        scoreBefore: input.currentScore,
+        scoreAfter: input.currentScore,
+        gradeBefore: input.currentGrade,
+        gradeAfter: input.currentGrade,
+        totalTLMovement: 0,
+        goalReached: false,
+        targetGrade: input.targetGrade,
+        skipped: true,
+        skipReason: 'Firmada likidite stresi sinyali yok — acil müdahale gerekmiyor',
+        watchlist: [
+          'Cari oran takibi — 1.2 altına düşerse tedbir alın',
+          'Nakit pozisyonu — 30 günlük ödeme yükümlülüklerini karşılamalı',
+          'Faiz karşılama oranı — 2.0x altına inerse finansal yük değerlendirilmeli',
+        ],
+      }
+    }
+
+    return buildScenario(
       analysis,
       horizon,
       input.sector,
@@ -293,7 +368,7 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
       maxActions,
       thresholds
     )
-  )
+  })
 
   return {
     analysis,
@@ -301,5 +376,6 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     currentScore: input.currentScore,
     currentGrade: input.currentGrade,
     sector: input.sector,
+    emergencyAssessment: emergency,
   }
 }
