@@ -9,6 +9,7 @@
  */
 
 import type { BalanceSheet } from './mutation'
+import type { AccountBalanceSheet, AccountMutation } from './simulator'
 
 // ─── TİPLER ──────────────────────────────────────────────────────────────────
 
@@ -546,3 +547,519 @@ export function getFeasibleActions(sector: string): Action[] {
 export function getAction(id: ActionId): Action {
   return ACTIONS[id]
 }
+
+// ─── HESAP KODU BAZLI AKSİYON TİPİ ──────────────────────────────────────────
+
+export interface AccountAction {
+  id:          ActionId
+  label:       string
+  description: string
+  timeHorizon: TimeHorizon
+  difficulty:  Difficulty
+  /** TDHP hesap kodu bazlı mutasyon (delta operasyonları) */
+  mutate:      (sheet: AccountBalanceSheet, amount: number) => AccountMutation
+  /** Bilançodan min/max/suggested TL aralığını hesaplar */
+  calcRange:   (sheet: AccountBalanceSheet) => { min: number; max: number; suggested: number }
+  /** Sektör yapılabilirlik katsayısı — 0.2 altı havuzdan çıkar */
+  sectorFeasibility: Record<string, number>
+  /** Firma bakiyelerinden türetilmiş somut uygulama notu */
+  howTo:       (sheet: AccountBalanceSheet, amount: number) => string
+}
+
+// ─── HESAP KODU YARDIMCILARI ──────────────────────────────────────────────────
+
+const getAccount = (sheet: AccountBalanceSheet, code: string): number =>
+  sheet.accounts.get(code) ?? 0
+
+const sumAccounts = (sheet: AccountBalanceSheet, codes: string[]): number =>
+  codes.reduce((sum, code) => sum + getAccount(sheet, code), 0)
+
+function pctRangeAcc(
+  base: number,
+  minPct: number,
+  maxPct: number,
+  sugPct: number,
+): { min: number; max: number; suggested: number } {
+  const b = Math.max(0, base)
+  if (b === 0) return { min: 0, max: 0, suggested: 0 }
+  return {
+    min:       Math.round(b * minPct),
+    max:       Math.round(b * maxPct),
+    suggested: Math.round(b * sugPct),
+  }
+}
+
+// ─── HESAP KODU BAZLI AKSİYON KATALOĞU ──────────────────────────────────────
+
+export const ACCOUNT_ACTIONS: Record<ActionId, AccountAction> = {
+
+  // ── 1. KV BORCU UV'YE ÇEVİR ─────────────────────────────────────────────────
+  kv_to_uv: {
+    id:          'kv_to_uv',
+    label:       ACTIONS.kv_to_uv.label,
+    description: ACTIONS.kv_to_uv.description,
+    timeHorizon: ACTIONS.kv_to_uv.timeHorizon,
+    difficulty:  ACTIONS.kv_to_uv.difficulty,
+    sectorFeasibility: ACTIONS.kv_to_uv.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'kv_to_uv',
+      operations: [
+        { code: '300', delta: -amount },   // KV Banka Kredileri azalır
+        { code: '400', delta: +amount },   // UV Banka Kredileri artar
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const kvDebt = sumAccounts(sheet, ['300','301','303','304','305','306','309'])
+      return pctRangeAcc(kvDebt, 0.10, 0.60, 0.30)
+    },
+
+    howTo: (sheet, amount) => {
+      const kvDebt = sumAccounts(sheet, ['300','301','303','304','305','306','309'])
+      return `Kısa vadeli finansal borcunuz ${formatTL(kvDebt)}. `
+        + `Bunun ${formatTL(amount)}'sini uzun vadeye çevirirseniz cari oran iyileşir, `
+        + `kısa vadeli yükümlülükleriniz hafifler. Bankanızla yeniden yapılandırma müzakeresi başlatın.`
+    },
+  },
+
+  // ── 2. VADESİ GEÇMİŞ ALACAK TAHSİL ET ──────────────────────────────────────
+  collect_receivables: {
+    id:          'collect_receivables',
+    label:       ACTIONS.collect_receivables.label,
+    description: ACTIONS.collect_receivables.description,
+    timeHorizon: ACTIONS.collect_receivables.timeHorizon,
+    difficulty:  ACTIONS.collect_receivables.difficulty,
+    sectorFeasibility: ACTIONS.collect_receivables.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'collect_receivables',
+      operations: [
+        { code: '120', delta: -amount },   // Ticari Alacaklar azalır
+        { code: '102', delta: +amount },   // Bankalar (nakit) artar
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const receivables = sumAccounts(sheet, ['120','121','126','127','128'])
+      return pctRangeAcc(receivables, 0.10, 0.50, 0.25)
+    },
+
+    howTo: (sheet, amount) => {
+      const receivables = sumAccounts(sheet, ['120','121','126','127','128'])
+      return `Ticari alacak bakiyeniz ${formatTL(receivables)}. `
+        + `${formatTL(amount)} tahsil edilirse kasanız bu kadar güçlenir, DSO düşer. `
+        + `90+ gün gecikmiş alacaklara ihtar gönderin; erken ödeme için %2–3 iskonto teklif edin.`
+    },
+  },
+
+  // ── 3. ATIL STOK ERİT ────────────────────────────────────────────────────────
+  liquidate_inventory: {
+    id:          'liquidate_inventory',
+    label:       ACTIONS.liquidate_inventory.label,
+    description: ACTIONS.liquidate_inventory.description,
+    timeHorizon: ACTIONS.liquidate_inventory.timeHorizon,
+    difficulty:  ACTIONS.liquidate_inventory.difficulty,
+    sectorFeasibility: ACTIONS.liquidate_inventory.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'liquidate_inventory',
+      operations: [
+        { code: '153', delta: -amount },   // Ticari Mallar stoku azalır
+        { code: '102', delta: +amount },   // Nakit artar (maliyetinde satış)
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const inventory = sumAccounts(sheet, ['150','151','152','153','157'])
+      return pctRangeAcc(inventory, 0.05, 0.30, 0.15)
+    },
+
+    howTo: (sheet, amount) => {
+      const inventory = sumAccounts(sheet, ['150','151','152','153','157'])
+      return `Stok bakiyeniz ${formatTL(inventory)}. `
+        + `${formatTL(amount)}'lik hareketsiz stok maliyetinde satılırsa kasanız güçlenir, nakit döngüsü hızlanır. `
+        + `En az 6 aydır hareket görmeyen kalemleri belirleyip indirimli satışa açın.`
+    },
+  },
+
+  // ── 4. FAZLA NAKİTLE KV BORÇ ÖDE ─────────────────────────────────────────────
+  repay_kv_debt: {
+    id:          'repay_kv_debt',
+    label:       ACTIONS.repay_kv_debt.label,
+    description: ACTIONS.repay_kv_debt.description,
+    timeHorizon: ACTIONS.repay_kv_debt.timeHorizon,
+    difficulty:  ACTIONS.repay_kv_debt.difficulty,
+    sectorFeasibility: ACTIONS.repay_kv_debt.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'repay_kv_debt',
+      operations: [
+        { code: '102', delta: -amount },   // Nakit azalır
+        { code: '300', delta: -amount },   // KV Banka Kredileri azalır
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const cash   = getAccount(sheet, '102')
+      const kvDebt = sumAccounts(sheet, ['300','301'])
+      return pctRangeAcc(Math.min(cash, kvDebt), 0.10, 0.50, 0.25)
+    },
+
+    howTo: (sheet, amount) => {
+      const cash   = getAccount(sheet, '102')
+      const kvDebt = sumAccounts(sheet, ['300','301','303','304'])
+      return `Kasanız ${formatTL(cash)}, kısa vadeli finansal borcunuz ${formatTL(kvDebt)}. `
+        + `${formatTL(amount)} ile KV kredi erken kapatılırsa kaldıraç ve faiz yükü azalır. `
+        + `Kapatma işlemi öncesi bankayla erken kapama maliyetini sorgulayın.`
+    },
+  },
+
+  // ── 5. FAALİYET GİDERİ AZALT ─────────────────────────────────────────────────
+  reduce_opex: {
+    id:          'reduce_opex',
+    label:       ACTIONS.reduce_opex.label,
+    description: ACTIONS.reduce_opex.description,
+    timeHorizon: ACTIONS.reduce_opex.timeHorizon,
+    difficulty:  ACTIONS.reduce_opex.difficulty,
+    sectorFeasibility: ACTIONS.reduce_opex.sectorFeasibility,
+
+    mutate: (sheet, amount) => {
+      const netProfit = getAccount(sheet, '590') - getAccount(sheet, '591')
+      const taxFactor = netProfit > 0 ? 0.75 : 1.0
+      return {
+        actionId: 'reduce_opex',
+        operations: [
+          { code: '632', delta: -amount },             // Genel Yönetim Giderleri azalır
+          { code: '590', delta: +(amount * taxFactor) }, // Net kâr artar
+        ],
+      }
+    },
+
+    calcRange: (sheet) => {
+      const opex = sumAccounts(sheet, ['630','631','632'])
+      return pctRangeAcc(opex, 0.03, 0.15, 0.08)
+    },
+
+    howTo: (sheet, amount) => {
+      const opex = sumAccounts(sheet, ['630','631','632'])
+      return `Faaliyet giderleriniz ${formatTL(opex)}. `
+        + `${formatTL(amount)} kısılırsa net kâra yaklaşık ${formatTL(amount * 0.75)} yansır. `
+        + `Genel yönetim, pazarlama ve idari gider kalemlerini tek tek gözden geçirin; `
+        + `ertelenebilir veya dışarıdan alınan hizmet maliyetlerini hedefleyin.`
+    },
+  },
+
+  // ── 6. BRÜT MARJ İYİLEŞTİR ───────────────────────────────────────────────────
+  improve_margin: {
+    id:          'improve_margin',
+    label:       ACTIONS.improve_margin.label,
+    description: ACTIONS.improve_margin.description,
+    timeHorizon: ACTIONS.improve_margin.timeHorizon,
+    difficulty:  ACTIONS.improve_margin.difficulty,
+    sectorFeasibility: ACTIONS.improve_margin.sectorFeasibility,
+
+    mutate: (sheet, amount) => {
+      const netProfit = getAccount(sheet, '590') - getAccount(sheet, '591')
+      const taxFactor = netProfit > 0 ? 0.75 : 1.0
+      return {
+        actionId: 'improve_margin',
+        operations: [
+          { code: '621', delta: -amount },             // Satılan Ticari Mal Maliyeti azalır
+          { code: '590', delta: +(amount * taxFactor) }, // Net kâr artar
+        ],
+      }
+    },
+
+    calcRange: (sheet) => {
+      const cogs = sumAccounts(sheet, ['620','621','622','623'])
+      return pctRangeAcc(cogs, 0.02, 0.10, 0.05)
+    },
+
+    howTo: (sheet, amount) => {
+      const revenue    = sumAccounts(sheet, ['600','601','602'])
+      const cogs       = sumAccounts(sheet, ['620','621','622','623'])
+      const grossProfit = revenue - cogs
+      if (grossProfit < 0) {
+        return `Satışların maliyetiniz ${formatTL(cogs)}, geliriniz ${formatTL(revenue)} — `
+          + `brüt zarar ${formatTL(-grossProfit)}. `
+          + `${formatTL(amount)} maliyet düşüşü sağlanırsa brüt zarar ${formatTL(-grossProfit - amount)}'e iner. `
+          + `Maliyet kalemlerinizi inceleyin: işçilik, hammadde, taşeron giderleri.`
+      }
+      return `Satışların maliyetiniz ${formatTL(cogs)}, geliriniz ${formatTL(revenue)}. `
+        + `${formatTL(amount)} maliyet düşüşü brüt kârınızı ${formatTL(grossProfit + amount)}'e yükseltir. `
+        + `Tedarikçi fiyat müzakeresi, toplu alım indirimi veya süreç verimliliği öncelikli hedef olmalı.`
+    },
+  },
+
+  // ── 7. REFİNANSE ET ───────────────────────────────────────────────────────────
+  refinance: {
+    id:          'refinance',
+    label:       ACTIONS.refinance.label,
+    description: ACTIONS.refinance.description,
+    timeHorizon: ACTIONS.refinance.timeHorizon,
+    difficulty:  ACTIONS.refinance.difficulty,
+    sectorFeasibility: ACTIONS.refinance.sectorFeasibility,
+
+    mutate: (sheet, amount) => {
+      const netProfit = getAccount(sheet, '590') - getAccount(sheet, '591')
+      const taxFactor = netProfit > 0 ? 0.75 : 1.0
+      return {
+        actionId: 'refinance',
+        operations: [
+          { code: '660', delta: -amount },             // Faiz gideri azalır
+          { code: '590', delta: +(amount * taxFactor) }, // Net kâr artar (anapara değişmez)
+        ],
+      }
+    },
+
+    calcRange: (sheet) => {
+      const totalDebt = sumAccounts(sheet, ['300','301','400','401'])
+      const suggested = Math.round(totalDebt * 0.20 * 0.14)
+      const min       = Math.round(totalDebt * 0.10 * 0.14)
+      const max       = Math.round(totalDebt * 0.50 * 0.14)
+      return { min, max, suggested }
+    },
+
+    howTo: (sheet, amount) => {
+      const totalDebt   = sumAccounts(sheet, ['300','301','400','401'])
+      const interestExp = getAccount(sheet, '660')
+      return `Toplam finansal borcunuz ${formatTL(totalDebt)}, mevcut faiz gideriniz ${formatTL(interestExp)}. `
+        + `${formatTL(amount)} yıllık faiz tasarrufu için alternatif banka teklifleri alın. `
+        + `Özellikle KV kredilerin bir kısmını daha düşük faizli UV yapıya çekmeyi hedefleyin.`
+    },
+  },
+
+  // ── 8. SERMAYE ARTIŞI ─────────────────────────────────────────────────────────
+  capital_increase: {
+    id:          'capital_increase',
+    label:       ACTIONS.capital_increase.label,
+    description: ACTIONS.capital_increase.description,
+    timeHorizon: ACTIONS.capital_increase.timeHorizon,
+    difficulty:  ACTIONS.capital_increase.difficulty,
+    sectorFeasibility: ACTIONS.capital_increase.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'capital_increase',
+      operations: [
+        { code: '102', delta: +amount },   // Nakit artar
+        { code: '500', delta: +amount },   // Ödenmiş Sermaye artar
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const equity =
+        sumAccounts(sheet, ['500','502']) - sumAccounts(sheet, ['501','503'])
+        + getAccount(sheet, '570') - getAccount(sheet, '580')
+        + getAccount(sheet, '590') - getAccount(sheet, '591')
+      return pctRangeAcc(Math.max(0, equity), 0.10, 0.50, 0.25)
+    },
+
+    howTo: (sheet, amount) => {
+      const equity =
+        sumAccounts(sheet, ['500','502']) - sumAccounts(sheet, ['501','503'])
+        + getAccount(sheet, '570') - getAccount(sheet, '580')
+        + getAccount(sheet, '590') - getAccount(sheet, '591')
+      return `Mevcut özkaynak tabanınız yaklaşık ${formatTL(equity)}. `
+        + `${formatTL(amount)} nakit sermaye girişi kasanızı ve özkaynağınızı doğrudan artırır. `
+        + `Mevcut ortakların sermaye koyması en hızlı yol; yeni yatırımcı süreci 3–6 ay alır.`
+    },
+  },
+
+  // ── 9. KÂR DAĞITIMINI DURDUR ─────────────────────────────────────────────────
+  retain_profit: {
+    id:          'retain_profit',
+    label:       ACTIONS.retain_profit.label,
+    description: ACTIONS.retain_profit.description,
+    timeHorizon: ACTIONS.retain_profit.timeHorizon,
+    difficulty:  ACTIONS.retain_profit.difficulty,
+    sectorFeasibility: ACTIONS.retain_profit.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'retain_profit',
+      operations: [
+        { code: '570', delta: +amount },   // Geçmiş Yıl Kârları artar
+        { code: '590', delta: -amount },   // Dönem Net Kârı azalır (transfer)
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const profit = getAccount(sheet, '590') - getAccount(sheet, '591')
+      if (profit <= 0) return { min: 0, max: 0, suggested: 0 }
+      return pctRangeAcc(profit, 0.50, 1.00, 0.80)
+    },
+
+    howTo: (sheet, amount) => {
+      const profit = getAccount(sheet, '590') - getAccount(sheet, '591')
+      return `Dönem net kârınız ${formatTL(profit)}. `
+        + `${formatTL(amount)} kâr dağıtılmazsa bu tutar birikmiş kârlara aktarılır, özkaynak güçlenir. `
+        + `Genel Kurul kararıyla kâr dağıtımı bu yıl ertelenebilir veya iptal edilebilir.`
+    },
+  },
+
+  // ── 10. ATIL DURAN VARLIK SAT ────────────────────────────────────────────────
+  sell_asset: {
+    id:          'sell_asset',
+    label:       ACTIONS.sell_asset.label,
+    description: ACTIONS.sell_asset.description,
+    timeHorizon: ACTIONS.sell_asset.timeHorizon,
+    difficulty:  ACTIONS.sell_asset.difficulty,
+    sectorFeasibility: ACTIONS.sell_asset.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'sell_asset',
+      operations: [
+        { code: '252', delta: -amount },   // Maddi Duran Varlık (Binalar) azalır
+        { code: '102', delta: +amount },   // Nakit artar
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const tangible = sumAccounts(sheet, ['250','251','252','253','254','255','256','258','259'])
+      return pctRangeAcc(tangible, 0.05, 0.25, 0.10)
+    },
+
+    howTo: (sheet, amount) => {
+      const tangible = sumAccounts(sheet, ['250','251','252','253','254','255','256','258','259'])
+      return `Maddi duran varlık bakiyeniz ${formatTL(tangible)}. `
+        + `${formatTL(amount)} değerinde atıl makine, araç veya gayrimenkul satışı kasanızı doğrudan güçlendirir. `
+        + `Aktif kullanım oranı düşük varlıkları tespit edin; değerleme için bağımsız ekspertiz alın.`
+    },
+  },
+
+  // ── 11. ALACAK VADESİNİ KISALT (DSO) ────────────────────────────────────────
+  shorten_dso: {
+    id:          'shorten_dso',
+    label:       ACTIONS.shorten_dso.label,
+    description: ACTIONS.shorten_dso.description,
+    timeHorizon: ACTIONS.shorten_dso.timeHorizon,
+    difficulty:  ACTIONS.shorten_dso.difficulty,
+    sectorFeasibility: ACTIONS.shorten_dso.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'shorten_dso',
+      operations: [
+        { code: '120', delta: -amount },   // Ticari Alacaklar azalır
+        { code: '102', delta: +amount },   // Nakit artar
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const receivables = sumAccounts(sheet, ['120','121'])
+      return pctRangeAcc(receivables, 0.10, 0.40, 0.20)
+    },
+
+    howTo: (sheet, amount) => {
+      const receivables = sumAccounts(sheet, ['120','121'])
+      return `Ticari alacak bakiyeniz ${formatTL(receivables)}. `
+        + `${formatTL(amount)} daha hızlı tahsil edilirse kasa bu kadar güçlenir, nakit döngüsü kısalır. `
+        + `Müşteri ödeme vadelerini kısaltın; peşin veya erken ödemeye %1–2 iskonto sunun.`
+    },
+  },
+
+  // ── 12. TEDARİKÇİ VADESİNİ UZAT (DPO) ──────────────────────────────────────
+  extend_dpo: {
+    id:          'extend_dpo',
+    label:       ACTIONS.extend_dpo.label,
+    description: ACTIONS.extend_dpo.description,
+    timeHorizon: ACTIONS.extend_dpo.timeHorizon,
+    difficulty:  ACTIONS.extend_dpo.difficulty,
+    sectorFeasibility: ACTIONS.extend_dpo.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'extend_dpo',
+      operations: [
+        { code: '320', delta: +amount },   // Ticari Borçlar artar (nakit çıkışı ertelendi)
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const payables = sumAccounts(sheet, ['320','321','326','329'])
+      return pctRangeAcc(payables, 0.05, 0.20, 0.10)
+    },
+
+    howTo: (sheet, amount) => {
+      const payables = sumAccounts(sheet, ['320','321','326','329'])
+      return `Ticari borç bakiyeniz ${formatTL(payables)}. `
+        + `${formatTL(amount)}'lik ödemeyi erteleyerek kasanızda bu tutar daha uzun kalır, nakit döngünüz iyileşir. `
+        + `Ana tedarikçilerinizle vade uzatma müzakeresine girin; karşılıklı hacim taahhüdü önerebilirsiniz.`
+    },
+  },
+
+  // ── 13. CİRO ARTIR ───────────────────────────────────────────────────────────
+  increase_revenue: {
+    id:          'increase_revenue',
+    label:       ACTIONS.increase_revenue.label,
+    description: ACTIONS.increase_revenue.description,
+    timeHorizon: ACTIONS.increase_revenue.timeHorizon,
+    difficulty:  ACTIONS.increase_revenue.difficulty,
+    sectorFeasibility: ACTIONS.increase_revenue.sectorFeasibility,
+
+    mutate: (sheet, amount) => {
+      const revenue    = sumAccounts(sheet, ['600','601','602'])
+      const cogs       = sumAccounts(sheet, ['620','621','622','623'])
+      const grossMargin = revenue > 0 ? (revenue - cogs) / revenue : 0.25
+      const netProfit   = getAccount(sheet, '590') - getAccount(sheet, '591')
+      const taxFactor   = netProfit > 0 ? 0.75 : 1.0
+      const cogsIncrease   = amount * (1 - grossMargin)
+      const profitIncrease = amount * grossMargin * taxFactor
+      const dsoIncrease    = amount * 0.164   // ~60 gün DSO
+      return {
+        actionId: 'increase_revenue',
+        operations: [
+          { code: '600', delta: +amount },           // Yurtiçi Satışlar artar
+          { code: '621', delta: +cogsIncrease },     // Satış Maliyeti artar
+          { code: '120', delta: +dsoIncrease },      // Ticari Alacaklar artar (60 gün DSO)
+          { code: '590', delta: +profitIncrease },   // Net Kâr artar
+        ],
+      }
+    },
+
+    calcRange: (sheet) => {
+      const revenue = sumAccounts(sheet, ['600','601','602'])
+      return pctRangeAcc(revenue, 0.03, 0.15, 0.08)
+    },
+
+    howTo: (sheet, amount) => {
+      const revenue     = sumAccounts(sheet, ['600','601','602'])
+      const netProfitAmt = getAccount(sheet, '590') - getAccount(sheet, '591')
+      const margin = revenue > 0 ? Math.max(0, netProfitAmt / revenue) : 0.08
+      return `Mevcut cironuz ${formatTL(revenue)}. `
+        + `${formatTL(amount)} ek gelir, mevcut net marj varsayımıyla ${formatTL(amount * margin)} net kâra dönüşür. `
+        + `Atıl kapasite için yeni müşteri veya sözleşme arayışına girin; mevcut müşterilere çapraz satış yapın.`
+    },
+  },
+
+  // ── 14. KREDİ KAPATMA ────────────────────────────────────────────────────────
+  close_credit: {
+    id:          'close_credit',
+    label:       ACTIONS.close_credit.label,
+    description: ACTIONS.close_credit.description,
+    timeHorizon: ACTIONS.close_credit.timeHorizon,
+    difficulty:  ACTIONS.close_credit.difficulty,
+    sectorFeasibility: ACTIONS.close_credit.sectorFeasibility,
+
+    mutate: (_sheet, amount) => ({
+      actionId: 'close_credit',
+      operations: [
+        { code: '102', delta: -amount },   // Nakit azalır
+        { code: '300', delta: -amount },   // KV Banka Kredileri azalır
+      ],
+    }),
+
+    calcRange: (sheet) => {
+      const cash   = getAccount(sheet, '102')
+      const kvDebt = sumAccounts(sheet, ['300','301'])
+      return pctRangeAcc(Math.min(cash, kvDebt), 0.10, 0.40, 0.20)
+    },
+
+    howTo: (sheet, amount) => {
+      const cash   = getAccount(sheet, '102')
+      const kvDebt = sumAccounts(sheet, ['300','301','303','304'])
+      return `Kasanız ${formatTL(cash)}, kısa vadeli finansal borcunuz ${formatTL(kvDebt)}. `
+        + `${formatTL(amount)} ile mevcut kredi kapatılırsa yıllık faiz yükü ve kaldıraç azalır. `
+        + `Kullanılmayan kredi limitlerini öncelikle hedefleyin; erken kapatma komisyonunu önceden sorgulayın.`
+    },
+  },
+}
+

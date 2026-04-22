@@ -12,14 +12,15 @@
  * Response: { scenarios: ScenarioResult[], currentScore: number, currentGrade: string, sector: string }
  */
 
-import { NextRequest }           from 'next/server'
-import { jsonUtf8 }              from '@/lib/http/jsonUtf8'
-import { prisma }                from '@/lib/db'
-import { getUserIdFromRequest }  from '@/lib/auth'
-import type { BalanceSheet }     from '@/lib/scoring/mutation'
-import { runScenarios }          from '@/lib/scoring/scenarioEngine'
+import { NextRequest }                   from 'next/server'
+import { jsonUtf8 }                      from '@/lib/http/jsonUtf8'
+import { prisma }                        from '@/lib/db'
+import { getUserIdFromRequest }          from '@/lib/auth'
+import type { BalanceSheet }             from '@/lib/scoring/mutation'
+import { runScenarios, runAccountScenarios } from '@/lib/scoring/scenarioEngine'
 import { calculateScore, scoreToRating } from '@/lib/scoring/score'
-import type { RatioResult }      from '@/lib/scoring/ratios'
+import type { RatioResult }              from '@/lib/scoring/ratios'
+import { accountsToBalanceSheet }        from '@/lib/scoring/simulator'
 
 // ─── Yardımcılar ─────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
       include: { financialData: true, entity: { select: { sector: true } } },
     })
 
-    if (!analysis)           return jsonUtf8({ error: 'Analiz bulunamadı.' },         { status: 404 })
+    if (!analysis)               return jsonUtf8({ error: 'Analiz bulunamadı.' },         { status: 404 })
     if (!analysis.financialData) return jsonUtf8({ error: 'Finansal veri bulunamadı.' }, { status: 422 })
 
     const fd     = analysis.financialData as unknown as Record<string, number | null>
@@ -120,10 +121,38 @@ export async function POST(req: NextRequest) {
     const subjectiveBonus = combinedScore - financialScore
     const currentScore    = combinedScore
 
-    const sheet = fdToSheet(fd)
     try {
+      // Önce FinancialAccount verisi var mı kontrol et
+      const financialAccounts = await prisma.financialAccount.findMany({
+        where: { analysisId: analysis.id },
+        select: { accountCode: true, amount: true },
+      })
+
+      if (financialAccounts.length > 0) {
+        // YENİ MOTOR — hesap kodu bazlı
+        const sheet = accountsToBalanceSheet(
+          financialAccounts.map(a => ({ accountCode: a.accountCode, amount: Number(a.amount) })),
+        )
+        const scenarios = runAccountScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
+        return jsonUtf8({
+          scenarios,
+          currentScore,
+          currentGrade: scoreToRating(currentScore),
+          sector,
+          engine: 'account',
+        })
+      }
+
+      // ESKİ MOTOR FALLBACK — aggregate BalanceSheet
+      const sheet = fdToSheet(fd)
       const scenarios = runScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
-      return jsonUtf8({ scenarios, currentScore, currentGrade: scoreToRating(currentScore), sector })
+      return jsonUtf8({
+        scenarios,
+        currentScore,
+        currentGrade: scoreToRating(currentScore),
+        sector,
+        engine: 'aggregate',
+      })
     } catch (error) {
       return jsonUtf8({ error: String(error) }, { status: 400 })
     }

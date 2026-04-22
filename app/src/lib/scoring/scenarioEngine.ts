@@ -11,7 +11,9 @@ import type { BalanceSheet } from './mutation'
 import { applyMutation }     from './mutation'
 import type { RatioResult }  from './ratios'
 import { scoreToRating }     from './score'
-import { ACTIONS, type ActionId, type Difficulty, type TimeHorizon } from './actions'
+import { ACTIONS, ACCOUNT_ACTIONS, type ActionId, type Difficulty, type TimeHorizon } from './actions'
+import type { AccountBalanceSheet } from './simulator'
+import { applyAccountMutation, balanceSheetToAccounts } from './simulator'
 
 // ─── TİPLER ──────────────────────────────────────────────────────────────────
 
@@ -239,4 +241,142 @@ export function runScenarios(
  */
 export function getTargetScore(grade: string): number {
   return GRADE_SCORES[grade] ?? 60
+}
+
+// ─── HESAP KODU BAZLI TEK SENARYO ────────────────────────────────────────────
+
+function runSingleAccountScenario(
+  sheet:           AccountBalanceSheet,
+  sector:          string,
+  horizon:         TimeHorizon,
+  targetGrade:     string,
+  currentScore:    number,
+  subjectiveBonus: number,
+): ScenarioResult {
+  const targetScore  = GRADE_SCORES[targetGrade] ?? 60
+  const allowedTimes = HORIZON_FILTER[horizon]
+
+  // Horizon + sektör filtresi
+  let candidatePool = Object.values(ACCOUNT_ACTIONS).filter(a => {
+    if (!allowedTimes.includes(a.timeHorizon)) return false
+    return (a.sectorFeasibility[sector] ?? 0.5) >= 0.2
+  })
+  if (candidatePool.length === 0) {
+    candidatePool = Object.values(ACCOUNT_ACTIONS).filter(a => {
+      if (!allowedTimes.includes(a.timeHorizon)) return false
+      return (a.sectorFeasibility[sector] ?? 0.5) >= 0.1
+    })
+  }
+
+  let currentSheet: AccountBalanceSheet = { accounts: new Map(sheet.accounts) }
+  let currentScoreValue = currentScore
+  const selectedActions: ScenarioAction[] = []
+  const usedIds = new Set<ActionId>()
+
+  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    if (currentScoreValue >= targetScore) break
+
+    let bestGain     = -Infinity
+    let bestActionId: ActionId | null = null
+    let bestAmount   = 0
+
+    for (const action of candidatePool) {
+      if (usedIds.has(action.id)) continue
+
+      const range  = action.calcRange(currentSheet)
+      const amount = range.suggested
+      if (amount <= 0) continue
+
+      const mutation    = action.mutate(currentSheet, amount)
+      const result      = applyAccountMutation(currentSheet, mutation, sector)
+      const feasibility = action.sectorFeasibility[sector] ?? 0.5
+      const gain        = result.scoreDelta * feasibility
+
+      if (gain > bestGain) {
+        bestGain     = gain
+        bestActionId = action.id
+        bestAmount   = amount
+      }
+    }
+
+    if (!bestActionId || bestGain <= 0) break
+
+    const bestAction = ACCOUNT_ACTIONS[bestActionId]
+    const mutation   = bestAction.mutate(currentSheet, bestAmount)
+    const result     = applyAccountMutation(currentSheet, mutation, sector)
+
+    selectedActions.push({
+      actionId:        bestActionId,
+      label:           bestAction.label,
+      description:     bestAction.description,
+      amountTL:        bestAmount,
+      mutationApplied: {},   // AccountMutation — aggregate BalanceSheet kullanılmıyor
+      ratioBefore:     extractKeyRatios(result.ratiosBefore),
+      ratioAfter:      extractKeyRatios(result.ratiosAfter),
+      scoreDelta:      result.scoreDelta,
+      difficulty:      bestAction.difficulty,
+      timeHorizon:     bestAction.timeHorizon,
+      howTo:           bestAction.howTo(currentSheet, bestAmount),
+    })
+
+    usedIds.add(bestActionId)
+    currentSheet      = result.after
+    currentScoreValue = result.scoreAfter.finalScore + subjectiveBonus
+  }
+
+  return {
+    horizon,
+    horizonLabel:    HORIZON_LABELS[horizon],
+    targetGrade,
+    actions:         selectedActions,
+    scoreBefore:     currentScore,
+    scoreAfter:      currentScoreValue,
+    gradeBefore:     scoreToRating(currentScore),
+    gradeAfter:      scoreToRating(currentScoreValue),
+    totalTLMovement: selectedActions.reduce((s, a) => s + a.amountTL, 0),
+    goalReached:     currentScoreValue >= (GRADE_SCORES[targetGrade] ?? 60),
+  }
+}
+
+// ─── HESAP KODU BAZLI ANA FONKSİYON ─────────────────────────────────────────
+
+/**
+ * 3 senaryo döner (short → medium → long) hesap kodu bazlı simülasyon ile.
+ *
+ * @param sheet               AccountBalanceSheet (Map<kod, bakiye>)
+ * @param sector              Sektör adı
+ * @param currentCombinedScore Combined skor (finansal + subjektif)
+ * @param targetGrade         Hedef not ("BBB", "BB" vb.)
+ * @param subjectiveBonus     Combined − finansal fark (varsayılan 0)
+ */
+export function runAccountScenarios(
+  sheet:               AccountBalanceSheet,
+  sector:              string,
+  currentCombinedScore: number,
+  targetGrade:         string,
+  subjectiveBonus    = 0,
+): ScenarioResult[] {
+  const targetScore  = GRADE_SCORES[targetGrade]
+  const currentGrade = scoreToRating(currentCombinedScore)
+
+  if (targetScore === undefined || targetScore <= currentCombinedScore) {
+    return [{
+      horizon:         'short',
+      horizonLabel:    'Hedef Not Geçersiz',
+      targetGrade,
+      actions:         [],
+      scoreBefore:     currentCombinedScore,
+      scoreAfter:      currentCombinedScore,
+      gradeBefore:     currentGrade,
+      gradeAfter:      currentGrade,
+      totalTLMovement: 0,
+      goalReached:     false,
+      error:           'Hedef not mevcut nottan yüksek olmalı',
+    }]
+  }
+
+  const horizons: TimeHorizon[] = ['short', 'medium', 'long']
+  return horizons.map(h =>
+    runSingleAccountScenario(sheet, sector, h, targetGrade, currentCombinedScore, subjectiveBonus),
+  )
 }
