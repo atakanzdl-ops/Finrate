@@ -394,7 +394,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const score  = calculateScore(ratios, entity.sector)
       const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
 
-      await prisma.analysis.upsert({
+      const analysis = await prisma.analysis.upsert({
         where: { entityId_year_period: { entityId, year: row.year, period } },
         update: {
           financialDataId:    financialData.id,
@@ -425,6 +425,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
         },
       })
+
+      // Ham hesap kodu verisi varsa (mizan yüklemelerinde) FinancialAccount tablosuna kaydet
+      if (row.rawAccounts && row.rawAccounts.length > 0) {
+        await prisma.financialAccount.deleteMany({ where: { analysisId: analysis.id } })
+        await prisma.financialAccount.createMany({
+          data: row.rawAccounts.map(a => ({
+            analysisId:  analysis.id,
+            accountCode: a.code,
+            accountName: '',
+            amount:      a.amount,
+          })),
+          skipDuplicates: true,
+        })
+        console.info('[upload] financialAccounts saved', {
+          analysisId: analysis.id,
+          year: row.year,
+          period,
+          count: row.rawAccounts.length,
+        })
+      }
 
       // PDF'den okunan yıl ile form override'ı farklıysa mismatch bilgisi ekle
       const detectedYear = detectedYears[index] ?? null

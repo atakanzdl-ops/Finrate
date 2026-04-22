@@ -29,6 +29,7 @@ export interface ParsedRow {
   meta?: ParseMeta
   docType?: string
   beyanType?: string
+  rawAccounts?: Array<{ code: string; amount: number }>
 }
 
 // ─── norm: Türkçe → ASCII, küçük harf ────────────────────────────────────────
@@ -454,6 +455,8 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
   const fields: Record<string, number> = {}
   const add = (f: string, v: number) => { if (v) fields[f] = (fields[f] ?? 0) + v }
 
+  const rawAccounts: Array<{ code: string; amount: number }> = []
+
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as (string | number | null)[]
     const rawCode = row[cols['code'] ?? 0]
@@ -463,7 +466,6 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
     const code = String(rawCode).replace(/\./g, '').trim()
     const nc   = code.replace(/\D/g, '')
     if (!nc || nc.length > 3 || nc.length < 2) continue
-    if (MIZAN_IGNORE.has(nc)) continue
 
     const getNum = (key: string, fallback?: string): number => {
       const idx =
@@ -479,6 +481,27 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
 
     const bb = getNum('bakBorc',   'borc')
     const ba = getNum('bakAlacak', 'alacak')
+
+    // ── Ham hesap kodu verisi (MIZAN_IGNORE dahil tüm MIZAN_MAP kodları) ────────
+    // rebuildAggregateFromAccounts() için 3-haneli kodların doğal bakiyeleri:
+    //   _A / _CA → bakAlacak (alacak bakiyeli hesaplar)
+    //   _CB / suffix yok → bakBorç (borç bakiyeli hesaplar)
+    //   MIZAN_SPLIT → bakBorç (ağırlıklı borç tarafı)
+    if (nc.length === 3) {
+      let rawAmount = 0
+      if (MIZAN_SPLIT[nc]) {
+        rawAmount = bb
+      } else {
+        const mapped = MIZAN_MAP[nc]
+        if (mapped) {
+          if (mapped.endsWith('_A') || mapped.endsWith('_CA')) rawAmount = ba
+          else rawAmount = bb
+        }
+      }
+      if (rawAmount !== 0) rawAccounts.push({ code: nc, amount: rawAmount })
+    }
+
+    if (MIZAN_IGNORE.has(nc)) continue
 
     if (MIZAN_SPLIT[nc]) {
       if (bb > 0) add(MIZAN_SPLIT[nc].bb, bb)
@@ -514,6 +537,7 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
     fields: fields as Record<string, number | null>,
     unmapped: [],
     meta: { ...metaBase, confidence: calcConfidence(metaBase) },
+    rawAccounts: rawAccounts.length > 0 ? rawAccounts : undefined,
   }]
 }
 
