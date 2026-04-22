@@ -206,6 +206,11 @@ export interface MeaningfulImpactThresholds {
   minEquityRatioDelta: number                  // default +0.005 (0.5pp)
   minInterestCoverageDelta: number             // default +0.20x
   minNetWorkingCapitalDeltaPctAssets: number   // default +0.003
+  // Aşama 5a-5: WC_COMPOSITION ailesi için
+  minQuickRatioDelta: number                   // default +0.025
+  minCashRatioDelta: number                    // default +0.010
+  minDsoImprovementDays: number                // default 2 gün (alacak tahsil süresi)
+  minCccImprovementDays: number                // default 3 gün (nakit çevrim döngüsü)
 }
 
 export interface MicroFilterConfig {
@@ -236,14 +241,22 @@ export const DEFAULT_THRESHOLDS: MeaningfulImpactThresholds = {
   minEquityRatioDelta: 0.005,
   minInterestCoverageDelta: 0.20,
   minNetWorkingCapitalDeltaPctAssets: 0.003,
+  minQuickRatioDelta: 0.025,
+  minCashRatioDelta: 0.010,
+  minDsoImprovementDays: 2,
+  minCccImprovementDays: 3,
 }
 
-// Dinamik eşik sınırları — Codex 5a-3 spesifikasyonu
+// Dinamik eşik sınırları — Codex 5a-3 + 5a-5 spesifikasyonu
 export const THRESHOLD_FLOORS: MeaningfulImpactThresholds = {
   minCurrentRatioDelta: 0.01,
   minEquityRatioDelta: 0.002,
   minInterestCoverageDelta: 0.05,
   minNetWorkingCapitalDeltaPctAssets: 0.001,
+  minQuickRatioDelta: 0.010,
+  minCashRatioDelta: 0.004,
+  minDsoImprovementDays: 1,
+  minCccImprovementDays: 1,
 }
 
 export const THRESHOLD_CEILINGS: MeaningfulImpactThresholds = {
@@ -251,6 +264,10 @@ export const THRESHOLD_CEILINGS: MeaningfulImpactThresholds = {
   minEquityRatioDelta: 0.008,
   minInterestCoverageDelta: 0.30,
   minNetWorkingCapitalDeltaPctAssets: 0.006,
+  minQuickRatioDelta: 0.040,
+  minCashRatioDelta: 0.020,
+  minDsoImprovementDays: 5,
+  minCccImprovementDays: 7,
 }
 
 export const DEFAULT_MICRO_FILTER: MicroFilterConfig = {

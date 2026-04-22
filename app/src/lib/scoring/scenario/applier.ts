@@ -7,6 +7,7 @@ import { DEFAULT_THRESHOLDS } from './contracts'
 import type { ActionCandidate } from './candidateGenerator'
 import { buildSixGroupAnalysis } from './analyzer'
 import { calculateRatiosFromAccounts } from '../ratios'
+import { getActionFamily } from './actionFamilies'
 
 /**
  * Dağıtım kuralı uygulayarak her kaynak hesabın ne kadarını kullanacağını belirler.
@@ -234,14 +235,11 @@ export function applyCandidate(
     INCOME_STATEMENT: afterAnalysis.groups.INCOME_STATEMENT.total - analysis.groups.INCOME_STATEMENT.total,
   }
 
-  // Anlamlı etki kontrolü
-  // Ratio eşiği kontrolü
-  const ratioPass =
-    ratioDelta.CURRENT_RATIO >= thresholds.minCurrentRatioDelta ||
-    ratioDelta.EQUITY_RATIO >= thresholds.minEquityRatioDelta ||
-    ratioDelta.INTEREST_COVERAGE >= thresholds.minInterestCoverageDelta
+  // ───────────────────────────────────────────────
+  // Aşama 5a-5: Aksiyon ailesine göre minimal impact
+  // ───────────────────────────────────────────────
 
-  // Parasal etki override — NİS değişimi / Aktif
+  // Parasal NİS override hesabı — tüm aileler için ortak
   const donenVarliklarBefore = analysis.groups.CURRENT_ASSETS.total
   const kvykBefore = analysis.groups.SHORT_TERM_LIABILITIES.total
   const donenVarliklarAfter = afterAnalysis.groups.CURRENT_ASSETS.total
@@ -252,26 +250,138 @@ export function applyCandidate(
     ? (nisAfter - nisBefore) / analysis.totals.assets
     : 0
 
-  // Override: ratio eşiği geçmedi ama NİS anlamlı arttıysa kabul et
-  // Güvenlik: ΔCari < -0.01 ise override reddet
-  const guardrailsPass = ratioDelta.CURRENT_RATIO >= -0.01
-  const monetaryOverridePass =
-    !ratioPass &&
-    deltaNwcPctAssets >= thresholds.minNetWorkingCapitalDeltaPctAssets &&
-    guardrailsPass
+  // DSO / CCC iyileşme hesabı — WC_COMPOSITION için
+  function sumAmounts(accountsArr: { accountCode: string; amount: number }[], codes: string[]): number {
+    return accountsArr
+      .filter(a => codes.some(c => a.accountCode === c || a.accountCode.startsWith(c)))
+      .reduce((s, a) => s + Math.abs(a.amount), 0)
+  }
 
-  const passesImpact = ratioPass || monetaryOverridePass
+  const accountsBefore = analysis.accounts.map(a => ({ accountCode: a.accountCode, amount: a.amount }))
+
+  const revenueBefore = sumAmounts(accountsBefore, ['600'])
+  const cogsBefore = sumAmounts(accountsBefore, ['621'])
+  const recBefore = sumAmounts(accountsBefore, ['120', '121', '126', '127'])
+  const invBefore = sumAmounts(accountsBefore, ['150', '151', '152', '153', '157'])
+
+  const revenueAfter = sumAmounts(updatedAccounts, ['600'])
+  const cogsAfter = sumAmounts(updatedAccounts, ['621'])
+  const recAfter = sumAmounts(updatedAccounts, ['120', '121', '126', '127'])
+  const invAfter = sumAmounts(updatedAccounts, ['150', '151', '152', '153', '157'])
+
+  // DSO iyileşmesi (gün) — alacak tahsil hızlanması
+  const annualRevBefore = Math.max(revenueBefore, 1)
+  const annualRevAfter = Math.max(revenueAfter, 1)
+  const dsoBefore = (recBefore / annualRevBefore) * 365
+  const dsoAfter = (recAfter / annualRevAfter) * 365
+  const dsoImprovement = dsoBefore - dsoAfter   // pozitif = iyileşme
+
+  // CCC iyileşmesi (gün) — DIO azalması (stok çevrim hızlanması)
+  const annualCogsBefore = Math.max(cogsBefore, 1)
+  const annualCogsAfter = Math.max(cogsAfter, 1)
+  const dioBefore = (invBefore / annualCogsBefore) * 365
+  const dioAfter = (invAfter / annualCogsAfter) * 365
+  const cccImprovement = dioBefore - dioAfter   // pozitif = iyileşme
+
+  // Aile tespiti
+  const family = getActionFamily(candidate.actionId)
+
+  // Aileye göre impact pass ve guardrail
+  let passesImpact = false
+  let monetaryOverridePass = false
+  let guardrailsPass = false
+  let impactMultiplier = 0
+
+  if (family === 'WC_COMPOSITION') {
+    // Guardrail: Quick Ratio < -0.02 ise reddet
+    guardrailsPass = ratioDelta.QUICK_RATIO >= -0.02
+
+    const ratioPass =
+      ratioDelta.QUICK_RATIO >= thresholds.minQuickRatioDelta ||
+      ratioDelta.CASH_RATIO >= thresholds.minCashRatioDelta
+
+    const dsoPass = dsoImprovement >= thresholds.minDsoImprovementDays
+    const cccPass = cccImprovement >= thresholds.minCccImprovementDays
+
+    monetaryOverridePass =
+      !ratioPass && !dsoPass && !cccPass &&
+      deltaNwcPctAssets >= thresholds.minNetWorkingCapitalDeltaPctAssets &&
+      guardrailsPass
+
+    passesImpact = (ratioPass || dsoPass || cccPass || monetaryOverridePass) && guardrailsPass
+
+    const positiveDeltas = [
+      ratioDelta.QUICK_RATIO / (thresholds.minQuickRatioDelta * 3),
+      ratioDelta.CASH_RATIO / (thresholds.minCashRatioDelta * 3),
+      dsoImprovement / (thresholds.minDsoImprovementDays * 3),
+      cccImprovement / (thresholds.minCccImprovementDays * 3),
+    ].map(x => Math.max(0, Math.min(1, x)))
+    impactMultiplier = positiveDeltas.reduce((a, b) => Math.max(a, b), 0)
+
+  } else if (family === 'DEBT_STRUCTURE') {
+    // Guardrail: Cari oran < -0.01 ise override reddet
+    guardrailsPass = ratioDelta.CURRENT_RATIO >= -0.01
+
+    const ratioPass =
+      ratioDelta.CURRENT_RATIO >= thresholds.minCurrentRatioDelta ||
+      ratioDelta.EQUITY_RATIO >= thresholds.minEquityRatioDelta ||
+      ratioDelta.INTEREST_COVERAGE >= thresholds.minInterestCoverageDelta
+
+    monetaryOverridePass =
+      !ratioPass &&
+      deltaNwcPctAssets >= thresholds.minNetWorkingCapitalDeltaPctAssets &&
+      guardrailsPass
+
+    passesImpact = ratioPass || monetaryOverridePass
+
+    const positiveDeltas = [
+      ratioDelta.CURRENT_RATIO / (thresholds.minCurrentRatioDelta * 3),
+      ratioDelta.EQUITY_RATIO / (thresholds.minEquityRatioDelta * 3),
+      ratioDelta.INTEREST_COVERAGE / (thresholds.minInterestCoverageDelta * 3),
+    ].map(x => Math.max(0, Math.min(1, x)))
+    impactMultiplier = positiveDeltas.reduce((a, b) => Math.max(a, b), 0)
+
+  } else {
+    // EQUITY_PNL
+    // Guardrail: Özkaynak oranı düşmesin
+    guardrailsPass = ratioDelta.EQUITY_RATIO >= -0.001
+
+    const ratioPass =
+      ratioDelta.EQUITY_RATIO >= thresholds.minEquityRatioDelta ||
+      ratioDelta.INTEREST_COVERAGE >= thresholds.minInterestCoverageDelta ||
+      ratioDelta.CURRENT_RATIO >= thresholds.minCurrentRatioDelta
+
+    monetaryOverridePass =
+      !ratioPass &&
+      deltaNwcPctAssets >= thresholds.minNetWorkingCapitalDeltaPctAssets &&
+      guardrailsPass
+
+    passesImpact = ratioPass || monetaryOverridePass
+
+    const positiveDeltas = [
+      ratioDelta.EQUITY_RATIO / (thresholds.minEquityRatioDelta * 3),
+      ratioDelta.INTEREST_COVERAGE / (thresholds.minInterestCoverageDelta * 3),
+      ratioDelta.CURRENT_RATIO / (thresholds.minCurrentRatioDelta * 3),
+    ].map(x => Math.max(0, Math.min(1, x)))
+    impactMultiplier = positiveDeltas.reduce((a, b) => Math.max(a, b), 0)
+  }
 
   if (!passesImpact) {
     constraintsTriggered.push("MINIMAL_IMPACT")
-    warnings.push(
-      `Etki yetersiz — ΔCari=${ratioDelta.CURRENT_RATIO.toFixed(3)}, ΔÖzk=${ratioDelta.EQUITY_RATIO.toFixed(3)}, ΔFaizKarş=${ratioDelta.INTEREST_COVERAGE.toFixed(2)}, ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
-    )
+    if (family === 'WC_COMPOSITION') {
+      warnings.push(
+        `Etki yetersiz [${family}] — ΔQuick=${ratioDelta.QUICK_RATIO.toFixed(3)}, ΔCash=${ratioDelta.CASH_RATIO.toFixed(3)}, ΔDSO=${dsoImprovement.toFixed(1)}g, ΔCCC=${cccImprovement.toFixed(1)}g, ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
+      )
+    } else {
+      warnings.push(
+        `Etki yetersiz [${family}] — ΔCari=${ratioDelta.CURRENT_RATIO.toFixed(3)}, ΔÖzk=${ratioDelta.EQUITY_RATIO.toFixed(3)}, ΔFaizKarş=${ratioDelta.INTEREST_COVERAGE.toFixed(2)}, ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
+      )
+    }
   }
 
   if (monetaryOverridePass) {
     warnings.push(
-      `Parasal override devreye girdi — ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
+      `Parasal override devreye girdi [${family}] — ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
     )
   }
 
@@ -280,15 +390,6 @@ export function applyCandidate(
     constraintsTriggered.push("CURRENT_RATIO_DEGRADED")
     warnings.push("Uyarı: cari oran önemli ölçüde düştü")
   }
-
-  // Impact multiplier — ratio delta'nın pozitifliği
-  const positiveDeltas = [
-    ratioDelta.CURRENT_RATIO / (thresholds.minCurrentRatioDelta * 3),
-    ratioDelta.EQUITY_RATIO / (thresholds.minEquityRatioDelta * 3),
-    ratioDelta.INTEREST_COVERAGE / (thresholds.minInterestCoverageDelta * 3),
-  ].map(x => Math.max(0, Math.min(1, x)))
-
-  const impactMultiplier = positiveDeltas.reduce((a, b) => Math.max(a, b), 0)
 
   // Priority score hesabı
   const sourceGroupAnalysis = candidate.template.sourceGroup !== "EXTERNAL"

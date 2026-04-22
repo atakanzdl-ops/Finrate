@@ -168,6 +168,26 @@ export function computeDynamicThresholds(
       THRESHOLD_FLOORS.minNetWorkingCapitalDeltaPctAssets,
       THRESHOLD_CEILINGS.minNetWorkingCapitalDeltaPctAssets
     ),
+    minQuickRatioDelta: clamp(
+      base.minQuickRatioDelta * multiplier,
+      THRESHOLD_FLOORS.minQuickRatioDelta,
+      THRESHOLD_CEILINGS.minQuickRatioDelta
+    ),
+    minCashRatioDelta: clamp(
+      base.minCashRatioDelta * multiplier,
+      THRESHOLD_FLOORS.minCashRatioDelta,
+      THRESHOLD_CEILINGS.minCashRatioDelta
+    ),
+    minDsoImprovementDays: clamp(
+      base.minDsoImprovementDays * multiplier,
+      THRESHOLD_FLOORS.minDsoImprovementDays,
+      THRESHOLD_CEILINGS.minDsoImprovementDays
+    ),
+    minCccImprovementDays: clamp(
+      base.minCccImprovementDays * multiplier,
+      THRESHOLD_FLOORS.minCccImprovementDays,
+      THRESHOLD_CEILINGS.minCccImprovementDays
+    ),
     _factors: {
       sizeFactor,
       stressFactor: stress.factor,
