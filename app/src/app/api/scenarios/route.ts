@@ -20,7 +20,8 @@ import type { BalanceSheet }             from '@/lib/scoring/mutation'
 import { runScenarios, runAccountScenarios } from '@/lib/scoring/scenarioEngine'
 import { calculateScore, scoreToRating } from '@/lib/scoring/score'
 import type { RatioResult }              from '@/lib/scoring/ratios'
-import { accountsToBalanceSheet }        from '@/lib/scoring/simulator'
+import { accountsToBalanceSheet, applyAccountMutation } from '@/lib/scoring/simulator'
+import { ACCOUNT_ACTIONS }                from '@/lib/scoring/actions'
 
 // ─── Yardımcılar ─────────────────────────────────────────────────────────────
 
@@ -128,12 +129,39 @@ export async function POST(req: NextRequest) {
         select: { accountCode: true, amount: true },
       })
 
+      console.log('[scenarios] analysisId:', analysisId)
+      console.log('[scenarios] accounts count:', financialAccounts.length)
+      console.log('[scenarios] engine:', financialAccounts.length > 0 ? 'account' : 'aggregate')
+      console.log('[scenarios] sector:', sector, '| currentScore:', currentScore, '| targetGrade:', targetGrade)
+      console.log('[scenarios] subjectiveBonus:', subjectiveBonus)
+
       if (financialAccounts.length > 0) {
         // YENİ MOTOR — hesap kodu bazlı
-        const sheet = accountsToBalanceSheet(
-          financialAccounts.map(a => ({ accountCode: a.accountCode, amount: Number(a.amount) })),
-        )
+        const accountList = financialAccounts.map(a => ({ accountCode: a.accountCode, amount: Number(a.amount) }))
+        const sheet = accountsToBalanceSheet(accountList)
+
+        // Debug: İlk 2 aksiyon için manuel scoreDelta testi
+        const actionIds = Object.keys(ACCOUNT_ACTIONS).slice(0, 2) as Array<keyof typeof ACCOUNT_ACTIONS>
+        for (const aid of actionIds) {
+          try {
+            const action = ACCOUNT_ACTIONS[aid]
+            const range  = action.calcRange(sheet)
+            if (range.suggested > 0) {
+              const mutation = action.mutate(sheet, range.suggested)
+              const result   = applyAccountMutation(sheet, mutation, sector)
+              console.log(`[scenarios] test[${aid}] range.suggested=${range.suggested} scoreBefore=${result.scoreBefore.finalScore} scoreAfter=${result.scoreAfter.finalScore} scoreDelta=${result.scoreDelta}`)
+            } else {
+              console.log(`[scenarios] test[${aid}] range.suggested=0 → SKIP`)
+            }
+          } catch (e) {
+            console.log(`[scenarios] test[${aid}] ERROR:`, String(e))
+          }
+        }
+
         const scenarios = runAccountScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
+        console.log('[scenarios] result — short actions:', scenarios[0]?.actions?.length ?? 0,
+          '| medium:', scenarios[1]?.actions?.length ?? 0,
+          '| long:', scenarios[2]?.actions?.length ?? 0)
         return jsonUtf8({
           scenarios,
           currentScore,
@@ -146,6 +174,7 @@ export async function POST(req: NextRequest) {
       // ESKİ MOTOR FALLBACK — aggregate BalanceSheet
       const sheet = fdToSheet(fd)
       const scenarios = runScenarios(sheet, sector, currentScore, targetGrade, subjectiveBonus)
+      console.log('[scenarios] aggregate engine — short actions:', scenarios[0]?.actions?.length ?? 0)
       return jsonUtf8({
         scenarios,
         currentScore,
@@ -154,6 +183,7 @@ export async function POST(req: NextRequest) {
         engine: 'aggregate',
       })
     } catch (error) {
+      console.error('[scenarios] ERROR:', String(error))
       return jsonUtf8({ error: String(error) }, { status: 400 })
     }
   }
