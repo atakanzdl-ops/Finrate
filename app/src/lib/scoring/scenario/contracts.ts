@@ -276,3 +276,12 @@ export const DEFAULT_MICRO_FILTER: MicroFilterConfig = {
   minActionAmountPctAssets: 0.002,
   maxMicroContributionShare: 0.30,
 }
+
+// Kayan nokta karşılaştırma tolerance
+export const SCORE_EPS = 1e-6
+
+// Engine içinde aksiyon filtrelemesi için minimum skor
+export const MIN_EXECUTION_SCORE = 0.1
+
+// UI tarafında gösterim için minimum skor (daha yüksek eşik)
+export const MIN_DISPLAY_SCORE = 0.5

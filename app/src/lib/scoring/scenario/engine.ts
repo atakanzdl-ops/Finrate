@@ -2,7 +2,7 @@ import type {
   SixGroupAnalysis, ActionEffect, ActionId,
   MeaningfulImpactThresholds, MicroFilterConfig,
 } from './contracts'
-import {} from './contracts'
+import { MIN_EXECUTION_SCORE, SCORE_EPS } from './contracts'
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
@@ -191,7 +191,7 @@ function evaluateCandidates(
       const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds)
 
       // Minimal impact olanları elediğimizde skor 0 olur — ama yine de listeye ekle, sıralamaya bırak
-      if (effect.scoreBreakdown.finalPriorityScore > 0) {
+      if (effect.scoreBreakdown.finalPriorityScore > MIN_EXECUTION_SCORE + SCORE_EPS) {
         results.push({ candidate, effect })
       }
     } catch {
