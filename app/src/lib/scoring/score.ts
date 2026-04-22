@@ -228,7 +228,8 @@ function hybridMetricScore(
  * Coverage >= 0.5 → sadece mevcut metriklerin ağırlıklı ortalaması alınır.
  */
 function weightedAvgCov(items: [number | null, number][]): { score: number; coverage: number; insufficient: boolean } {
-  const valid = items.filter((x): x is [number, number] => x[0] != null)
+  // NaN/Infinity (Infinity-Infinity = NaN, 0-division Infinity) is treated as missing data
+  const valid = items.filter((x): x is [number, number] => x[0] != null && isFinite(x[0]))
   if (!valid.length) return { score: 50, coverage: 0, insufficient: true }
 
   const totalWeightAll   = items.reduce((s, [, w]) => s + w, 0)

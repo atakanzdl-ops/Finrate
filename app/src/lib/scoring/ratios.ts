@@ -237,15 +237,15 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   //   DPO: Ortalama Borç (320+321+329≈tradePayables) / (Ortalama SMM / 365)
   // Diğer sektörler: aynı formüller, inventory+prepaidSuppliers dahil
 
-  const dso = revenue != null && avgReceivables != null
+  const dso = revenue != null && revenue > 0 && avgReceivables != null
     ? (avgReceivables / revenue) * 365
     : null
 
-  const dpo = costBase != null && avgPayables != null
+  const dpo = costBase != null && costBase > 0 && avgPayables != null
     ? (avgPayables / costBase) * 365
     : null
 
-  const dio = avgInventory != null && costBase != null
+  const dio = avgInventory != null && costBase != null && costBase > 0
     ? (avgInventory / costBase) * 365
     : null
 
