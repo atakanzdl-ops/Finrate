@@ -438,8 +438,8 @@ function CircularScore({ score, rating }: { score: number; rating: string }) {
 
 /* ─── Feature flag: ?v2=1 → ScenarioPanelV2 ────────── */
 function useV2Scenario(): boolean {
-  const searchParams = useSearchParams()
-  return searchParams?.get('v2') === '1'
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('v2') === '1'
 }
 
 /* ─── Main Page ──────────────────────────────────── */
