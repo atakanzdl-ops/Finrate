@@ -12,7 +12,8 @@ import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
 import SubjectiveForm from '@/components/analysis/SubjectiveForm'
 import TrendChart from '@/components/analysis/TrendChart'
-import ScenarioPanel from '@/components/analysis/ScenarioPanel'
+import ScenarioPanel   from '@/components/analysis/ScenarioPanel'
+import ScenarioPanelV2 from '@/components/analysis/ScenarioPanelV2'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
 import { scoreToRating } from '@/lib/scoring/score'
@@ -433,6 +434,12 @@ function CircularScore({ score, rating }: { score: number; rating: string }) {
       </div>
     </div>
   )
+}
+
+/* ─── Feature flag: ?v2=1 → ScenarioPanelV2 ────────── */
+function useV2Scenario(): boolean {
+  const searchParams = useSearchParams()
+  return searchParams?.get('v2') === '1'
 }
 
 /* ─── Main Page ──────────────────────────────────── */
@@ -1227,11 +1234,19 @@ function AnalizPageContent() {
 
                 {/* ── SENARYO ─────────────────── */}
                 {activeTab === 'scenario' && (
-                  <ScenarioPanel
-                    analysisId={selected.id}
-                    currentGrade={cr}
-                    currentScore={cs}
-                  />
+                  useV2Scenario() ? (
+                    <ScenarioPanelV2
+                      analysisId={selected.id}
+                      currentScore={cs}
+                      currentGrade={cr}
+                    />
+                  ) : (
+                    <ScenarioPanel
+                      analysisId={selected.id}
+                      currentGrade={cr}
+                      currentScore={cs}
+                    />
+                  )
                 )}
 
                 {/* ── SUBJEKTİF ───────────────── */}
