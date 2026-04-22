@@ -140,21 +140,39 @@ export async function POST(req: NextRequest) {
         const accountList = financialAccounts.map(a => ({ accountCode: a.accountCode, amount: Number(a.amount) }))
         const sheet = accountsToBalanceSheet(accountList)
 
-        // Debug: İlk 2 aksiyon için manuel scoreDelta testi
-        const actionIds = Object.keys(ACCOUNT_ACTIONS).slice(0, 2) as Array<keyof typeof ACCOUNT_ACTIONS>
-        for (const aid of actionIds) {
+        // ── Debug objesi — Chrome Network'ten görülebilir ─────────────────────
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const debug: Record<string, any> = {
+          accountCount:      accountList.length,
+          firstFiveAccounts: accountList.slice(0, 5).map(a => ({ code: a.accountCode, amount: a.amount })),
+          testActions:       [] as Record<string, unknown>[],
+        }
+
+        for (const [id, action] of Object.entries(ACCOUNT_ACTIONS)) {
           try {
-            const action = ACCOUNT_ACTIONS[aid]
-            const range  = action.calcRange(sheet)
-            if (range.suggested > 0) {
-              const mutation = action.mutate(sheet, range.suggested)
-              const result   = applyAccountMutation(sheet, mutation, sector)
-              console.log(`[scenarios] test[${aid}] range.suggested=${range.suggested} scoreBefore=${result.scoreBefore.finalScore} scoreAfter=${result.scoreAfter.finalScore} scoreDelta=${result.scoreDelta}`)
-            } else {
-              console.log(`[scenarios] test[${aid}] range.suggested=0 → SKIP`)
+            const range = action.calcRange(sheet)
+            if (range.suggested <= 0) {
+              debug.testActions.push({ id, skipped: 'range.suggested <= 0', range })
+              continue
             }
-          } catch (e) {
-            console.log(`[scenarios] test[${aid}] ERROR:`, String(e))
+            const mutation = action.mutate(sheet, range.suggested)
+            const result   = applyAccountMutation(sheet, mutation, sector)
+            debug.testActions.push({
+              id,
+              range,
+              scoreBefore:        result.scoreBefore.finalScore,
+              scoreAfter:         result.scoreAfter.finalScore,
+              scoreDelta:         result.scoreDelta,
+              balanceCheck:       result.balanceCheck,
+              ratiosBeforeSample: {
+                currentRatio: result.ratiosBefore.currentRatio,
+                debtToEquity: result.ratiosBefore.debtToEquity,
+                roe:          result.ratiosBefore.roe,
+                grossMargin:  result.ratiosBefore.grossMargin,
+              },
+            })
+          } catch (err) {
+            debug.testActions.push({ id, error: String((err as Error)?.message ?? err) })
           }
         }
 
@@ -168,6 +186,7 @@ export async function POST(req: NextRequest) {
           currentGrade: scoreToRating(currentScore),
           sector,
           engine: 'account',
+          debug,
         })
       }
 
