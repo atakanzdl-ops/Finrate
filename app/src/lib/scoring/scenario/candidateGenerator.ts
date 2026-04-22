@@ -1,10 +1,12 @@
 import type {
   ActionId, ActionTemplate, SixGroupAnalysis, GroupCode,
   FeasibilityLevel, AccountLine, SectorCode, DistributionMode,
-  AmountBasis,
+  AmountBasis, MicroFilterConfig,
 } from './contracts'
 import { ACTION_CATALOG } from './actionCatalog'
 import { SECTOR_PROFILES } from './sectorProfiles'
+import type { StressLevel } from './dynamicThresholds'
+import { evaluateDynamicPrecondition } from './dynamicPreconditions'
 
 export interface ActionCandidate {
   actionId: ActionId
@@ -189,7 +191,13 @@ function determineDistributionMode(
 /**
  * Ana fonksiyon — tüm aday aksiyonları üretir.
  */
-export function generateCandidates(analysis: SixGroupAnalysis): ActionCandidate[] {
+export function generateCandidates(
+  analysis: SixGroupAnalysis,
+  context?: {
+    stressLevel?: StressLevel
+    microFilter?: MicroFilterConfig
+  }
+): ActionCandidate[] {
   const candidates: ActionCandidate[] = []
   const sectorProfile = SECTOR_PROFILES[analysis.sector]
 
@@ -200,8 +208,23 @@ export function generateCandidates(analysis: SixGroupAnalysis): ActionCandidate[
     const feasibility = template.sectorFeasibility[analysis.sector]
     if (feasibility === "BLOCKED") continue
 
-    // Precondition kontrolü
+    // Statik precondition kontrolü
     const { passed, failures } = checkConditions(analysis, template.preconditions)
+
+    // Dinamik precondition (A04-A07 için)
+    let dynamicPass = true
+    const dynamicFailures: string[] = []
+    if (context?.stressLevel !== undefined && context?.microFilter !== undefined) {
+      const dyn = evaluateDynamicPrecondition(template.id, analysis, {
+        stressLevel: context.stressLevel,
+        microFilter: context.microFilter,
+      })
+      dynamicPass = dyn.pass
+      dynamicFailures.push(...dyn.reasons)
+    }
+
+    const combinedPass = passed && dynamicPass
+    const combinedFailures = [...failures, ...dynamicFailures]
 
     // Eligible accounts
     const eligibleSources = findEligibleAccounts(analysis, template, 'source')
@@ -244,8 +267,8 @@ export function generateCandidates(analysis: SixGroupAnalysis): ActionCandidate[
       feasibilityMultiplier: feasibilityToMultiplier(feasibility),
       eligibleSourceAccounts: eligibleSources,
       eligibleTargetAccounts: eligibleTargets,
-      preconditionPassed: passed,
-      preconditionFailures: failures,
+      preconditionPassed: combinedPass,
+      preconditionFailures: combinedFailures,
       sectorPrioritized: sectorProfile.priorityActions.includes(template.id),
       sectorDiscouraged: sectorProfile.discouragedActions.includes(template.id),
     })

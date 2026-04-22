@@ -1,6 +1,6 @@
 import type {
   SixGroupAnalysis, ActionEffect, ActionId,
-  MeaningfulImpactThresholds,
+  MeaningfulImpactThresholds, MicroFilterConfig,
 } from './contracts'
 import {} from './contracts'
 import { buildSixGroupAnalysis } from './analyzer'
@@ -8,7 +8,8 @@ import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
 import { calculateRatiosFromAccounts } from '../ratios'
 import { calculateScore, scoreToRating } from '../score'
-import { computeDynamicThresholds } from './dynamicThresholds'
+import { computeDynamicThresholds, type StressLevel } from './dynamicThresholds'
+import { computeDynamicMicroFilter } from './dynamicMicroFilter'
 
 export interface ScenarioHorizon {
   key: 'short' | 'medium' | 'long'
@@ -167,6 +168,7 @@ export interface EngineResult {
   sector: string
   emergencyAssessment: EmergencyAssessment
   appliedThresholds: MeaningfulImpactThresholds
+  appliedMicroFilter: MicroFilterConfig
   stressLevel: string
 }
 
@@ -242,7 +244,9 @@ function buildScenario(
   targetScore: number,
   subjectiveBonus: number,
   maxActions: number,
-  thresholds: MeaningfulImpactThresholds
+  thresholds: MeaningfulImpactThresholds,
+  stressLevel: StressLevel,
+  microFilter: MicroFilterConfig
 ): ScenarioOutput {
   let currentAnalysis = analysis
   let scoreNow = currentScore
@@ -254,7 +258,7 @@ function buildScenario(
     if (scoreNow >= targetScore) break
 
     // Aday üret
-    const candidates = generateCandidates(currentAnalysis).filter(c =>
+    const candidates = generateCandidates(currentAnalysis, { stressLevel, microFilter }).filter(c =>
       horizon.allowedActionIds.includes(c.actionId)
     )
 
@@ -372,6 +376,10 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     input.targetScore,
   )
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stressLevel: StressLevel = (dynamicThresholds as any)._factors?.stressLevel ?? 'MILD'
+  const microFilter = computeDynamicMicroFilter(analysis, stressLevel)
+
   const emergency = assessEmergencyNeed(analysis)
 
   const scenarios: ScenarioOutput[] = HORIZONS.map(horizon => {
@@ -408,7 +416,9 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
       input.targetScore,
       input.subjectiveBonus ?? 0,
       maxActions,
-      dynamicThresholds
+      dynamicThresholds,
+      stressLevel,
+      microFilter
     )
   })
 
@@ -420,6 +430,7 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     sector: input.sector,
     emergencyAssessment: emergency,
     appliedThresholds: dynamicThresholds,
+    appliedMicroFilter: microFilter,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     stressLevel: (dynamicThresholds as any)._factors?.stressLevel ?? 'UNKNOWN',
   }
