@@ -357,3 +357,145 @@ export function calculateRatios(d: FinancialInput): RatioResult {
     adjustedCashConversionCycle,
   }
 }
+
+// ─── HESAP KODU BAZLI FONKSIYONLAR ───────────────────────────────────────────
+
+import { rebuildAggregateFromAccounts } from './accountMapper'
+import { Prisma } from '@prisma/client'
+
+/**
+ * FinancialAccount[] tablosundan rasyoları hesaplar.
+ * Hesap kodu bazlı yeni motor — accountMapper ile aggregate'e çevirip mevcut calculateRatios'a verir.
+ * İleride tamamen hesap kodu bazlı hesaplama yapılacaksa bu fonksiyon direkt implemente edilebilir.
+ */
+export function calculateRatiosFromAccounts(
+  accounts:          { accountCode: string; amount: Prisma.Decimal | number }[],
+  previousAccounts?: { accountCode: string; amount: Prisma.Decimal | number }[],
+): RatioResult {
+  const aggregate = rebuildAggregateFromAccounts(accounts) as FinancialInput
+
+  // Önceki dönem verisi varsa prevRevenue / prevInventory vb. alanlarını doldur
+  if (previousAccounts) {
+    const prev = rebuildAggregateFromAccounts(previousAccounts)
+    aggregate.prevRevenue          = prev.revenue          ?? undefined
+    aggregate.prevInventory        = prev.inventory        ?? undefined
+    aggregate.prevTradeReceivables = prev.tradeReceivables ?? undefined
+    aggregate.prevTradePayables    = prev.tradePayables    ?? undefined
+  }
+
+  return calculateRatios(aggregate)
+}
+
+/**
+ * Hesap kodu bazlı bilanço ve gelir tablosu toplamları.
+ * Doğrudan hesap kodu aralıklarından hesaplanır — aggregate'e bağımlı değil.
+ */
+export function getAccountTotals(
+  accounts: { accountCode: string; amount: Prisma.Decimal | number }[],
+): {
+  currentAssets:        number
+  nonCurrentAssets:     number
+  totalAssets:          number
+  currentLiabilities:   number
+  nonCurrentLiabilities: number
+  totalLiabilities:     number
+  totalEquity:          number
+  revenue:              number
+  costOfSales:          number
+  grossProfit:          number
+  operatingExpenses:    number
+  operatingProfit:      number
+  interestExpense:      number
+  netProfit:            number
+} {
+  const sum = (codes: string[]): number =>
+    accounts
+      .filter(a => codes.includes(a.accountCode))
+      .reduce((s, a) => s + Number(a.amount), 0)
+
+  // Dönen varlıklar (10–19 aralığı, karşılık ve (-) kalemler düşülür)
+  const currentAssets =
+    sum(['100', '101', '102', '108'])   - sum(['103']) +
+    sum(['110', '111', '112', '118'])   - sum(['119']) +
+    sum(['120', '121', '126', '127', '128']) - sum(['122', '129']) +
+    sum(['131', '132', '133', '135', '136', '138']) - sum(['137', '139']) +
+    sum(['150', '151', '152', '153', '157', '159']) - sum(['158']) +
+    sum(['170', '178']) +
+    sum(['180', '181', '190', '191', '193', '195', '196', '197', '198'])
+
+  // Duran varlıklar (20–29 aralığı)
+  const nonCurrentAssets =
+    sum(['220', '221', '226']) +
+    sum(['240', '242', '245']) +
+    sum(['250', '251', '252', '253', '254', '255', '256', '258', '259']) - sum(['257']) +
+    sum(['260', '261', '262', '263', '264', '267', '269']) - sum(['268']) +
+    sum(['280', '281']) +
+    sum(['294', '295'])
+
+  const totalAssets = currentAssets + nonCurrentAssets
+
+  // KV yabancı kaynaklar (30–39)
+  const currentLiabilities =
+    sum(['300', '301', '303', '304', '305', '306', '309']) - sum(['302', '308']) +
+    sum(['320', '321', '326', '329'])   - sum(['322']) +
+    sum(['331', '332', '333', '335', '336']) - sum(['337']) +
+    sum(['340', '349']) +
+    sum(['350', '358']) +
+    sum(['360', '361', '368', '369']) +
+    sum(['370', '372', '373', '379'])   - sum(['371']) +
+    sum(['380', '381']) +
+    sum(['391', '392', '393', '397', '399'])
+
+  // UV yabancı kaynaklar (40–49)
+  const nonCurrentLiabilities =
+    sum(['400', '401', '405', '407', '409']) - sum(['402', '408']) +
+    sum(['420', '421', '426', '429'])   - sum(['422']) +
+    sum(['431', '432', '433', '436'])   - sum(['437']) +
+    sum(['440', '449']) +
+    sum(['472', '479']) +
+    sum(['480', '481']) +
+    sum(['492'])
+
+  const totalLiabilities = currentLiabilities + nonCurrentLiabilities
+
+  // Özkaynaklar (50–59)
+  const totalEquity =
+    sum(['500', '502']) - sum(['501', '503']) +
+    sum(['520', '521', '522', '523', '524', '529']) +
+    sum(['540', '541', '542', '548', '549']) +
+    sum(['570']) - sum(['580']) +
+    sum(['590']) - sum(['591'])
+
+  // Gelir tablosu (60–69)
+  const revenue          = sum(['600', '601', '602']) - sum(['610', '611', '612'])
+  const costOfSales      = sum(['620', '621', '622', '623'])
+  const grossProfit      = revenue - costOfSales
+  const operatingExpenses = sum(['630', '631', '632'])
+
+  const otherOperatingIncome  = sum(['640', '641', '642', '643', '644', '645', '646', '647', '648', '649'])
+  const otherOperatingExpense = sum(['653', '654', '655', '656', '657', '658', '659'])
+  const operatingProfit = grossProfit - operatingExpenses + otherOperatingIncome - otherOperatingExpense
+
+  const interestExpense   = sum(['660', '661'])
+  const extraordinaryIncome  = sum(['671', '679'])
+  const extraordinaryExpense = sum(['680', '681', '689'])
+  const taxExpense        = sum(['691'])
+  const netProfit         = operatingProfit - interestExpense + extraordinaryIncome - extraordinaryExpense - taxExpense
+
+  return {
+    currentAssets,
+    nonCurrentAssets,
+    totalAssets,
+    currentLiabilities,
+    nonCurrentLiabilities,
+    totalLiabilities,
+    totalEquity,
+    revenue,
+    costOfSales,
+    grossProfit,
+    operatingExpenses,
+    operatingProfit,
+    interestExpense,
+    netProfit,
+  }
+}
