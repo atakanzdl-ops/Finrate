@@ -146,6 +146,14 @@ async function main() {
         for (const s of ea.signals) console.log(`  ⚠ ${s}`)
       }
 
+      // Ters bakiye emniyet ağı uyarıları
+      if (result.analysis.warnings?.length > 0) {
+        console.log(`\n⚠ Ters bakiye uyarıları:`)
+        for (const w of result.analysis.warnings) {
+          console.log(`  ${w}`)
+        }
+      }
+
       // 6 grup özet
       console.log(`\n6 Grup Analizi:`)
       const g = result.analysis.groups
@@ -269,6 +277,57 @@ async function main() {
   } else {
     console.log('\n✓ Sağlıklı firma testi başarılı — watchlist path çalışıyor')
   }
+
+  // ============ TERS BAKİYE REKLASIFIKASYON TESTİ ============
+  console.log('\n\n╔═══ TERS BAKİYE TESTİ ═══╗')
+
+  const { reclassifyAccounts } = await import('../src/lib/scoring/reversalMap.ts')
+
+  const messyAccounts = [
+    { code: '120', amount: -15_000_000 },  // Alacak ters → 340 olmalı
+    { code: '320', amount: -8_000_000 },   // Borç ters → 159 olmalı
+    { code: '159', amount: 10_000_000 },   // Normal avans
+    { code: '131', amount: -5_000_000 },   // Ortak alacağı ters → 331 olmalı
+    { code: '102', amount: 20_000_000 },   // Normal banka
+    { code: '500', amount: 50_000_000 },   // Normal sermaye
+  ]
+
+  const reclass = reclassifyAccounts(messyAccounts)
+
+  console.log(`Orijinal hesap sayısı: ${messyAccounts.length}`)
+  console.log(`Reklasifikasyon sonrası: ${reclass.accounts.length}`)
+  console.log(`\nReklasifikasyon kayıtları:`)
+  for (const r of reclass.reversals) {
+    console.log(`  ${r.originalCode} (${r.originalAmount.toLocaleString('tr-TR')}) → ${r.reclassifiedCode} (+${r.amount.toLocaleString('tr-TR')}) [${r.ruleId}]`)
+  }
+
+  console.log(`\nFinal hesap listesi:`)
+  for (const a of reclass.accounts) {
+    console.log(`  ${a.code}: ${a.amount.toLocaleString('tr-TR')}`)
+  }
+
+  // Assertions
+  const finalMap = new Map(reclass.accounts.map(a => [a.code, a.amount]))
+
+  if (finalMap.get('340') !== 15_000_000) {
+    console.log('\n❌ HATA: 120 ters bakiye 340\'a aktarılmadı')
+    process.exit(1)
+  }
+  if (finalMap.get('331') !== 5_000_000) {
+    console.log('\n❌ HATA: 131 ters bakiye 331\'e aktarılmadı')
+    process.exit(1)
+  }
+  // 320 ters 8M + 159 normal 10M → 159'da toplam 18M (320 kalemi 159'a eklenir)
+  if (finalMap.get('159') !== 18_000_000) {
+    console.log(`\n❌ HATA: 159 toplamı yanlış — beklenen 18M, gelen ${finalMap.get('159')?.toLocaleString('tr-TR')}`)
+    process.exit(1)
+  }
+  if (finalMap.has('120') || finalMap.has('320') || finalMap.has('131')) {
+    console.log('\n❌ HATA: Ters bakiyeli orijinal hesaplar silinmedi')
+    process.exit(1)
+  }
+
+  console.log('\n✓ Ters bakiye reklasifikasyon testi başarılı')
 
   await prisma.$disconnect()
 }

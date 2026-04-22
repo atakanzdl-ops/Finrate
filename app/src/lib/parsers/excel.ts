@@ -30,6 +30,7 @@ export interface ParsedRow {
   docType?: string
   beyanType?: string
   rawAccounts?: Array<{ code: string; amount: number }>
+  reversals?: import('@/lib/scoring/reversalMap').ReversalEntry[]
 }
 
 // ─── norm: Türkçe → ASCII, küçük harf ────────────────────────────────────────
@@ -446,7 +447,7 @@ const MIZAN_MAP: Record<string, string> = {
   '402': 'longTermFinancialDebt_CB',
 }
 
-export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
+export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
   const header = findMizanHeader(rows)
   if (!header) return []
   const { headerIdx, cols } = header
@@ -523,12 +524,26 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
   if (Object.keys(fields).length < 3) return []
 
   const matchedRows = Object.keys(fields).length
+
+  // Ters bakiye reklasifikasyonu — parser katmanı (birinci katman)
+  const { reclassifyAccounts } = await import('@/lib/scoring/reversalMap')
+  const reclass = reclassifyAccounts(rawAccounts)
+  const finalRawAccounts = reclass.accounts
+  const reversals = reclass.reversals
+
+  if (reversals.length > 0) {
+    console.log(`[parser] ${reversals.length} ters bakiye reklasifiye edildi:`)
+    for (const r of reversals) {
+      console.log(`  ${r.originalCode} (${r.originalAmount.toLocaleString('tr-TR')}) → ${r.reclassifiedCode} (+${r.amount.toLocaleString('tr-TR')}) [${r.ruleId}]`)
+    }
+  }
+
   const metaBase = {
     path: 'mizan' as const,
     totalRows: Math.max(rows.length - (headerIdx + 1), 0),
     matchedRows,
     ignoredRows: 0, zeroBalanceRows: 0, unmappedRows: 0,
-    reverseBalanceWarnings: [] as string[],
+    reverseBalanceWarnings: reversals.map(r => `${r.originalCode} → ${r.reclassifiedCode} [${r.ruleId}]`),
     parseWarnings: [] as string[],
   }
   return [{
@@ -537,7 +552,8 @@ export function parseMizanRows(rows: unknown[][]): ParsedRow[] {
     fields: fields as Record<string, number | null>,
     unmapped: [],
     meta: { ...metaBase, confidence: calcConfidence(metaBase) },
-    rawAccounts: rawAccounts.length > 0 ? rawAccounts : undefined,
+    rawAccounts: finalRawAccounts.length > 0 ? finalRawAccounts : undefined,
+    reversals: reversals.length > 0 ? reversals : undefined,
   }]
 }
 
@@ -554,7 +570,7 @@ function selectMizanSheet(wb: ReturnType<typeof XLSX.read>): { sheetName: string
 
 // ─── Ana export: parseExcelBuffer ─────────────────────────────────────────────
 
-export function parseExcelBuffer(buffer: Buffer, _fileName?: string): ParsedRow[] {
+export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Promise<ParsedRow[]> {
   const wb = XLSX.read(buffer, { type: 'buffer' })
   const { sheetName, ws } = selectMizanSheet(wb)
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
@@ -575,7 +591,7 @@ export function parseExcelBuffer(buffer: Buffer, _fileName?: string): ParsedRow[
   // 2) Mizan (DETAY MİZAN)
   if (detectMizanFormat(rows)) {
     console.info('[excel] parse path: mizan', { sheetName, rowCount: rows.length })
-    const result = parseMizanRows(rows)
+    const result = await parseMizanRows(rows)
     const meta = result[0]?.meta
     console.info('[excel:mizan] summary', {
       sheetName, rowCount: rows.length, parsedRows: result.length,

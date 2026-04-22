@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let parsedRows
     if (isExcel) {
-      parsedRows = parseExcelBuffer(buffer)
+      parsedRows = await parseExcelBuffer(buffer)
     } else if (isCsv) {
       parsedRows = parseCsvText(buffer.toString('utf-8'))
     } else {
@@ -428,6 +428,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       // Ham hesap kodu verisi varsa (mizan yüklemelerinde) FinancialAccount tablosuna kaydet
       if (row.rawAccounts && row.rawAccounts.length > 0) {
+        // Audit trail — ters bakiye reklasifikasyonları logla
+        if (row.reversals && row.reversals.length > 0) {
+          console.log(`[upload] Analiz ${analysis.id} için ${row.reversals.length} ters bakiye reklasifiye edildi`)
+          for (const r of row.reversals) {
+            console.log(`  ${r.originalCode} → ${r.reclassifiedCode} (${r.amount.toLocaleString('tr-TR')} TL)`)
+          }
+        }
         await prisma.financialAccount.deleteMany({ where: { analysisId: analysis.id } })
         await prisma.financialAccount.createMany({
           data: row.rawAccounts.map(a => ({

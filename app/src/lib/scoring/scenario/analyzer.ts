@@ -236,6 +236,28 @@ export function buildSixGroupAnalysis(
     }
   }
 
+  // Parser'dan kaçmış ters bakiyeler için emniyet ağı (ikinci katman)
+  const residualReversals: string[] = []
+
+  for (const a of adjusted) {
+    const meta = a.meta
+    if (!meta) continue
+
+    // Varlık/gider hesabı negatif bakiye veriyorsa (contra olmayan)
+    if (!meta.contra && a.amount < 0 && (meta.side === 'ASSET' || meta.side === 'EXPENSE')) {
+      residualReversals.push(
+        `${a.code} (${meta.name}) negatif bakiye: ${a.amount.toLocaleString('tr-TR')}`
+      )
+    }
+
+    // Pasif/gelir/özkaynak hesabı pozitif büyüklükte negatif bakiye veriyorsa — anormal
+    if (!meta.contra && a.amount < 0 && (meta.side === 'LIABILITY' || meta.side === 'INCOME' || meta.side === 'EQUITY')) {
+      residualReversals.push(
+        `${a.code} (${meta.name}) negatif bakiye (${meta.side}): ${a.amount.toLocaleString('tr-TR')}`
+      )
+    }
+  }
+
   return {
     schemaVersion: "1.0.0",
     scenarioId: options.scenarioId,
@@ -253,5 +275,6 @@ export function buildSixGroupAnalysis(
     accounts: lines,
     ratios,
     benchmarkSetId: options.benchmarkSetId ?? "default_tcmb_2024",
+    ...(residualReversals.length > 0 && { warnings: residualReversals }),
   }
 }

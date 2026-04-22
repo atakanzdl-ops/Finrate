@@ -122,6 +122,7 @@ export interface SixGroupAnalysis {
   accounts: AccountLine[]
   ratios: Record<RatioCode, RatioValue>
   benchmarkSetId: string
+  warnings?: string[]              // Emniyet ağı: ters bakiye vb. anormallikler
 }
 
 export interface AmountRangeRule {
