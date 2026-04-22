@@ -134,7 +134,8 @@ export function rebuildAggregateFromAccounts(
       .filter(a => codes.includes(a.accountCode))
       .reduce((sum, a) => sum + Number(a.amount), 0)
 
-  return {
+  // Alt bileşenler — tüm TDHP kodlarından hesaplanır
+  const r = {
     // Hazır değerler (net)
     cash: get(['100', '101', '102', '108']) - get(['103']),
 
@@ -211,6 +212,35 @@ export function rebuildAggregateFromAccounts(
     costOfSales:        get(['620', '621', '622', '623']),
     operatingExpenses:  get(['630', '631', '632']),
     interestExpense:    get(['660', '661']),
+  }
+
+  // ── calculateRatios için gerekli toplam alanlar ───────────────────────────────
+  // calculateRatios(d: FinancialInput) d.totalCurrentAssets, d.totalAssets gibi
+  // aggregate alanları doğrudan okur — alt bileşenlerden fallback hesaplama yapmaz.
+  // rebuildAggregateFromAccounts yalnızca alt bileşenleri döndürdüğü için tüm
+  // likidite ve kaldıraç rasyoları null çıkıyordu; skor sabit 50 kalıyordu.
+
+  const tca  = r.cash + r.tradeReceivables + r.otherReceivables
+             + r.inventory + r.prepaidSuppliers + r.otherCurrentAssets
+  const tnca = r.tangibleAssets + r.intangibleAssets + r.otherNonCurrentAssets
+  const tcl  = r.shortTermFinancialDebt + r.tradePayables + r.otherShortTermPayables
+             + r.advancesReceived + r.taxPayables
+  const tncl = r.longTermFinancialDebt + r.otherNonCurrentLiabilities
+  const teq  = r.paidInCapital + r.capitalReserves + r.profitReserves
+             + r.retainedEarnings - r.retainedLosses + r.netProfitCurrentYear
+
+  return {
+    ...r,
+    // Aggregate toplamlar
+    totalCurrentAssets:         tca,
+    totalNonCurrentAssets:      tnca,
+    totalAssets:                tca + tnca,
+    totalCurrentLiabilities:    tcl,
+    totalNonCurrentLiabilities: tncl,
+    totalEquity:                teq,
+    // calculateRatios farklı alan adları bekliyor
+    netProfit:                  r.netProfitCurrentYear,
+    cogs:                       r.costOfSales,
   }
 }
 
