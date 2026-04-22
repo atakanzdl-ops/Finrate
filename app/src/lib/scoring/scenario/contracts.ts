@@ -238,6 +238,21 @@ export const DEFAULT_THRESHOLDS: MeaningfulImpactThresholds = {
   minNetWorkingCapitalDeltaPctAssets: 0.003,
 }
 
+// Dinamik eşik sınırları — Codex 5a-3 spesifikasyonu
+export const THRESHOLD_FLOORS: MeaningfulImpactThresholds = {
+  minCurrentRatioDelta: 0.01,
+  minEquityRatioDelta: 0.002,
+  minInterestCoverageDelta: 0.05,
+  minNetWorkingCapitalDeltaPctAssets: 0.001,
+}
+
+export const THRESHOLD_CEILINGS: MeaningfulImpactThresholds = {
+  minCurrentRatioDelta: 0.05,
+  minEquityRatioDelta: 0.008,
+  minInterestCoverageDelta: 0.30,
+  minNetWorkingCapitalDeltaPctAssets: 0.006,
+}
+
 export const DEFAULT_MICRO_FILTER: MicroFilterConfig = {
   minLineShareInGroup: 0.05,
   minLineAmountTry: 2_000_000,

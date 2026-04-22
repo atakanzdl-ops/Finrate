@@ -235,15 +235,43 @@ export function applyCandidate(
   }
 
   // Anlamlı etki kontrolü
-  const passesImpact =
+  // Ratio eşiği kontrolü
+  const ratioPass =
     ratioDelta.CURRENT_RATIO >= thresholds.minCurrentRatioDelta ||
     ratioDelta.EQUITY_RATIO >= thresholds.minEquityRatioDelta ||
     ratioDelta.INTEREST_COVERAGE >= thresholds.minInterestCoverageDelta
 
+  // Parasal etki override — NİS değişimi / Aktif
+  const donenVarliklarBefore = analysis.groups.CURRENT_ASSETS.total
+  const kvykBefore = analysis.groups.SHORT_TERM_LIABILITIES.total
+  const donenVarliklarAfter = afterAnalysis.groups.CURRENT_ASSETS.total
+  const kvykAfter = afterAnalysis.groups.SHORT_TERM_LIABILITIES.total
+  const nisBefore = donenVarliklarBefore - kvykBefore
+  const nisAfter = donenVarliklarAfter - kvykAfter
+  const deltaNwcPctAssets = analysis.totals.assets > 0
+    ? (nisAfter - nisBefore) / analysis.totals.assets
+    : 0
+
+  // Override: ratio eşiği geçmedi ama NİS anlamlı arttıysa kabul et
+  // Güvenlik: ΔCari < -0.01 ise override reddet
+  const guardrailsPass = ratioDelta.CURRENT_RATIO >= -0.01
+  const monetaryOverridePass =
+    !ratioPass &&
+    deltaNwcPctAssets >= thresholds.minNetWorkingCapitalDeltaPctAssets &&
+    guardrailsPass
+
+  const passesImpact = ratioPass || monetaryOverridePass
+
   if (!passesImpact) {
     constraintsTriggered.push("MINIMAL_IMPACT")
     warnings.push(
-      `Etki yetersiz — ΔCari=${ratioDelta.CURRENT_RATIO.toFixed(3)}, ΔÖzk=${ratioDelta.EQUITY_RATIO.toFixed(3)}, ΔFaizKarş=${ratioDelta.INTEREST_COVERAGE.toFixed(2)}`
+      `Etki yetersiz — ΔCari=${ratioDelta.CURRENT_RATIO.toFixed(3)}, ΔÖzk=${ratioDelta.EQUITY_RATIO.toFixed(3)}, ΔFaizKarş=${ratioDelta.INTEREST_COVERAGE.toFixed(2)}, ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
+    )
+  }
+
+  if (monetaryOverridePass) {
+    warnings.push(
+      `Parasal override devreye girdi — ΔNİS/Aktif=${(deltaNwcPctAssets * 100).toFixed(2)}%`
     )
   }
 

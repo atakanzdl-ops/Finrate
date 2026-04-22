@@ -2,12 +2,13 @@ import type {
   SixGroupAnalysis, ActionEffect, ActionId,
   MeaningfulImpactThresholds,
 } from './contracts'
-import { DEFAULT_THRESHOLDS } from './contracts'
+import {} from './contracts'
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
 import { calculateRatiosFromAccounts } from '../ratios'
 import { calculateScore, scoreToRating } from '../score'
+import { computeDynamicThresholds } from './dynamicThresholds'
 
 export interface ScenarioHorizon {
   key: 'short' | 'medium' | 'long'
@@ -165,6 +166,8 @@ export interface EngineResult {
   currentGrade: string
   sector: string
   emergencyAssessment: EmergencyAssessment
+  appliedThresholds: MeaningfulImpactThresholds
+  stressLevel: string
 }
 
 /**
@@ -352,7 +355,6 @@ export interface RunEngineInput {
 }
 
 export function runScenarioEngine(input: RunEngineInput): EngineResult {
-  const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS
   const maxActions = input.maxActionsPerHorizon ?? 8
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -362,6 +364,13 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     sector: input.sector,
     ratios: input.currentRatios as Parameters<typeof buildSixGroupAnalysis>[1]['ratios'],
   })
+
+  // Dinamik eşik hesaplama — analysis hazır olduktan sonra
+  const dynamicThresholds = input.thresholds ?? computeDynamicThresholds(
+    analysis,
+    input.currentScore,
+    input.targetScore,
+  )
 
   const emergency = assessEmergencyNeed(analysis)
 
@@ -399,7 +408,7 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
       input.targetScore,
       input.subjectiveBonus ?? 0,
       maxActions,
-      thresholds
+      dynamicThresholds
     )
   })
 
@@ -410,5 +419,8 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     currentGrade: input.currentGrade,
     sector: input.sector,
     emergencyAssessment: emergency,
+    appliedThresholds: dynamicThresholds,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    stressLevel: (dynamicThresholds as any)._factors?.stressLevel ?? 'UNKNOWN',
   }
 }
