@@ -12,6 +12,10 @@ import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
 import { CUMULATIVE_GUARDRAILS, type HorizonKey } from './capMatrix'
+import {
+  determineRegime, determineGapBand, initialUnlockStage,
+  type Regime, type GapBand,
+} from './adaptivePolicy'
 import { calculateRatiosFromAccounts } from '../ratios'
 import { calculateScore, scoreToRating } from '../score'
 import { computeDynamicThresholds, type StressLevel } from './dynamicThresholds'
@@ -235,7 +239,10 @@ function evaluateCandidates(
   sector: string,
   thresholds: MeaningfulImpactThresholds,
   minScore: number = MIN_EXECUTION_SCORE,
-  horizon: HorizonKey = 'medium'
+  horizon: HorizonKey = 'medium',
+  regime: Regime = 'STABLE',
+  gapBand: GapBand = 'MEDIUM',
+  unlockStage: 0 | 1 | 2 = 0
 ): { results: Array<{ candidate: ActionCandidate; effect: ActionEffect }>; stats: EvalStats } {
   const results: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
   const stats: EvalStats = { evaluated: 0, accepted: 0, efficiencyRejected: 0, shockRejected: 0 }
@@ -246,7 +253,7 @@ function evaluateCandidates(
 
     stats.evaluated++
     try {
-      const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds, horizon)
+      const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds, horizon, regime, gapBand, unlockStage)
 
       if (effect.scoreBreakdown.finalPriorityScore > minScore + SCORE_EPS) {
         results.push({ candidate, effect })
@@ -322,6 +329,12 @@ function buildScenario(
 ): BuildScenarioResult {
   const horizonKey = horizon.key as HorizonKey
 
+  // Fix F-3c: Adaptive policy context — regime, gap band, unlock stage
+  const regime: Regime       = determineRegime(currentScore, stressLevel)
+  const gapBand: GapBand     = determineGapBand(currentScore, targetScore)
+  const unlockStage: 0|1|2   = initialUnlockStage(currentScore, targetScore)
+  console.log(`[buildScenario:${horizonKey}] Regime=${regime}, GapBand=${gapBand}, UnlockStage=${unlockStage}`)
+
   // Horizon bazlı sınırlar
   const maxActions = horizonKey === 'long' ? MAX_ACTIONS_LONG
     : horizonKey === 'medium' ? MAX_ACTIONS_MEDIUM
@@ -363,8 +376,8 @@ function buildScenario(
       break
     }
 
-    // Aday üret — Fix F-2: horizonKey geçiriliyor (cap matrisini belirler)
-    const allCandidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }).filter(c =>
+    // Aday üret — Fix F-3c: horizonKey + adaptive regime/gap/stage geçiriliyor
+    const allCandidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }, regime, gapBand, unlockStage).filter(c =>
       horizon.allowedActionIds.includes(c.actionId)
     )
     totalCandidatesGenerated += allCandidates.length
@@ -387,9 +400,9 @@ function buildScenario(
       break
     }
 
-    // Değerlendir — horizon bazlı minScore + efficiency filter
+    // Değerlendir — horizon bazlı minScore + adaptive efficiency filter
     const { results: evaluated, stats: evalStats } = evaluateCandidates(
-      currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey
+      currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey, regime, gapBand, unlockStage
     )
     totalCandidatesEvaluated += evalStats.evaluated
     totalCandidatesAccepted  += evalStats.accepted

@@ -4,7 +4,11 @@ import type {
   MeaningfulImpactThresholds,
 } from './contracts'
 import { DEFAULT_THRESHOLDS, DEFAULT_SHOCK_GUARDRAILS } from './contracts'
-import { EFFICIENCY_FILTER, type HorizonKey } from './capMatrix'
+import type { HorizonKey } from './capMatrix'
+import {
+  computeMinEfficiency, computeHardReject, isCatastrophic,
+  type Regime, type GapBand,
+} from './adaptivePolicy'
 import type { ActionCandidate } from './candidateGenerator'
 import { buildSixGroupAnalysis } from './analyzer'
 import { calculateRatiosFromAccounts } from '../ratios'
@@ -124,7 +128,10 @@ export function applyCandidate(
   amount: number,
   sector: string,
   thresholds: MeaningfulImpactThresholds = DEFAULT_THRESHOLDS,
-  horizon: HorizonKey = 'medium'
+  horizon: HorizonKey = 'medium',
+  regime: Regime = 'STABLE',
+  gapBand: GapBand = 'MEDIUM',
+  unlockStage: 0 | 1 | 2 = 0
 ): ActionEffect {
   const warnings: string[] = []
   const constraintsTriggered: string[] = []
@@ -514,7 +521,7 @@ export function applyCandidate(
   const standaloneDelta = scoreAfterStandalone - scoreBeforeStandalone
 
   // ───────────────────────────────────────────────
-  // Fix F-2: Verim filtresi — düşük etki / yüksek maliyet aksiyonları eliyor
+  // Fix F-3c: Adaptive verim filtresi (regime × horizon × gap × stage)
   // ───────────────────────────────────────────────
   const bsImpactForEff = analysis.totals.assets > 0
     ? clampedAmount / analysis.totals.assets
@@ -523,27 +530,42 @@ export function applyCandidate(
     ? standaloneDelta / (bsImpactForEff * 100)
     : 0
 
-  const effFilter = EFFICIENCY_FILTER[horizon]
+  const minEff  = computeMinEfficiency(regime, horizon, gapBand, unlockStage)
+  const hardRej = computeHardReject(regime, horizon, unlockStage)
+
+  let efficiencyReject = false
   const efficiencyReasons: string[] = []
 
-  // Hard reject: çok büyük bilanço hareketi, çok küçük skor katkısı
-  if (
-    bsImpactForEff > effFilter.hardReject.balanceSheetImpactGt &&
-    standaloneDelta < effFilter.hardReject.scoreDeltaLt
-  ) {
+  // Hard reject kontrolü (null = kapalı, kriz+long gibi durumlar)
+  if (hardRej !== null) {
+    if (
+      bsImpactForEff > hardRej.balanceSheetImpactGt &&
+      standaloneDelta < hardRej.scoreDeltaLt
+    ) {
+      efficiencyReject = true
+      efficiencyReasons.push(
+        `Hard reject [${regime}/${horizon}/stage${unlockStage}]: ${(bsImpactForEff * 100).toFixed(1)}% bilanço hareketi için sadece +${standaloneDelta.toFixed(2)} puan`
+      )
+    }
+  }
+
+  // Catastrophic floor — hard reject kapalı olsa bile uygulanan emniyet eşiği
+  if (!efficiencyReject && isCatastrophic(bsImpactForEff, standaloneDelta)) {
+    efficiencyReject = true
     efficiencyReasons.push(
-      `Verim düşük (hard): ${(bsImpactForEff * 100).toFixed(1)}% bilanço hareketi için sadece +${standaloneDelta.toFixed(2)} puan`
+      `Catastrophic floor: ${(bsImpactForEff * 100).toFixed(1)}% hareket, +${standaloneDelta.toFixed(2)} puan`
     )
   }
 
-  // Min efficiency: (puan kazancı) / (bilanço hareketi %) eşiğini geçmeli
-  if (efficiencyReasons.length === 0 && efficiency < effFilter.minEfficiency) {
+  // Min efficiency eşiği
+  if (!efficiencyReject && efficiency < minEff) {
+    efficiencyReject = true
     efficiencyReasons.push(
-      `Verim ${efficiency.toFixed(2)} < eşik ${effFilter.minEfficiency} (1% bilanço hareketi başına puan)`
+      `Verim ${efficiency.toFixed(2)} < eşik ${minEff.toFixed(2)} [${regime}/${horizon}/stage${unlockStage}]`
     )
   }
 
-  if (efficiencyReasons.length > 0) {
+  if (efficiencyReject) {
     constraintsTriggered.push('EFFICIENCY_FILTER')
     warnings.push(...efficiencyReasons)
     finalPriorityScore = 0

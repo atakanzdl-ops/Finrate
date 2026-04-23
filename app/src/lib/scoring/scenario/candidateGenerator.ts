@@ -8,6 +8,10 @@ import { SECTOR_PROFILES } from './sectorProfiles'
 import type { StressLevel } from './dynamicThresholds'
 import { evaluateDynamicPrecondition } from './dynamicPreconditions'
 import { getTargetCapPct, getGlobalCapPct, type HorizonKey } from './capMatrix'
+import {
+  computeTargetCapMultiplier, computeGlobalCapMultiplier,
+  type Regime, type GapBand,
+} from './adaptivePolicy'
 
 export interface ActionCandidate {
   actionId: ActionId
@@ -37,33 +41,39 @@ export interface AmountCapResult {
 }
 
 /**
- * Fix E + F-2: Çift taraflı büyüklük kontrolü.
- * suggestedPct bazlı tutara hem targetMaxPct (ufuk+sektör bazlı) hem de
- * globalMaxPctOfAssets (ufuk bazlı) cap'lerini uygular.
+ * Fix E + F-2 + F-3c: Çift taraflı büyüklük kontrolü.
+ * targetMaxPct ve globalMaxPct, ufuk+sektör bazlı cap matrisine
+ * regime × gap × stage adaptive çarpanlar uygulanarak hesaplanır.
  */
 export function computeBoundedAmount(
   base: number,
   template: ActionTemplate,
   analysis: SixGroupAnalysis,
   horizon: HorizonKey = 'medium',
-  sector: SectorCode = 'MANUFACTURING'
+  sector: SectorCode = 'MANUFACTURING',
+  regime: Regime = 'STABLE',
+  gapBand: GapBand = 'MEDIUM',
+  unlockStage: 0 | 1 | 2 = 0
 ): AmountCapResult {
   const rangeCap = base * template.amountRule.maxPct
 
-  // Hedef grup cap'i — ufuk + sektör bazlı dinamik değer
+  // Hedef grup cap'i — ufuk + sektör + adaptive çarpan
   let targetGroupCap = Infinity
   if (template.targetGroup !== 'EXTERNAL') {
     const tgt = template.targetGroup as Exclude<GroupCode, 'EXTERNAL'>
     const targetGroupTotal = Math.abs(analysis.groups[tgt]?.total ?? 0)
     if (targetGroupTotal > 0) {
-      const targetMaxPct = getTargetCapPct(template.id as ActionId, horizon, sector)
-      targetGroupCap = targetGroupTotal * targetMaxPct
+      const baseTargetPct = getTargetCapPct(template.id as ActionId, horizon, sector)
+      const targetMult    = computeTargetCapMultiplier(regime, horizon, gapBand, unlockStage)
+      targetGroupCap = targetGroupTotal * baseTargetPct * targetMult
     }
   }
 
-  // Global aktif cap'i — ufuk bazlı dinamik değer
+  // Global aktif cap'i — ufuk + adaptive çarpan
   const assetsCap = analysis.totals.assets > 0
-    ? analysis.totals.assets * getGlobalCapPct(template.id as ActionId, horizon)
+    ? analysis.totals.assets *
+      getGlobalCapPct(template.id as ActionId, horizon) *
+      computeGlobalCapMultiplier(regime, horizon, gapBand, unlockStage)
     : Infinity
 
   const raw = base * template.amountRule.suggestedPct
@@ -252,7 +262,8 @@ function determineDistributionMode(
 
 /**
  * Ana fonksiyon — tüm aday aksiyonları üretir.
- * horizon: cap matrisinin hangi sütununu kullanacağını belirler.
+ * horizon: cap matrisinin hangi sütununu belirler.
+ * regime/gapBand/unlockStage: F-3c adaptive çarpanlar için.
  */
 export function generateCandidates(
   analysis: SixGroupAnalysis,
@@ -260,7 +271,10 @@ export function generateCandidates(
   context?: {
     stressLevel?: StressLevel
     microFilter?: MicroFilterConfig
-  }
+  },
+  regime: Regime = 'STABLE',
+  gapBand: GapBand = 'MEDIUM',
+  unlockStage: 0 | 1 | 2 = 0
 ): ActionCandidate[] {
   const candidates: ActionCandidate[] = []
   const sectorProfile = SECTOR_PROFILES[analysis.sector]
@@ -315,8 +329,8 @@ export function generateCandidates(
       template.amountRule.absoluteMax ?? Infinity
     )
 
-    // Fix E + F-2: computeBoundedAmount ile ufuk+sektör bazlı cap uygula
-    const capResult = computeBoundedAmount(base, template, analysis, horizon, analysis.sector)
+    // Fix E + F-2 + F-3c: computeBoundedAmount ile ufuk+sektör+adaptive cap uygula
+    const capResult = computeBoundedAmount(base, template, analysis, horizon, analysis.sector, regime, gapBand, unlockStage)
     const amountSuggested = capResult.amount
 
     const distributionMode = hasExternalSource
