@@ -1,6 +1,7 @@
 import type {
   SixGroupAnalysis, ActionEffect, ActionId,
   MeaningfulImpactThresholds, MicroFilterConfig,
+  ActionEligibilityReport, ActionEligibilityStatus, RejectionReasonCode,
 } from './contracts'
 import {
   MIN_EXECUTION_SCORE, SCORE_EPS,
@@ -8,6 +9,8 @@ import {
   MAX_ACTIONS_SHORT, MAX_ACTIONS_MEDIUM, MAX_ACTIONS_LONG,
   MAX_REPEAT_PER_ACTION_LONG,
 } from './contracts'
+import { ACTION_CATALOG } from './actionCatalog'
+import { getActionFamily } from './actionFamilies'
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
@@ -109,6 +112,8 @@ export interface ScenarioOutput {
   skipped?: boolean
   skipReason?: string
   watchlist?: string[]
+  // F-4e: 14 aksiyonun tam eligibility durumu
+  eligibilityReport?: ActionEligibilityReport[]
 }
 
 export interface EngineMetrics {
@@ -237,6 +242,7 @@ interface EvalStats {
 /**
  * Her aksiyon için etki hesaplar, geçerli olanları döndürür.
  * minScore: horizon bazlı eşik (long için daha düşük)
+ * F-4e: Reddedilen adaylar da `rejected` listesinde döner (eligibility raporu için).
  */
 function evaluateCandidates(
   analysis: SixGroupAnalysis,
@@ -248,8 +254,13 @@ function evaluateCandidates(
   regime: Regime = 'STABLE',
   gapBand: GapBand = 'MEDIUM',
   unlockStage: 0 | 1 | 2 = 0
-): { results: Array<{ candidate: ActionCandidate; effect: ActionEffect }>; stats: EvalStats } {
-  const results: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
+): {
+  results:  Array<{ candidate: ActionCandidate; effect: ActionEffect }>
+  rejected: Array<{ candidate: ActionCandidate; effect: ActionEffect }>
+  stats: EvalStats
+} {
+  const results:  Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
+  const rejected: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
   const stats: EvalStats = { evaluated: 0, accepted: 0, efficiencyRejected: 0, shockRejected: 0 }
 
   for (const candidate of candidates) {
@@ -267,6 +278,7 @@ function evaluateCandidates(
         // Neden reddedildi — constraint tracking
         if (effect.constraintsTriggered.includes('EFFICIENCY_FILTER')) stats.efficiencyRejected++
         if (effect.constraintsTriggered.includes('SHOCK_GUARDRAIL'))   stats.shockRejected++
+        rejected.push({ candidate, effect })
       }
     } catch {
       // Aksiyon uygulanamadı, atla
@@ -274,7 +286,7 @@ function evaluateCandidates(
     }
   }
 
-  return { results, stats }
+  return { results, rejected, stats }
 }
 
 /**
@@ -343,6 +355,50 @@ function buildScenario(
 
   if (process.env.DEBUG_SCENARIO) {
     console.log(`[buildScenario:${horizonKey}] Regime=${regime}, GapBand=${gapBand}, UnlockStage=${unlockStage}`)
+  }
+
+  // ─────────────────────────────────────────────────
+  // F-4e: Eligibility map — 14 aksiyonun durumunu izler
+  // ─────────────────────────────────────────────────
+  const eligibilityMap = new Map<string, ActionEligibilityReport>()
+
+  for (const [actionId, template] of Object.entries(ACTION_CATALOG)) {
+    const inHorizon = horizon.allowedActionIds.includes(actionId as ActionId)
+    eligibilityMap.set(actionId, {
+      actionId,
+      actionName: template.name,
+      family: getActionFamily(actionId as ActionId),
+      status: 'NOT_EVALUABLE' as ActionEligibilityStatus,
+      reasonCode:   inHorizon ? undefined : 'NOT_IN_HORIZON' as RejectionReasonCode,
+      reasonMessage: inHorizon ? undefined : `${horizonKey} ufkunda bu aksiyon izinli değil`,
+    })
+  }
+
+  // Ön sınıflandırma: başlangıç analizi üzerinde bir kez çalıştır
+  // NO_ELIGIBLE_SOURCE vs PRECONDITION_FAIL ayrımı için
+  {
+    const initCands = generateCandidates(analysis, horizonKey, { stressLevel, microFilter }, regime, gapBand, unlockStage)
+    const initCandIds = new Set(initCands.map(c => c.actionId))
+
+    for (const actionId of horizon.allowedActionIds) {
+      const row = eligibilityMap.get(actionId)
+      if (!row) continue
+
+      const cand = initCands.find(c => c.actionId === actionId)
+      if (!cand) {
+        // generateCandidates üretmedi — kaynak hesap yok veya sektör blokajı
+        row.reasonCode    = 'NO_ELIGIBLE_SOURCE'
+        row.reasonMessage = 'Kaynak hesap bulunamadı veya sektör tarafından bloke'
+      } else if (!cand.preconditionPassed) {
+        row.status        = 'REJECTED' as ActionEligibilityStatus
+        row.reasonCode    = 'PRECONDITION_FAIL' as RejectionReasonCode
+        row.reasonMessage = cand.preconditionFailures.join('; ').slice(0, 200)
+      }
+      // else: ön koşul OK ve kaynak var — değerlendirme döngüsüne bırak
+    }
+
+    // initCandIds kullanılmadı uyarısını baskıla
+    void initCandIds
   }
 
   // Horizon bazlı sınırlar
@@ -423,13 +479,44 @@ function buildScenario(
       }
 
       // Değerlendir — adaptive efficiency filter
-      const { results: evaluated, stats: evalStats } = evaluateCandidates(
+      const { results: evaluated, rejected: evalRejected, stats: evalStats } = evaluateCandidates(
         currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey, regime, gapBand, unlockStage
       )
       totalCandidatesEvaluated += evalStats.evaluated
       totalCandidatesAccepted  += evalStats.accepted
       totalEfficiencyRejected  += evalStats.efficiencyRejected
       totalShockRejected       += evalStats.shockRejected
+
+      // F-4e: Reddedilen adaylar için eligibility map güncelle
+      for (const rej of evalRejected) {
+        const row = eligibilityMap.get(rej.candidate.actionId)
+        if (!row || row.status === 'SELECTED') continue
+        const ct = rej.effect.constraintsTriggered
+        const reasonCode: RejectionReasonCode = ct.includes('SHOCK_GUARDRAIL')  ? 'SHOCK_GUARDRAIL'
+          : ct.includes('EFFICIENCY_FILTER')                                     ? 'EFFICIENCY_FAIL'
+          : ct.includes('MINIMAL_IMPACT')                                        ? 'ZERO_IMPACT'
+          : 'HARD_REJECT'
+        row.status        = 'REJECTED'
+        row.reasonCode    = reasonCode
+        row.reasonMessage = (rej.effect.warnings ?? []).join('; ').slice(0, 200) || undefined
+        row.proposedAmount      = rej.effect.amountApplied
+        row.scoreDelta          = rej.effect.actualScoreDelta
+        row.balanceSheetImpact  = rej.effect.balanceSheetImpact
+        row.priorityScore       = rej.effect.scoreBreakdown.finalPriorityScore
+      }
+
+      // F-4e: Geçen adayları ELIGIBLE olarak işaretle
+      for (const ev of evaluated) {
+        const row = eligibilityMap.get(ev.candidate.actionId)
+        if (!row || row.status === 'SELECTED') continue
+        row.status             = 'ELIGIBLE'
+        row.reasonCode         = undefined
+        row.reasonMessage      = undefined
+        row.proposedAmount     = ev.effect.amountApplied
+        row.scoreDelta         = ev.effect.actualScoreDelta
+        row.balanceSheetImpact = ev.effect.balanceSheetImpact
+        row.priorityScore      = ev.effect.scoreBreakdown.finalPriorityScore
+      }
 
       if (evaluated.length === 0) {
         // Unlock dene (ilk denemede)
@@ -444,6 +531,22 @@ function buildScenario(
 
       // Çakışma çözümü
       const resolved = resolveConflicts(evaluated)
+
+      // F-4e: Çakışma nedeniyle elenenleri işaretle
+      if (resolved.length < evaluated.length) {
+        const resolvedIds = new Set(resolved.map(r => r.candidate.actionId))
+        for (const ev of evaluated) {
+          if (!resolvedIds.has(ev.candidate.actionId)) {
+            const row = eligibilityMap.get(ev.candidate.actionId)
+            if (row && row.status === 'ELIGIBLE') {
+              row.status        = 'REJECTED'
+              row.reasonCode    = 'CONFLICTED_OUT'
+              row.reasonMessage = 'Çakışan yüksek öncelikli aksiyon seçildi'
+            }
+          }
+        }
+      }
+
       if (resolved.length === 0) {
         if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (çakışma sonrası)' }
         break outerLoop
@@ -472,6 +575,9 @@ function buildScenario(
         if (Math.max(newCAShare, newNCAShare, newSTLShare, newLTLShare, newEqShare) > ABSOLUTE_GROUP_SHARE_HARD_STOP) {
           skipCount++
           incGuardrail('CUM_GUARDRAIL_ABSOLUTE_HARD_STOP')
+          // F-4e
+          const _r = eligibilityMap.get(item.candidate.actionId)
+          if (_r && _r.status === 'ELIGIBLE') { _r.status = 'REJECTED'; _r.reasonCode = 'CUM_GUARDRAIL_ABSOLUTE_HARD_STOP'; _r.reasonMessage = `Mutlak grup payı ${(ABSOLUTE_GROUP_SHARE_HARD_STOP*100).toFixed(0)}% sınırı aşıldı` }
           continue
         }
 
@@ -487,6 +593,9 @@ function buildScenario(
         if (worstDeterioration > cumulativeGuards.maxGroupShareDeteriorationPP) {
           skipCount++
           incGuardrail('CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION')
+          // F-4e
+          const _r = eligibilityMap.get(item.candidate.actionId)
+          if (_r && _r.status === 'ELIGIBLE') { _r.status = 'REJECTED'; _r.reasonCode = 'CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION'; _r.reasonMessage = `Grup payı bozulması ${(worstDeterioration*100).toFixed(1)}pp > limit ${(cumulativeGuards.maxGroupShareDeteriorationPP*100).toFixed(1)}pp` }
           continue
         }
 
@@ -494,6 +603,9 @@ function buildScenario(
         if (newEqShare - initialEquityShare > cumulativeGuards.maxEquityIncreasePP) {
           skipCount++
           incGuardrail('CUM_GUARDRAIL_EQUITY_PP')
+          // F-4e
+          const _r = eligibilityMap.get(item.candidate.actionId)
+          if (_r && _r.status === 'ELIGIBLE') { _r.status = 'REJECTED'; _r.reasonCode = 'CUM_GUARDRAIL_EQUITY_PP'; _r.reasonMessage = `Kümülatif özkaynak artışı ${((newEqShare-initialEquityShare)*100).toFixed(1)}pp > limit ${(cumulativeGuards.maxEquityIncreasePP*100).toFixed(1)}pp` }
           continue
         }
 
@@ -501,6 +613,9 @@ function buildScenario(
         if (initialKvykShare - newSTLShare > cumulativeGuards.maxKvykDecreasePP) {
           skipCount++
           incGuardrail('CUM_GUARDRAIL_KVYK_PP')
+          // F-4e
+          const _r = eligibilityMap.get(item.candidate.actionId)
+          if (_r && _r.status === 'ELIGIBLE') { _r.status = 'REJECTED'; _r.reasonCode = 'CUM_GUARDRAIL_KVYK_PP'; _r.reasonMessage = `Kümülatif KVYK azalışı ${((initialKvykShare-newSTLShare)*100).toFixed(1)}pp > limit ${(cumulativeGuards.maxKvykDecreasePP*100).toFixed(1)}pp` }
           continue
         }
 
@@ -588,6 +703,25 @@ function buildScenario(
     stopReason = { code: 'MAX_ACTIONS_REACHED', message: `${maxActions} aksiyon sınırına ulaşıldı` }
   }
 
+  // F-4e: Seçilen aksiyonları SELECTED olarak işaretle + selectionCount
+  {
+    const selectionCounts = new Map<string, number>()
+    for (const act of chosenActions) {
+      selectionCounts.set(act.actionId, (selectionCounts.get(act.actionId) ?? 0) + 1)
+    }
+    for (const [actionId, count] of selectionCounts.entries()) {
+      const row = eligibilityMap.get(actionId)
+      if (row) {
+        row.status         = 'SELECTED'
+        row.selectionCount = count
+        row.reasonCode     = undefined
+        row.reasonMessage  = undefined
+      }
+    }
+  }
+
+  const eligibilityReport = Array.from(eligibilityMap.values())
+
   // Tutarlılık kontrolü: toplam delta ≈ senaryo skor artışı (±0.1 tolerans)
   const totalDelta    = chosenActions.reduce((s, a) => s + a.actualScoreDelta, 0)
   const scenarioDelta = scoreNow - currentScore
@@ -609,6 +743,7 @@ function buildScenario(
     goalReached: scoreNow >= targetScore,
     targetGrade,
     stopReason,
+    eligibilityReport,
     _metrics: {
       candidatesGenerated:         totalCandidatesGenerated,
       candidatesEvaluated:         totalCandidatesEvaluated,
@@ -684,6 +819,18 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
           'Nakit pozisyonu — 30 günlük ödeme yükümlülüklerini karşılamalı',
           'Faiz karşılama oranı — 2.0x altına inerse finansal yük değerlendirilmedi',
         ],
+        eligibilityReport: Object.keys(ACTION_CATALOG).map(actionId => ({
+          actionId,
+          actionName: ACTION_CATALOG[actionId as ActionId].name,
+          family: getActionFamily(actionId as ActionId),
+          status: 'NOT_EVALUABLE' as ActionEligibilityStatus,
+          reasonCode:   (horizon.allowedActionIds.includes(actionId as ActionId)
+            ? undefined
+            : 'NOT_IN_HORIZON') as RejectionReasonCode | undefined,
+          reasonMessage: horizon.allowedActionIds.includes(actionId as ActionId)
+            ? 'Acil müdahale ufku atlandı (stres sinyali yok)'
+            : `${horizon.key} ufkunda bu aksiyon izinli değil`,
+        })),
         _metrics: {
           candidatesGenerated: 0, candidatesEvaluated: 0, candidatesAccepted: 0,
           efficiencyRejected: 0, shockRejected: 0, cumulativeGuardrailBreak: false,

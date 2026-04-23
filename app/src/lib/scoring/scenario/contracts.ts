@@ -214,6 +214,42 @@ export interface ActionEffect {
   afterAnalysis: SixGroupAnalysis
 }
 
+// ─── F-4e: Aksiyon Eligibility Raporu ────────────────────────────────────────
+
+export type ActionEligibilityStatus = 'SELECTED' | 'ELIGIBLE' | 'REJECTED' | 'NOT_EVALUABLE'
+
+export type RejectionReasonCode =
+  | 'NOT_IN_HORIZON'
+  | 'PRECONDITION_FAIL'
+  | 'NO_ELIGIBLE_SOURCE'
+  | 'MATERIALITY_FAIL'
+  | 'EFFICIENCY_FAIL'
+  | 'SHOCK_GUARDRAIL'
+  | 'CUM_GUARDRAIL_EQUITY_PP'
+  | 'CUM_GUARDRAIL_KVYK_PP'
+  | 'CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION'
+  | 'CUM_GUARDRAIL_ABSOLUTE_HARD_STOP'
+  | 'CONFLICTED_OUT'
+  | 'DATA_MISSING_PNL'
+  | 'REPEATED_MAX'
+  | 'ZERO_IMPACT'
+  | 'HARD_REJECT'
+
+export interface ActionEligibilityReport {
+  actionId: string
+  actionName: string
+  family: 'WC_COMPOSITION' | 'DEBT_STRUCTURE' | 'EQUITY_PNL'
+  status: ActionEligibilityStatus
+  reasonCode?: RejectionReasonCode
+  reasonMessage?: string
+  proposedAmount?: number
+  scoreDelta?: number
+  balanceSheetImpact?: number
+  priorityScore?: number
+  /** Kaç kere seçildi (long horizon aksiyon tekrarı için) */
+  selectionCount?: number
+}
+
 export interface MeaningfulImpactThresholds {
   minCurrentRatioDelta: number                 // default +0.03
   minEquityRatioDelta: number                  // default +0.005 (0.5pp)

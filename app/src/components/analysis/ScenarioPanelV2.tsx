@@ -277,6 +277,90 @@ function ScenarioCard({ scenario }: { scenario: any }) {
         <p>{scenario.actions?.length ?? 0} aksiyon önerisi</p>
         <p>{formatTL(scenario.totalTLMovement ?? 0)} toplam hareket</p>
       </div>
+
+      {/* F-4e: 14 Aksiyon Eligibility Paneli */}
+      {scenario.eligibilityReport && scenario.eligibilityReport.length > 0 && (
+        <details className="mt-4 border-t border-slate-200 pt-4">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 select-none">
+            🔍 14 Aksiyon Analizi —{' '}
+            <span className="text-green-700">
+              {scenario.eligibilityReport.filter((r: any) => r.status === 'SELECTED').length} seçildi
+            </span>
+            {' · '}
+            <span className="text-blue-700">
+              {scenario.eligibilityReport.filter((r: any) => r.status === 'ELIGIBLE').length} eligible
+            </span>
+            {' · '}
+            <span className="text-red-700">
+              {scenario.eligibilityReport.filter((r: any) => r.status === 'REJECTED').length} reddedildi
+            </span>
+            {' · '}
+            <span className="text-slate-400">
+              {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_EVALUABLE').length} değerlendirilmedi
+            </span>
+          </summary>
+
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500">
+                  <th className="py-2 pr-3">Aksiyon</th>
+                  <th className="py-2 pr-3">Aile</th>
+                  <th className="py-2 pr-3">Durum</th>
+                  <th className="py-2 pr-3 text-right">Tutar</th>
+                  <th className="py-2 pr-3 text-right">Skor</th>
+                  <th className="py-2">Neden</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenario.eligibilityReport.map((row: any, i: number) => {
+                  const familyLabel = row.family === 'WC_COMPOSITION' ? 'Çalışma Sermayesi'
+                    : row.family === 'DEBT_STRUCTURE' ? 'Borç Yapısı'
+                    : 'Özkaynak/Kârlılık'
+                  const statusLabel = row.status === 'SELECTED'     ? '✅ Seçildi'
+                    : row.status === 'ELIGIBLE'     ? '🔵 Eligible'
+                    : row.status === 'REJECTED'     ? '❌ Red'
+                    : '⚪ Değ. yok'
+                  const rowBg = row.status === 'SELECTED'     ? 'bg-green-50'
+                    : row.status === 'ELIGIBLE'     ? 'bg-blue-50'
+                    : row.status === 'REJECTED'     ? 'bg-red-50'
+                    : ''
+                  return (
+                    <tr key={i} className={`border-b border-slate-100 ${rowBg}`}>
+                      <td className="py-1.5 pr-3 font-medium text-slate-800">
+                        {row.actionName}
+                        {row.selectionCount && row.selectionCount > 1 ? (
+                          <span className="ml-1 text-slate-400">×{row.selectionCount}</span>
+                        ) : null}
+                      </td>
+                      <td className="py-1.5 pr-3 text-slate-500">{familyLabel}</td>
+                      <td className="py-1.5 pr-3 whitespace-nowrap">{statusLabel}</td>
+                      <td className="py-1.5 pr-3 text-right text-slate-700">
+                        {row.proposedAmount ? `${(row.proposedAmount / 1e6).toFixed(1)}M` : '—'}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right text-emerald-700">
+                        {row.scoreDelta != null ? `+${row.scoreDelta.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="py-1.5 text-slate-500 text-[11px] max-w-[160px]">
+                        {row.reasonCode ? (
+                          <>
+                            <span className="font-mono text-slate-400">{row.reasonCode}</span>
+                            {row.reasonMessage && (
+                              <div className="text-slate-400 truncate" title={row.reasonMessage}>
+                                {row.reasonMessage.slice(0, 80)}
+                              </div>
+                            )}
+                          </>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </div>
   )
 }
