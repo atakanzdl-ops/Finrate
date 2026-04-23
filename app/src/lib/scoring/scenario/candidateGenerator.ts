@@ -7,6 +7,7 @@ import { ACTION_CATALOG } from './actionCatalog'
 import { SECTOR_PROFILES } from './sectorProfiles'
 import type { StressLevel } from './dynamicThresholds'
 import { evaluateDynamicPrecondition } from './dynamicPreconditions'
+import { getTargetCapPct, getGlobalCapPct, type HorizonKey } from './capMatrix'
 
 export interface ActionCandidate {
   actionId: ActionId
@@ -36,35 +37,34 @@ export interface AmountCapResult {
 }
 
 /**
- * Fix E: Çift taraflı büyüklük kontrolü.
- * suggestedPct bazlı tutara hem targetMaxPctOfTargetGroup hem de
- * globalMaxPctOfAssets cap'lerini uygular.
+ * Fix E + F-2: Çift taraflı büyüklük kontrolü.
+ * suggestedPct bazlı tutara hem targetMaxPct (ufuk+sektör bazlı) hem de
+ * globalMaxPctOfAssets (ufuk bazlı) cap'lerini uygular.
  */
 export function computeBoundedAmount(
   base: number,
   template: ActionTemplate,
-  analysis: SixGroupAnalysis
+  analysis: SixGroupAnalysis,
+  horizon: HorizonKey = 'medium',
+  sector: SectorCode = 'MANUFACTURING'
 ): AmountCapResult {
   const rangeCap = base * template.amountRule.maxPct
 
-  // Hedef grup cap'i
+  // Hedef grup cap'i — ufuk + sektör bazlı dinamik değer
   let targetGroupCap = Infinity
-  if (
-    template.amountRule.targetMaxPctOfTargetGroup != null &&
-    template.targetGroup !== 'EXTERNAL'
-  ) {
+  if (template.targetGroup !== 'EXTERNAL') {
     const tgt = template.targetGroup as Exclude<GroupCode, 'EXTERNAL'>
     const targetGroupTotal = Math.abs(analysis.groups[tgt]?.total ?? 0)
     if (targetGroupTotal > 0) {
-      targetGroupCap = targetGroupTotal * template.amountRule.targetMaxPctOfTargetGroup
+      const targetMaxPct = getTargetCapPct(template.id as ActionId, horizon, sector)
+      targetGroupCap = targetGroupTotal * targetMaxPct
     }
   }
 
-  // Global aktif cap'i
-  let assetsCap = Infinity
-  if (template.amountRule.globalMaxPctOfAssets != null && analysis.totals.assets > 0) {
-    assetsCap = analysis.totals.assets * template.amountRule.globalMaxPctOfAssets
-  }
+  // Global aktif cap'i — ufuk bazlı dinamik değer
+  const assetsCap = analysis.totals.assets > 0
+    ? analysis.totals.assets * getGlobalCapPct(template.id as ActionId, horizon)
+    : Infinity
 
   const raw = base * template.amountRule.suggestedPct
   const effectiveCap = Math.min(rangeCap, targetGroupCap, assetsCap)
@@ -252,9 +252,11 @@ function determineDistributionMode(
 
 /**
  * Ana fonksiyon — tüm aday aksiyonları üretir.
+ * horizon: cap matrisinin hangi sütununu kullanacağını belirler.
  */
 export function generateCandidates(
   analysis: SixGroupAnalysis,
+  horizon: HorizonKey = 'medium',
   context?: {
     stressLevel?: StressLevel
     microFilter?: MicroFilterConfig
@@ -313,8 +315,8 @@ export function generateCandidates(
       template.amountRule.absoluteMax ?? Infinity
     )
 
-    // Fix E: computeBoundedAmount ile çift taraflı cap uygula
-    const capResult = computeBoundedAmount(base, template, analysis)
+    // Fix E + F-2: computeBoundedAmount ile ufuk+sektör bazlı cap uygula
+    const capResult = computeBoundedAmount(base, template, analysis, horizon, analysis.sector)
     const amountSuggested = capResult.amount
 
     const distributionMode = hasExternalSource

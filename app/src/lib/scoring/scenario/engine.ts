@@ -11,6 +11,7 @@ import {
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
+import { CUMULATIVE_GUARDRAILS, type HorizonKey } from './capMatrix'
 import { calculateRatiosFromAccounts } from '../ratios'
 import { calculateScore, scoreToRating } from '../score'
 import { computeDynamicThresholds, type StressLevel } from './dynamicThresholds'
@@ -186,7 +187,8 @@ function evaluateCandidates(
   candidates: ActionCandidate[],
   sector: string,
   thresholds: MeaningfulImpactThresholds,
-  minScore: number = MIN_EXECUTION_SCORE
+  minScore: number = MIN_EXECUTION_SCORE,
+  horizon: HorizonKey = 'medium'
 ): Array<{ candidate: ActionCandidate; effect: ActionEffect }> {
   const results: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
 
@@ -195,7 +197,7 @@ function evaluateCandidates(
     if (candidate.feasibilityMultiplier === 0) continue
 
     try {
-      const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds)
+      const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds, horizon)
 
       if (effect.scoreBreakdown.finalPriorityScore > minScore + SCORE_EPS) {
         results.push({ candidate, effect })
@@ -253,7 +255,7 @@ function buildScenario(
   stressLevel: StressLevel,
   microFilter: MicroFilterConfig
 ): ScenarioOutput {
-  const horizonKey = horizon.key
+  const horizonKey = horizon.key as HorizonKey
 
   // Horizon bazlı sınırlar
   const maxActions = horizonKey === 'long' ? MAX_ACTIONS_LONG
@@ -266,6 +268,15 @@ function buildScenario(
 
   const allowRepeat = horizonKey === 'long'
 
+  // Fix F-2: Kümülatif guardrail başlangıç referansı
+  const cumulativeGuards = CUMULATIVE_GUARDRAILS[horizonKey]
+  const initialEquityShare = analysis.totals.liabilitiesAndEquity > 0
+    ? analysis.groups.EQUITY.total / analysis.totals.liabilitiesAndEquity
+    : 0
+  const initialKvykShare = analysis.totals.liabilitiesAndEquity > 0
+    ? analysis.groups.SHORT_TERM_LIABILITIES.total / analysis.totals.liabilitiesAndEquity
+    : 0
+
   let currentAnalysis = analysis
   let scoreNow = currentScore
   let gradeNow = currentGrade
@@ -275,8 +286,8 @@ function buildScenario(
   for (let i = 0; i < maxActions; i++) {
     if (scoreNow >= targetScore) break
 
-    // Aday üret
-    const candidates = generateCandidates(currentAnalysis, { stressLevel, microFilter }).filter(c =>
+    // Aday üret — Fix F-2: horizonKey geçiriliyor (cap matrisini belirler)
+    const candidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }).filter(c =>
       horizon.allowedActionIds.includes(c.actionId)
     )
 
@@ -293,8 +304,8 @@ function buildScenario(
       fresh = candidates.filter(c => !alreadyPicked.has(c.actionId))
     }
 
-    // Değerlendir — horizon bazlı minScore
-    const evaluated = evaluateCandidates(currentAnalysis, fresh, sector, thresholds, minExecScore)
+    // Değerlendir — horizon bazlı minScore + efficiency filter
+    const evaluated = evaluateCandidates(currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey)
     if (evaluated.length === 0) break
 
     // Çakışma çözümü
@@ -357,6 +368,51 @@ function buildScenario(
 
     chosenActions.push(best.effect)
     totalTL += best.effect.amountApplied
+
+    // Fix F-2: Kümülatif guardrail kontrolü
+    const newEquityShare = currentAnalysis.totals.liabilitiesAndEquity > 0
+      ? currentAnalysis.groups.EQUITY.total / currentAnalysis.totals.liabilitiesAndEquity
+      : 0
+    const newKvykShare = currentAnalysis.totals.liabilitiesAndEquity > 0
+      ? currentAnalysis.groups.SHORT_TERM_LIABILITIES.total / currentAnalysis.totals.liabilitiesAndEquity
+      : 0
+
+    const cumEquityIncrease = newEquityShare - initialEquityShare
+    const cumKvykDecrease   = initialKvykShare - newKvykShare
+
+    if (cumEquityIncrease > cumulativeGuards.maxEquityIncreasePP) {
+      console.warn(
+        `[buildScenario:${horizonKey}] Kümülatif özkaynak artışı ${(cumEquityIncrease * 100).toFixed(1)}pp (limit ${cumulativeGuards.maxEquityIncreasePP * 100}pp) — iterasyon durduruluyor`
+      )
+      break
+    }
+    if (cumKvykDecrease > cumulativeGuards.maxKvykDecreasePP) {
+      console.warn(
+        `[buildScenario:${horizonKey}] Kümülatif KVYK düşüşü ${(cumKvykDecrease * 100).toFixed(1)}pp (limit ${cumulativeGuards.maxKvykDecreasePP * 100}pp) — iterasyon durduruluyor`
+      )
+      break
+    }
+
+    // Herhangi bir grubun bilanço içi payı %65'i aştı mı?
+    const ltotal = currentAnalysis.totals.liabilitiesAndEquity > 0
+      ? currentAnalysis.totals.liabilitiesAndEquity
+      : 1
+    const atotal = currentAnalysis.totals.assets > 0
+      ? currentAnalysis.totals.assets
+      : 1
+    const maxGroupShare = Math.max(
+      currentAnalysis.groups.CURRENT_ASSETS.total / atotal,
+      currentAnalysis.groups.NON_CURRENT_ASSETS.total / atotal,
+      currentAnalysis.groups.SHORT_TERM_LIABILITIES.total / ltotal,
+      currentAnalysis.groups.LONG_TERM_LIABILITIES.total / ltotal,
+      currentAnalysis.groups.EQUITY.total / ltotal,
+    )
+    if (maxGroupShare > cumulativeGuards.maxGroupShare) {
+      console.warn(
+        `[buildScenario:${horizonKey}] Grup payı ${(maxGroupShare * 100).toFixed(1)}% (limit ${cumulativeGuards.maxGroupShare * 100}%) — iterasyon durduruluyor`
+      )
+      break
+    }
   }
 
   // Tutarlılık kontrolü: toplam delta ≈ senaryo skor artışı (±0.1 tolerans)

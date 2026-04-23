@@ -4,6 +4,7 @@ import type {
   MeaningfulImpactThresholds,
 } from './contracts'
 import { DEFAULT_THRESHOLDS, DEFAULT_SHOCK_GUARDRAILS } from './contracts'
+import { EFFICIENCY_FILTER, type HorizonKey } from './capMatrix'
 import type { ActionCandidate } from './candidateGenerator'
 import { buildSixGroupAnalysis } from './analyzer'
 import { calculateRatiosFromAccounts } from '../ratios'
@@ -122,7 +123,8 @@ export function applyCandidate(
   candidate: ActionCandidate,
   amount: number,
   sector: string,
-  thresholds: MeaningfulImpactThresholds = DEFAULT_THRESHOLDS
+  thresholds: MeaningfulImpactThresholds = DEFAULT_THRESHOLDS,
+  horizon: HorizonKey = 'medium'
 ): ActionEffect {
   const warnings: string[] = []
   const constraintsTriggered: string[] = []
@@ -509,6 +511,43 @@ export function applyCandidate(
   // Standalone skor — iteratif bağlamda engine.ts tarafından override edilecek
   const scoreBeforeStandalone = calculateScore(ratiosBeforeRaw, sector).finalScore
   const scoreAfterStandalone  = calculateScore(ratiosAfterRaw,  sector).finalScore
+  const standaloneDelta = scoreAfterStandalone - scoreBeforeStandalone
+
+  // ───────────────────────────────────────────────
+  // Fix F-2: Verim filtresi — düşük etki / yüksek maliyet aksiyonları eliyor
+  // ───────────────────────────────────────────────
+  const bsImpactForEff = analysis.totals.assets > 0
+    ? clampedAmount / analysis.totals.assets
+    : 0
+  const efficiency = bsImpactForEff > 0
+    ? standaloneDelta / (bsImpactForEff * 100)
+    : 0
+
+  const effFilter = EFFICIENCY_FILTER[horizon]
+  const efficiencyReasons: string[] = []
+
+  // Hard reject: çok büyük bilanço hareketi, çok küçük skor katkısı
+  if (
+    bsImpactForEff > effFilter.hardReject.balanceSheetImpactGt &&
+    standaloneDelta < effFilter.hardReject.scoreDeltaLt
+  ) {
+    efficiencyReasons.push(
+      `Verim düşük (hard): ${(bsImpactForEff * 100).toFixed(1)}% bilanço hareketi için sadece +${standaloneDelta.toFixed(2)} puan`
+    )
+  }
+
+  // Min efficiency: (puan kazancı) / (bilanço hareketi %) eşiğini geçmeli
+  if (efficiencyReasons.length === 0 && efficiency < effFilter.minEfficiency) {
+    efficiencyReasons.push(
+      `Verim ${efficiency.toFixed(2)} < eşik ${effFilter.minEfficiency} (1% bilanço hareketi başına puan)`
+    )
+  }
+
+  if (efficiencyReasons.length > 0) {
+    constraintsTriggered.push('EFFICIENCY_FILTER')
+    warnings.push(...efficiencyReasons)
+    finalPriorityScore = 0
+  }
 
   return {
     schemaVersion: "1.0.0",
@@ -536,7 +575,7 @@ export function applyCandidate(
     targetGroupImpact,
     balanceSheetImpact,
     bindingCap: candidate.bindingCap ?? null,
-    actualScoreDelta:  scoreAfterStandalone - scoreBeforeStandalone,
+    actualScoreDelta:  standaloneDelta,
     scoreBeforeAction: scoreBeforeStandalone,
     scoreAfterAction:  scoreAfterStandalone,
   }
