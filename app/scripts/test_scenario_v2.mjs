@@ -184,7 +184,14 @@ async function main() {
           const deltaCur = a.ratioDelta.CURRENT_RATIO.toFixed(3)
           const deltaQuick = a.ratioDelta.QUICK_RATIO.toFixed(3)
           const family = getActionFamily(a.actionId)
-          console.log(`        • ${a.actionId} [${family}] — ${amount}M TL, ΔCari=${deltaCur}, ΔQuick=${deltaQuick}, skor=${priority}`)
+          // Fix E: raporlama metrikleri
+          const tgImpact = a.targetGroupImpact != null ? `targetImpact=${(a.targetGroupImpact*100).toFixed(1)}%` : ''
+          const bsImpact = a.balanceSheetImpact  != null ? `bsImpact=${(a.balanceSheetImpact*100).toFixed(1)}%` : ''
+          const binding  = a.bindingCap ? `binding=${a.bindingCap}` : ''
+          const shockWarn = a.constraintsTriggered?.includes('SHOCK_GUARDRAIL') ? ' ⚡SHOCK' : ''
+          const capInfo = [tgImpact, bsImpact, binding].filter(Boolean).join(', ')
+          console.log(`        • ${a.actionId} [${family}]${shockWarn} — ${amount}M TL, ΔCari=${deltaCur}, ΔQuick=${deltaQuick}, skor=${priority}`)
+          if (capInfo) console.log(`            📊 ${capInfo}`)
 
           // Hesap hareketleri — özet
           const topMoves = a.accountMovements
@@ -328,6 +335,84 @@ async function main() {
   }
 
   console.log('\n✓ Ters bakiye reklasifikasyon testi başarılı')
+
+  // ============ FIX E: ŞOK GUARDRAIL TESTİ ============
+  // Küçük bir firmada büyük bir aksiyon şok guardrail'i tetiklemeli
+  console.log('\n\n╔═══ FIX E: ŞOK GUARDRAIL TESTİ (küçük firma) ═══╗')
+
+  // Çok küçük bilanço — toplam aktif ~5M TL
+  const tinyAccounts = [
+    { accountCode: '102', amount: 1_000_000 },   // Banka
+    { accountCode: '120', amount: 800_000 },     // Alacak
+    { accountCode: '252', amount: 2_000_000 },   // Bina
+    { accountCode: '300', amount: 500_000 },     // KV kredi
+    { accountCode: '320', amount: 300_000 },     // Satıcılar
+    { accountCode: '500', amount: 3_000_000 },   // Sermaye
+    { accountCode: '600', amount: 5_000_000 },   // Satış
+    { accountCode: '621', amount: 3_500_000 },   // SMM
+  ]
+
+  const tinyRatios = calculateRatiosFromAccounts(tinyAccounts)
+  const tinyScore = calculateScore(tinyRatios, 'İmalat')
+
+  console.log(`Küçük firma toplam aktif: ~${(1_000_000 + 800_000 + 2_000_000).toLocaleString('tr-TR')} TL`)
+  console.log(`Skor: ${tinyScore.finalScore.toFixed(1)} (${scoreToRating(tinyScore.finalScore)})`)
+
+  const tinyResult = runScenarioEngine({
+    accounts: tinyAccounts,
+    companyId: 'synthetic-tiny',
+    scenarioId: 'test-tiny-shock',
+    sector: 'İmalat',
+    currentScore: tinyScore.finalScore,
+    currentGrade: scoreToRating(tinyScore.finalScore),
+    targetGrade: 'AA',
+    targetScore: 85,
+    currentRatios: {
+      CURRENT_RATIO: tinyRatios.currentRatio ?? 0,
+      CASH_RATIO: tinyRatios.cashRatio ?? 0,
+      QUICK_RATIO: tinyRatios.quickRatio ?? 0,
+      EQUITY_RATIO: tinyRatios.equityRatio ?? 0,
+      DEBT_TO_EQUITY: tinyRatios.debtToEquity ?? 0,
+      INTEREST_COVERAGE: tinyRatios.interestCoverage ?? 0,
+    },
+  })
+
+  // Tüm aksiyonlar içinde SHOCK_GUARDRAIL tetiklenenleri bul
+  let shockCount = 0
+  for (const scen of tinyResult.scenarios) {
+    for (const a of (scen.actions ?? [])) {
+      if (a.constraintsTriggered?.includes('SHOCK_GUARDRAIL')) {
+        shockCount++
+        console.log(`  ⚡ SHOCK tetiklendi: ${a.actionId} — skor=${a.scoreBreakdown.finalPriorityScore.toFixed(1)}`)
+        for (const w of a.warnings) {
+          if (w.includes('Şok guardrail')) console.log(`       ${w}`)
+        }
+      }
+    }
+    // Skipped senaryolarda da watchlist'e bak
+    if (scen.watchlist?.length) {
+      for (const w of scen.watchlist) {
+        if (w.includes('SHOCK')) console.log(`  👁 Watchlist: ${w}`)
+      }
+    }
+  }
+
+  // cap metrikleri — tüm horizonlardaki aksiyonları tara
+  console.log(`\nFix E cap metrikleri (küçük firma):`)
+  for (const scen of tinyResult.scenarios) {
+    for (const a of (scen.actions ?? [])) {
+      const tgI = a.targetGroupImpact != null ? `targetImpact=${(a.targetGroupImpact*100).toFixed(1)}%` : '-'
+      const bsI = a.balanceSheetImpact  != null ? `bsImpact=${(a.balanceSheetImpact*100).toFixed(1)}%` : '-'
+      const bnd = a.bindingCap ? `binding=${a.bindingCap}` : 'binding=none'
+      console.log(`  ${a.actionId}: ${tgI}, ${bsI}, ${bnd}`)
+    }
+  }
+
+  if (shockCount > 0) {
+    console.log(`\n✓ Şok guardrail testi başarılı — ${shockCount} aksiyon guardrail'e takıldı`)
+  } else {
+    console.log(`\n⚠ Şok guardrail bu küçük firma verisinde tetiklenmedi (cap yine de çalışıyor olabilir — log'u kontrol et)`)
+  }
 
   await prisma.$disconnect()
 }

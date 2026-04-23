@@ -3,7 +3,7 @@ import type {
   DistributionMode, SixGroupAnalysis, RatioCode, GroupCode,
   MeaningfulImpactThresholds,
 } from './contracts'
-import { DEFAULT_THRESHOLDS } from './contracts'
+import { DEFAULT_THRESHOLDS, DEFAULT_SHOCK_GUARDRAILS } from './contracts'
 import type { ActionCandidate } from './candidateGenerator'
 import { buildSixGroupAnalysis } from './analyzer'
 import { calculateRatiosFromAccounts } from '../ratios'
@@ -236,6 +236,80 @@ export function applyCandidate(
   }
 
   // ───────────────────────────────────────────────
+  // Fix E: Şok Guardrail — tek aksiyon bilanço şoku kontrolü
+  // ───────────────────────────────────────────────
+  const shockViolations: string[] = []
+  const shockGroups = [
+    'CURRENT_ASSETS', 'NON_CURRENT_ASSETS',
+    'SHORT_TERM_LIABILITIES', 'LONG_TERM_LIABILITIES', 'EQUITY',
+  ] as const
+
+  for (const g of shockGroups) {
+    const before = Math.abs(analysis.groups[g].total)
+    const delta  = Math.abs(groupDelta[g])
+    if (before > 0 && delta / before > DEFAULT_SHOCK_GUARDRAILS.maxGroupChangePct) {
+      shockViolations.push(
+        `${g}: %${(delta / before * 100).toFixed(1)} > %${(DEFAULT_SHOCK_GUARDRAILS.maxGroupChangePct * 100).toFixed(0)}`
+      )
+    }
+  }
+
+  // Toplam aktif değişimi
+  const totalAssetsDelta = Math.abs(afterAnalysis.totals.assets - analysis.totals.assets)
+  if (
+    analysis.totals.assets > 0 &&
+    totalAssetsDelta / analysis.totals.assets > DEFAULT_SHOCK_GUARDRAILS.maxTotalAssetChangePct
+  ) {
+    shockViolations.push(
+      `TOTAL_ASSETS: %${(totalAssetsDelta / analysis.totals.assets * 100).toFixed(1)} > %${(DEFAULT_SHOCK_GUARDRAILS.maxTotalAssetChangePct * 100).toFixed(0)}`
+    )
+  }
+
+  if (shockViolations.length > 0) {
+    constraintsTriggered.push("SHOCK_GUARDRAIL")
+    warnings.push(`Şok guardrail ihlali: ${shockViolations.join('; ')}`)
+
+    // Hard reject — score 0, erken dön
+    const targetGroupForImpact = candidate.template.targetGroup !== 'EXTERNAL'
+      ? analysis.groups[candidate.template.targetGroup as Exclude<GroupCode, 'EXTERNAL'>]
+      : null
+    const tgImpact = targetGroupForImpact && Math.abs(targetGroupForImpact.total) > 0
+      ? clampedAmount / Math.abs(targetGroupForImpact.total)
+      : null
+    const bsImpact = analysis.totals.assets > 0
+      ? clampedAmount / analysis.totals.assets
+      : null
+
+    return {
+      schemaVersion: "1.0.0",
+      scenarioId: analysis.scenarioId,
+      actionId: candidate.actionId,
+      distributionModeApplied: candidate.distributionMode,
+      amountRequested: amount,
+      amountApplied: clampedAmount,
+      beforeRatios,
+      afterRatios,
+      ratioDelta,
+      groupDelta,
+      accountMovements,
+      constraintsTriggered,
+      warnings,
+      scoreBreakdown: {
+        materiality: 0,
+        manageability: 0,
+        costScore: 0,
+        feasibilityMultiplier: candidate.feasibilityMultiplier,
+        impactMultiplier: 0,
+        confidenceMultiplier: candidate.template.confidence,
+        finalPriorityScore: 0,
+      },
+      ...(tgImpact !== null && { targetGroupImpact: tgImpact }),
+      ...(bsImpact !== null && { balanceSheetImpact: bsImpact }),
+      bindingCap: candidate.bindingCap ?? null,
+    }
+  }
+
+  // ───────────────────────────────────────────────
   // Aşama 5a-5: Aksiyon ailesine göre minimal impact
   // ───────────────────────────────────────────────
 
@@ -412,6 +486,17 @@ export function applyCandidate(
   // Minimal impact — score 0
   if (!passesImpact) finalPriorityScore = 0
 
+  // Fix E: Raporlama metrikleri
+  const targetGroupAnalysisForMetrics = candidate.template.targetGroup !== 'EXTERNAL'
+    ? analysis.groups[candidate.template.targetGroup as Exclude<GroupCode, 'EXTERNAL'>]
+    : null
+  const targetGroupImpact = targetGroupAnalysisForMetrics && Math.abs(targetGroupAnalysisForMetrics.total) > 0
+    ? clampedAmount / Math.abs(targetGroupAnalysisForMetrics.total)
+    : undefined
+  const balanceSheetImpact = analysis.totals.assets > 0
+    ? clampedAmount / analysis.totals.assets
+    : undefined
+
   return {
     schemaVersion: "1.0.0",
     scenarioId: analysis.scenarioId,
@@ -435,5 +520,8 @@ export function applyCandidate(
       confidenceMultiplier,
       finalPriorityScore,
     },
+    targetGroupImpact,
+    balanceSheetImpact,
+    bindingCap: candidate.bindingCap ?? null,
   }
 }

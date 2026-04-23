@@ -12,6 +12,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.05,
       suggestedPct: 0.10,
       maxPct: 0.30,
+      targetMaxPctOfTargetGroup: 0.20,
+      globalMaxPctOfAssets: 0.08,
     },
     distributionDefault: "HYBRID_70_30",
     accountMappings: [
@@ -53,6 +55,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.05,
       suggestedPct: 0.12,
       maxPct: 0.25,
+      targetMaxPctOfTargetGroup: 0.18,
+      globalMaxPctOfAssets: 0.08,
     },
     distributionDefault: "HYBRID_70_30",
     accountMappings: [
@@ -91,6 +95,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.05,
       suggestedPct: 0.10,
       maxPct: 0.35,
+      targetMaxPctOfTargetGroup: 0.15,
+      globalMaxPctOfAssets: 0.08,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -130,6 +136,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.02,
       suggestedPct: 0.08,
       maxPct: 0.20,
+      targetMaxPctOfTargetGroup: 0.12,
+      globalMaxPctOfAssets: 0.08,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -170,6 +178,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.03,
       suggestedPct: 0.10,
       maxPct: 0.25,
+      targetMaxPctOfTargetGroup: 0.10,
+      globalMaxPctOfAssets: 0.05,
     },
     distributionDefault: "HYBRID_70_30",
     accountMappings: [
@@ -208,6 +218,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.03,
       suggestedPct: 0.08,
       maxPct: 0.20,
+      targetMaxPctOfTargetGroup: 0.12,
+      globalMaxPctOfAssets: 0.05,
     },
     distributionDefault: "HYBRID_70_30",
     accountMappings: [
@@ -246,6 +258,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.02,
       suggestedPct: 0.06,
       maxPct: 0.15,
+      targetMaxPctOfTargetGroup: 0.08,
+      globalMaxPctOfAssets: 0.05,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -284,6 +298,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.02,
       suggestedPct: 0.07,
       maxPct: 0.20,
+      targetMaxPctOfTargetGroup: 0.10,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -322,6 +338,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.03,
       suggestedPct: 0.10,
       maxPct: 0.30,
+      targetMaxPctOfTargetGroup: 0.12,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -361,6 +379,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.02,
       suggestedPct: 0.08,
       maxPct: 0.25,
+      targetMaxPctOfTargetGroup: 0.15,
+      globalMaxPctOfAssets: 0.10,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -399,6 +419,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.20,
       suggestedPct: 0.60,
       maxPct: 1.00,
+      targetMaxPctOfTargetGroup: 0.10,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [
@@ -437,6 +459,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.01,
       suggestedPct: 0.03,
       maxPct: 0.08,
+      targetMaxPctOfTargetGroup: 0.08,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "PROPORTIONAL",
     accountMappings: [
@@ -476,6 +500,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.01,
       suggestedPct: 0.04,
       maxPct: 0.10,
+      targetMaxPctOfTargetGroup: 0.08,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "PROPORTIONAL",
     accountMappings: [
@@ -514,6 +540,8 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
       minPct: 0.05,
       suggestedPct: 0.12,
       maxPct: 0.30,
+      targetMaxPctOfTargetGroup: 0.10,
+      globalMaxPctOfAssets: 0.06,
     },
     distributionDefault: "LARGEST_FIRST",
     accountMappings: [

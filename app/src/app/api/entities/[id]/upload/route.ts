@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (isExcel) {
       parsedRows = await parseExcelBuffer(buffer)
     } else if (isCsv) {
-      parsedRows = parseCsvText(buffer.toString('utf-8'))
+      parsedRows = await parseCsvText(buffer.toString('utf-8'))
     } else {
       const { parsePdfBuffer } = await import('@/lib/parsers/pdf')
       parsedRows = await parsePdfBuffer(buffer)

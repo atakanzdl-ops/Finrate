@@ -23,6 +23,68 @@ export interface ActionCandidate {
   preconditionFailures: string[]
   sectorPrioritized: boolean
   sectorDiscouraged: boolean
+  bindingCap?: 'targetGroup' | 'assets' | 'range' | null  // Fix E: hangi cap bağlayıcıydı
+}
+
+// Fix E: computeBoundedAmount sonucu
+export interface AmountCapResult {
+  amount: number
+  bindingCap: 'targetGroup' | 'assets' | 'range' | null
+  targetGroupCap: number
+  assetsCap: number
+  rangeCap: number
+}
+
+/**
+ * Fix E: Çift taraflı büyüklük kontrolü.
+ * suggestedPct bazlı tutara hem targetMaxPctOfTargetGroup hem de
+ * globalMaxPctOfAssets cap'lerini uygular.
+ */
+export function computeBoundedAmount(
+  base: number,
+  template: ActionTemplate,
+  analysis: SixGroupAnalysis
+): AmountCapResult {
+  const rangeCap = base * template.amountRule.maxPct
+
+  // Hedef grup cap'i
+  let targetGroupCap = Infinity
+  if (
+    template.amountRule.targetMaxPctOfTargetGroup != null &&
+    template.targetGroup !== 'EXTERNAL'
+  ) {
+    const tgt = template.targetGroup as Exclude<GroupCode, 'EXTERNAL'>
+    const targetGroupTotal = Math.abs(analysis.groups[tgt]?.total ?? 0)
+    if (targetGroupTotal > 0) {
+      targetGroupCap = targetGroupTotal * template.amountRule.targetMaxPctOfTargetGroup
+    }
+  }
+
+  // Global aktif cap'i
+  let assetsCap = Infinity
+  if (template.amountRule.globalMaxPctOfAssets != null && analysis.totals.assets > 0) {
+    assetsCap = analysis.totals.assets * template.amountRule.globalMaxPctOfAssets
+  }
+
+  const raw = base * template.amountRule.suggestedPct
+  const effectiveCap = Math.min(rangeCap, targetGroupCap, assetsCap)
+  const minFloor = base * template.amountRule.minPct
+  const amount = Math.max(minFloor, Math.min(raw, effectiveCap))
+
+  // Hangi cap bağlayıcı oldu?
+  let bindingCap: 'targetGroup' | 'assets' | 'range' | null = null
+  if (raw > effectiveCap) {
+    // En küçük cap bağlayıcıdır
+    if (targetGroupCap <= assetsCap && targetGroupCap <= rangeCap) {
+      bindingCap = 'targetGroup'
+    } else if (assetsCap <= targetGroupCap && assetsCap <= rangeCap) {
+      bindingCap = 'assets'
+    } else {
+      bindingCap = 'range'
+    }
+  }
+
+  return { amount, bindingCap, targetGroupCap, assetsCap, rangeCap }
 }
 
 /**
@@ -246,11 +308,14 @@ export function generateCandidates(
       base * template.amountRule.minPct,
       template.amountRule.absoluteMin ?? 0
     )
-    const amountSuggested = base * template.amountRule.suggestedPct
     const amountMax = Math.min(
       base * template.amountRule.maxPct,
       template.amountRule.absoluteMax ?? Infinity
     )
+
+    // Fix E: computeBoundedAmount ile çift taraflı cap uygula
+    const capResult = computeBoundedAmount(base, template, analysis)
+    const amountSuggested = capResult.amount
 
     const distributionMode = hasExternalSource
       ? template.distributionDefault
@@ -271,6 +336,7 @@ export function generateCandidates(
       preconditionFailures: combinedFailures,
       sectorPrioritized: sectorProfile.priorityActions.includes(template.id),
       sectorDiscouraged: sectorProfile.discouragedActions.includes(template.id),
+      bindingCap: capResult.bindingCap,
     })
   }
 

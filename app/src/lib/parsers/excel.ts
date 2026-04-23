@@ -633,9 +633,8 @@ export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Prom
 
 // ─── CSV ──────────────────────────────────────────────────────────────────────
 
-export function parseCsvText(text: string): ParsedRow[] {
+export async function parseCsvText(text: string): Promise<ParsedRow[]> {
   const wb = XLSX.read(text, { type: 'string' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
   return parseExcelBuffer(Buffer.from(buf))
 }

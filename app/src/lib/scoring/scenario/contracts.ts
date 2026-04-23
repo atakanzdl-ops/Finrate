@@ -132,6 +132,8 @@ export interface AmountRangeRule {
   maxPct: number                   // 0..1
   absoluteMin?: number             // TRY
   absoluteMax?: number             // TRY
+  targetMaxPctOfTargetGroup?: number // Hard cap: tutar hedef grubun bu yüzdesini geçemez (0..1)
+  globalMaxPctOfAssets?: number      // Hard cap: tutar toplam aktifin bu yüzdesini geçemez (0..1)
 }
 
 export interface AccountMappingRule {
@@ -200,6 +202,10 @@ export interface ActionEffect {
     confidenceMultiplier: number   // 0..1
     finalPriorityScore: number     // 0..100
   }
+  // Fix E: Çift taraflı büyüklük raporlama metrikleri
+  targetGroupImpact?: number       // uygulanan tutar / hedef grup büyüklüğü (0..1)
+  balanceSheetImpact?: number      // uygulanan tutar / toplam aktif (0..1)
+  bindingCap?: 'targetGroup' | 'assets' | 'range' | null  // hangi cap bağlayıcıydı
 }
 
 export interface MeaningfulImpactThresholds {
@@ -286,3 +292,27 @@ export const MIN_EXECUTION_SCORE = 0.1
 
 // UI tarafında gösterim için minimum skor (daha yüksek eşik)
 export const MIN_DISPLAY_SCORE = 0.5
+
+// Fix E: Şok Guardrail — tek bir aksiyonun bilanço üzerindeki ani şok etkisini sınırlar
+export interface ShockGuardrails {
+  maxGroupChangePct: number        // Herhangi bir grupta max değişim oranı (default 0.40 = %40)
+  maxTotalAssetChangePct: number   // Toplam aktifte max değişim oranı (default 0.25 = %25)
+  maxEquityChangePct: number       // Özkaynaklarda max değişim oranı (default 0.30 = %30)
+}
+
+export const DEFAULT_SHOCK_GUARDRAILS: ShockGuardrails = {
+  maxGroupChangePct: 0.40,
+  maxTotalAssetChangePct: 0.25,
+  maxEquityChangePct: 0.30,
+}
+
+// Fix E: Sektör sapma eşikleri — rasyo bazlı sektör normundan sapma kontrolü
+export interface SectorDeviationThresholds {
+  maxCurrentRatioDeviation: number   // Sektör medyanından max sapma (cari oran)
+  maxEquityRatioDeviation: number    // Sektör medyanından max sapma (özkaynak oranı)
+}
+
+export const DEFAULT_SECTOR_DEVIATION: SectorDeviationThresholds = {
+  maxCurrentRatioDeviation: 2.0,
+  maxEquityRatioDeviation: 0.40,
+}

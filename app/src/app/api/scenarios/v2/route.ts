@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (!analysis) {
+    if (!analysis || !analysis.entity) {
       return NextResponse.json({ error: 'Analiz bulunamadı' }, { status: 404 })
     }
 
@@ -80,12 +80,14 @@ export async function POST(req: NextRequest) {
     }))
 
     const ratios = calculateRatiosFromAccounts(accounts)
-    const sector = analysis.entity.sector ?? 'İmalat'
+    const sector: string = analysis.entity.sector ?? 'İmalat'
     const scoreResult = calculateScore(ratios, sector)
 
     // Subjektif bonus — DB'deki scoreFinal ile finansal skor arasındaki fark
     const financialScore = scoreResult.finalScore
-    const combinedScore  = analysis.scoreFinal != null ? Number(analysis.scoreFinal) : financialScore
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawScoreFinal = (analysis as any).scoreFinal
+    const combinedScore  = rawScoreFinal != null ? Number(rawScoreFinal) : financialScore
     const subjectiveBonus = combinedScore - financialScore
 
     const currentScore = combinedScore
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const result = runScenarioEngine({
       accounts,
-      companyId:  analysis.entityId,
+      companyId:  analysis.entityId ?? analysis.id,
       scenarioId: `solo-${analysis.id}-${Date.now()}`,
       sector,
       currentScore,
