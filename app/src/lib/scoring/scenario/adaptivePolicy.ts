@@ -73,8 +73,8 @@ export const GLOBAL_CAP_SCALING = {
 export const EFFICIENCY_POLICY = {
   minByRegimeAndHorizon: {
     STABLE:   { short: 0.50, medium: 0.35, long: 0.20 },
-    RECOVERY: { short: 0.40, medium: 0.28, long: 0.16 },
-    CRISIS:   { short: 0.30, medium: 0.20, long: 0.12 },
+    RECOVERY: { short: 0.30, medium: 0.22, long: 0.14 },
+    CRISIS:   { short: 0.20, medium: 0.15, long: 0.10 },
   },
   byGapBand: {
     SMALL:  1.05,
@@ -86,7 +86,7 @@ export const EFFICIENCY_POLICY = {
     1: 0.85,
     2: 0.70,
   },
-  floors: { short: 0.20, medium: 0.15, long: 0.10 },
+  floors: { short: 0.15, medium: 0.12, long: 0.08 },
 
   hardRejectByRegime: {
     STABLE: {
@@ -332,4 +332,37 @@ export function nextUnlockStage(current: 0 | 1 | 2): 0 | 1 | 2 {
   if (current === 0) return 1
   if (current === 1) return 2
   return 2
+}
+
+// ─── F-4b: Yön-duyarlı grup bozulma kontrolü ─────────────────────────────────
+
+/**
+ * Her grup için hangi yön "bozulma" sayılır:
+ *  - 'increase'  → pay artışı kötü (STL, CA artarsa tehlikeli)
+ *  - 'decrease'  → pay azalması kötü (EQUITY azalırsa tehlikeli)
+ *  - 'neither'   → yön değişimi nötr / beklenen (LTL ve NCA için)
+ *
+ * A01/A02/A03 gibi KV→UV çeviren aksiyonlarda LTL payı artar ama bu iyileştirmedir.
+ * Bu tabloya göre LONG_TERM_LIABILITIES + NON_CURRENT_ASSETS değişimi asla bozulma sayılmaz.
+ */
+export const GROUP_DETERIORATION_DIRECTION: Record<string, 'increase' | 'decrease' | 'neither'> = {
+  CURRENT_ASSETS:         'decrease',  // Dönen varlıklar azalırsa bozulma (likidite kaybı)
+  NON_CURRENT_ASSETS:     'neither',   // Duran varlık değişimi nötr
+  SHORT_TERM_LIABILITIES: 'increase',  // KVYK artarsa bozulma
+  LONG_TERM_LIABILITIES:  'neither',   // UVYK artması beklenen / iyi (vade uzatma)
+  EQUITY:                 'decrease',  // Özkaynak azalırsa bozulma
+}
+
+/**
+ * Belirli bir grup için verilen pay değişimi gerçek bir bozulma mı?
+ *
+ * @param groupKey   - Grup adı (örn. "SHORT_TERM_LIABILITIES")
+ * @param shareChange - Yeni pay - eski pay (pozitif = artış)
+ * @returns true → bozulma, false → beklenen/nötr değişim
+ */
+export function isDeteriorationForGroup(groupKey: string, shareChange: number): boolean {
+  const direction = GROUP_DETERIORATION_DIRECTION[groupKey] ?? 'neither'
+  if (direction === 'increase') return shareChange > 0
+  if (direction === 'decrease') return shareChange < 0
+  return false
 }

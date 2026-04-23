@@ -216,7 +216,7 @@ export interface ActionEffect {
 
 // ─── F-4e: Aksiyon Eligibility Raporu ────────────────────────────────────────
 
-export type ActionEligibilityStatus = 'SELECTED' | 'ELIGIBLE' | 'REJECTED' | 'NOT_EVALUABLE'
+export type ActionEligibilityStatus = 'SELECTED' | 'ELIGIBLE' | 'REJECTED' | 'NOT_EVALUABLE' | 'NOT_SELECTED_TARGET_REACHED'
 
 export type RejectionReasonCode =
   | 'NOT_IN_HORIZON'

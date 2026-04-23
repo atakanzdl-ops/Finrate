@@ -149,7 +149,6 @@ export const ACTION_CATALOG: Record<ActionId, ActionTemplate> = {
     ],
     preconditions: [
       { key: "group.CURRENT_ASSETS.account.102", operator: ">", value: 0 },
-      { key: "ratio.CASH_RATIO", operator: ">", value: 0.15 },
     ],
     sectorFeasibility: {
       CONSTRUCTION: "MEDIUM", MANUFACTURING: "MEDIUM", TRADE: "MEDIUM",

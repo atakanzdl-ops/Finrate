@@ -298,6 +298,14 @@ function ScenarioCard({ scenario }: { scenario: any }) {
             <span className="text-slate-400">
               {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_EVALUABLE').length} değerlendirilmedi
             </span>
+            {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_SELECTED_TARGET_REACHED').length > 0 && (
+              <>
+                {' · '}
+                <span className="text-slate-400">
+                  {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_SELECTED_TARGET_REACHED').length} hedef karşılandı
+                </span>
+              </>
+            )}
           </summary>
 
           <div className="mt-3 overflow-x-auto">
@@ -317,13 +325,15 @@ function ScenarioCard({ scenario }: { scenario: any }) {
                   const familyLabel = row.family === 'WC_COMPOSITION' ? 'Çalışma Sermayesi'
                     : row.family === 'DEBT_STRUCTURE' ? 'Borç Yapısı'
                     : 'Özkaynak/Kârlılık'
-                  const statusLabel = row.status === 'SELECTED'     ? '✅ Seçildi'
-                    : row.status === 'ELIGIBLE'     ? '🔵 Eligible'
-                    : row.status === 'REJECTED'     ? '❌ Red'
+                  const statusLabel = row.status === 'SELECTED'                  ? '✅ Seçildi'
+                    : row.status === 'ELIGIBLE'                    ? '🔵 Eligible'
+                    : row.status === 'REJECTED'                    ? '❌ Red'
+                    : row.status === 'NOT_SELECTED_TARGET_REACHED' ? '⚪ Hedef karşılandı'
                     : '⚪ Değ. yok'
-                  const rowBg = row.status === 'SELECTED'     ? 'bg-green-50'
-                    : row.status === 'ELIGIBLE'     ? 'bg-blue-50'
-                    : row.status === 'REJECTED'     ? 'bg-red-50'
+                  const rowBg = row.status === 'SELECTED'                  ? 'bg-green-50'
+                    : row.status === 'ELIGIBLE'                    ? 'bg-blue-50'
+                    : row.status === 'REJECTED'                    ? 'bg-red-50'
+                    : row.status === 'NOT_SELECTED_TARGET_REACHED' ? 'bg-slate-50'
                     : ''
                   return (
                     <tr key={i} className={`border-b border-slate-100 ${rowBg}`}>

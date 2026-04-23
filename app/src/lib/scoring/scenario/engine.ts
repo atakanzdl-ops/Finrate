@@ -19,6 +19,7 @@ import {
   determineRegime, determineGapBand, initialUnlockStage,
   computeCumulativeGuardrails, shouldUnlock, nextUnlockStage,
   GUARDRAIL_BREACH_POLICY, ABSOLUTE_GROUP_SHARE_HARD_STOP,
+  isDeteriorationForGroup,
   type Regime, type GapBand,
 } from './adaptivePolicy'
 import { calculateRatiosFromAccounts } from '../ratios'
@@ -581,15 +582,18 @@ function buildScenario(
           continue
         }
 
-        // Kontrol 2: Kümülatif bozulma — herhangi bir grubun payı başlangıca göre kötüleşti mi?
-        const worstDeterioration = Math.max(
-          0,
-          newCAShare  - initialShares.CURRENT_ASSETS,
-          newNCAShare - initialShares.NON_CURRENT_ASSETS,
-          newSTLShare - initialShares.SHORT_TERM_LIABILITIES,
-          newLTLShare - initialShares.LONG_TERM_LIABILITIES,
-          initialShares.EQUITY - newEqShare,  // özkaynak azalması = bozulma
-        )
+        // Kontrol 2: Yön-duyarlı kümülatif bozulma (F-4b) — sadece gerçek bozulmalar sayılır.
+        // LONG_TERM_LIABILITIES artışı (KV→UV çevirme) ve NON_CURRENT_ASSETS değişimi nötr sayılır.
+        const groupShareChanges: Record<string, number> = {
+          CURRENT_ASSETS:         newCAShare  - initialShares.CURRENT_ASSETS,
+          NON_CURRENT_ASSETS:     newNCAShare - initialShares.NON_CURRENT_ASSETS,
+          SHORT_TERM_LIABILITIES: newSTLShare - initialShares.SHORT_TERM_LIABILITIES,
+          LONG_TERM_LIABILITIES:  newLTLShare - initialShares.LONG_TERM_LIABILITIES,
+          EQUITY:                 newEqShare  - initialShares.EQUITY,
+        }
+        const worstDeterioration = Object.entries(groupShareChanges)
+          .filter(([key, change]) => isDeteriorationForGroup(key, change))
+          .reduce((max, [, change]) => Math.max(max, Math.abs(change)), 0)
         if (worstDeterioration > cumulativeGuards.maxGroupShareDeteriorationPP) {
           skipCount++
           incGuardrail('CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION')
@@ -716,6 +720,15 @@ function buildScenario(
         row.selectionCount = count
         row.reasonCode     = undefined
         row.reasonMessage  = undefined
+      }
+    }
+  }
+
+  // F-4 UI: Hedef ulaşıldıysa, kalan ELIGIBLE aksiyonları NOT_SELECTED_TARGET_REACHED olarak işaretle
+  if (stopReason?.code === 'TARGET_REACHED') {
+    for (const row of eligibilityMap.values()) {
+      if (row.status === 'ELIGIBLE') {
+        row.status = 'NOT_SELECTED_TARGET_REACHED'
       }
     }
   }
