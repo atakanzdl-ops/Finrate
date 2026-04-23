@@ -71,6 +71,21 @@ export const HORIZONS: ScenarioHorizon[] = [
   },
 ]
 
+export type StopReasonCode =
+  | 'CUM_GUARDRAIL_EQUITY_PP'
+  | 'CUM_GUARDRAIL_KVYK_PP'
+  | 'CUM_GUARDRAIL_GROUP_SHARE'
+  | 'MAX_ACTIONS_REACHED'
+  | 'TARGET_REACHED'
+  | 'NO_VALID_CANDIDATES'
+
+export interface StopReason {
+  code: StopReasonCode
+  message: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  detail?: Record<string, any>
+}
+
 export interface ScenarioOutput {
   horizon: 'short' | 'medium' | 'long'
   horizonLabel: string
@@ -82,10 +97,34 @@ export interface ScenarioOutput {
   totalTLMovement: number
   goalReached: boolean
   targetGrade: string
+  stopReason?: StopReason
   // Aşama 5a-2: horizon atlandıysa true
   skipped?: boolean
   skipReason?: string
   watchlist?: string[]
+}
+
+export interface EngineMetrics {
+  /** Seçilen aksiyonlar içinde herhangi bir cap'e takılan oran (0..1) */
+  capHitRate: number
+  /** Verim filtresiyle elenmiş aday sayısı (tüm horizonlar toplamı) */
+  efficiencyRejectedCount: number
+  /** Şok guardrail ile elenmiş aday sayısı */
+  shockGuardrailCount: number
+  /** Kümülatif guardrail ile loop kırılma sayısı (horizon toplamı) */
+  cumulativeGuardrailBreaks: number
+  /** Horizon bazlı istatistikler */
+  byHorizon: Record<HorizonKey, {
+    candidatesGenerated: number
+    candidatesEvaluated: number
+    candidatesAccepted: number
+    stopReasonCode?: StopReasonCode
+  }>
+  /** Sektör bazlı cap isabet sayısı */
+  bySector?: {
+    sector: string
+    capHits: number
+  }
 }
 
 /**
@@ -176,6 +215,14 @@ export interface EngineResult {
   appliedThresholds: MeaningfulImpactThresholds
   appliedMicroFilter: MicroFilterConfig
   stressLevel: string
+  engineMetrics: EngineMetrics
+}
+
+interface EvalStats {
+  evaluated: number
+  accepted: number
+  efficiencyRejected: number
+  shockRejected: number
 }
 
 /**
@@ -189,18 +236,25 @@ function evaluateCandidates(
   thresholds: MeaningfulImpactThresholds,
   minScore: number = MIN_EXECUTION_SCORE,
   horizon: HorizonKey = 'medium'
-): Array<{ candidate: ActionCandidate; effect: ActionEffect }> {
+): { results: Array<{ candidate: ActionCandidate; effect: ActionEffect }>; stats: EvalStats } {
   const results: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
+  const stats: EvalStats = { evaluated: 0, accepted: 0, efficiencyRejected: 0, shockRejected: 0 }
 
   for (const candidate of candidates) {
     if (!candidate.preconditionPassed) continue
     if (candidate.feasibilityMultiplier === 0) continue
 
+    stats.evaluated++
     try {
       const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds, horizon)
 
       if (effect.scoreBreakdown.finalPriorityScore > minScore + SCORE_EPS) {
         results.push({ candidate, effect })
+        stats.accepted++
+      } else {
+        // Neden reddedildi — constraint tracking
+        if (effect.constraintsTriggered.includes('EFFICIENCY_FILTER')) stats.efficiencyRejected++
+        if (effect.constraintsTriggered.includes('SHOCK_GUARDRAIL'))   stats.shockRejected++
       }
     } catch {
       // Aksiyon uygulanamadı, atla
@@ -208,7 +262,7 @@ function evaluateCandidates(
     }
   }
 
-  return results
+  return { results, stats }
 }
 
 /**
@@ -239,6 +293,17 @@ function resolveConflicts(
   return selected
 }
 
+interface BuildScenarioResult extends ScenarioOutput {
+  _metrics: {
+    candidatesGenerated: number
+    candidatesEvaluated: number
+    candidatesAccepted: number
+    efficiencyRejected: number
+    shockRejected: number
+    cumulativeGuardrailBreak: boolean
+  }
+}
+
 /**
  * Senaryo üretimi — belirli horizon için top N aksiyon seçer ve zincir halinde uygular.
  */
@@ -254,7 +319,7 @@ function buildScenario(
   thresholds: MeaningfulImpactThresholds,
   stressLevel: StressLevel,
   microFilter: MicroFilterConfig
-): ScenarioOutput {
+): BuildScenarioResult {
   const horizonKey = horizon.key as HorizonKey
 
   // Horizon bazlı sınırlar
@@ -282,14 +347,27 @@ function buildScenario(
   let gradeNow = currentGrade
   let totalTL = 0
   const chosenActions: ActionEffect[] = []
+  let stopReason: StopReason | undefined
+
+  // Metrics accumulators
+  let totalCandidatesGenerated = 0
+  let totalCandidatesEvaluated = 0
+  let totalCandidatesAccepted  = 0
+  let totalEfficiencyRejected  = 0
+  let totalShockRejected       = 0
+  let cumulativeGuardrailBreak = false
 
   for (let i = 0; i < maxActions; i++) {
-    if (scoreNow >= targetScore) break
+    if (scoreNow >= targetScore) {
+      stopReason = { code: 'TARGET_REACHED', message: `Hedef skor ${targetScore} ulaşıldı` }
+      break
+    }
 
     // Aday üret — Fix F-2: horizonKey geçiriliyor (cap matrisini belirler)
-    const candidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }).filter(c =>
+    const allCandidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }).filter(c =>
       horizon.allowedActionIds.includes(c.actionId)
     )
+    totalCandidatesGenerated += allCandidates.length
 
     // Tekrar kontrolü: long'da max MAX_REPEAT_PER_ACTION_LONG kez, diğerlerinde tekrar yok
     let fresh: ActionCandidate[]
@@ -298,19 +376,37 @@ function buildScenario(
       for (const a of chosenActions) {
         countByAction.set(a.actionId, (countByAction.get(a.actionId) ?? 0) + 1)
       }
-      fresh = candidates.filter(c => (countByAction.get(c.actionId) ?? 0) < MAX_REPEAT_PER_ACTION_LONG)
+      fresh = allCandidates.filter(c => (countByAction.get(c.actionId) ?? 0) < MAX_REPEAT_PER_ACTION_LONG)
     } else {
       const alreadyPicked = new Set(chosenActions.map(a => a.actionId))
-      fresh = candidates.filter(c => !alreadyPicked.has(c.actionId))
+      fresh = allCandidates.filter(c => !alreadyPicked.has(c.actionId))
+    }
+
+    if (fresh.length === 0) {
+      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (tekrar sınırı)' }
+      break
     }
 
     // Değerlendir — horizon bazlı minScore + efficiency filter
-    const evaluated = evaluateCandidates(currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey)
-    if (evaluated.length === 0) break
+    const { results: evaluated, stats: evalStats } = evaluateCandidates(
+      currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey
+    )
+    totalCandidatesEvaluated += evalStats.evaluated
+    totalCandidatesAccepted  += evalStats.accepted
+    totalEfficiencyRejected  += evalStats.efficiencyRejected
+    totalShockRejected       += evalStats.shockRejected
+
+    if (evaluated.length === 0) {
+      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (filtre sonrası)' }
+      break
+    }
 
     // Çakışma çözümü
     const resolved = resolveConflicts(evaluated)
-    if (resolved.length === 0) break
+    if (resolved.length === 0) {
+      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (çakışma sonrası)' }
+      break
+    }
 
     // En yüksek skorlu seçilir
     const best = resolved[0]
@@ -381,15 +477,21 @@ function buildScenario(
     const cumKvykDecrease   = initialKvykShare - newKvykShare
 
     if (cumEquityIncrease > cumulativeGuards.maxEquityIncreasePP) {
-      console.warn(
-        `[buildScenario:${horizonKey}] Kümülatif özkaynak artışı ${(cumEquityIncrease * 100).toFixed(1)}pp (limit ${cumulativeGuards.maxEquityIncreasePP * 100}pp) — iterasyon durduruluyor`
-      )
+      stopReason = {
+        code: 'CUM_GUARDRAIL_EQUITY_PP',
+        message: `Kümülatif özkaynak artışı ${(cumEquityIncrease * 100).toFixed(1)}pp, limit ${cumulativeGuards.maxEquityIncreasePP * 100}pp`,
+        detail: { actualPP: cumEquityIncrease, limitPP: cumulativeGuards.maxEquityIncreasePP },
+      }
+      cumulativeGuardrailBreak = true
       break
     }
     if (cumKvykDecrease > cumulativeGuards.maxKvykDecreasePP) {
-      console.warn(
-        `[buildScenario:${horizonKey}] Kümülatif KVYK düşüşü ${(cumKvykDecrease * 100).toFixed(1)}pp (limit ${cumulativeGuards.maxKvykDecreasePP * 100}pp) — iterasyon durduruluyor`
-      )
+      stopReason = {
+        code: 'CUM_GUARDRAIL_KVYK_PP',
+        message: `Kümülatif KVYK düşüşü ${(cumKvykDecrease * 100).toFixed(1)}pp, limit ${cumulativeGuards.maxKvykDecreasePP * 100}pp`,
+        detail: { actualPP: cumKvykDecrease, limitPP: cumulativeGuards.maxKvykDecreasePP },
+      }
+      cumulativeGuardrailBreak = true
       break
     }
 
@@ -408,11 +510,19 @@ function buildScenario(
       currentAnalysis.groups.EQUITY.total / ltotal,
     )
     if (maxGroupShare > cumulativeGuards.maxGroupShare) {
-      console.warn(
-        `[buildScenario:${horizonKey}] Grup payı ${(maxGroupShare * 100).toFixed(1)}% (limit ${cumulativeGuards.maxGroupShare * 100}%) — iterasyon durduruluyor`
-      )
+      stopReason = {
+        code: 'CUM_GUARDRAIL_GROUP_SHARE',
+        message: `Grup payı ${(maxGroupShare * 100).toFixed(1)}%, limit ${cumulativeGuards.maxGroupShare * 100}%`,
+        detail: { actualShare: maxGroupShare, limitShare: cumulativeGuards.maxGroupShare },
+      }
+      cumulativeGuardrailBreak = true
       break
     }
+  }
+
+  // Döngü normal tamamlandıysa (maxActions'a ulaşıldı)
+  if (!stopReason && chosenActions.length >= maxActions) {
+    stopReason = { code: 'MAX_ACTIONS_REACHED', message: `${maxActions} aksiyon sınırına ulaşıldı` }
   }
 
   // Tutarlılık kontrolü: toplam delta ≈ senaryo skor artışı (±0.1 tolerans)
@@ -435,6 +545,15 @@ function buildScenario(
     totalTLMovement: totalTL,
     goalReached: scoreNow >= targetScore,
     targetGrade,
+    stopReason,
+    _metrics: {
+      candidatesGenerated: totalCandidatesGenerated,
+      candidatesEvaluated: totalCandidatesEvaluated,
+      candidatesAccepted:  totalCandidatesAccepted,
+      efficiencyRejected:  totalEfficiencyRejected,
+      shockRejected:       totalShockRejected,
+      cumulativeGuardrailBreak,
+    },
   }
 }
 
@@ -480,10 +599,10 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
 
   const emergency = assessEmergencyNeed(analysis)
 
-  const scenarios: ScenarioOutput[] = HORIZONS.map(horizon => {
+  const buildResults = HORIZONS.map(horizon => {
     // Kısa horizon sadece acil durum varsa çalışsın
     if (horizon.key === 'short' && !emergency.required) {
-      return {
+      const skipped: BuildScenarioResult = {
         horizon: 'short',
         horizonLabel: horizon.label,
         actions: [],
@@ -499,9 +618,14 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
         watchlist: [
           'Cari oran takibi — 1.2 altına düşerse tedbir alın',
           'Nakit pozisyonu — 30 günlük ödeme yükümlülüklerini karşılamalı',
-          'Faiz karşılama oranı — 2.0x altına inerse finansal yük değerlendirilmeli',
+          'Faiz karşılama oranı — 2.0x altına inerse finansal yük değerlendirilmedi',
         ],
+        _metrics: {
+          candidatesGenerated: 0, candidatesEvaluated: 0, candidatesAccepted: 0,
+          efficiencyRejected: 0, shockRejected: 0, cumulativeGuardrailBreak: false,
+        },
       }
+      return skipped
     }
 
     return buildScenario(
@@ -519,6 +643,40 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     )
   })
 
+  // Strip _metrics from public scenarios array
+  const scenarios: ScenarioOutput[] = buildResults.map(({ _metrics: _m, ...rest }) => rest)
+
+  // Aggregate EngineMetrics
+  const horizonKeys: HorizonKey[] = ['short', 'medium', 'long']
+  const byHorizon = Object.fromEntries(
+    horizonKeys.map((k, idx) => {
+      const m = buildResults[idx]._metrics
+      return [k, {
+        candidatesGenerated: m.candidatesGenerated,
+        candidatesEvaluated: m.candidatesEvaluated,
+        candidatesAccepted:  m.candidatesAccepted,
+        stopReasonCode:      buildResults[idx].stopReason?.code,
+      }]
+    })
+  ) as Record<HorizonKey, { candidatesGenerated: number; candidatesEvaluated: number; candidatesAccepted: number; stopReasonCode?: StopReasonCode }>
+
+  const allActions = buildResults.flatMap(r => r.actions)
+  const capHitCount = allActions.filter(a => a.bindingCap !== null && a.bindingCap !== undefined).length
+  const capHitRate  = allActions.length > 0 ? capHitCount / allActions.length : 0
+
+  const efficiencyRejectedCount    = buildResults.reduce((s, r) => s + r._metrics.efficiencyRejected, 0)
+  const shockGuardrailCount        = buildResults.reduce((s, r) => s + r._metrics.shockRejected, 0)
+  const cumulativeGuardrailBreaks  = buildResults.filter(r => r._metrics.cumulativeGuardrailBreak).length
+
+  const engineMetrics: EngineMetrics = {
+    capHitRate,
+    efficiencyRejectedCount,
+    shockGuardrailCount,
+    cumulativeGuardrailBreaks,
+    byHorizon,
+    bySector: { sector: input.sector, capHits: capHitCount },
+  }
+
   return {
     analysis,
     scenarios,
@@ -530,5 +688,6 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
     appliedMicroFilter: microFilter,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     stressLevel: (dynamicThresholds as any)._factors?.stressLevel ?? 'UNKNOWN',
+    engineMetrics,
   }
 }
