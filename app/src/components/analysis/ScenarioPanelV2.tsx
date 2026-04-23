@@ -79,7 +79,7 @@ export default function ScenarioPanelV2({ analysisId, currentScore, currentGrade
       const res  = await fetch('/api/scenarios/v2', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ analysisId, targetGrade }),
+        body:    JSON.stringify({ analysisId, targetGrade, currentScoreOverride: currentScore }),
       })
       const data = await res.json()
 

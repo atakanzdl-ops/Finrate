@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { analysisId, groupId, targetGrade } = body
+    const { analysisId, groupId, targetGrade, currentScoreOverride } = body
 
     if (!targetGrade) {
       return NextResponse.json({ error: 'targetGrade gerekli' }, { status: 400 })
@@ -83,11 +83,15 @@ export async function POST(req: NextRequest) {
     const sector: string = analysis.entity.sector ?? 'İmalat'
     const scoreResult = calculateScore(ratios, sector)
 
-    // Subjektif bonus — DB'deki scoreFinal ile finansal skor arasındaki fark
+    // Subjektif bonus — frontend combined score > DB scoreFinal > finansal skor öncelik sırası
     const financialScore = scoreResult.finalScore
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawScoreFinal = (analysis as any).scoreFinal
-    const combinedScore  = rawScoreFinal != null ? Number(rawScoreFinal) : financialScore
+    const combinedScore = currentScoreOverride != null
+      ? Number(currentScoreOverride)
+      : rawScoreFinal != null
+        ? Number(rawScoreFinal)
+        : financialScore
     const subjectiveBonus = combinedScore - financialScore
 
     const currentScore = combinedScore
