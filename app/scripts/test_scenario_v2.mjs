@@ -166,6 +166,8 @@ async function main() {
 
       console.log(`\n3 Senaryo Özeti:`)
       for (const s of result.scenarios) {
+        const maxLabel = s.horizon === 'long' ? 12 : s.horizon === 'medium' ? 6 : 3
+        console.log(`  [${s.horizonLabel}] max=${maxLabel} aksiyon`)
         if (s.skipped) {
           console.log(`  — ${s.horizonLabel} [ATLANDI]`)
           console.log(`      ${s.skipReason}`)

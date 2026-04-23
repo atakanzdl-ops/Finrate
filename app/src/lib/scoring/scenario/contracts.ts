@@ -291,8 +291,21 @@ export const DEFAULT_MICRO_FILTER: MicroFilterConfig = {
 // Kayan nokta karşılaştırma tolerance
 export const SCORE_EPS = 1e-6
 
-// Engine içinde aksiyon filtrelemesi için minimum skor
+// Engine içinde aksiyon filtrelemesi için minimum skor (backward compat)
 export const MIN_EXECUTION_SCORE = 0.1
+
+// Horizon bazlı minimum execution score
+export const MIN_EXECUTION_SCORE_SHORT  = 0.1
+export const MIN_EXECUTION_SCORE_MEDIUM = 0.1
+export const MIN_EXECUTION_SCORE_LONG   = 0.05
+
+// Horizon bazlı maksimum aksiyon sayısı
+export const MAX_ACTIONS_SHORT  = 3
+export const MAX_ACTIONS_MEDIUM = 6
+export const MAX_ACTIONS_LONG   = 12
+
+// Aynı aksiyonun bir ufukta max tekrar sayısı (sadece long)
+export const MAX_REPEAT_PER_ACTION_LONG = 3
 
 // UI tarafında gösterim için minimum skor (daha yüksek eşik)
 export const MIN_DISPLAY_SCORE = 0.5

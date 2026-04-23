@@ -2,7 +2,12 @@ import type {
   SixGroupAnalysis, ActionEffect, ActionId,
   MeaningfulImpactThresholds, MicroFilterConfig,
 } from './contracts'
-import { MIN_EXECUTION_SCORE, SCORE_EPS } from './contracts'
+import {
+  MIN_EXECUTION_SCORE, SCORE_EPS,
+  MIN_EXECUTION_SCORE_SHORT, MIN_EXECUTION_SCORE_MEDIUM, MIN_EXECUTION_SCORE_LONG,
+  MAX_ACTIONS_SHORT, MAX_ACTIONS_MEDIUM, MAX_ACTIONS_LONG,
+  MAX_REPEAT_PER_ACTION_LONG,
+} from './contracts'
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
@@ -174,12 +179,14 @@ export interface EngineResult {
 
 /**
  * Her aksiyon için etki hesaplar, geçerli olanları döndürür.
+ * minScore: horizon bazlı eşik (long için daha düşük)
  */
 function evaluateCandidates(
   analysis: SixGroupAnalysis,
   candidates: ActionCandidate[],
   sector: string,
-  thresholds: MeaningfulImpactThresholds
+  thresholds: MeaningfulImpactThresholds,
+  minScore: number = MIN_EXECUTION_SCORE
 ): Array<{ candidate: ActionCandidate; effect: ActionEffect }> {
   const results: Array<{ candidate: ActionCandidate; effect: ActionEffect }> = []
 
@@ -190,8 +197,7 @@ function evaluateCandidates(
     try {
       const effect = applyCandidate(analysis, candidate, candidate.amountSuggested, sector, thresholds)
 
-      // Minimal impact olanları elediğimizde skor 0 olur — ama yine de listeye ekle, sıralamaya bırak
-      if (effect.scoreBreakdown.finalPriorityScore > MIN_EXECUTION_SCORE + SCORE_EPS) {
+      if (effect.scoreBreakdown.finalPriorityScore > minScore + SCORE_EPS) {
         results.push({ candidate, effect })
       }
     } catch {
@@ -243,11 +249,23 @@ function buildScenario(
   targetGrade: string,
   targetScore: number,
   subjectiveBonus: number,
-  maxActions: number,
   thresholds: MeaningfulImpactThresholds,
   stressLevel: StressLevel,
   microFilter: MicroFilterConfig
 ): ScenarioOutput {
+  const horizonKey = horizon.key
+
+  // Horizon bazlı sınırlar
+  const maxActions = horizonKey === 'long' ? MAX_ACTIONS_LONG
+    : horizonKey === 'medium' ? MAX_ACTIONS_MEDIUM
+    : MAX_ACTIONS_SHORT
+
+  const minExecScore = horizonKey === 'long' ? MIN_EXECUTION_SCORE_LONG
+    : horizonKey === 'medium' ? MIN_EXECUTION_SCORE_MEDIUM
+    : MIN_EXECUTION_SCORE_SHORT
+
+  const allowRepeat = horizonKey === 'long'
+
   let currentAnalysis = analysis
   let scoreNow = currentScore
   let gradeNow = currentGrade
@@ -262,12 +280,21 @@ function buildScenario(
       horizon.allowedActionIds.includes(c.actionId)
     )
 
-    // Daha önce seçilen aksiyonları at (aynı aksiyonu iki kez önerme)
-    const alreadyPicked = new Set(chosenActions.map(a => a.actionId))
-    const fresh = candidates.filter(c => !alreadyPicked.has(c.actionId))
+    // Tekrar kontrolü: long'da max MAX_REPEAT_PER_ACTION_LONG kez, diğerlerinde tekrar yok
+    let fresh: ActionCandidate[]
+    if (allowRepeat) {
+      const countByAction = new Map<string, number>()
+      for (const a of chosenActions) {
+        countByAction.set(a.actionId, (countByAction.get(a.actionId) ?? 0) + 1)
+      }
+      fresh = candidates.filter(c => (countByAction.get(c.actionId) ?? 0) < MAX_REPEAT_PER_ACTION_LONG)
+    } else {
+      const alreadyPicked = new Set(chosenActions.map(a => a.actionId))
+      fresh = candidates.filter(c => !alreadyPicked.has(c.actionId))
+    }
 
-    // Değerlendir
-    const evaluated = evaluateCandidates(currentAnalysis, fresh, sector, thresholds)
+    // Değerlendir — horizon bazlı minScore
+    const evaluated = evaluateCandidates(currentAnalysis, fresh, sector, thresholds, minExecScore)
     if (evaluated.length === 0) break
 
     // Çakışma çözümü
@@ -370,11 +397,11 @@ export interface RunEngineInput {
   subjectiveBonus?: number
   currentRatios?: Partial<Record<string, number>>
   thresholds?: MeaningfulImpactThresholds
+  /** @deprecated Horizon bazlı sınırlar artık contracts.ts sabitleriyle yönetilir */
   maxActionsPerHorizon?: number
 }
 
 export function runScenarioEngine(input: RunEngineInput): EngineResult {
-  const maxActions = input.maxActionsPerHorizon ?? 8
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const analysis = buildSixGroupAnalysis(input.accounts, {
@@ -430,7 +457,6 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
       input.targetGrade,
       input.targetScore,
       input.subjectiveBonus ?? 0,
-      maxActions,
       dynamicThresholds,
       stressLevel,
       microFilter
