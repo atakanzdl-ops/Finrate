@@ -7,6 +7,7 @@ import { DEFAULT_THRESHOLDS, DEFAULT_SHOCK_GUARDRAILS } from './contracts'
 import type { ActionCandidate } from './candidateGenerator'
 import { buildSixGroupAnalysis } from './analyzer'
 import { calculateRatiosFromAccounts } from '../ratios'
+import { calculateScore } from '../score'
 import { getActionFamily } from './actionFamilies'
 
 /**
@@ -280,6 +281,10 @@ export function applyCandidate(
       ? clampedAmount / analysis.totals.assets
       : null
 
+    // Standalone skor hesabı — shock durumunda da tutarlı olsun
+    const scoreBeforeStandalone = calculateScore(ratiosBeforeRaw, sector).finalScore
+    const scoreAfterStandalone  = calculateScore(ratiosAfterRaw,  sector).finalScore
+
     return {
       schemaVersion: "1.0.0",
       scenarioId: analysis.scenarioId,
@@ -306,6 +311,10 @@ export function applyCandidate(
       ...(tgImpact !== null && { targetGroupImpact: tgImpact }),
       ...(bsImpact !== null && { balanceSheetImpact: bsImpact }),
       bindingCap: candidate.bindingCap ?? null,
+      // engine.ts iteratif bağlamda bunları override eder
+      actualScoreDelta:   scoreAfterStandalone - scoreBeforeStandalone,
+      scoreBeforeAction:  scoreBeforeStandalone,
+      scoreAfterAction:   scoreAfterStandalone,
     }
   }
 
@@ -497,6 +506,10 @@ export function applyCandidate(
     ? clampedAmount / analysis.totals.assets
     : undefined
 
+  // Standalone skor — iteratif bağlamda engine.ts tarafından override edilecek
+  const scoreBeforeStandalone = calculateScore(ratiosBeforeRaw, sector).finalScore
+  const scoreAfterStandalone  = calculateScore(ratiosAfterRaw,  sector).finalScore
+
   return {
     schemaVersion: "1.0.0",
     scenarioId: analysis.scenarioId,
@@ -523,5 +536,8 @@ export function applyCandidate(
     targetGroupImpact,
     balanceSheetImpact,
     bindingCap: candidate.bindingCap ?? null,
+    actualScoreDelta:  scoreAfterStandalone - scoreBeforeStandalone,
+    scoreBeforeAction: scoreBeforeStandalone,
+    scoreAfterAction:  scoreAfterStandalone,
   }
 }

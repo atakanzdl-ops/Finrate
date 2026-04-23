@@ -206,6 +206,10 @@ export interface ActionEffect {
   targetGroupImpact?: number       // uygulanan tutar / hedef grup büyüklüğü (0..1)
   balanceSheetImpact?: number      // uygulanan tutar / toplam aktif (0..1)
   bindingCap?: 'targetGroup' | 'assets' | 'range' | null  // hangi cap bağlayıcıydı
+  // Gerçek skor etkisi — iteratif bağlamda aksiyon öncesi/sonrası farkı
+  actualScoreDelta: number         // örn: +4.5 — iteratif skor katkısı (engine tarafından güncellenir)
+  scoreBeforeAction: number        // aksiyon uygulanmadan önceki toplam skor
+  scoreAfterAction: number         // aksiyon uygulandıktan sonraki toplam skor
 }
 
 export interface MeaningfulImpactThresholds {

@@ -319,11 +319,26 @@ function buildScenario(
 
     // Subjektif bonus korunur — sadece finansal skor değişir
     const newFinancialScore = newScoreResult.finalScore
+    const scoreBefore = scoreNow
     scoreNow = Math.min(100, newFinancialScore + subjectiveBonus)
     gradeNow = scoreToRating(scoreNow)
 
+    // Iteratif skor katkısı — standalone applier değerini override et
+    best.effect.actualScoreDelta  = scoreNow - scoreBefore
+    best.effect.scoreBeforeAction = scoreBefore
+    best.effect.scoreAfterAction  = scoreNow
+
     chosenActions.push(best.effect)
     totalTL += best.effect.amountApplied
+  }
+
+  // Tutarlılık kontrolü: toplam delta ≈ senaryo skor artışı (±0.1 tolerans)
+  const totalDelta    = chosenActions.reduce((s, a) => s + a.actualScoreDelta, 0)
+  const scenarioDelta = scoreNow - currentScore
+  if (chosenActions.length > 0 && Math.abs(totalDelta - scenarioDelta) > 0.1) {
+    console.warn(
+      `[engine] Tutarsızlık [${horizon.key}]: Σ actualScoreDelta=${totalDelta.toFixed(2)}, senaryo Δ=${scenarioDelta.toFixed(2)}`
+    )
   }
 
   return {

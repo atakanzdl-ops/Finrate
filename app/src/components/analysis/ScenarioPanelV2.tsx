@@ -311,7 +311,10 @@ function ActionCard({ action, index }: { action: any; index: number }) {
             <div className="text-right flex-shrink-0">
               <div className="font-semibold text-slate-900">{formatTL(action.amountApplied)}</div>
               <div className="text-xs text-emerald-600">
-                Skor etkisi: {action.scoreBreakdown?.finalPriorityScore?.toFixed(1) ?? '-'}
+                Skor katkısı: +{(action.actualScoreDelta ?? 0).toFixed(1)} puan
+              </div>
+              <div className="text-xs text-slate-400">
+                Öncelik: {action.scoreBreakdown?.finalPriorityScore?.toFixed(0) ?? '-'}
               </div>
             </div>
           </div>

@@ -185,12 +185,13 @@ async function main() {
           const deltaQuick = a.ratioDelta.QUICK_RATIO.toFixed(3)
           const family = getActionFamily(a.actionId)
           // Fix E: raporlama metrikleri
-          const tgImpact = a.targetGroupImpact != null ? `targetImpact=${(a.targetGroupImpact*100).toFixed(1)}%` : ''
-          const bsImpact = a.balanceSheetImpact  != null ? `bsImpact=${(a.balanceSheetImpact*100).toFixed(1)}%` : ''
-          const binding  = a.bindingCap ? `binding=${a.bindingCap}` : ''
+          const tgImpact  = a.targetGroupImpact != null ? `targetImpact=${(a.targetGroupImpact*100).toFixed(1)}%` : ''
+          const bsImpact  = a.balanceSheetImpact  != null ? `bsImpact=${(a.balanceSheetImpact*100).toFixed(1)}%` : ''
+          const binding   = a.bindingCap ? `binding=${a.bindingCap}` : ''
           const shockWarn = a.constraintsTriggered?.includes('SHOCK_GUARDRAIL') ? ' ⚡SHOCK' : ''
-          const capInfo = [tgImpact, bsImpact, binding].filter(Boolean).join(', ')
-          console.log(`        • ${a.actionId} [${family}]${shockWarn} — ${amount}M TL, ΔCari=${deltaCur}, ΔQuick=${deltaQuick}, skor=${priority}`)
+          const capInfo   = [tgImpact, bsImpact, binding].filter(Boolean).join(', ')
+          const scoreDeltaStr = a.actualScoreDelta != null ? `+${a.actualScoreDelta.toFixed(2)} puan` : '?'
+          console.log(`        • ${a.actionId} [${family}]${shockWarn} — ${amount}M TL, ΔCari=${deltaCur}, ΔQuick=${deltaQuick}, skor=${priority}, 📈${scoreDeltaStr}`)
           if (capInfo) console.log(`            📊 ${capInfo}`)
 
           // Hesap hareketleri — özet
