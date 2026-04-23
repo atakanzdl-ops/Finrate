@@ -210,6 +210,8 @@ export interface ActionEffect {
   actualScoreDelta: number         // örn: +4.5 — iteratif skor katkısı (engine tarafından güncellenir)
   scoreBeforeAction: number        // aksiyon uygulanmadan önceki toplam skor
   scoreAfterAction: number         // aksiyon uygulandıktan sonraki toplam skor
+  // F-3c Part 2: Pre-selection guardrail için aksiyon sonrası bilanço durumu
+  afterAnalysis: SixGroupAnalysis
 }
 
 export interface MeaningfulImpactThresholds {

@@ -11,9 +11,11 @@ import {
 import { buildSixGroupAnalysis } from './analyzer'
 import { generateCandidates, type ActionCandidate } from './candidateGenerator'
 import { applyCandidate } from './applier'
-import { CUMULATIVE_GUARDRAILS, type HorizonKey } from './capMatrix'
+import { type HorizonKey } from './capMatrix'
 import {
   determineRegime, determineGapBand, initialUnlockStage,
+  computeCumulativeGuardrails, shouldUnlock, nextUnlockStage,
+  GUARDRAIL_BREACH_POLICY, ABSOLUTE_GROUP_SHARE_HARD_STOP,
   type Regime, type GapBand,
 } from './adaptivePolicy'
 import { calculateRatiosFromAccounts } from '../ratios'
@@ -78,7 +80,8 @@ export const HORIZONS: ScenarioHorizon[] = [
 export type StopReasonCode =
   | 'CUM_GUARDRAIL_EQUITY_PP'
   | 'CUM_GUARDRAIL_KVYK_PP'
-  | 'CUM_GUARDRAIL_GROUP_SHARE'
+  | 'CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION'
+  | 'CUM_GUARDRAIL_ABSOLUTE_HARD_STOP'
   | 'MAX_ACTIONS_REACHED'
   | 'TARGET_REACHED'
   | 'NO_VALID_CANDIDATES'
@@ -117,6 +120,8 @@ export interface EngineMetrics {
   shockGuardrailCount: number
   /** Kümülatif guardrail ile loop kırılma sayısı (horizon toplamı) */
   cumulativeGuardrailBreaks: number
+  /** Guardrail kodu bazlı skip/kırılma sayıları (tüm horizonlar toplamı) */
+  guardrailRejectedCountByCode: Partial<Record<StopReasonCode, number>>
   /** Horizon bazlı istatistikler */
   byHorizon: Record<HorizonKey, {
     candidatesGenerated: number
@@ -308,6 +313,7 @@ interface BuildScenarioResult extends ScenarioOutput {
     efficiencyRejected: number
     shockRejected: number
     cumulativeGuardrailBreak: boolean
+    guardrailRejectedCountByCode: Partial<Record<StopReasonCode, number>>
   }
 }
 
@@ -330,10 +336,14 @@ function buildScenario(
   const horizonKey = horizon.key as HorizonKey
 
   // Fix F-3c: Adaptive policy context — regime, gap band, unlock stage
-  const regime: Regime       = determineRegime(currentScore, stressLevel)
-  const gapBand: GapBand     = determineGapBand(currentScore, targetScore)
-  const unlockStage: 0|1|2   = initialUnlockStage(currentScore, targetScore)
-  console.log(`[buildScenario:${horizonKey}] Regime=${regime}, GapBand=${gapBand}, UnlockStage=${unlockStage}`)
+  const regime: Regime   = determineRegime(currentScore, stressLevel)
+  const gapBand: GapBand = determineGapBand(currentScore, targetScore)
+  let unlockStage: 0|1|2 = initialUnlockStage(currentScore, targetScore)
+  let cumulativeGuards   = computeCumulativeGuardrails(regime, horizonKey, unlockStage)
+
+  if (process.env.DEBUG_SCENARIO) {
+    console.log(`[buildScenario:${horizonKey}] Regime=${regime}, GapBand=${gapBand}, UnlockStage=${unlockStage}`)
+  }
 
   // Horizon bazlı sınırlar
   const maxActions = horizonKey === 'long' ? MAX_ACTIONS_LONG
@@ -346,14 +356,18 @@ function buildScenario(
 
   const allowRepeat = horizonKey === 'long'
 
-  // Fix F-2: Kümülatif guardrail başlangıç referansı
-  const cumulativeGuards = CUMULATIVE_GUARDRAILS[horizonKey]
-  const initialEquityShare = analysis.totals.liabilitiesAndEquity > 0
-    ? analysis.groups.EQUITY.total / analysis.totals.liabilitiesAndEquity
-    : 0
-  const initialKvykShare = analysis.totals.liabilitiesAndEquity > 0
-    ? analysis.groups.SHORT_TERM_LIABILITIES.total / analysis.totals.liabilitiesAndEquity
-    : 0
+  // F-3c Part 2: Baseline shares for deterioration guardrail
+  const initialAtotal = analysis.totals.assets > 0 ? analysis.totals.assets : 1
+  const initialLtotal = analysis.totals.liabilitiesAndEquity > 0 ? analysis.totals.liabilitiesAndEquity : 1
+  const initialShares = {
+    CURRENT_ASSETS:         analysis.groups.CURRENT_ASSETS.total / initialAtotal,
+    NON_CURRENT_ASSETS:     analysis.groups.NON_CURRENT_ASSETS.total / initialAtotal,
+    SHORT_TERM_LIABILITIES: analysis.groups.SHORT_TERM_LIABILITIES.total / initialLtotal,
+    LONG_TERM_LIABILITIES:  analysis.groups.LONG_TERM_LIABILITIES.total / initialLtotal,
+    EQUITY:                 analysis.groups.EQUITY.total / initialLtotal,
+  }
+  const initialEquityShare = initialShares.EQUITY
+  const initialKvykShare   = initialShares.SHORT_TERM_LIABILITIES
 
   let currentAnalysis = analysis
   let scoreNow = currentScore
@@ -369,68 +383,160 @@ function buildScenario(
   let totalEfficiencyRejected  = 0
   let totalShockRejected       = 0
   let cumulativeGuardrailBreak = false
+  const guardrailRejectedByCode: Partial<Record<StopReasonCode, number>> = {}
+  const incGuardrail = (code: StopReasonCode) => {
+    guardrailRejectedByCode[code] = (guardrailRejectedByCode[code] ?? 0) + 1
+  }
 
-  for (let i = 0; i < maxActions; i++) {
+  outerLoop: for (let i = 0; i < maxActions; i++) {
     if (scoreNow >= targetScore) {
       stopReason = { code: 'TARGET_REACHED', message: `Hedef skor ${targetScore} ulaşıldı` }
       break
     }
 
-    // Aday üret — Fix F-3c: horizonKey + adaptive regime/gap/stage geçiriliyor
-    const allCandidates = generateCandidates(currentAnalysis, horizonKey, { stressLevel, microFilter }, regime, gapBand, unlockStage).filter(c =>
-      horizon.allowedActionIds.includes(c.actionId)
-    )
-    totalCandidatesGenerated += allCandidates.length
+    // Her slot için en fazla 2 deneme: deneme 0 = normal, deneme 1 = unlock sonrası
+    let best: { candidate: ActionCandidate; effect: ActionEffect } | null = null
 
-    // Tekrar kontrolü: long'da max MAX_REPEAT_PER_ACTION_LONG kez, diğerlerinde tekrar yok
-    let fresh: ActionCandidate[]
-    if (allowRepeat) {
-      const countByAction = new Map<string, number>()
-      for (const a of chosenActions) {
-        countByAction.set(a.actionId, (countByAction.get(a.actionId) ?? 0) + 1)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      // Aday üret — horizonKey + adaptive regime/gap/stage
+      const allCandidates = generateCandidates(
+        currentAnalysis, horizonKey, { stressLevel, microFilter }, regime, gapBand, unlockStage
+      ).filter(c => horizon.allowedActionIds.includes(c.actionId))
+      totalCandidatesGenerated += allCandidates.length
+
+      // Tekrar kontrolü
+      let fresh: ActionCandidate[]
+      if (allowRepeat) {
+        const countByAction = new Map<string, number>()
+        for (const a of chosenActions) {
+          countByAction.set(a.actionId, (countByAction.get(a.actionId) ?? 0) + 1)
+        }
+        fresh = allCandidates.filter(c => (countByAction.get(c.actionId) ?? 0) < MAX_REPEAT_PER_ACTION_LONG)
+      } else {
+        const alreadyPicked = new Set(chosenActions.map(a => a.actionId))
+        fresh = allCandidates.filter(c => !alreadyPicked.has(c.actionId))
       }
-      fresh = allCandidates.filter(c => (countByAction.get(c.actionId) ?? 0) < MAX_REPEAT_PER_ACTION_LONG)
-    } else {
-      const alreadyPicked = new Set(chosenActions.map(a => a.actionId))
-      fresh = allCandidates.filter(c => !alreadyPicked.has(c.actionId))
-    }
 
-    if (fresh.length === 0) {
-      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (tekrar sınırı)' }
-      break
-    }
+      if (fresh.length === 0) {
+        if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (tekrar sınırı)' }
+        break outerLoop
+      }
 
-    // Değerlendir — horizon bazlı minScore + adaptive efficiency filter
-    const { results: evaluated, stats: evalStats } = evaluateCandidates(
-      currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey, regime, gapBand, unlockStage
-    )
-    totalCandidatesEvaluated += evalStats.evaluated
-    totalCandidatesAccepted  += evalStats.accepted
-    totalEfficiencyRejected  += evalStats.efficiencyRejected
-    totalShockRejected       += evalStats.shockRejected
+      // Değerlendir — adaptive efficiency filter
+      const { results: evaluated, stats: evalStats } = evaluateCandidates(
+        currentAnalysis, fresh, sector, thresholds, minExecScore, horizonKey, regime, gapBand, unlockStage
+      )
+      totalCandidatesEvaluated += evalStats.evaluated
+      totalCandidatesAccepted  += evalStats.accepted
+      totalEfficiencyRejected  += evalStats.efficiencyRejected
+      totalShockRejected       += evalStats.shockRejected
 
-    if (evaluated.length === 0) {
-      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (filtre sonrası)' }
-      break
-    }
+      if (evaluated.length === 0) {
+        // Unlock dene (ilk denemede)
+        if (attempt === 0 && shouldUnlock(scoreNow >= targetScore, targetScore - scoreNow, true, unlockStage)) {
+          unlockStage = nextUnlockStage(unlockStage)
+          cumulativeGuards = computeCumulativeGuardrails(regime, horizonKey, unlockStage)
+          continue
+        }
+        if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (filtre sonrası)' }
+        break outerLoop
+      }
 
-    // Çakışma çözümü
-    const resolved = resolveConflicts(evaluated)
-    if (resolved.length === 0) {
-      if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (çakışma sonrası)' }
-      break
-    }
+      // Çakışma çözümü
+      const resolved = resolveConflicts(evaluated)
+      if (resolved.length === 0) {
+        if (!stopReason) stopReason = { code: 'NO_VALID_CANDIDATES', message: 'Geçerli aday aksiyon kalmadı (çakışma sonrası)' }
+        break outerLoop
+      }
 
-    // En yüksek skorlu seçilir
-    const best = resolved[0]
+      // ─────────────────────────────────────────────────
+      // F-3c Part 2: SKIP_AND_TRY_NEXT — Pre-selection guardrail
+      // ─────────────────────────────────────────────────
+      let skipCount = 0
+      const maxSkip = GUARDRAIL_BREACH_POLICY.maxSkippedCandidatesPerIteration
 
-    // Uygula — yeni analiz üret
+      for (const item of resolved) {
+        if (skipCount >= maxSkip) break
+
+        const aa  = item.effect.afterAnalysis
+        const aT  = aa.totals.assets > 0 ? aa.totals.assets : 1
+        const lT  = aa.totals.liabilitiesAndEquity > 0 ? aa.totals.liabilitiesAndEquity : 1
+
+        const newCAShare  = aa.groups.CURRENT_ASSETS.total / aT
+        const newNCAShare = aa.groups.NON_CURRENT_ASSETS.total / aT
+        const newSTLShare = aa.groups.SHORT_TERM_LIABILITIES.total / lT
+        const newLTLShare = aa.groups.LONG_TERM_LIABILITIES.total / lT
+        const newEqShare  = aa.groups.EQUITY.total / lT
+
+        // Kontrol 1: Mutlak hard stop (herhangi bir grubun payı > 0.98)
+        if (Math.max(newCAShare, newNCAShare, newSTLShare, newLTLShare, newEqShare) > ABSOLUTE_GROUP_SHARE_HARD_STOP) {
+          skipCount++
+          incGuardrail('CUM_GUARDRAIL_ABSOLUTE_HARD_STOP')
+          continue
+        }
+
+        // Kontrol 2: Kümülatif bozulma — herhangi bir grubun payı başlangıca göre kötüleşti mi?
+        const worstDeterioration = Math.max(
+          0,
+          newCAShare  - initialShares.CURRENT_ASSETS,
+          newNCAShare - initialShares.NON_CURRENT_ASSETS,
+          newSTLShare - initialShares.SHORT_TERM_LIABILITIES,
+          newLTLShare - initialShares.LONG_TERM_LIABILITIES,
+          initialShares.EQUITY - newEqShare,  // özkaynak azalması = bozulma
+        )
+        if (worstDeterioration > cumulativeGuards.maxGroupShareDeteriorationPP) {
+          skipCount++
+          incGuardrail('CUM_GUARDRAIL_GROUP_SHARE_DETERIORATION')
+          continue
+        }
+
+        // Kontrol 3: Kümülatif özkaynak artışı PP
+        if (newEqShare - initialEquityShare > cumulativeGuards.maxEquityIncreasePP) {
+          skipCount++
+          incGuardrail('CUM_GUARDRAIL_EQUITY_PP')
+          continue
+        }
+
+        // Kontrol 4: Kümülatif KVYK azalışı PP
+        if (initialKvykShare - newSTLShare > cumulativeGuards.maxKvykDecreasePP) {
+          skipCount++
+          incGuardrail('CUM_GUARDRAIL_KVYK_PP')
+          continue
+        }
+
+        // Tüm kontroller geçildi — bu adayı seç
+        best = item
+        break
+      }
+
+      if (best) break  // Aday bulundu — attempt döngüsünden çık
+
+      // Hiçbir aday guardrail'ı geçemedi — unlock dene (ilk denemede)
+      if (attempt === 0 && shouldUnlock(scoreNow >= targetScore, targetScore - scoreNow, true, unlockStage)) {
+        unlockStage = nextUnlockStage(unlockStage)
+        cumulativeGuards = computeCumulativeGuardrails(regime, horizonKey, unlockStage)
+        continue  // attempt 1
+      }
+
+      // Gerçekten hiç aday yok
+      if (!stopReason) stopReason = {
+        code: 'NO_VALID_CANDIDATES',
+        message: 'Tüm adaylar guardrail veya filtre tarafından engellendi',
+      }
+      cumulativeGuardrailBreak = skipCount > 0
+      break outerLoop
+    }  // end attempt loop
+
+    if (!best) break  // Güvenlik — normalde outerLoop break ile çıkılmış olmalı
+
+    // ─────────────────────────────────────────────────
+    // Seçilen adayı uygula — yeni analiz üret
+    // ─────────────────────────────────────────────────
     const updatedAccounts = currentAnalysis.accounts.map(acc => {
-      const mv = best.effect.accountMovements.find(m => m.accountCode === acc.accountCode)
+      const mv = best!.effect.accountMovements.find(m => m.accountCode === acc.accountCode)
       return mv ? { accountCode: acc.accountCode, amount: acc.amount + mv.delta } : { accountCode: acc.accountCode, amount: acc.amount }
     })
 
-    // Yeni hesaplar (ör. hedef hesap analysis'te yoksa ekle)
     for (const mv of best.effect.accountMovements) {
       const exists = updatedAccounts.find(a => a.accountCode === mv.accountCode)
       if (!exists) {
@@ -445,11 +551,11 @@ function buildScenario(
         scenarioId: analysis.scenarioId,
         sector,
         ratios: {
-          CURRENT_RATIO: best.effect.afterRatios.CURRENT_RATIO,
-          QUICK_RATIO: best.effect.afterRatios.QUICK_RATIO,
-          CASH_RATIO: best.effect.afterRatios.CASH_RATIO,
-          DEBT_TO_EQUITY: best.effect.afterRatios.DEBT_TO_EQUITY,
-          EQUITY_RATIO: best.effect.afterRatios.EQUITY_RATIO,
+          CURRENT_RATIO:    best.effect.afterRatios.CURRENT_RATIO,
+          QUICK_RATIO:      best.effect.afterRatios.QUICK_RATIO,
+          CASH_RATIO:       best.effect.afterRatios.CASH_RATIO,
+          DEBT_TO_EQUITY:   best.effect.afterRatios.DEBT_TO_EQUITY,
+          EQUITY_RATIO:     best.effect.afterRatios.EQUITY_RATIO,
           INTEREST_COVERAGE: best.effect.afterRatios.INTEREST_COVERAGE,
         },
       }
@@ -461,76 +567,20 @@ function buildScenario(
       amount: a.amount,
     }))
 
-    const newRatios = calculateRatiosFromAccounts(updatedAccountsForScore)
+    const newRatios      = calculateRatiosFromAccounts(updatedAccountsForScore)
     const newScoreResult = calculateScore(newRatios, sector)
 
     // Subjektif bonus korunur — sadece finansal skor değişir
-    const newFinancialScore = newScoreResult.finalScore
     const scoreBefore = scoreNow
-    scoreNow = Math.min(100, newFinancialScore + subjectiveBonus)
-    gradeNow = scoreToRating(scoreNow)
+    scoreNow  = Math.min(100, newScoreResult.finalScore + subjectiveBonus)
+    gradeNow  = scoreToRating(scoreNow)
 
-    // Iteratif skor katkısı — standalone applier değerini override et
     best.effect.actualScoreDelta  = scoreNow - scoreBefore
     best.effect.scoreBeforeAction = scoreBefore
     best.effect.scoreAfterAction  = scoreNow
 
     chosenActions.push(best.effect)
     totalTL += best.effect.amountApplied
-
-    // Fix F-2: Kümülatif guardrail kontrolü
-    const newEquityShare = currentAnalysis.totals.liabilitiesAndEquity > 0
-      ? currentAnalysis.groups.EQUITY.total / currentAnalysis.totals.liabilitiesAndEquity
-      : 0
-    const newKvykShare = currentAnalysis.totals.liabilitiesAndEquity > 0
-      ? currentAnalysis.groups.SHORT_TERM_LIABILITIES.total / currentAnalysis.totals.liabilitiesAndEquity
-      : 0
-
-    const cumEquityIncrease = newEquityShare - initialEquityShare
-    const cumKvykDecrease   = initialKvykShare - newKvykShare
-
-    if (cumEquityIncrease > cumulativeGuards.maxEquityIncreasePP) {
-      stopReason = {
-        code: 'CUM_GUARDRAIL_EQUITY_PP',
-        message: `Kümülatif özkaynak artışı ${(cumEquityIncrease * 100).toFixed(1)}pp, limit ${cumulativeGuards.maxEquityIncreasePP * 100}pp`,
-        detail: { actualPP: cumEquityIncrease, limitPP: cumulativeGuards.maxEquityIncreasePP },
-      }
-      cumulativeGuardrailBreak = true
-      break
-    }
-    if (cumKvykDecrease > cumulativeGuards.maxKvykDecreasePP) {
-      stopReason = {
-        code: 'CUM_GUARDRAIL_KVYK_PP',
-        message: `Kümülatif KVYK düşüşü ${(cumKvykDecrease * 100).toFixed(1)}pp, limit ${cumulativeGuards.maxKvykDecreasePP * 100}pp`,
-        detail: { actualPP: cumKvykDecrease, limitPP: cumulativeGuards.maxKvykDecreasePP },
-      }
-      cumulativeGuardrailBreak = true
-      break
-    }
-
-    // Herhangi bir grubun bilanço içi payı %65'i aştı mı?
-    const ltotal = currentAnalysis.totals.liabilitiesAndEquity > 0
-      ? currentAnalysis.totals.liabilitiesAndEquity
-      : 1
-    const atotal = currentAnalysis.totals.assets > 0
-      ? currentAnalysis.totals.assets
-      : 1
-    const maxGroupShare = Math.max(
-      currentAnalysis.groups.CURRENT_ASSETS.total / atotal,
-      currentAnalysis.groups.NON_CURRENT_ASSETS.total / atotal,
-      currentAnalysis.groups.SHORT_TERM_LIABILITIES.total / ltotal,
-      currentAnalysis.groups.LONG_TERM_LIABILITIES.total / ltotal,
-      currentAnalysis.groups.EQUITY.total / ltotal,
-    )
-    if (maxGroupShare > cumulativeGuards.maxGroupShare) {
-      stopReason = {
-        code: 'CUM_GUARDRAIL_GROUP_SHARE',
-        message: `Grup payı ${(maxGroupShare * 100).toFixed(1)}%, limit ${cumulativeGuards.maxGroupShare * 100}%`,
-        detail: { actualShare: maxGroupShare, limitShare: cumulativeGuards.maxGroupShare },
-      }
-      cumulativeGuardrailBreak = true
-      break
-    }
   }
 
   // Döngü normal tamamlandıysa (maxActions'a ulaşıldı)
@@ -560,12 +610,13 @@ function buildScenario(
     targetGrade,
     stopReason,
     _metrics: {
-      candidatesGenerated: totalCandidatesGenerated,
-      candidatesEvaluated: totalCandidatesEvaluated,
-      candidatesAccepted:  totalCandidatesAccepted,
-      efficiencyRejected:  totalEfficiencyRejected,
-      shockRejected:       totalShockRejected,
+      candidatesGenerated:         totalCandidatesGenerated,
+      candidatesEvaluated:         totalCandidatesEvaluated,
+      candidatesAccepted:          totalCandidatesAccepted,
+      efficiencyRejected:          totalEfficiencyRejected,
+      shockRejected:               totalShockRejected,
       cumulativeGuardrailBreak,
+      guardrailRejectedCountByCode: guardrailRejectedByCode,
     },
   }
 }
@@ -636,6 +687,7 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
         _metrics: {
           candidatesGenerated: 0, candidatesEvaluated: 0, candidatesAccepted: 0,
           efficiencyRejected: 0, shockRejected: 0, cumulativeGuardrailBreak: false,
+          guardrailRejectedCountByCode: {},
         },
       }
       return skipped
@@ -677,15 +729,25 @@ export function runScenarioEngine(input: RunEngineInput): EngineResult {
   const capHitCount = allActions.filter(a => a.bindingCap !== null && a.bindingCap !== undefined).length
   const capHitRate  = allActions.length > 0 ? capHitCount / allActions.length : 0
 
-  const efficiencyRejectedCount    = buildResults.reduce((s, r) => s + r._metrics.efficiencyRejected, 0)
-  const shockGuardrailCount        = buildResults.reduce((s, r) => s + r._metrics.shockRejected, 0)
-  const cumulativeGuardrailBreaks  = buildResults.filter(r => r._metrics.cumulativeGuardrailBreak).length
+  const efficiencyRejectedCount   = buildResults.reduce((s, r) => s + r._metrics.efficiencyRejected, 0)
+  const shockGuardrailCount       = buildResults.reduce((s, r) => s + r._metrics.shockRejected, 0)
+  const cumulativeGuardrailBreaks = buildResults.filter(r => r._metrics.cumulativeGuardrailBreak).length
+
+  // Aggregate guardrailRejectedCountByCode across horizons
+  const guardrailRejectedCountByCode: Partial<Record<StopReasonCode, number>> = {}
+  for (const r of buildResults) {
+    for (const [code, cnt] of Object.entries(r._metrics.guardrailRejectedCountByCode)) {
+      const k = code as StopReasonCode
+      guardrailRejectedCountByCode[k] = (guardrailRejectedCountByCode[k] ?? 0) + (cnt as number)
+    }
+  }
 
   const engineMetrics: EngineMetrics = {
     capHitRate,
     efficiencyRejectedCount,
     shockGuardrailCount,
     cumulativeGuardrailBreaks,
+    guardrailRejectedCountByCode,
     byHorizon,
     bySector: { sector: input.sector, capHits: capHitCount },
   }

@@ -120,36 +120,39 @@ export const EFFICIENCY_POLICY = {
 
 export const CUMULATIVE_GUARDRAILS_BY_REGIME: Record<
   Regime,
-  Record<HorizonKey, { maxEquityIncreasePP: number; maxKvykDecreasePP: number; maxGroupShare: number }>
+  Record<HorizonKey, { maxEquityIncreasePP: number; maxKvykDecreasePP: number; maxGroupShareDeteriorationPP: number }>
 > = {
   STABLE: {
-    short:  { maxEquityIncreasePP: 0.05, maxKvykDecreasePP: 0.05, maxGroupShare: 0.65 },
-    medium: { maxEquityIncreasePP: 0.08, maxKvykDecreasePP: 0.10, maxGroupShare: 0.65 },
-    long:   { maxEquityIncreasePP: 0.12, maxKvykDecreasePP: 0.15, maxGroupShare: 0.65 },
+    short:  { maxEquityIncreasePP: 0.05, maxKvykDecreasePP: 0.05, maxGroupShareDeteriorationPP: 0.03 },
+    medium: { maxEquityIncreasePP: 0.08, maxKvykDecreasePP: 0.10, maxGroupShareDeteriorationPP: 0.05 },
+    long:   { maxEquityIncreasePP: 0.12, maxKvykDecreasePP: 0.15, maxGroupShareDeteriorationPP: 0.07 },
   },
   RECOVERY: {
-    short:  { maxEquityIncreasePP: 0.07, maxKvykDecreasePP: 0.07, maxGroupShare: 0.67 },
-    medium: { maxEquityIncreasePP: 0.11, maxKvykDecreasePP: 0.13, maxGroupShare: 0.67 },
-    long:   { maxEquityIncreasePP: 0.16, maxKvykDecreasePP: 0.19, maxGroupShare: 0.67 },
+    short:  { maxEquityIncreasePP: 0.07, maxKvykDecreasePP: 0.07, maxGroupShareDeteriorationPP: 0.04 },
+    medium: { maxEquityIncreasePP: 0.11, maxKvykDecreasePP: 0.13, maxGroupShareDeteriorationPP: 0.07 },
+    long:   { maxEquityIncreasePP: 0.16, maxKvykDecreasePP: 0.19, maxGroupShareDeteriorationPP: 0.10 },
   },
   CRISIS: {
-    short:  { maxEquityIncreasePP: 0.09, maxKvykDecreasePP: 0.09, maxGroupShare: 0.70 },
-    medium: { maxEquityIncreasePP: 0.15, maxKvykDecreasePP: 0.17, maxGroupShare: 0.70 },
-    long:   { maxEquityIncreasePP: 0.22, maxKvykDecreasePP: 0.24, maxGroupShare: 0.70 },
+    short:  { maxEquityIncreasePP: 0.09, maxKvykDecreasePP: 0.09, maxGroupShareDeteriorationPP: 0.06 },
+    medium: { maxEquityIncreasePP: 0.15, maxKvykDecreasePP: 0.17, maxGroupShareDeteriorationPP: 0.09 },
+    long:   { maxEquityIncreasePP: 0.22, maxKvykDecreasePP: 0.24, maxGroupShareDeteriorationPP: 0.13 },
   },
 }
 
 export const CUMULATIVE_GUARDRAIL_STAGE_ADD = {
-  0: { equityPP: 0.00, kvykPP: 0.00, groupShare: 0.00 },
-  1: { equityPP: 0.02, kvykPP: 0.03, groupShare: 0.01 },
-  2: { equityPP: 0.03, kvykPP: 0.04, groupShare: 0.02 },
+  0: { equityPP: 0.00, kvykPP: 0.00, groupShareDeteriorationPP: 0.000 },
+  1: { equityPP: 0.02, kvykPP: 0.03, groupShareDeteriorationPP: 0.010 },
+  2: { equityPP: 0.03, kvykPP: 0.04, groupShareDeteriorationPP: 0.020 },
 } as const
 
 export const CUMULATIVE_GUARDRAIL_HARD_MAX = {
-  maxEquityIncreasePP: 0.25,
-  maxKvykDecreasePP:   0.28,
-  maxGroupShare:       0.72,
+  maxEquityIncreasePP:          0.25,
+  maxKvykDecreasePP:            0.28,
+  maxGroupShareDeteriorationPP: 0.15,
 } as const
+
+/** Herhangi bir grubun bilanço payı bu mutlak eşiği geçerse anında dur. */
+export const ABSOLUTE_GROUP_SHARE_HARD_STOP = 0.98
 
 export const GUARDRAIL_BREACH_POLICY = {
   onCandidateBreach:                'SKIP_AND_TRY_NEXT' as const,
@@ -284,15 +287,24 @@ export function computeCumulativeGuardrails(
   regime: Regime,
   horizon: HorizonKey,
   unlockStage: 0 | 1 | 2,
-): { maxEquityIncreasePP: number; maxKvykDecreasePP: number; maxGroupShare: number } {
+): { maxEquityIncreasePP: number; maxKvykDecreasePP: number; maxGroupShareDeteriorationPP: number } {
   const base    = CUMULATIVE_GUARDRAILS_BY_REGIME[regime][horizon]
   const add     = CUMULATIVE_GUARDRAIL_STAGE_ADD[unlockStage]
   const hardMax = CUMULATIVE_GUARDRAIL_HARD_MAX
 
   return {
-    maxEquityIncreasePP: Math.min(base.maxEquityIncreasePP + add.equityPP, hardMax.maxEquityIncreasePP),
-    maxKvykDecreasePP:   Math.min(base.maxKvykDecreasePP   + add.kvykPP,   hardMax.maxKvykDecreasePP),
-    maxGroupShare:       Math.min(base.maxGroupShare        + add.groupShare, hardMax.maxGroupShare),
+    maxEquityIncreasePP: Math.min(
+      base.maxEquityIncreasePP + add.equityPP,
+      hardMax.maxEquityIncreasePP,
+    ),
+    maxKvykDecreasePP: Math.min(
+      base.maxKvykDecreasePP + add.kvykPP,
+      hardMax.maxKvykDecreasePP,
+    ),
+    maxGroupShareDeteriorationPP: Math.min(
+      base.maxGroupShareDeteriorationPP + add.groupShareDeteriorationPP,
+      hardMax.maxGroupShareDeteriorationPP,
+    ),
   }
 }
 

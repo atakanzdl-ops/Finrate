@@ -324,6 +324,7 @@ export function applyCandidate(
       actualScoreDelta:   scoreAfterStandalone - scoreBeforeStandalone,
       scoreBeforeAction:  scoreBeforeStandalone,
       scoreAfterAction:   scoreAfterStandalone,
+      afterAnalysis,
     }
   }
 
@@ -600,5 +601,6 @@ export function applyCandidate(
     actualScoreDelta:  standaloneDelta,
     scoreBeforeAction: scoreBeforeStandalone,
     scoreAfterAction:  scoreAfterStandalone,
+    afterAnalysis,
   }
 }
