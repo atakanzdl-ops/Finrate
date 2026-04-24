@@ -93,6 +93,19 @@ function assessAssetEfficiency(productivity: any): string {
   return 'Zayif'
 }
 
+/**
+ * Backend'den gelen alan string veya string[] olabilir.
+ * Her iki durumu da guvenceli string[] 'e normalize eder.
+ * Null / undefined → bos dizi.
+ */
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v)).filter(v => v && v.trim().length > 0)
+  }
+  if (typeof value === 'string' && value.trim()) return [value]
+  return []
+}
+
 // ─── BankerMetric ─────────────────────────────────────────────────────────────
 
 function BankerMetric({ label, value }: { label: string; value: string }) {
@@ -171,7 +184,7 @@ function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: 
       {expanded && (
         <div className="px-5 pb-4 space-y-3 border-t border-slate-100 pt-4">
           {/* Narrative — hide degenerate backend text when requiredActionNames is empty */}
-          {plan?.requiredActionNames?.length > 0
+          {toStringArray(plan?.requiredActionNames).length > 0
             ? plan?.narrative && (
                 <div className="text-sm text-[#1E293B]">{plan.narrative}</div>
               )
@@ -184,13 +197,13 @@ function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: 
             )
           }
 
-          {plan?.requiredActionNames && plan.requiredActionNames.length > 0 && (
+          {toStringArray(plan?.requiredActionNames).length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
                 Gerekli Aksiyonlar
               </div>
               <div className="flex flex-wrap gap-2">
-                {plan.requiredActionNames.map((a: string, i: number) => (
+                {toStringArray(plan?.requiredActionNames).map((a: string, i: number) => (
                   <span key={i} className="text-xs px-2 py-1 rounded-[6px] bg-slate-100 text-[#1E293B]">
                     {a}
                   </span>
@@ -524,14 +537,14 @@ function AksiyonPlaniTab({
                 {/* Expand detay */}
                 {isOpen && (
                   <div className="px-6 pb-5 bg-slate-50/50 space-y-4">
-                    {/* Why Selected */}
-                    {action.whySelected && action.whySelected.length > 0 && (
+                    {/* Why Selected — toStringArray: backend string or string[] → safe array */}
+                    {toStringArray(action.whySelected).length > 0 && (
                       <div>
                         <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2 mt-4">
                           Neden Bu Aksiyon Secildi?
                         </div>
                         <ul className="space-y-1.5">
-                          {action.whySelected.map((reason: string, i: number) => (
+                          {toStringArray(action.whySelected).map((reason: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-[#1E293B]">
                               <Check size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
                               <span>{reason}</span>
@@ -763,9 +776,9 @@ function DetayTab({
                     </div>
                   </div>
 
-                  {r.whyRejected && r.whyRejected.length > 0 && (
+                  {toStringArray(r.whyRejected).length > 0 && (
                     <ul className="space-y-1 mt-2">
-                      {r.whyRejected.map((reason: string, i: number) => (
+                      {toStringArray(r.whyRejected).map((reason: string, i: number) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-[#1E293B]">
                           <X size={14} className="text-red-400 shrink-0 mt-0.5" />
                           <span>{reason}</span>
