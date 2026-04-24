@@ -301,6 +301,39 @@ export function dedupeActions(actions: SelectedAction[]): SelectedAction[] {
   })
 }
 
+/**
+ * Engine ayni aksiyonu farkli tutarlarla birden fazla kez secebilir
+ * (optimizer her iterasyonda farkli amount candidate secebilir).
+ * Bu fonksiyon ayni actionId'li kayitlari TEK satirda birlestir:
+ *   - amountTRY: toplanir
+ *   - transactions: birlestir (tüm muhasebe bacaklari korunur)
+ *   - estimatedNotchContribution: toplanir, max 2.0 ile sinirlanir
+ *   - Diger alanlar (horizon, narrative vb.) ilk kaydın degerini korur
+ *
+ * NOT: dedupeActions SONRASI cagirilir — onceden exact-duplicate'lar
+ * zaten temizlenmis olur, sadece farkli-tutar parçalar kalir.
+ */
+function consolidateByActionId(actions: SelectedAction[]): SelectedAction[] {
+  const map = new Map<string, SelectedAction>()
+
+  for (const action of actions) {
+    const existing = map.get(action.actionId)
+    if (existing) {
+      existing.amountTRY = (existing.amountTRY ?? 0) + (action.amountTRY ?? 0)
+      existing.transactions = [...existing.transactions, ...action.transactions]
+      existing.estimatedNotchContribution = Math.min(
+        (existing.estimatedNotchContribution ?? 0) + (action.estimatedNotchContribution ?? 0),
+        2.0,
+      )
+    } else {
+      // Shallow copy + transactions deep-copy (mutation koruması)
+      map.set(action.actionId, { ...action, transactions: [...action.transactions] })
+    }
+  }
+
+  return Array.from(map.values())
+}
+
 // ─── BUILDER: EXECUTIVE ANSWER ───────────────────────────────────────────────
 
 function buildExecutiveAnswer(
@@ -361,10 +394,11 @@ function buildExecutiveAnswer(
 // ─── BUILDER: ACTION PLAN ROWS ───────────────────────────────────────────────
 
 function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
-  const deduped = dedupeActions(engineResult.portfolio)
+  const deduped      = dedupeActions(engineResult.portfolio)
+  const consolidated = consolidateByActionId(deduped)   // same-id parts → single row
   const rows: ActionPlanRow[] = []
 
-  deduped.forEach((action, idx) => {
+  consolidated.forEach((action, idx) => {
     const template  = ACTION_CATALOG_V3[action.actionId]
     const cat       = ACTION_CATEGORY_MAP[action.actionId] ?? 'HYBRID'
 
@@ -468,15 +502,18 @@ function buildTwoNotchPlan(engineResult: EngineResult): NotchPlan {
 // ─── BUILDER: ACCOUNTING IMPACT TABLE ────────────────────────────────────────
 
 function buildAccountingImpactTable(engineResult: EngineResult): AccountingImpactRow[] {
-  const deduped = dedupeActions(engineResult.portfolio)
-  const rows: AccountingImpactRow[] = []
-  let rank = 1
+  const deduped      = dedupeActions(engineResult.portfolio)
+  const consolidated = consolidateByActionId(deduped)   // same-id parts merged
 
-  for (const action of deduped) {
+  // Tüm bacakları düz liste olarak topla
+  const rawRows: AccountingImpactRow[] = []
+  let rawRank = 1
+
+  for (const action of consolidated) {
     for (const tx of action.transactions) {
       for (const leg of tx.legs) {
-        rows.push({
-          rank:                   rank++,
+        rawRows.push({
+          rank:                   rawRank++,
           horizon:                action.horizon,
           actionId:               action.actionId,
           actionName:             action.actionName,
@@ -494,7 +531,22 @@ function buildAccountingImpactTable(engineResult: EngineResult): AccountingImpac
     }
   }
 
-  return rows
+  // Aynı (actionId, accountCode, legSide) kombinasyonunu birleştir
+  // Örnek: "102 Bankalar DEBIT ₺2.1M + ₺1.8M + ₺2.5M" → "102 Bankalar DEBIT ₺6.4M"
+  const mergedMap = new Map<string, AccountingImpactRow>()
+  for (const row of rawRows) {
+    const key = `${row.actionId}|${row.accountCode}|${row.legSide}`
+    const existing = mergedMap.get(key)
+    if (existing) {
+      existing.amountTRY += row.amountTRY
+      existing.amountFormatted = formatTRY(existing.amountTRY)
+    } else {
+      mergedMap.set(key, { ...row })
+    }
+  }
+
+  // rank yeniden numaralandır
+  return Array.from(mergedMap.values()).map((row, idx) => ({ ...row, rank: idx + 1 }))
 }
 
 // ─── BUILDER: WHY CAPITAL ALONE NOT ENOUGH ───────────────────────────────────
@@ -639,9 +691,10 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 // ─── BUILDER: UI READY ROWS ──────────────────────────────────────────────────
 
 function buildUiReadyRows(engineResult: EngineResult): UiReadyRow[] {
-  const deduped = dedupeActions(engineResult.portfolio)
+  const deduped      = dedupeActions(engineResult.portfolio)
+  const consolidated = consolidateByActionId(deduped)   // same-id parts merged
 
-  return deduped.map((action, idx) => {
+  return consolidated.map((action, idx) => {
     const cat     = ACTION_CATEGORY_MAP[action.actionId] ?? 'HYBRID'
     const template = ACTION_CATALOG_V3[action.actionId]
 
