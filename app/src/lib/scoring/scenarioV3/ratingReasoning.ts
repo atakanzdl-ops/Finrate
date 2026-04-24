@@ -370,19 +370,25 @@ export interface RatingTransition {
   explanation:       string
   blockedByCeiling:  boolean
   bindingCeiling?:   CeilingConstraint
+
+  /** PATCH 1: Portfolio capacity cap */
+  blockedByPortfolioCapacity: boolean
+  portfolioNotchCapacity:     number    // Infinity = sinir yok
+  achievableByPortfolio:      number    // floor(portfolioNotchCapacity)
 }
 
 const MIN_CONFIDENCE = 0.25  // Bounded degradation floor
 
 export function buildRatingTransition(
-  currentRating:   RatingGrade,
-  rawTargetRating: RatingGrade,
-  bindingCeiling:  CeilingConstraint | null,
-  productivity:    AssetProductivityResult,
-  composition:     PortfolioComposition,
-  consumption:     SeverityConsumption,
+  currentRating:          RatingGrade,
+  rawTargetRating:        RatingGrade,
+  bindingCeiling:         CeilingConstraint | null,
+  productivity:           AssetProductivityResult,
+  composition:            PortfolioComposition,
+  consumption:            SeverityConsumption,
+  portfolioNotchCapacity: number = Infinity,  // PATCH 1: portfoy kapasitesi
 ): RatingTransition {
-  // Ceiling uygulanmasi
+  // ── 1. Ceiling uygulanmasi (mevcut mantik korunur)
   let finalTargetRating = rawTargetRating
   let blockedByCeiling  = false
   if (
@@ -393,7 +399,21 @@ export function buildRatingTransition(
     blockedByCeiling  = true
   }
 
-  const notchesGained = ratingToIndex(finalTargetRating) - ratingToIndex(currentRating)
+  // ── 2. PATCH 1: Portfolio kapasitesi uygulanmasi
+  //    finalTargetRating = min(ceiling_result, currentRating + floor(portfolioNotchCapacity))
+  const achievableByPortfolio     = Math.floor(portfolioNotchCapacity)
+  const maxRatingByPortfolio      = notchUp(currentRating, achievableByPortfolio)
+  let   blockedByPortfolioCapacity = false
+
+  if (
+    isFinite(portfolioNotchCapacity) &&
+    ratingToIndex(maxRatingByPortfolio) < ratingToIndex(finalTargetRating)
+  ) {
+    finalTargetRating          = maxRatingByPortfolio
+    blockedByPortfolioCapacity = true
+  }
+
+  const notchesGained = Math.max(0, ratingToIndex(finalTargetRating) - ratingToIndex(currentRating))
 
   // Confidence hesabi — DOUBLE-COUNTING GUARD
   let confidenceModifier      = 1.0
@@ -449,6 +469,10 @@ export function buildRatingTransition(
     explanation +=
       ` ${bindingCeiling.source} ceiling'i ${bindingCeiling.maxRating} seviyesinde sinirliyor: ${bindingCeiling.reason}.`
   }
+  if (blockedByPortfolioCapacity) {
+    explanation +=
+      ` Portfoy kapasitesi ${achievableByPortfolio} kademe tasiyor; hedef bu kapasitenin uzerinde.`
+  }
   if (confidenceReasons.length > 0) {
     explanation += ` Guven: ${confidenceReasons.join('; ')}.`
   }
@@ -464,6 +488,9 @@ export function buildRatingTransition(
     explanation,
     blockedByCeiling,
     bindingCeiling: bindingCeiling ?? undefined,
+    blockedByPortfolioCapacity,
+    portfolioNotchCapacity,
+    achievableByPortfolio,
   }
 }
 
@@ -821,6 +848,11 @@ export interface RatingReasoningInput {
   guardrail:          GuardrailReport
   productivity:       AssetProductivityResult
   portfolioActionIds: string[]
+
+  /** PATCH 1: Portfoyun toplam estimated notch contribution toplamı.
+   *  Verilmezse Infinity (backward compat — cap uygulanmaz).
+   */
+  portfolioNotchCapacity?: number
 }
 
 export interface RatingReasoningResult {
@@ -869,6 +901,7 @@ export function analyzeRatingReasoning(
     input.productivity,
     portfolioComposition,
     consumption,
+    input.portfolioNotchCapacity ?? Infinity,  // PATCH 1
   )
 
   // 5. Driver'lar (consumption'a gore double-counting guard)

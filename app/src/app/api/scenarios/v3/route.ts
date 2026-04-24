@@ -228,7 +228,8 @@ export async function POST(req: NextRequest) {
     const decisionAnswer = buildDecisionAnswer(
       engineResult,
       targetRating,
-      null,  // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
+      null,       // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
+      balances,   // PATCH 1: dataQualityWarning icin hesap sayisi
     )
 
     // ── 10. RESPONSE ──────────────────────────────────────────────────────────

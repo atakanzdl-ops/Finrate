@@ -253,6 +253,8 @@ export interface EngineResult {
     twoNotchScenario:    unknown
     sensitivityAnalysis: unknown
     bankerSummary:       string
+    /** PATCH 1: RatingTransition tam nesnesi — blockedByPortfolioCapacity vb. */
+    transition:          unknown
   }
 
   layerSummaries: {
@@ -1407,6 +1409,11 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   const defaultTarget: RatingGrade = input.targetRating ?? 'BB-'
 
+  // PATCH 1: Portfoyun toplam notch kapasitesini hesapla (FAZ 3 sonrasi)
+  const portfolioNotchCapacityV1 = fullPortfolio.reduce(
+    (sum, action) => sum + (action.estimatedNotchContribution ?? 0), 0,
+  )
+
   let reasoning = analyzeRatingReasoning({
     currentRating:      input.currentRating,
     rawTargetRating:    defaultTarget,
@@ -1425,6 +1432,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
     },
     productivity,
     portfolioActionIds: fullPortfolio.map(a => a.actionId),
+    portfolioNotchCapacity: portfolioNotchCapacityV1,  // PATCH 1
   })
 
   // ── FAZ 4: LOCAL REPAIR ───────────────────────────────────────────────────
@@ -1451,6 +1459,11 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
     guardrailResults   = buildGuardrailResults(workingContext, fullPortfolio)
 
+    // PATCH 1: Repair sonrasi guncellenmis kapasite
+    const portfolioNotchCapacityV2 = fullPortfolio.reduce(
+      (sum, action) => sum + (action.estimatedNotchContribution ?? 0), 0,
+    )
+
     reasoning = analyzeRatingReasoning({
       currentRating:   input.currentRating,
       rawTargetRating: defaultTarget,
@@ -1466,6 +1479,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
       },
       productivity,
       portfolioActionIds: fullPortfolio.map(a => a.actionId),
+      portfolioNotchCapacity: portfolioNotchCapacityV2,  // PATCH 1
     })
   }
 
@@ -1511,6 +1525,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
       twoNotchScenario:    reasoning.twoNotchScenario,
       sensitivityAnalysis: reasoning.sensitivityAnalysis,
       bankerSummary:       reasoning.bankerSummary,
+      transition:          reasoning.transition,  // PATCH 1
     },
     layerSummaries: {
       productivity,

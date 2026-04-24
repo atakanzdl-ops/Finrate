@@ -198,6 +198,23 @@ export interface ComparisonWithV2 {
   diffNote: string
 }
 
+// ─── DATA QUALITY WARNING ─────────────────────────────────────────────────────
+
+/** PATCH 1: Veri kalitesi uyarisi.
+ *  Mizan az hesap iceriginde engine portfoy uretemiyor olabilir.
+ *  UI bu uyariyi kirmizi banner olarak gostermeli.
+ */
+export interface DataQualityWarning {
+  hasLimitedData:           boolean
+  accountCount:             number
+  rejectedCandidatesCount:  number
+  portfolioSize:            number
+  /** Kullaniciya gosterilecek kisa mesaj */
+  message:                  string
+  /** Nasil iyilestirilebilir */
+  recommendation:           string
+}
+
 // ─── MAIN OUTPUT ─────────────────────────────────────────────────────────────
 
 export interface DecisionAnswer {
@@ -213,6 +230,8 @@ export interface DecisionAnswer {
   rejectedInsights: RejectedInsight[]
   consultantNarrative: ConsultantNarrative
   comparisonWithV2?: ComparisonWithV2
+  /** PATCH 1: Veri kalitesi uyarisi — sparse mizan durumunda dolu */
+  dataQualityWarning?: DataQualityWarning
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -671,7 +690,10 @@ function buildRejectedInsights(engineResult: EngineResult): RejectedInsight[] {
 
 // ─── BUILDER: CONSULTANT NARRATIVE ───────────────────────────────────────────
 
-function buildConsultantNarrative(engineResult: EngineResult): ConsultantNarrative {
+function buildConsultantNarrative(
+  engineResult: EngineResult,
+  requestedTarget?: RatingGrade,
+): ConsultantNarrative {
   const drivers        = engineResult.reasoning.drivers as DriverGroup | null
   const bindingCeiling = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
   const productivity   = engineResult.layerSummaries.productivity as {
@@ -752,21 +774,50 @@ function buildConsultantNarrative(engineResult: EngineResult): ConsultantNarrati
     structuralNeed = 'Mevcut portföy yapısal dönüşümü kapsıyor — tutarlı uygulama yeterli.'
   }
 
-  // ── bankerView ────────────────────────────────────────────────────────────
+  // ── bankerView — PATCH 1: portfolio capacity farkindaliği ──────────────────
   const { confidence, confidenceModifier, finalTargetRating, notchesGained } = engineResult
 
-  let bankerView =
-    `Bankacı gözünden: ${engineResult.currentRating} → ${finalTargetRating} ` +
-    `(${notchesGained} kademe), güven ${confidence} (%${(confidenceModifier * 100).toFixed(0)}). `
+  // RatingTransition'dan portfolio capacity bilgisi
+  const transition = engineResult.reasoning.transition as {
+    blockedByPortfolioCapacity?: boolean
+    achievableByPortfolio?: number
+    portfolioNotchCapacity?: number
+  } | null
 
-  if (confidence === 'HIGH') {
-    bankerView += 'Kredi komitesi bu yol haritasını olumlu karşılar — tutarlı uygulama şart.'
-  } else if (confidence === 'MEDIUM') {
-    bankerView += 'Orta güven — uygulama riski var. Takip mekanizması kurulmalı.'
+  const blockedByCapacity  = transition?.blockedByPortfolioCapacity ?? false
+  const capacityNotches    = transition?.achievableByPortfolio ?? notchesGained
+  const rawCapacity        = transition?.portfolioNotchCapacity ?? Infinity
+  const confidenceLabel    = confidence === 'HIGH' ? 'yüksek güvenle' : confidence === 'MEDIUM' ? 'orta güvenle' : 'düşük güvenle'
+
+  let bankerView: string
+
+  if (blockedByCapacity) {
+    // Portfoy kapasitesi istenen hedefin altinda — asil kritik mesaj
+    bankerView =
+      `Kredi komitesi bakışı: ${requestedTarget ?? finalTargetRating} hedefi teorik olarak tavan içinde görünüyor ` +
+      `ancak önerilen aksiyon portföyü en fazla ${capacityNotches} kademe iyileşme taşır ` +
+      `(toplam katkı: ${isFinite(rawCapacity) ? rawCapacity.toFixed(2) : '∞'} notch). ` +
+      `Mevcut portföyle ulaşılabilir seviye: ${finalTargetRating}. ` +
+      `Daha yüksek bir hedefe ulaşmak için portföyün genişletilmesi — özellikle yapısal aksiyonların eklenmesi — gerekiyor. ` +
+      `Likidite iyileşmesi tek başına rating artırmaz; aktif verimliliği ve gelir kalitesi de gösterilmeli.`
+  } else if (notchesGained === 0) {
+    bankerView =
+      `Kredi komitesi bakışı: Mevcut yapıda anlamlı rating iyileşmesi görülmedi. ` +
+      `${engineResult.reasoning.bankerSummary as string || 'Köklü operasyonel değişim gerekiyor.'}`
   } else {
-    bankerView +=
-      'Düşük güven — bilanço düzenlemeleri yeterli değil, köklü operasyonel değişim gerekiyor. ' +
-      'Bankacılar teminat ve nakit akışı analizine odaklanacak.'
+    bankerView =
+      `Kredi komitesi bakışı: ${engineResult.currentRating} → ${finalTargetRating} ` +
+      `(${notchesGained} kademe) ${confidenceLabel} destekleniyor. `
+
+    if (confidence === 'HIGH') {
+      bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa revizyon anlamlı olur.'
+    } else if (confidence === 'MEDIUM') {
+      bankerView += 'Orta güven — uygulama riski var, takip mekanizması kurulmalı.'
+    } else {
+      bankerView +=
+        'Düşük güven — bilanço düzenlemeleri yeterli değil, köklü operasyonel değişim gerekiyor. ' +
+        'Bankacılar teminat ve nakit akışı analizine odaklanacak.'
+    }
   }
 
   return {
@@ -819,20 +870,67 @@ function buildComparisonWithV2(
   }
 }
 
+// ─── BUILDER: DATA QUALITY WARNING ───────────────────────────────────────────
+
+/**
+ * PATCH 1: Sparse mizan durumunda kullaniciya uyari.
+ * Kriterler:
+ *   - hesap sayisi < 30 (az kesim)
+ *   - reddedilen aday sayisi >= 30 VE portfoy <= 2 aksiyon
+ *   - portfoy <= 1 aksiyon
+ */
+function buildDataQualityWarning(
+  engineResult:    EngineResult,
+  accountBalances?: Record<string, number>,
+): DataQualityWarning | undefined {
+  const accountCount        = accountBalances ? Object.keys(accountBalances).length : 0
+  const rejectedCount       = engineResult.debug?.rejectedCandidates?.length ?? 0
+  const portfolioSize       = engineResult.portfolio.length
+
+  const hasLimitedData =
+    (accountCount > 0 && accountCount < 30) ||
+    (rejectedCount >= 30 && portfolioSize <= 2) ||
+    portfolioSize <= 1
+
+  if (!hasLimitedData) return undefined
+
+  const parts: string[] = []
+  if (accountCount > 0 && accountCount < 30) {
+    parts.push(`Mizan hesap detayı sınırlı (${accountCount} hesap).`)
+  }
+  if (rejectedCount >= 30 && portfolioSize <= 2) {
+    parts.push(`Çoğu aksiyon uygulanabilir bulunmadı (${rejectedCount} aday elendi).`)
+  }
+  if (portfolioSize <= 1) {
+    parts.push('Önerilen aksiyon seti daraldı.')
+  }
+
+  return {
+    hasLimitedData:          true,
+    accountCount,
+    rejectedCandidatesCount: rejectedCount,
+    portfolioSize,
+    message:         parts.join(' ') || 'Veri kalitesi analiz kapsamını kısıtladı.',
+    recommendation:  'Daha ayrıntılı bir mizan (gelir tablosu hesapları dahil, 30+ hesap) ile analiz tekrarlanırsa öneri seti genişleyebilir.',
+  }
+}
+
 // ─── ANA API ─────────────────────────────────────────────────────────────────
 
 /**
  * engineV3.ts ciktisini banker UI cevabina donusturur.
  *
- * @param engineResult - runEngineV3 ciktisi
+ * @param engineResult    - runEngineV3 ciktisi
  * @param requestedTarget - kullanicinin istedigi hedef rating
- * @param v2Result - opsiyonel V2 karsilastirma (null = atla)
+ * @param v2Result        - opsiyonel V2 karsilastirma (null = atla)
+ * @param accountBalances - PATCH 1: dataQualityWarning icin hesap sayisi
  */
 export function buildDecisionAnswer(
   engineResult:    EngineResult,
   requestedTarget: RatingGrade,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  v2Result: any | null = null,
+  v2Result:         any | null = null,
+  accountBalances?: Record<string, number>,
 ): DecisionAnswer {
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
   const whatCompanyShouldDo          = buildActionPlan(engineResult)
@@ -844,7 +942,9 @@ export function buildDecisionAnswer(
   const ifNotDoneRisk                = buildIfNotDoneRisk(engineResult)
   const uiReadyRows                  = buildUiReadyRows(engineResult)
   const rejectedInsights             = buildRejectedInsights(engineResult)
-  const consultantNarrative          = buildConsultantNarrative(engineResult)
+  // PATCH 1: requestedTarget'ı geç — portfolio capacity mesajı için
+  const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
+  const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
   const comparisonWithV2 = v2Result != null
     ? buildComparisonWithV2(engineResult, v2Result)
@@ -863,5 +963,6 @@ export function buildDecisionAnswer(
     rejectedInsights,
     consultantNarrative,
     comparisonWithV2,
+    dataQualityWarning,
   }
 }
