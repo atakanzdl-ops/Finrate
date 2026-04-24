@@ -170,17 +170,27 @@ function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: 
 
       {expanded && (
         <div className="px-5 pb-4 space-y-3 border-t border-slate-100 pt-4">
-          {plan?.narrative && (
-            <div className="text-sm text-[#1E293B]">{plan.narrative}</div>
-          )}
+          {/* Narrative — hide degenerate backend text when requiredActionNames is empty */}
+          {plan?.requiredActionNames?.length > 0
+            ? plan?.narrative && (
+                <div className="text-sm text-[#1E293B]">{plan.narrative}</div>
+              )
+            : (
+              <div className="text-sm text-[#64748B] italic">
+                {plan?.isAchievable
+                  ? 'Mevcut portföy bu kademeye ulaşmak için yeterli görünüyor.'
+                  : 'Spesifik aksiyon önerisi üretilemedi.'}
+              </div>
+            )
+          }
 
-          {plan?.requiredActions && plan.requiredActions.length > 0 && (
+          {plan?.requiredActionNames && plan.requiredActionNames.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
                 Gerekli Aksiyonlar
               </div>
               <div className="flex flex-wrap gap-2">
-                {plan.requiredActions.map((a: string, i: number) => (
+                {plan.requiredActionNames.map((a: string, i: number) => (
                   <span key={i} className="text-xs px-2 py-1 rounded-[6px] bg-slate-100 text-[#1E293B]">
                     {a}
                   </span>
@@ -495,7 +505,7 @@ function AksiyonPlaniTab({
                   </div>
                   {/* Tutar */}
                   <div className="col-span-2 flex items-center">
-                    <div className="font-semibold text-[#1E293B]">{action.amountText ?? '—'}</div>
+                    <div className="font-semibold text-[#1E293B]">{action.amountFormatted ?? '—'}</div>
                   </div>
                   {/* Amac */}
                   <div className="col-span-3 flex items-center">

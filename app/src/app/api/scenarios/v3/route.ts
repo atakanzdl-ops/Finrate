@@ -209,10 +209,20 @@ export async function POST(req: NextRequest) {
     const sector = mapSectorCode(analysis.entity.sector)
 
     // ── 7. MEVCUT RATİNG ─────────────────────────────────────────────────────
+    // Oncelik 1: finalRating string'i — zaten hesaplanmis, RATING_ORDER'da gecerli
+    // Oncelik 2: scoreFinal sayisaldan scoreToRatingGrade ile turetet
+    // Oncelik 3: fallback 50 → 'B+' (uyari: bu yanlislikla secilebilir)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawScoreFinal = (analysis as any).scoreFinal
-    const baseScore     = rawScoreFinal != null ? Number(rawScoreFinal) : 50
-    const currentRating = scoreToRatingGrade(baseScore)
+    const rawFinalRating = (analysis as any).finalRating as string | null | undefined
+    const currentRating: RatingGrade =
+      rawFinalRating && (RATING_ORDER as string[]).includes(rawFinalRating)
+        ? (rawFinalRating as RatingGrade)
+        : (() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawScoreFinal = (analysis as any).scoreFinal
+            const baseScore     = rawScoreFinal != null ? Number(rawScoreFinal) : 50
+            return scoreToRatingGrade(baseScore)
+          })()
     const targetRating  = parseRatingGrade(targetGrade)
 
     // ── 8. V3 ENGINE ─────────────────────────────────────────────────────────
