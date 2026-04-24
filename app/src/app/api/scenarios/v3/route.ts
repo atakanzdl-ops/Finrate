@@ -14,13 +14,15 @@ import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReason
  */
 function mapSectorCode(sectorStr: string | null | undefined): SectorCode {
   if (!sectorStr) return 'MANUFACTURING'
-  const s = sectorStr.toLowerCase()
-  if (s.includes('inşaat') || s.includes('insaat') || s.includes('construction')) return 'CONSTRUCTION'
-  if (s.includes('imalat') || s.includes('manufactur'))                           return 'MANUFACTURING'
-  if (s.includes('ticaret') || s.includes('trade') || s.includes('wholesale'))   return 'TRADE'
-  if (s.includes('perakende') || s.includes('retail'))                           return 'RETAIL'
-  if (s.includes('bilgi') || s.includes('teknoloji') || s.includes('it') || s.includes('yazılım')) return 'IT'
-  if (s.includes('hizmet') || s.includes('service'))                             return 'SERVICES'
+  // toLocaleLowerCase('tr') kullanilir: Turkce 'I' → 'ı', 'İ' → 'i' (ASCII i)
+  // .toLowerCase() yanlis: 'İnşaat'.toLowerCase() === 'i̇nşaat' (dotted, ASCII degil)
+  const s = sectorStr.toLocaleLowerCase('tr')
+  if (s.includes('inşaat') || s.includes('insaat') || s.includes('taahhüt') || s.includes('construction')) return 'CONSTRUCTION'
+  if (s.includes('imalat') || s.includes('üretim') || s.includes('sanayi') || s.includes('manufactur'))   return 'MANUFACTURING'
+  if (s.includes('toptan') || s.includes('ticaret') || s.includes('trade') || s.includes('wholesale'))    return 'TRADE'
+  if (s.includes('perakende') || s.includes('retail'))                                                    return 'RETAIL'
+  if (s.includes('bilişim') || s.includes('yazılım') || s.includes('teknoloji') || s.includes('it'))      return 'IT'
+  if (s.includes('hizmet') || s.includes('service'))                                                      return 'SERVICES'
   return 'MANUFACTURING'
 }
 

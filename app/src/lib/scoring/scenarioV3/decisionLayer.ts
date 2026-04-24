@@ -341,9 +341,10 @@ function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
       sustainability:           action.sustainability,
       qualityScore:             action.qualityScore,
       estimatedNotchContribution: action.estimatedNotchContribution,
-      whySelected:              action.narrative,
+      // cfoRationale oncelikli (bankaci dili); action.narrative teknik scoring string iceriyor
+      whySelected:              template?.cfoRationale ?? action.narrative,
       accountingEffect:         txDesc,
-      cfoRationale:             template?.cfoRationale     ?? action.narrative,
+      cfoRationale:             template?.cfoRationale ?? action.narrative,
       bankerPerspective:        template?.bankerPerspective ?? '',
     })
   })
@@ -615,7 +616,7 @@ function buildUiReadyRows(engineResult: EngineResult): UiReadyRow[] {
       qualityScore:     action.qualityScore,
       notchContribution: action.estimatedNotchContribution,
       sustainability:   action.sustainability,
-      whySelected:      action.narrative,
+      whySelected:      template?.cfoRationale ?? action.narrative,
       cfoRationale:     template?.cfoRationale ?? action.narrative,
     }
   })
