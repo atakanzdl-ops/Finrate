@@ -49,6 +49,12 @@ import {
   X,
   GitCompare,
 } from 'lucide-react'
+import {
+  UI_RATING_CATEGORIES,
+  mapUiRatingToInternal,
+  normalizeRatingForUi,
+  ratingTooltip,
+} from '@/lib/scoring/uiRating'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -191,7 +197,7 @@ function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: 
             : (
               <div className="text-sm text-[#64748B] italic">
                 {plan?.isAchievable
-                  ? 'Mevcut portföy bu kademeye ulaşmak için yeterli görünüyor.'
+                  ? 'Mevcut portföy bu seviyeye ulaşmak için yeterli görünüyor.'
                   : 'Spesifik aksiyon önerisi üretilemedi.'}
               </div>
             )
@@ -248,11 +254,22 @@ function OzetTab({ result }: { result: any }) {
             <div className="text-xs uppercase tracking-wider text-[#2EC4B6] font-semibold mb-2">
               Gercekci Ust Sinir
             </div>
-            <div className="text-4xl font-bold">{exec.achievableTarget ?? exec.achievableRating}</div>
+            <div className="text-4xl font-bold">
+              <span title={ratingTooltip(exec.achievableTarget ?? exec.achievableRating)}>
+                {normalizeRatingForUi(exec.achievableTarget ?? exec.achievableRating)}
+              </span>
+            </div>
             <div className="text-sm text-white/70 mt-1">
-              Mevcut: {exec.currentRating}
+              Mevcut:{' '}
+              <span title={ratingTooltip(exec.currentRating)}>
+                {normalizeRatingForUi(exec.currentRating)}
+              </span>
               {exec.requestedTarget && exec.requestedTarget !== (exec.achievableTarget ?? exec.achievableRating) && (
-                <> &bull; İstenen: {exec.requestedTarget}</>
+                <> &bull; İstenen:{' '}
+                  <span title={ratingTooltip(exec.requestedTarget)}>
+                    {normalizeRatingForUi(exec.requestedTarget)}
+                  </span>
+                </>
               )}
             </div>
           </div>
@@ -306,7 +323,11 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-sm text-amber-800">
                 Teorik rating tavani mevcut olsa da secilen aksiyon portfoyu bu seviyeyi tasimiyor.
                 Mevcut portfoyle ulasilabilir en yuksek seviye:{' '}
-                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
+                <strong>
+                  <span title={ratingTooltip(exec.achievableTarget ?? exec.achievableRating)}>
+                    {normalizeRatingForUi(exec.achievableTarget ?? exec.achievableRating)}
+                  </span>
+                </strong>.
               </div>
             </div>
           </div>
@@ -888,6 +909,7 @@ function DetayTab({
 
 export default function ScenarioPanelV3({ analysisId, currentScore: _currentScore, currentGrade }: ScenarioPanelV3Props) {
   const [targetGrade,         setTargetGrade]         = useState<string>('')
+  const [selectedUiRating,    setSelectedUiRating]    = useState<string>('')
   const [activeTab,           setActiveTab]           = useState<'ozet' | 'aksiyon' | 'detay'>('ozet')
   const [includeV2Comparison, setIncludeV2Comparison] = useState<boolean>(false)
   const [loading,             setLoading]             = useState(false)
@@ -964,7 +986,9 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           <div>
             <div className="text-xs text-[#64748B] uppercase tracking-wide">Mevcut Not</div>
             <div className="text-2xl font-bold text-[#1E293B] mt-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              {currentGrade}
+              <span title={ratingTooltip(currentGrade)}>
+                {normalizeRatingForUi(currentGrade)}
+              </span>
             </div>
           </div>
           <div className="text-right">
@@ -976,18 +1000,21 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
         <div className="mt-4">
           <div className="text-sm font-medium text-[#1E293B] mb-2">Hedef Rating</div>
           <div className="flex flex-wrap gap-2">
-            {['CCC+', 'B-', 'B', 'B+', 'BB-', 'BB', 'BB+', 'BBB-', 'BBB', 'BBB+', 'A-', 'A'].map(g => (
+            {(UI_RATING_CATEGORIES.filter(r => r !== 'D') as readonly string[]).map(uiRating => (
               <button
-                key={g}
-                onClick={() => setTargetGrade(g)}
+                key={uiRating}
+                onClick={() => {
+                  setSelectedUiRating(uiRating)
+                  setTargetGrade(mapUiRatingToInternal(uiRating))
+                }}
                 className="px-3 py-2 rounded-[8px] text-sm font-medium border transition-all"
                 style={{
-                  background:   targetGrade === g ? '#0B3C5D'  : '#ffffff',
-                  color:        targetGrade === g ? '#ffffff'  : '#1E293B',
-                  borderColor:  targetGrade === g ? '#0B3C5D'  : '#E5E9F0',
+                  background:   selectedUiRating === uiRating ? '#0B3C5D' : '#ffffff',
+                  color:        selectedUiRating === uiRating ? '#ffffff' : '#1E293B',
+                  borderColor:  selectedUiRating === uiRating ? '#0B3C5D' : '#E5E9F0',
                 }}
               >
-                {g}
+                {uiRating}
               </button>
             ))}
           </div>
