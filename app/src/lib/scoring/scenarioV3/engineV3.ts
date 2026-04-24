@@ -618,8 +618,11 @@ function isActionApplicable(
     }
   }
 
-  // 5. Min source amount (TDHP grup-match ile)
-  if (action.preconditions.minSourceAmountTRY) {
+  // 5. Min source amount — SADECE requiredAccountCodes varsa bakiye kontrol et.
+  // requiredCodes boş olan aksiyonlarda (kârlılık/gelir/sermaye: A10, A12, A13, A18 vb.)
+  // reduce() → 0 döner → 0 < minSourceAmountTRY → her zaman YANLIŞ REJECT.
+  // Bu aksiyonlar için eligibility kaynağı aşağıdaki customCheck'tir (5b).
+  if (action.preconditions.minSourceAmountTRY && requiredCodes.length > 0) {
     const sourceBalance = requiredCodes.reduce(
       (s, c) => s + (findBalanceInGroup(context.accountBalances, c)?.balance ?? 0), 0
     )
@@ -627,6 +630,21 @@ function isActionApplicable(
       return {
         applicable: false,
         reason: `Kaynak bakiye yetersiz: ${sourceBalance.toFixed(0)} < ${action.preconditions.minSourceAmountTRY}`,
+      }
+    }
+  }
+
+  // 5b. customCheck — preconditions.customCheck varsa çalıştır.
+  // Hem requiredCodes olan hem olmayan tüm aksiyonlar için geçerlidir.
+  // Katalog customCheck'leri analysis.accounts[] array'i bekler;
+  // recordToAccountBalances() ile FirmContext.accountBalances adapt edilir.
+  if (action.preconditions.customCheck) {
+    const analysisProxy = { accounts: recordToAccountBalances(context.accountBalances) }
+    const checkResult   = action.preconditions.customCheck(analysisProxy)
+    if (!checkResult.pass) {
+      return {
+        applicable: false,
+        reason: checkResult.reason ?? 'Precondition customCheck basarisiz',
       }
     }
   }
