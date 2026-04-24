@@ -50,7 +50,7 @@ import {
   GitCompare,
 } from 'lucide-react'
 import {
-  UI_RATING_CATEGORIES,
+  getTargetRatingOptions,
   mapUiRatingToInternal,
   normalizeRatingForUi,
   ratingTooltip,
@@ -999,25 +999,37 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
 
         <div className="mt-4">
           <div className="text-sm font-medium text-[#1E293B] mb-2">Hedef Rating</div>
-          <div className="flex flex-wrap gap-2">
-            {(UI_RATING_CATEGORIES.filter(r => r !== 'D') as readonly string[]).map(uiRating => (
-              <button
-                key={uiRating}
-                onClick={() => {
-                  setSelectedUiRating(uiRating)
-                  setTargetGrade(mapUiRatingToInternal(uiRating))
-                }}
-                className="px-3 py-2 rounded-[8px] text-sm font-medium border transition-all"
-                style={{
-                  background:   selectedUiRating === uiRating ? '#0B3C5D' : '#ffffff',
-                  color:        selectedUiRating === uiRating ? '#ffffff' : '#1E293B',
-                  borderColor:  selectedUiRating === uiRating ? '#0B3C5D' : '#E5E9F0',
-                }}
-              >
-                {uiRating}
-              </button>
-            ))}
-          </div>
+          {(() => {
+            const targetOptions = getTargetRatingOptions(currentGrade)
+            if (targetOptions.length === 0) {
+              return (
+                <p className="text-sm text-[#64748B] italic">
+                  Firma zaten en yüksek rating seviyesinde.
+                </p>
+              )
+            }
+            return (
+              <div className="flex flex-wrap gap-2">
+                {targetOptions.map(uiRating => (
+                  <button
+                    key={uiRating}
+                    onClick={() => {
+                      setSelectedUiRating(uiRating)
+                      setTargetGrade(mapUiRatingToInternal(uiRating))
+                    }}
+                    className="px-3 py-2 rounded-[8px] text-sm font-medium border transition-all"
+                    style={{
+                      background:   selectedUiRating === uiRating ? '#0B3C5D' : '#ffffff',
+                      color:        selectedUiRating === uiRating ? '#ffffff' : '#1E293B',
+                      borderColor:  selectedUiRating === uiRating ? '#0B3C5D' : '#E5E9F0',
+                    }}
+                  >
+                    {uiRating}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
         </div>
 
         <div className="mt-5 flex items-center justify-between">

@@ -68,6 +68,30 @@ export function mapUiRatingToInternal(uiRating: string): string {
 }
 
 /**
+ * Mevcut rating'in üstündeki (iyileşme yönündeki) UI kategorilerini döner.
+ * Mevcut kategori ve D dahil değil.
+ *
+ * Örnekler:
+ *   currentRating = "C"   → ['CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
+ *   currentRating = "B-"  → normalizeRatingForUi → "B"
+ *                         → ['BB', 'BBB', 'A', 'AA', 'AAA']
+ *   currentRating = "AAA" → []  (en üst seviyede, hedef seçilemez)
+ *   currentRating = null  → ['C', 'CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA'] (fallback)
+ */
+export function getTargetRatingOptions(currentRating?: string | null): UiRatingCategory[] {
+  const currentCategory = normalizeRatingForUi(currentRating)
+  const currentIdx = UI_RATING_CATEGORIES.indexOf(currentCategory as UiRatingCategory)
+
+  if (currentIdx < 0) {
+    // Tanımsız veya bilinmeyen rating → D hariç hepsini döndür
+    return UI_RATING_CATEGORIES.filter(r => r !== 'D') as unknown as UiRatingCategory[]
+  }
+
+  // Mevcut indexin üstündeki kategoriler (mevcut dahil değil)
+  return UI_RATING_CATEGORIES.slice(currentIdx + 1) as unknown as UiRatingCategory[]
+}
+
+/**
  * Rating gösterimi için tooltip metni üretir.
  * Internal (notch'lu) rating varsa gösterir, aksi halde undefined döner.
  *
