@@ -14,6 +14,7 @@ import SubjectiveForm from '@/components/analysis/SubjectiveForm'
 import TrendChart from '@/components/analysis/TrendChart'
 import ScenarioPanel   from '@/components/analysis/ScenarioPanel'
 import ScenarioPanelV2 from '@/components/analysis/ScenarioPanelV2'
+import ScenarioPanelV3 from '@/components/analysis/ScenarioPanelV3'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
 import { scoreToRating } from '@/lib/scoring/score'
@@ -440,6 +441,12 @@ function CircularScore({ score, rating }: { score: number; rating: string }) {
 function useV2Scenario(): boolean {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('v2') === '1'
+}
+
+/* ─── Feature flag: ?v=v3 → ScenarioPanelV3 ───────── */
+function useV3Scenario(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('v') === 'v3'
 }
 
 /* ─── Main Page ──────────────────────────────────── */
@@ -1234,7 +1241,13 @@ function AnalizPageContent() {
 
                 {/* ── SENARYO ─────────────────── */}
                 {activeTab === 'scenario' && (
-                  useV2Scenario() ? (
+                  useV3Scenario() ? (
+                    <ScenarioPanelV3
+                      analysisId={selected.id}
+                      currentScore={cs}
+                      currentGrade={cr}
+                    />
+                  ) : useV2Scenario() ? (
                     <ScenarioPanelV2
                       analysisId={selected.id}
                       currentScore={cs}
