@@ -206,7 +206,9 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     liquidityImpactRatio: 0.30,  // Gelir iyileşmesi uzun vadede nakde döner
   },
   A13_OPEX_OPTIMIZATION: {
-    sourceAccountRequirements: ['770', '771', '772'],
+    // Duzeltme: 770-772 maliyet merkezi hesaplari cogu KOBİ'de yok.
+    // 630-632 standart P&L gider hesaplari (AR-GE / Pazarlama / Genel Yonetim).
+    sourceAccountRequirements: ['630', '631', '632'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.50,
   },

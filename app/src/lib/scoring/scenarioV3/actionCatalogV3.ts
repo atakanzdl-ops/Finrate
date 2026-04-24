@@ -117,7 +117,7 @@ const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
 
   preconditions: {
     requiredAccountCodes: ['300', '303', '304'],
-    minSourceAmountTRY: 5_000_000,
+    minSourceAmountTRY: 1_000_000,  // 5M → 1M: orta olcekli firmalari dahil et
   },
 
   qualityCoefficient: 0.30,
@@ -130,7 +130,7 @@ const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
     minPctOfBasis: 0.10,
     typicalPctOfBasis: 0.25,
     maxPctOfBasis: 0.50,
-    absoluteMinTRY: 5_000_000,
+    absoluteMinTRY: 1_000_000,  // 5M → 1M: paralel esit
   },
 
   sectorCompatibility: {
