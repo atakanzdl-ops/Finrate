@@ -151,6 +151,7 @@ export async function POST(req: NextRequest) {
       analysisId,
       targetGrade,
       currentScoreOverride,
+      currentGrade: clientCurrentGrade,  // UI'dan gelen rating (header ile ayni kaynak)
       includeV2Comparison = false,
     } = body
 
@@ -209,15 +210,21 @@ export async function POST(req: NextRequest) {
     const sector = mapSectorCode(analysis.entity.sector)
 
     // ── 7. MEVCUT RATİNG ─────────────────────────────────────────────────────
-    // Oncelik 1: finalRating string'i — zaten hesaplanmis, RATING_ORDER'da gecerli
-    // Oncelik 2: scoreFinal sayisaldan scoreToRatingGrade ile turetet
-    // Oncelik 3: fallback 50 → 'B+' (uyari: bu yanlislikla secilebilir)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawFinalRating = (analysis as any).finalRating as string | null | undefined
+    // Oncelik 1: clientCurrentGrade — UI'dan gelen, header ile AYNI kaynak
+    //            (page.tsx: combinedRating(combinedScore(analysis)))
+    //            Bu, tüm kullaniciya gosterilen rating ile senaryo motorunun
+    //            kullandigi rating'in tutarli olmasini garantiler.
+    // Oncelik 2: analysis.finalRating (DB'de sakli, V2 motoru tarafindan yazilmis)
+    // Oncelik 3: scoreFinal'den turet (fallback — eksik data durumu)
     const currentRating: RatingGrade =
-      rawFinalRating && (RATING_ORDER as string[]).includes(rawFinalRating)
-        ? (rawFinalRating as RatingGrade)
+      clientCurrentGrade && (RATING_ORDER as string[]).includes(clientCurrentGrade as string)
+        ? (clientCurrentGrade as RatingGrade)
         : (() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawFinalRating = (analysis as any).finalRating as string | null | undefined
+            if (rawFinalRating && (RATING_ORDER as string[]).includes(rawFinalRating)) {
+              return rawFinalRating as RatingGrade
+            }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rawScoreFinal = (analysis as any).scoreFinal
             const baseScore     = rawScoreFinal != null ? Number(rawScoreFinal) : 50

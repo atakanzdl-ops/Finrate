@@ -667,17 +667,26 @@ function DetayTab({
   setRejectedExpanded: (v: boolean) => void
 }) {
   const da         = result.decisionAnswer
+  // Aksiyon Planı chevron ile AYNI kaynak: whatCompanyShouldDo + accountingLegsByAction
+  // accountingImpactTable KULLANILMAZ — flat rows, .debits/.credits yok → kutular boş
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accounting: any[] = Array.isArray(da.accountingImpactTable) ? da.accountingImpactTable : []
+  const consolidatedActions: any[] = Array.isArray(da.whatCompanyShouldDo) ? da.whatCompanyShouldDo : []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rejected:   any[] = Array.isArray(da.rejectedInsights) ? da.rejectedInsights : []
   const comparison = da.comparisonWithV2
 
+  // Muhasebe verisi olan aksiyonlar (en az bir BORÇ veya ALACAK bacağı olmalı)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actionsWithLegs = consolidatedActions.filter((action: any) => {
+    const legs = da.accountingLegsByAction?.[action.actionId]
+    return (legs?.debits?.length ?? 0) > 0 || (legs?.credits?.length ?? 0) > 0
+  })
+
   return (
     <div className="space-y-6">
 
-      {/* A. ACCOUNTING IMPACT TABLE */}
-      {accounting.length > 0 && (
+      {/* A. ACCOUNTING IMPACT TABLE — accountingLegsByAction datasource */}
+      {actionsWithLegs.length > 0 && (
         <div
           className="bg-white border border-[#E5E9F0] rounded-[12px] overflow-hidden"
           style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
@@ -696,43 +705,57 @@ function DetayTab({
           </div>
 
           <div className="divide-y divide-slate-100">
-            {accounting.map((row, idx) => (
-              <div key={idx} className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="font-medium text-[#1E293B]">{row.actionName}</div>
-                  <div className="text-sm font-semibold text-[#1E293B]">
-                    {formatAmount(row.amountTRY)}
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {actionsWithLegs.map((action: any, idx: number) => {
+              const legs  = da.accountingLegsByAction?.[action.actionId]
+              const debs  = legs?.debits  ?? []
+              const creds = legs?.credits ?? []
+              return (
+                <div key={idx} className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-medium text-[#1E293B]">{action.actionName}</div>
+                    <div className="text-sm font-semibold text-[#1E293B]">
+                      {action.amountFormatted ?? formatAmount(action.amountTRY)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-slate-50 rounded-[8px] p-3">
+                      <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Borc</div>
+                      {debs.length === 0
+                        ? <div className="text-xs text-slate-400 italic">Borç kaydı yok</div>
+                        : debs.map((d: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-sm py-1">
+                            <span className="text-[#1E293B] font-mono text-xs">
+                              {d.accountCode} {d.accountName}
+                            </span>
+                            <span className="font-semibold ml-2" style={{ color: '#2EC4B6' }}>
+                              {d.amountFormatted}
+                            </span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                    <div className="bg-slate-50 rounded-[8px] p-3">
+                      <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Alacak</div>
+                      {creds.length === 0
+                        ? <div className="text-xs text-slate-400 italic">Alacak kaydı yok</div>
+                        : creds.map((c: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-sm py-1">
+                            <span className="text-[#1E293B] font-mono text-xs">
+                              {c.accountCode} {c.accountName}
+                            </span>
+                            <span className="text-red-500 font-semibold ml-2">
+                              {c.amountFormatted}
+                            </span>
+                          </div>
+                        ))
+                      }
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-slate-50 rounded-[8px] p-3">
-                    <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Borc</div>
-                    {(row.debits ?? []).map((d: { account: string; amount: number }, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-sm py-1">
-                        <span className="text-[#1E293B] font-mono text-xs">{d.account}</span>
-                        <span className="font-semibold" style={{ color: '#2EC4B6' }}>
-                          +{formatAmount(d.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="bg-slate-50 rounded-[8px] p-3">
-                    <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Alacak</div>
-                    {(row.credits ?? []).map((c: { account: string; amount: number }, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-sm py-1">
-                        <span className="text-[#1E293B] font-mono text-xs">{c.account}</span>
-                        <span className="text-red-600 font-semibold">-{formatAmount(c.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {row.netEffect && (
-                  <div className="text-xs text-[#64748B] italic mt-3">{row.netEffect}</div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -885,7 +908,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       const res = await fetch('/api/scenarios/v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisId, targetGrade, includeV2Comparison }),
+        body: JSON.stringify({ analysisId, targetGrade, currentGrade, includeV2Comparison }),
       })
       const data = await res.json()
       if (!res.ok) {
