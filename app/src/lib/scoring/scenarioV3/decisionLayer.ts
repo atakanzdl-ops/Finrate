@@ -223,6 +223,8 @@ export interface DecisionAnswer {
   oneNotchPlan: NotchPlan
   twoNotchPlan: NotchPlan
   accountingImpactTable: AccountingImpactRow[]
+  /** PATCH 2: actionId → { debits, credits } gruplu muhasebe arama tablosu */
+  accountingLegsByAction: Record<string, { debits: AccountingImpactRow[]; credits: AccountingImpactRow[] }>
   whyCapitalAloneIsNotEnough: string
   targetFeasibilityExplanation: string
   ifNotDoneRisk: string
@@ -235,6 +237,28 @@ export interface DecisionAnswer {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+// ─── TDHP GRUP ADLARI ─────────────────────────────────────────────────────────
+
+const TDHP_GROUP_NAMES: Record<string, string> = {
+  '10': 'Hazır Değerler',
+  '12': 'Ticari Alacaklar',
+  '15': 'Stoklar',
+  '18': 'Gelecek Aylara Ait Giderler',
+  '25': 'Maddi Duran Varlıklar',
+  '28': 'Birikmiş Amortismanlar',
+  '30': 'Mali Borçlar',
+  '32': 'Ticari Borçlar',
+  '33': 'Diğer Borçlar',
+  '34': 'Alınan Avanslar',
+  '35': 'Borç Senetleri',
+  '50': 'Ödenmiş Sermaye',
+  '59': 'Dönem Net Kârı/Zararı',
+  '60': 'Brüt Satışlar',
+  '66': 'Finansman Giderleri',
+  '69': 'Dönem Kârı/Zararı',
+  '78': 'Gider Çeşitleri',
+}
 
 function formatTRY(amount: number): string {
   if (amount >= 1_000_000_000) {
@@ -873,36 +897,57 @@ function buildComparisonWithV2(
 // ─── BUILDER: DATA QUALITY WARNING ───────────────────────────────────────────
 
 /**
- * PATCH 1: Sparse mizan durumunda kullaniciya uyari.
- * Kriterler:
- *   - hesap sayisi < 30 (az kesim)
- *   - reddedilen aday sayisi >= 30 VE portfoy <= 2 aksiyon
- *   - portfoy <= 1 aksiyon
+ * PATCH 2: Coverage-tabanlı veri kalitesi uyarısı.
+ * Sabit hesap sayısı eşiği (< 30) yerine action catalog'un
+ * gerektirdiği hesap gruplarının kaçının mizanda mevcut olduğunu ölçer.
+ *
+ * coverage = mevcut_grup / gerekli_grup < 0.5 → uyarı tetiklenir.
+ * Sadece pure numeric ve sıfırdan büyük bakiyeli kodlar sayılır.
  */
 function buildDataQualityWarning(
-  engineResult:    EngineResult,
+  engineResult:     EngineResult,
   accountBalances?: Record<string, number>,
 ): DataQualityWarning | undefined {
-  const accountCount        = accountBalances ? Object.keys(accountBalances).length : 0
-  const rejectedCount       = engineResult.debug?.rejectedCandidates?.length ?? 0
-  const portfolioSize       = engineResult.portfolio.length
+  const accountCount  = accountBalances ? Object.keys(accountBalances).length : 0
+  const rejectedCount = engineResult.debug?.rejectedCandidates?.length ?? 0
+  const portfolioSize = engineResult.portfolio.length
 
-  const hasLimitedData =
-    (accountCount > 0 && accountCount < 30) ||
-    (rejectedCount >= 30 && portfolioSize <= 2) ||
-    portfolioSize <= 1
+  // Action catalog'daki benzersiz hesap grubu kodlarını topla (2 hane)
+  const requiredGroups = new Set<string>()
+  for (const action of Object.values(ACTION_CATALOG_V3)) {
+    for (const code of action.preconditions?.requiredAccountCodes ?? []) {
+      requiredGroups.add(code.slice(0, 2))
+    }
+  }
+
+  // Mizanda mevcut olan gruplar (pure numeric, bakiye > 0)
+  const presentGroups = new Set<string>()
+  if (accountBalances) {
+    for (const [code, bal] of Object.entries(accountBalances)) {
+      if (/^\d+$/.test(code) && Math.abs(bal) > 0) {
+        presentGroups.add(code.slice(0, 2))
+      }
+    }
+  }
+
+  const missingGroups = [...requiredGroups].filter(g => !presentGroups.has(g))
+  const coverage = requiredGroups.size > 0
+    ? (requiredGroups.size - missingGroups.length) / requiredGroups.size
+    : 1
+
+  const hasLimitedData = coverage < 0.5 || portfolioSize <= 1
 
   if (!hasLimitedData) return undefined
 
-  const parts: string[] = []
-  if (accountCount > 0 && accountCount < 30) {
-    parts.push(`Mizan hesap detayı sınırlı (${accountCount} hesap).`)
-  }
-  if (rejectedCount >= 30 && portfolioSize <= 2) {
-    parts.push(`Çoğu aksiyon uygulanabilir bulunmadı (${rejectedCount} aday elendi).`)
-  }
-  if (portfolioSize <= 1) {
-    parts.push('Önerilen aksiyon seti daraldı.')
+  // Mesaj: hangi gruplar eksik
+  let message: string
+  if (missingGroups.length > 0) {
+    const missingLabels = missingGroups
+      .map(g => `${g}X ${TDHP_GROUP_NAMES[g] ?? 'grubu'}`)
+      .join(', ')
+    message = `Şu hesap grupları eksik: ${missingLabels}. Bu gruplarla ilgili aksiyonlar önerilemedi.`
+  } else {
+    message = 'Portföy boyutu küçük, analiz kapsamı sınırlı.'
   }
 
   return {
@@ -910,8 +955,10 @@ function buildDataQualityWarning(
     accountCount,
     rejectedCandidatesCount: rejectedCount,
     portfolioSize,
-    message:         parts.join(' ') || 'Veri kalitesi analiz kapsamını kısıtladı.',
-    recommendation:  'Daha ayrıntılı bir mizan (gelir tablosu hesapları dahil, 30+ hesap) ile analiz tekrarlanırsa öneri seti genişleyebilir.',
+    message,
+    recommendation: missingGroups.length > 0
+      ? `Eksik grupları mizana ekleyin (${missingGroups.slice(0, 4).map(g => `${g}X`).join(', ')}) ve analizi tekrarlayın.`
+      : 'Daha kapsamlı bir mizan ile analiz tekrarlanırsa öneri seti genişleyebilir.',
   }
 }
 
@@ -946,6 +993,19 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
+  // PATCH 2: actionId → { debits, credits } gruplu lookup (mutation yok)
+  const accountingLegsByAction: Record<string, { debits: AccountingImpactRow[]; credits: AccountingImpactRow[] }> = {}
+  for (const row of accountingImpactTable) {
+    if (!accountingLegsByAction[row.actionId]) {
+      accountingLegsByAction[row.actionId] = { debits: [], credits: [] }
+    }
+    if (row.legSide === 'DEBIT') {
+      accountingLegsByAction[row.actionId].debits.push(row)
+    } else {
+      accountingLegsByAction[row.actionId].credits.push(row)
+    }
+  }
+
   const comparisonWithV2 = v2Result != null
     ? buildComparisonWithV2(engineResult, v2Result)
     : undefined
@@ -956,6 +1016,7 @@ export function buildDecisionAnswer(
     oneNotchPlan,
     twoNotchPlan,
     accountingImpactTable,
+    accountingLegsByAction,
     whyCapitalAloneIsNotEnough,
     targetFeasibilityExplanation,
     ifNotDoneRisk,

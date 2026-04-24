@@ -549,6 +549,38 @@ function calculateAmountCandidates(
   )
 }
 
+// ─── TDHP GRUP EŞLEMESİ ─────────────────────────────────────────────────────
+
+/**
+ * TDHP hesap grubu eşleme.
+ * İlk 2 hane grup kodu (30=Mali Borçlar, 32=Ticari Borçlar, 15=Stoklar vb.)
+ * Önce tam eşleşme, yoksa grup içinde herhangi bir alt hesap.
+ * Sadece pure numeric ve istenen uzunlukta/daha uzun kodları kabul eder.
+ */
+function findBalanceInGroup(
+  balances:     Record<string, number>,
+  requiredCode: string,
+): { code: string; balance: number } | null {
+  // 1. Exact match öncelik
+  const exactBal = balances[requiredCode]
+  if (exactBal != null && Math.abs(exactBal) > 0) {
+    return { code: requiredCode, balance: exactBal }
+  }
+  // 2. TDHP grup fallback (ilk 2 hane, güvenli filtrelerle)
+  const groupPrefix = requiredCode.slice(0, 2)
+  for (const [code, bal] of Object.entries(balances)) {
+    if (
+      /^\d+$/.test(code) &&                  // sadece rakam (30A, KOD30 elenir)
+      code.length >= requiredCode.length &&   // yeterli uzunluk
+      code.startsWith(groupPrefix) &&
+      Math.abs(bal) > 0
+    ) {
+      return { code, balance: bal }
+    }
+  }
+  return null
+}
+
 // ─── APPLICABILITY KONTROLU ───────────────────────────────────────────────────
 
 function isActionApplicable(
@@ -574,19 +606,22 @@ function isActionApplicable(
     return { applicable: false, reason: semantic.reason ?? 'Semantik imkansizlik' }
   }
 
-  // 4. Preconditions - required account codes
+  // 4. Preconditions - required account codes (TDHP grup-match ile)
   const requiredCodes = action.preconditions.requiredAccountCodes ?? []
   for (const code of requiredCodes) {
-    const bal = context.accountBalances[code] ?? 0
-    if (Math.abs(bal) <= 0) {
-      return { applicable: false, reason: `Kaynak hesap ${code} bakiyesi yok` }
+    const found = findBalanceInGroup(context.accountBalances, code)
+    if (!found) {
+      return {
+        applicable: false,
+        reason: `Kaynak hesap ${code} grubu (${code.slice(0, 2)}X) bakiyesi yok`,
+      }
     }
   }
 
-  // 5. Min source amount
+  // 5. Min source amount (TDHP grup-match ile)
   if (action.preconditions.minSourceAmountTRY) {
     const sourceBalance = requiredCodes.reduce(
-      (s, c) => s + Math.abs(context.accountBalances[c] ?? 0), 0
+      (s, c) => s + (findBalanceInGroup(context.accountBalances, c)?.balance ?? 0), 0
     )
     if (sourceBalance < action.preconditions.minSourceAmountTRY) {
       return {

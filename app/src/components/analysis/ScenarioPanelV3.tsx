@@ -207,8 +207,8 @@ function OzetTab({ result }: { result: any }) {
   const da          = result.decisionAnswer
   const exec        = da.executiveAnswer
   const consultant  = da.consultantNarrative
-  const productivity = (result as any).layerSummaries?.productivity
-    ?? (result as any).engineResult?.debug?.layerSummaries?.productivity
+  const productivity = (result as any).engineResult?.layerSummaries?.productivity
+    ?? (result as any).layerSummaries?.productivity
     ?? null
   const transition  = result.engineResult?.reasoning?.transition
 
@@ -225,10 +225,10 @@ function OzetTab({ result }: { result: any }) {
             <div className="text-xs uppercase tracking-wider text-[#2EC4B6] font-semibold mb-2">
               Gercekci Ust Sinir
             </div>
-            <div className="text-4xl font-bold">{exec.achievableRating}</div>
+            <div className="text-4xl font-bold">{exec.achievableTarget ?? exec.achievableRating}</div>
             <div className="text-sm text-white/70 mt-1">
               Mevcut: {exec.currentRating}
-              {exec.requestedTarget && exec.requestedTarget !== exec.achievableRating && (
+              {exec.requestedTarget && exec.requestedTarget !== (exec.achievableTarget ?? exec.achievableRating) && (
                 <> &bull; İstenen: {exec.requestedTarget}</>
               )}
             </div>
@@ -236,11 +236,11 @@ function OzetTab({ result }: { result: any }) {
 
           <div
             className={`px-3 py-1.5 rounded-[8px] text-xs font-medium
-              ${exec.isTargetFeasible
+              ${exec.targetMatchesRequest ?? exec.isTargetFeasible
                 ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                 : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}
           >
-            {exec.isTargetFeasible ? 'Hedef Ulasilabilir' : 'Hedef Sinirli'}
+            {exec.targetMatchesRequest ?? exec.isTargetFeasible ? 'Hedef Ulasilabilir' : 'Hedef Sinirli'}
           </div>
         </div>
 
@@ -251,10 +251,10 @@ function OzetTab({ result }: { result: any }) {
         )}
 
         <div className="mt-4 pt-4 border-t border-white/10 space-y-2 text-sm">
-          {exec.mainReason && (
+          {(exec.executiveSummary ?? exec.mainReason ?? exec.subtitle) && (
             <div className="flex items-start gap-2">
               <Info size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
-              <span className="text-white/80">{exec.mainReason}</span>
+              <span className="text-white/80">{exec.executiveSummary ?? exec.mainReason ?? exec.subtitle}</span>
             </div>
           )}
           {exec.confidence && (
@@ -265,7 +265,6 @@ function OzetTab({ result }: { result: any }) {
                 <strong className="text-white">
                   {exec.confidence === 'HIGH' ? 'Yuksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Dusuk'}
                 </strong>
-                {exec.confidenceReason ? ` — ${exec.confidenceReason}` : ''}
               </span>
             </div>
           )}
@@ -284,7 +283,7 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-sm text-amber-800">
                 Teorik rating tavani mevcut olsa da secilen aksiyon portfoyu bu seviyeyi tasimiyor.
                 Mevcut portfoyle ulasilabilir en yuksek seviye:{' '}
-                <strong>{exec.achievableRating}</strong>.
+                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
               </div>
             </div>
           </div>
@@ -532,28 +531,46 @@ function AksiyonPlaniTab({
                       </div>
                     )}
 
-                    {/* Muhasebe Bacaklari */}
-                    {(action.debitLegs?.length > 0 || action.creditLegs?.length > 0) && (
+                    {/* Muhasebe Bacaklari — accountingLegsByAction lookup */}
+                    {(() => {
+                      const legs  = da.accountingLegsByAction?.[action.actionId]
+                      const debs  = legs?.debits  ?? []
+                      const creds = legs?.credits ?? []
+                      if (debs.length === 0 && creds.length === 0) {
+                        return (
+                          <p className="text-sm text-[#94A3B8] mt-4">
+                            Bu aksiyon için muhasebe detayı mevcut değil.
+                          </p>
+                        )
+                      }
+                      return (
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
+                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2 mt-4">
                           Muhasebe Etkisi
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
                             <div className="text-xs text-[#64748B] mb-2">Borc</div>
-                            {(action.debitLegs ?? []).map((leg: string, i: number) => (
-                              <div key={i} className="text-sm text-slate-800 font-mono">{leg}</div>
+                            {debs.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                              <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
+                                <span>{leg.accountCode} {leg.accountName}</span>
+                                <span className="ml-3 text-[#2EC4B6] font-semibold">{leg.amountFormatted}</span>
+                              </div>
                             ))}
                           </div>
                           <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
                             <div className="text-xs text-[#64748B] mb-2">Alacak</div>
-                            {(action.creditLegs ?? []).map((leg: string, i: number) => (
-                              <div key={i} className="text-sm text-slate-800 font-mono">{leg}</div>
+                            {creds.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                              <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
+                                <span>{leg.accountCode} {leg.accountName}</span>
+                                <span className="ml-3 text-red-500 font-semibold">{leg.amountFormatted}</span>
+                              </div>
                             ))}
                           </div>
                         </div>
                       </div>
-                    )}
+                      )
+                    })()}
 
                     {/* Banker Perspective */}
                     {action.bankerPerspective && (
@@ -628,9 +645,9 @@ function DetayTab({
 }) {
   const da         = result.decisionAnswer
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accounting: any[] = da.accountingImpactTable ?? []
+  const accounting: any[] = Array.isArray(da.accountingImpactTable) ? da.accountingImpactTable : []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rejected:   any[] = da.rejectedInsights ?? []
+  const rejected:   any[] = Array.isArray(da.rejectedInsights) ? da.rejectedInsights : []
   const comparison = da.comparisonWithV2
 
   return (

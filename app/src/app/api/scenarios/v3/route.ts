@@ -255,6 +255,8 @@ export async function POST(req: NextRequest) {
         feasibility:        engineResult.feasibility,
         reasoning:          engineResult.reasoning,
         decisionTrace:      engineResult.decisionTrace,
+        // PATCH 2: BankerPerspective metrics icin
+        layerSummaries:     engineResult.layerSummaries ?? null,
         debug:              process.env.NODE_ENV === 'development'
           ? engineResult.debug
           : undefined,
