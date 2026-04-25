@@ -714,7 +714,18 @@ function isActionApplicable(
     return { applicable: false, reason: 'Pozitif net kar gerektirir' }
   }
 
-  // 10. Repeat max kontrolu
+  // 10a. Ratio-based aksiyonlar tek seferlik secilir.
+  // computeAmount cap'i "12 ayda uygulanabilir maksimum" olarak tasarlandi;
+  // ayni aksiyonu tekrar secmek cap mantigi ile celiski olusturur.
+  // targetRatio VEYA computeAmount tanimliysa bu kural devreye girer.
+  if (action.targetRatio != null || action.computeAmount != null) {
+    const alreadyUsed = previouslySelected.some(id => id === action.id)
+    if (alreadyUsed) {
+      return { applicable: false, reason: 'Ratio-based aksiyon zaten secildi (tek seferlik kural)' }
+    }
+  }
+
+  // 10b. Repeat max kontrolu (standart aksiyonlar)
   const prevCount = previouslySelected.filter(id => id === action.id).length
   if (prevCount >= action.repeatDecay.maxRepeats) {
     return { applicable: false, reason: `Max tekrar (${action.repeatDecay.maxRepeats}) asildi` }
