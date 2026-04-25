@@ -780,11 +780,18 @@ export function buildDrivers(
     )
   }
 
-  // ── STRUCTURAL / COSMETIC AKSIYON LISTESI ────────────────────────────────
+  // ── STRUCTURAL / COSMETIC AKSIYON LISTESI (dedupe: aynı id iki kez listelenmez) ──
+  const seenStructural = new Set<string>()
+  const seenCosmetic   = new Set<string>()
   for (const id of portfolioActionIds) {
     const cat = ACTION_CATEGORY_MAP[id]
-    if (cat === 'STRUCTURAL')    structural.push(id)
-    else if (cat === 'COSMETIC') cosmetic.push(id)
+    if (cat === 'STRUCTURAL' && !seenStructural.has(id)) {
+      structural.push(id)
+      seenStructural.add(id)
+    } else if (cat === 'COSMETIC' && !seenCosmetic.has(id)) {
+      cosmetic.push(id)
+      seenCosmetic.add(id)
+    }
   }
 
   // qualityResults ileride weighted negative/positive hesabi icin hazir

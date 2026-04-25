@@ -299,6 +299,42 @@ function actionIdToLabel(actionId: string): string {
 }
 
 /**
+ * Binding ceiling'i tek temiz cümleye dönüştürür.
+ *
+ * Sorun: ceilingTypeToDisplay(source) + reason, aynı kavramı iki kez tekrar eder.
+ *   Örnek kötü: "Aktif Verimliliği (Aktif verimliliği orta seviyenin altında — rating tavanı BB)"
+ *   Örnek iyi:  "Aktif Verimliliği alanı orta seviyenin altında; BB üzerinde sınırlayıcı etki yaratıyor"
+ *
+ * İşlem:
+ *   1. reason'ın başındaki source-display prefix'ini temizle
+ *   2. reason'ın sonundaki "— rating tavanı X" suffix'ini temizle
+ *   3. Kaynak + temiz açıklama + maxRating ile sade cümle üret
+ */
+function formatCeilingDisplay(
+  bindingCeiling: { source: string; maxRating: string; reason?: string }
+): string {
+  const sourceDisplay = ceilingTypeToDisplay(bindingCeiling.source)
+  let reason = (bindingCeiling.reason ?? '').trim()
+
+  // Kaynak etiketinin prefix tekrarını sil (büyük/küçük harf duyarsız)
+  const sourcePrefix = sourceDisplay.toLowerCase()
+  if (reason.toLowerCase().startsWith(sourcePrefix)) {
+    reason = reason.substring(sourceDisplay.length).replace(/^[-—\s]+/, '').trim()
+  }
+
+  // "— rating tavanı X olarak sınırlandırılmıştır" veya "— rating tavanı X" suffix'ini sil
+  reason = reason
+    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\s+olarak sınırlandırılmıştır\.?$/i, '')
+    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\.?$/i, '')
+    .trim()
+
+  if (reason) {
+    return `${sourceDisplay} alanı ${reason}; ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
+  }
+  return `${sourceDisplay} alanı ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
+}
+
+/**
  * Ayni actionId + amountTRY kombinasyonu portfoyler arasi tekrar etmez.
  * Cumulative horizon yapisi nedeniyle short aksiyonlar medium + long'da da gorunur.
  * dedupeActions yalnizca unique kombinasyonlari dondurur.
@@ -642,10 +678,7 @@ function buildTargetFeasibilityExplanation(
   }
 
   if (bindingCeiling) {
-    parts.push(
-      `${ceilingTypeToDisplay(bindingCeiling.source)} tavanı ${bindingCeiling.maxRating} seviyesinde aktif: ` +
-      `${bindingCeiling.reason}.`
-    )
+    parts.push(`${formatCeilingDisplay(bindingCeiling)}.`)
   }
 
   if (feasibility) {
@@ -815,9 +848,8 @@ function buildConsultantNarrative(
   let coreIssue = ''
 
   if (bindingCeiling) {
-    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${ceilingTypeToDisplay(bindingCeiling.source)} ` +
-      `(${bindingCeiling.reason}). Bu sorun çözülmeden ${bindingCeiling.maxRating} ` +
-      `tavanını kırmanız mümkün değil.`
+    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${formatCeilingDisplay(bindingCeiling)}. ` +
+      `Bu sorun çözülmeden ${bindingCeiling.maxRating} tavanını kırmanız mümkün değil.`
   } else if (sustainability?.constraints?.hasCeiling) {
     const reason = sustainability.constraints.ceilingReasons?.[0] ?? 'gelir kalitesi düşük'
     coreIssue = `Gelir kalitesi sorunu: ${reason}. Sürdürülebilir gelir tabanı oluşturulmadan rating iyileşmesi kalıcı olmaz.`
@@ -846,20 +878,41 @@ function buildConsultantNarrative(
   const missedOpps     = engineResult.reasoning.missedOpportunities as MissedOpportunity[] | null
   let structuralNeed   = ''
 
+  // Cross-section dedupe: drivers + longActions + missedOpps aynı id iki kez yazılmaz
+  const shownStructuralIds = new Set<string>()
+
   if (drivers && drivers.structural.length > 0) {
-    const structuralLabels = drivers.structural.slice(0, 3).map(actionIdToLabel)
-    structuralNeed =
-      `Kalıcı iyileşme için yapısal dönüşüm şart: ${structuralLabels.join(', ')}. `
+    const structuralLabels = drivers.structural
+      .slice(0, 3)
+      .filter(id => {
+        if (shownStructuralIds.has(id)) return false
+        shownStructuralIds.add(id)
+        return true
+      })
+      .map(actionIdToLabel)
+    if (structuralLabels.length > 0) {
+      structuralNeed = `Kalıcı iyileşme için yapısal dönüşüm şart: ${structuralLabels.join(', ')}. `
+    }
   }
 
   if (longActions.length > 0) {
-    const longNames = longActions.slice(0, 2).map(
-      a => ACTION_CATALOG_V3[a.actionId]?.name ?? a.actionName
-    )
-    structuralNeed += `Uzun vadede: ${longNames.join(' ve ')}.`
+    const longNames = longActions
+      .slice(0, 2)
+      .filter(a => {
+        if (shownStructuralIds.has(a.actionId)) return false
+        shownStructuralIds.add(a.actionId)
+        return true
+      })
+      .map(a => ACTION_CATALOG_V3[a.actionId]?.name ?? a.actionName)
+    if (longNames.length > 0) {
+      structuralNeed += `Uzun vadede: ${longNames.join(' ve ')}.`
+    }
   } else if (missedOpps && missedOpps.length > 0) {
     const topMissed = missedOpps[0]
-    structuralNeed += `Kritik eksik: ${ACTION_CATALOG_V3[topMissed.actionId]?.name ?? topMissed.actionId} uygulanmadan hedef rating'e ulaşmak zorlaşıyor.`
+    if (!shownStructuralIds.has(topMissed.actionId)) {
+      const name = ACTION_CATALOG_V3[topMissed.actionId]?.name ?? topMissed.actionId
+      structuralNeed += `Kritik eksik: ${name} uygulanmadan hedef rating'e ulaşmak zorlaşıyor.`
+    }
   }
 
   if (!structuralNeed) {
