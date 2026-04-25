@@ -933,14 +933,20 @@ function runGreedySelection(
       }
 
       // Aggressiveness'a gore filtre
+      // 'rasyo-hedef': computeAmount aktif aksiyonlar — her aggressiveness seviyesinde dahil edilir.
       const labelsToUse = aggressiveness === 'conservative'
-        ? ['min', 'typical']
+        ? ['min', 'typical', 'rasyo-hedef']
         : aggressiveness === 'aggressive'
-          ? ['aggressive', 'maxRealistic']
-          : ['typical', 'aggressive']
+          ? ['aggressive', 'maxRealistic', 'rasyo-hedef']
+          : ['typical', 'aggressive', 'rasyo-hedef']
 
       for (const amt of amountCandidates) {
-        if (!labelsToUse.includes(amt.label)) continue
+        if (!labelsToUse.includes(amt.label)) {
+          algorithmTrace.push(
+            `[label_filter] ${action.id}: label='${amt.label}' whitelist dışı, atlandı (aggressiveness=${aggressiveness})`
+          )
+          continue
+        }
 
         const scoreResult = scoreCandidate(action, amt.amountTRY, currentContext, horizon, allSelectedIds)
         if (scoreResult.totalScore <= 0) continue
