@@ -259,6 +259,8 @@ export interface FirmContext {
   grossProfit:       number
   interestExpense:   number
   operatingCashFlow: number | null
+  /** Finansal dönem tipi — computeAmount period-day hesabı için */
+  period?:           string
 }
 
 // ============ ACTION TEMPLATE V3 ============

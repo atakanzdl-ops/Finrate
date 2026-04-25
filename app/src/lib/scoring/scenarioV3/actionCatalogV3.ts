@@ -21,6 +21,8 @@ import {
   SemanticType,
 } from './contracts'
 
+import { getPeriodDays, getBenchmarkValue, applyFeasibilityCap } from './ratioHelpers'
+
 // ─── Helper Types ─────────────────────────────────────────────────────────────
 
 interface RawAccount {
@@ -430,6 +432,48 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     'Vadesi geçmiş alacaklar önceliklendirilir, iskonto programı veya tahsilat ekibi güçlendirilerek nakit döngüsü kısaltılır.',
   bankerPerspective:
     'Gerçek nakit yaratır. Alacak tahsil süresi (DSO) kısaldıkça işletme sermayesi döngüsü hızlanır ve finansal esneklik artar. Alacak kalitesi — özellikle gecikme profili — bu aksiyonun sürdürülebilirlik boyutunu belirleyen kilit göstergedir.',
+
+  computeAmount: (ctx) => {
+    // 1. Gerekli verileri al
+    const ar = (ctx.accountBalances['120'] ?? 0) + (ctx.accountBalances['121'] ?? 0)
+    const netSales = ctx.netSales
+    if (ar <= 0 || netSales <= 0) return null
+
+    // 2. Period gün sayısı (Durum C: ctx.period alanından)
+    const { days: periodDays } = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+
+    // 3. Benchmark DSO
+    const bm = getBenchmarkValue(ctx.sector, 'receivablesDays')
+    const targetDays = bm?.value ?? 90  // fallback 90
+
+    // 4. Applicability check
+    // 1.1 tolerans: Benchmark'ın hafif üzerindeki firmalarda
+    // gereksiz aksiyon önerilmesini engellemek için kullanılıyor.
+    // Hard scientific threshold değil — pragmatik tampon.
+    // Örn: DSO 85 olan firma (benchmark 79), 79 × 1.1 = 86.9
+    // altında olduğu için aksiyon önerilmez. 6 günlük iyileştirme
+    // önermek gürültü yaratır.
+    const currentDSO = (ar / netSales) * periodDays
+    if (currentDSO <= targetDays * 1.1) return null
+
+    // 5. Hedef bakiye
+    const targetAR = (netSales * targetDays) / periodDays
+
+    // 6. Feasibility cap (%25)
+    const result = applyFeasibilityCap(ar, targetAR, 0.25)
+
+    // 7. null/0 koruması → fallback'e geç
+    return result > 0 ? result : null
+  },
+
+  targetRatio: {
+    metric:          'DSO',
+    benchmarkField:  'receivablesDays',
+    basis:           'netSales',
+    fallback:        90,
+    reliability:     'TCMB_DIRECT',
+    // targetDays omit edildi (opsiyonel, dinamik benchmark'tan gelecek)
+  },
 }
 
 // ── A06 ──────────────────────────────────────────────────────────────────────

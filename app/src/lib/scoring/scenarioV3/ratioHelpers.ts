@@ -94,15 +94,30 @@ const TCMB_DIRECT_FIELDS: ReadonlySet<keyof SectorBenchmark> = new Set([
 ])
 
 /**
+ * SectorCode (İngilizce enum) → getSectorBenchmark için Türkçe keyword eşleştirmesi.
+ * getSectorBenchmark Türkçe string arar; SectorCode doğrudan geçilirse 'Genel' dönüyor.
+ */
+const SECTOR_CODE_TO_TR: Record<string, string> = {
+  CONSTRUCTION:  'inşaat',
+  MANUFACTURING: 'imalat',
+  TRADE:         'ticaret',
+  RETAIL:        'perakende',
+  SERVICES:      'hizmet',
+  IT:            'bilişim',
+}
+
+/**
  * Sektör + alan için TCMB benchmark değerini döner.
  * Bulunamazsa null — caller targetRatio.fallback kullanır.
- * sector: SectorCode veya herhangi bir sektör string'i (getSectorBenchmark string alır)
+ * sector: SectorCode (İngilizce) veya Türkçe sektör string'i
  */
 export function getBenchmarkValue(
   sector: string,
   field: keyof SectorBenchmark
 ): { value: number; reliability: 'TCMB_DIRECT' | 'FINRATE_ESTIMATE' } | null {
-  const bm = getSectorBenchmark(sector)
+  // SectorCode → Türkçe çevir (getSectorBenchmark keyword match için gerekli)
+  const lookupSector = SECTOR_CODE_TO_TR[sector.toUpperCase()] ?? sector
+  const bm = getSectorBenchmark(lookupSector)
   if (!bm) return null
   const value = bm[field]
   if (typeof value !== 'number') return null

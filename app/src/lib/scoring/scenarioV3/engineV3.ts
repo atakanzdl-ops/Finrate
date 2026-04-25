@@ -289,6 +289,8 @@ interface FirmContext {
   grossProfit:      number
   interestExpense:  number
   operatingCashFlow: number | null
+  /** Finansal dönem tipi — computeAmount period-day hesabı için */
+  period?:          string
 }
 
 interface AmountCandidate {
@@ -419,6 +421,7 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
     grossProfit:      input.incomeStatement.grossProfit,
     interestExpense:  input.incomeStatement.interestExpense,
     operatingCashFlow: input.incomeStatement.operatingCashFlow ?? null,
+    period: (input as any).financialData?.period ?? 'ANNUAL',
   }
 }
 
