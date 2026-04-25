@@ -37,7 +37,7 @@ import {
   RATING_ORDER,
   ratingToIndex,
 } from './ratingReasoning'
-import { ceilingTypeToDisplay, confidenceToDisplay } from '../displayMaps'
+import { ceilingTypeToDisplay, confidenceToDisplay, formatCeilingDisplay } from '../displayMaps'
 import type {
   CeilingConstraint,
   DriverGroup,
@@ -296,42 +296,6 @@ function categoryLabel(cat: string): string {
  */
 function actionIdToLabel(actionId: string): string {
   return ACTION_CATALOG_V3[actionId]?.name ?? actionId
-}
-
-/**
- * Binding ceiling'i tek temiz cümleye dönüştürür.
- *
- * Sorun: ceilingTypeToDisplay(source) + reason, aynı kavramı iki kez tekrar eder.
- *   Örnek kötü: "Aktif Verimliliği (Aktif verimliliği orta seviyenin altında — rating tavanı BB)"
- *   Örnek iyi:  "Aktif Verimliliği alanı orta seviyenin altında; BB üzerinde sınırlayıcı etki yaratıyor"
- *
- * İşlem:
- *   1. reason'ın başındaki source-display prefix'ini temizle
- *   2. reason'ın sonundaki "— rating tavanı X" suffix'ini temizle
- *   3. Kaynak + temiz açıklama + maxRating ile sade cümle üret
- */
-function formatCeilingDisplay(
-  bindingCeiling: { source: string; maxRating: string; reason?: string }
-): string {
-  const sourceDisplay = ceilingTypeToDisplay(bindingCeiling.source)
-  let reason = (bindingCeiling.reason ?? '').trim()
-
-  // Kaynak etiketinin prefix tekrarını sil (büyük/küçük harf duyarsız)
-  const sourcePrefix = sourceDisplay.toLowerCase()
-  if (reason.toLowerCase().startsWith(sourcePrefix)) {
-    reason = reason.substring(sourceDisplay.length).replace(/^[-—\s]+/, '').trim()
-  }
-
-  // "— rating tavanı X olarak sınırlandırılmıştır" veya "— rating tavanı X" suffix'ini sil
-  reason = reason
-    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\s+olarak sınırlandırılmıştır\.?$/i, '')
-    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\.?$/i, '')
-    .trim()
-
-  if (reason) {
-    return `${sourceDisplay} alanı ${reason}; ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
-  }
-  return `${sourceDisplay} alanı ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
 }
 
 /**
@@ -704,7 +668,7 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 
   if (bindingCeiling) {
     parts.push(
-      `Mevcut ${ceilingTypeToDisplay(bindingCeiling.source)} tavanı aşılmadığı sürece ` +
+      `${formatCeilingDisplay(bindingCeiling)} koşulları değişmediği sürece ` +
       `firma ${bindingCeiling.maxRating} seviyesinin üzerine çıkamaz.`
     )
   }

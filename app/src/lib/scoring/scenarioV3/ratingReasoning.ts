@@ -73,7 +73,7 @@ import type {
 } from './assetProductivity'
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
-import { ceilingTypeToDisplay } from '../displayMaps'
+import { ceilingTypeToDisplay, formatCeilingDisplay } from '../displayMaps'
 
 // Unused import guard — tipler tanimlanmis ama dogrudan kullanilmiyor
 void 0 as unknown as ActionTemplateV3
@@ -821,9 +821,7 @@ export function buildBankerSummary(
 
   // Binding ceiling
   if (bindingCeiling) {
-    parts.push(
-      `Rating tavanı: ${bindingCeiling.maxRating} (${ceilingTypeToDisplay(bindingCeiling.source)}). ${bindingCeiling.reason}.`
-    )
+    parts.push(`${formatCeilingDisplay(bindingCeiling)}.`)
   }
 
   // Supporting ceilings

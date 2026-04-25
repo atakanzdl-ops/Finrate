@@ -54,6 +54,40 @@ export function confidenceToDisplay(level: string): string {
  *
  * Kullanım: actionTypeToDisplay('STRUCTURAL') → 'Yapısal'
  */
+/**
+ * Binding ceiling'i tek temiz cümleye dönüştürür.
+ * Hem ratingReasoning.ts hem decisionLayer.ts tarafından kullanılır.
+ *
+ * Sorun: ceilingTypeToDisplay(source) + reason aynı kavramı iki kez tekrar eder.
+ *   Kötü: "Aktif Verimliliği (Aktif verimliliği orta seviyenin altında — rating tavanı BB)"
+ *   İyi:  "Aktif Verimliliği alanı orta seviyenin altında; BB üzerinde sınırlayıcı etki yaratıyor"
+ *
+ * Kullanım: formatCeilingDisplay(bindingCeiling) → temiz cümle
+ */
+export function formatCeilingDisplay(
+  bindingCeiling: { source: string; maxRating: string; reason?: string }
+): string {
+  const sourceDisplay = ceilingTypeToDisplay(bindingCeiling.source)
+  let reason = (bindingCeiling.reason ?? '').trim()
+
+  // Kaynak etiketinin başından prefix tekrarını sil (büyük/küçük harf duyarsız)
+  const sourcePrefix = sourceDisplay.toLowerCase()
+  if (reason.toLowerCase().startsWith(sourcePrefix)) {
+    reason = reason.substring(sourceDisplay.length).replace(/^[-—\s]+/, '').trim()
+  }
+
+  // "— rating tavanı X olarak sınırlandırılmıştır" veya "— rating tavanı X" suffix'ini sil
+  reason = reason
+    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\s+olarak sınırlandırılmıştır\.?$/i, '')
+    .replace(/\s*—\s*rating tavan[ıi]\s+\S+\.?$/i, '')
+    .trim()
+
+  if (reason) {
+    return `${sourceDisplay} alanı ${reason}; ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
+  }
+  return `${sourceDisplay} alanı ${bindingCeiling.maxRating} üzerinde sınırlayıcı etki yaratıyor`
+}
+
 export function actionTypeToDisplay(type: string): string {
   const map: Record<string, string> = {
     'structural':       'yapısal',

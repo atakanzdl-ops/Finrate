@@ -74,25 +74,25 @@ function formatAmount(n: number | undefined | null): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function assessLiquidity(productivity: any): string {
   const cashRatio = productivity?.metrics?.cashToAssets ?? 0.1
-  if (cashRatio > 0.15) return 'Iyi'
+  if (cashRatio > 0.15) return 'İyi'
   if (cashRatio > 0.05) return 'Orta'
-  return 'Dusuk'
+  return 'Düşük'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function assessStructuralRisk(productivity: any): string {
   const trapped = productivity?.metrics?.trappedAssetsShare ?? 0
-  if (trapped < 0.30) return 'Dusuk'
+  if (trapped < 0.30) return 'Düşük'
   if (trapped < 0.60) return 'Orta'
-  return 'Yuksek'
+  return 'Yüksek'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function assessAssetEfficiency(productivity: any): string {
   const score = productivity?.productivityScore ?? 0
-  if (score >= 0.70) return 'Iyi'
+  if (score >= 0.70) return 'İyi'
   if (score >= 0.40) return 'Orta'
-  return 'Zayif'
+  return 'Zayıf'
 }
 
 /**
@@ -112,8 +112,8 @@ function toStringArray(value: unknown): string[] {
 
 function BankerMetric({ label, value }: { label: string; value: string }) {
   const color =
-    value === 'Iyi'    || value === 'Yuksek' ? 'text-green-600 bg-green-50 border-green-200' :
-    value === 'Orta'   || value === 'Dusuk'  ? 'text-amber-700 bg-amber-50  border-amber-200' :
+    value === 'İyi'   || value === 'Yüksek' ? 'text-green-600 bg-green-50 border-green-200' :
+    value === 'Orta'  || value === 'Düşük'  ? 'text-amber-700 bg-amber-50  border-amber-200' :
     'text-red-700 bg-red-50 border-red-200'
 
   return (
@@ -288,9 +288,9 @@ function OzetTab({ result }: { result: any }) {
             <div className="flex items-start gap-2">
               <Shield size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
               <span className="text-white/80">
-                Guven:{' '}
+                Güven:{' '}
                 <strong className="text-white">
-                  {exec.confidence === 'HIGH' ? 'Yuksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Dusuk'}
+                  {exec.confidence === 'HIGH' ? 'Yüksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}
                 </strong>
               </span>
             </div>
@@ -305,11 +305,11 @@ function OzetTab({ result }: { result: any }) {
             <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
             <div>
               <div className="font-semibold text-amber-900 mb-1">
-                Portfoy Kapasite Uyarisi
+                Portföy Kapasite Uyarısı
               </div>
               <div className="text-sm text-amber-800">
-                Teorik rating tavani mevcut olsa da secilen aksiyon portfoyu bu seviyeyi tasimiyor.
-                Mevcut portfoyle ulasilabilir en yuksek seviye:{' '}
+                Teorik rating tavanı mevcut olsa da seçilen aksiyon portföyü bu seviyeyi taşımıyor.
+                Mevcut portföyle ulaşılabilir en yüksek seviye:{' '}
                 <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
               </div>
             </div>
@@ -323,7 +323,7 @@ function OzetTab({ result }: { result: any }) {
           <div className="flex items-start gap-3">
             <Database className="text-amber-600 shrink-0 mt-0.5" size={20} />
             <div>
-              <div className="font-semibold text-amber-900 mb-1">Veri Kalitesi Uyarisi</div>
+              <div className="font-semibold text-amber-900 mb-1">Veri Kalitesi Uyarısı</div>
               <div className="text-sm text-amber-800">{da.dataQualityWarning.message}</div>
               {da.dataQualityWarning.recommendation && (
                 <div className="text-xs text-amber-700 mt-2">{da.dataQualityWarning.recommendation}</div>
@@ -391,14 +391,14 @@ function OzetTab({ result }: { result: any }) {
             Finrate Perspektifi
           </div>
           <BankerMetric label="Likidite"          value={assessLiquidity(productivity)} />
-          <BankerMetric label="Yapisal Risk"       value={assessStructuralRisk(productivity)} />
-          <BankerMetric label="Aktif Verimliligi"  value={assessAssetEfficiency(productivity)} />
+          <BankerMetric label="Yapısal Risk"        value={assessStructuralRisk(productivity)} />
+          <BankerMetric label="Aktif Verimliliği"  value={assessAssetEfficiency(productivity)} />
           <BankerMetric
-            label="Rating Guveni"
+            label="Rating Güveni"
             value={
-              exec.confidence === 'HIGH'   ? 'Yuksek' :
+              exec.confidence === 'HIGH'   ? 'Yüksek' :
               exec.confidence === 'MEDIUM' ? 'Orta'   :
-              'Dusuk'
+              'Düşük'
             }
           />
         </div>
@@ -794,7 +794,7 @@ function DetayTab({
                 Neden Bu Aksiyonlar Secilmedi?
               </h3>
               <p className="text-sm text-[#64748B] mt-1">
-                Yuksek skor alip reddedilen {rejected.length} aksiyon.
+                Yüksek skor alıp reddedilen {rejected.length} aksiyon.
               </p>
             </div>
             <ChevronDown
@@ -1074,7 +1074,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
         >
           <Loader2 className="animate-spin mx-auto" size={32} style={{ color: '#0B3C5D' }} />
-          <div className="mt-4 text-[#64748B]">Portfoy analizi hazirlaniyor...</div>
+          <div className="mt-4 text-[#64748B]">Portföy analizi hazırlanıyor...</div>
         </div>
       )}
 
