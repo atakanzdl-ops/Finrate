@@ -5,6 +5,10 @@ import { runEngineV3 }               from '@/lib/scoring/scenarioV3/engineV3'
 import { buildDecisionAnswer }       from '@/lib/scoring/scenarioV3/decisionLayer'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
+import {
+  RATING_ORDER,
+  normalizeLegacyRating,
+}                                    from '@/lib/scoring/scenarioV3/ratingReasoning'
 
 // ─── SECTOR STRING → SECTORCODE MAPPING ──────────────────────────────────────
 
@@ -87,40 +91,19 @@ function buildIncomeStatement(balances: Record<string, number>) {
 
 // ─── CURRENT RATING HELPER ───────────────────────────────────────────────────
 
-const RATING_ORDER: RatingGrade[] = [
-  'D', 'C', 'CC',
-  'CCC-', 'CCC', 'CCC+',
-  'B-', 'B', 'B+',
-  'BB-', 'BB', 'BB+',
-  'BBB-', 'BBB', 'BBB+',
-  'A-', 'A', 'A+',
-  'AA-', 'AA', 'AA+', 'AAA',
-]
-
 /**
- * Skor => V3 RatingGrade eslemesi.
+ * Skor => V3 RatingGrade eslemesi (10 kategori).
  * V2 scoreToRating ile yakin kalibrasyon.
+ * Her 3 notch grubu → tek kategori.
  */
 function scoreToRatingGrade(score: number): RatingGrade {
   if (score >= 95) return 'AAA'
-  if (score >= 92) return 'AA+'
-  if (score >= 89) return 'AA'
-  if (score >= 86) return 'AA-'
-  if (score >= 83) return 'A+'
-  if (score >= 80) return 'A'
-  if (score >= 76) return 'A-'
-  if (score >= 73) return 'BBB+'
-  if (score >= 70) return 'BBB'
-  if (score >= 66) return 'BBB-'
-  if (score >= 62) return 'BB+'
-  if (score >= 58) return 'BB'
-  if (score >= 54) return 'BB-'
-  if (score >= 50) return 'B+'
-  if (score >= 46) return 'B'
-  if (score >= 42) return 'B-'
-  if (score >= 38) return 'CCC+'
-  if (score >= 34) return 'CCC'
-  if (score >= 30) return 'CCC-'
+  if (score >= 86) return 'AA'
+  if (score >= 76) return 'A'
+  if (score >= 66) return 'BBB'
+  if (score >= 54) return 'BB'
+  if (score >= 42) return 'B'
+  if (score >= 30) return 'CCC'
   if (score >= 25) return 'CC'
   if (score >= 20) return 'C'
   return 'D'
@@ -128,11 +111,14 @@ function scoreToRatingGrade(score: number): RatingGrade {
 
 /**
  * targetGrade string'i V3 RatingGrade'e parse eder.
+ * Legacy 22-notch değerler normalize edilir.
  * Gecersiz deger 'BBB'e fallback.
  */
 function parseRatingGrade(grade: string): RatingGrade {
   if ((RATING_ORDER as string[]).includes(grade)) return grade as RatingGrade
-  return 'BBB'
+  // Legacy notch değer (BBB-, B+ vs) → normalize
+  const normalized = normalizeLegacyRating(grade)
+  return normalized
 }
 
 // ─── ROUTE HANDLER ────────────────────────────────────────────────────────────
@@ -216,14 +202,15 @@ export async function POST(req: NextRequest) {
     //            kullandigi rating'in tutarli olmasini garantiler.
     // Oncelik 2: analysis.finalRating (DB'de sakli, V2 motoru tarafindan yazilmis)
     // Oncelik 3: scoreFinal'den turet (fallback — eksik data durumu)
+    // normalizeLegacyRating: 22-notch legacy değerler (BBB-, B+) → 10 kategori
     const currentRating: RatingGrade =
-      clientCurrentGrade && (RATING_ORDER as string[]).includes(clientCurrentGrade as string)
-        ? (clientCurrentGrade as RatingGrade)
+      clientCurrentGrade
+        ? normalizeLegacyRating(clientCurrentGrade as string)
         : (() => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rawFinalRating = (analysis as any).finalRating as string | null | undefined
-            if (rawFinalRating && (RATING_ORDER as string[]).includes(rawFinalRating)) {
-              return rawFinalRating as RatingGrade
+            if (rawFinalRating) {
+              return normalizeLegacyRating(rawFinalRating)
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rawScoreFinal = (analysis as any).scoreFinal

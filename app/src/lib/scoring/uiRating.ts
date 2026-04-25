@@ -1,114 +1,66 @@
 /**
  * UI rating presentation helpers.
- * Engine 22-notch canonical skala kullanır (ratingReasoning.ts).
- * UI kullanıcıya 10 kategori gösterir.
  *
- * ÖNEMLİ: Bu dosya yalnızca UI katmanı içindir.
- * Backend/engine/API response DEĞİŞMEZ — 22 notch canonical korunur.
+ * V3.1: Engine artık 10 kategori kullanıyor — UI = internal.
+ * Normalizasyon ve mapping helper'larına artık gerek yok.
+ * Legacy 22-notch veriler için normalizeLegacyRating kullanılır.
+ *
+ * Tek source of truth: ratingReasoning.RATING_ORDER
  */
 
-export const UI_RATING_CATEGORIES = [
-  'D',
-  'C',
-  'CC',
-  'CCC',
-  'B',
-  'BB',
-  'BBB',
-  'A',
-  'AA',
-  'AAA',
-] as const
+import {
+  RATING_ORDER,
+  type RatingGrade,
+  normalizeLegacyRating,
+} from './scenarioV3/ratingReasoning'
 
-export type UiRatingCategory = (typeof UI_RATING_CATEGORIES)[number]
+// Re-export: UI ve engine aynı diziyi kullanır
+export { RATING_ORDER as UI_RATING_CATEGORIES }
+export type { RatingGrade as UiRatingCategory }
 
 /**
- * Backend'den gelen herhangi bir rating'i (22-notch dahil)
- * UI kategorisine indirir.
+ * Mevcut rating'in üstündeki (iyileşme yönündeki) kategorileri döner.
+ * D ve mevcut dahil değil.
  *
  * Örnekler:
- *   "BBB+" → "BBB"
- *   "BBB"  → "BBB"
- *   "BBB-" → "BBB"
- *   "B-"   → "B"
- *   "CCC+" → "CCC"
- *   "C"    → "C"   (değişmez)
- *   null   → "-"
+ *   "C"    → [CC, CCC, B, BB, BBB, A, AA, AAA]
+ *   "B-"   → normalize → "B" → [BB, BBB, A, AA, AAA]
+ *   "BBB"  → [A, AA, AAA]
+ *   "AAA"  → []   (en üst seviyede)
+ *   null   → D hariç hepsi (fallback)
  */
-export function normalizeRatingForUi(rating?: string | null): string {
-  if (!rating) return '-'
-  const clean = rating.trim().toUpperCase()
-  return clean.replace(/[+-]/g, '')
-}
-
-/**
- * UI kategorisinden backend'e gönderilecek internal rating'i üretir.
- *
- * Mapping stratejisi:
- * - Üst segmentler (AA, A, BBB, BB, B): alt notch default (AA-, A-, BBB-, BB-, B-)
- *   Sebep: Kullanıcı "hedefim BBB" dediğinde motor en zor noktayı hedeflesin
- * - CCC: kendi mid-notch (CCC, CCC- değil) — distressed boundary korunur
- * - Tek notch'lular (AAA, CC, C, D): olduğu gibi
- */
-export function mapUiRatingToInternal(uiRating: string): string {
-  const clean = uiRating.trim().toUpperCase()
-  switch (clean) {
-    case 'AA':  return 'AA-'
-    case 'A':   return 'A-'
-    case 'BBB': return 'BBB-'
-    case 'BB':  return 'BB-'
-    case 'B':   return 'B-'
-    case 'CCC': return 'CCC'   // CCC- değil — distressed boundary
-    case 'AAA': return 'AAA'
-    case 'CC':  return 'CC'
-    case 'C':   return 'C'
-    case 'D':   return 'D'
-    default:    return clean
-  }
-}
-
-/**
- * Mevcut rating'in üstündeki (iyileşme yönündeki) UI kategorilerini döner.
- * Mevcut kategori ve D dahil değil.
- *
- * Örnekler:
- *   currentRating = "C"   → ['CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
- *   currentRating = "B-"  → normalizeRatingForUi → "B"
- *                         → ['BB', 'BBB', 'A', 'AA', 'AAA']
- *   currentRating = "AAA" → []  (en üst seviyede, hedef seçilemez)
- *   currentRating = null  → ['C', 'CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA'] (fallback)
- */
-export function getTargetRatingOptions(currentRating?: string | null): UiRatingCategory[] {
-  const currentCategory = normalizeRatingForUi(currentRating)
-  const currentIdx = UI_RATING_CATEGORIES.indexOf(currentCategory as UiRatingCategory)
+export function getTargetRatingOptions(currentRating?: string | null): RatingGrade[] {
+  const currentCategory = normalizeLegacyRating(currentRating)
+  const currentIdx = RATING_ORDER.indexOf(currentCategory)
 
   if (currentIdx < 0) {
-    // Tanımsız veya bilinmeyen rating → D hariç hepsini döndür
-    return UI_RATING_CATEGORIES.filter(r => r !== 'D') as unknown as UiRatingCategory[]
+    // Bilinmeyen rating → D hariç hepsini döndür
+    return RATING_ORDER.filter(r => r !== 'D') as RatingGrade[]
   }
 
   // Mevcut indexin üstündeki kategoriler (mevcut dahil değil)
-  return UI_RATING_CATEGORIES.slice(currentIdx + 1) as unknown as UiRatingCategory[]
+  return RATING_ORDER.slice(currentIdx + 1) as RatingGrade[]
 }
 
 /**
- * Rating gösterimi için tooltip metni üretir.
- * Internal (notch'lu) rating varsa gösterir, aksi halde undefined döner.
- *
- * Kullanım: title={ratingTooltip(internalRating)}
+ * İki rating arasındaki kategori delta'sını hesaplar.
+ * Legacy 22-notch verileri normalize eder.
  *
  * Örnekler:
- *   "BBB-" → "Internal rating: BBB-"
- *   "BBB"  → undefined  (sadeleştirilmiş ile aynı, tooltip gereksiz)
- *   "C"    → undefined
+ *   ("C", "B")    → 3   (C→CC→CCC→B)
+ *   ("BBB-","A-") → 1   normalize → "BBB"→"A"  → 1
+ *   ("B","B+")    → 0   normalize → "B"→"B"    → 0 (aynı kategori)
  */
-export function ratingTooltip(internal?: string | null): string | undefined {
-  if (!internal) return undefined
-  const clean = internal.trim().toUpperCase()
-  const simplified = normalizeRatingForUi(clean)
-  // Internal ile simplified farklıysa notch modifier vardı → tooltip göster
-  if (clean !== simplified) {
-    return `Internal rating: ${clean}`
-  }
-  return undefined
+export function countCategoryTransitions(
+  from?: string | null,
+  to?: string | null,
+): number {
+  const fromCat = normalizeLegacyRating(from)
+  const toCat   = normalizeLegacyRating(to)
+
+  const fromIdx = RATING_ORDER.indexOf(fromCat)
+  const toIdx   = RATING_ORDER.indexOf(toCat)
+
+  if (fromIdx < 0 || toIdx < 0) return 0
+  return toIdx - fromIdx
 }

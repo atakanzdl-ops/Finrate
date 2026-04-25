@@ -1460,7 +1460,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   let guardrailResults = buildGuardrailResults(workingContext, fullPortfolio)
 
-  const defaultTarget: RatingGrade = input.targetRating ?? 'BB-'
+  const defaultTarget: RatingGrade = input.targetRating ?? 'BB'
 
   // PATCH 1: Portfoyun toplam notch kapasitesini hesapla (FAZ 3 sonrasi)
   const portfolioNotchCapacityV1 = fullPortfolio.reduce(

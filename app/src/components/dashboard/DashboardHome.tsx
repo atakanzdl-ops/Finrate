@@ -11,7 +11,6 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import FinrateShell from '@/components/layout/FinrateShell'
-import { normalizeRatingForUi, ratingTooltip } from '@/lib/scoring/uiRating'
 
 interface Analysis {
   id: string
@@ -164,11 +163,8 @@ export default function DashboardHome() {
                 <p className="text-xs text-slate-500 tracking-widest font-bold">SKOR / RATING</p>
                 <div className="mt-3 flex items-end gap-3">
                   <span className="text-5xl font-black text-[#0B3C5D]">{latest ? Math.round(latest.finalScore) : '-'}</span>
-                  <span
-                    title={ratingTooltip(latest?.finalRating)}
-                    className={`text-sm font-bold px-3 py-1 rounded-full border ${latest ? ratingTone(latest.finalRating) : 'text-slate-500 bg-slate-50 border-slate-200'}`}
-                  >
-                    {latest?.finalRating ? normalizeRatingForUi(latest.finalRating) : '—'}
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full border ${latest ? ratingTone(latest.finalRating) : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
+                    {latest?.finalRating ?? '—'}
                   </span>
                 </div>
               </div>
@@ -221,11 +217,8 @@ export default function DashboardHome() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-[#1E293B]">{item.entity?.name ?? 'Şirket'}</span>
-                          <span
-                            title={ratingTooltip(item.finalRating)}
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(item.finalRating)}`}
-                          >
-                            {normalizeRatingForUi(item.finalRating)}
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(item.finalRating)}`}>
+                            {item.finalRating}
                           </span>
                         </div>
                         <div className="mt-3 text-2xl font-black text-[#0B3C5D]">{Math.round(item.finalScore)}</div>

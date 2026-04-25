@@ -49,12 +49,7 @@ import {
   X,
   GitCompare,
 } from 'lucide-react'
-import {
-  getTargetRatingOptions,
-  mapUiRatingToInternal,
-  normalizeRatingForUi,
-  ratingTooltip,
-} from '@/lib/scoring/uiRating'
+import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -255,21 +250,12 @@ function OzetTab({ result }: { result: any }) {
               Gercekci Ust Sinir
             </div>
             <div className="text-4xl font-bold">
-              <span title={ratingTooltip(exec.achievableTarget ?? exec.achievableRating)}>
-                {normalizeRatingForUi(exec.achievableTarget ?? exec.achievableRating)}
-              </span>
+              {exec.achievableTarget ?? exec.achievableRating}
             </div>
             <div className="text-sm text-white/70 mt-1">
-              Mevcut:{' '}
-              <span title={ratingTooltip(exec.currentRating)}>
-                {normalizeRatingForUi(exec.currentRating)}
-              </span>
+              Mevcut: {exec.currentRating}
               {exec.requestedTarget && exec.requestedTarget !== (exec.achievableTarget ?? exec.achievableRating) && (
-                <> &bull; İstenen:{' '}
-                  <span title={ratingTooltip(exec.requestedTarget)}>
-                    {normalizeRatingForUi(exec.requestedTarget)}
-                  </span>
-                </>
+                <> &bull; İstenen: {exec.requestedTarget}</>
               )}
             </div>
           </div>
@@ -323,11 +309,7 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-sm text-amber-800">
                 Teorik rating tavani mevcut olsa da secilen aksiyon portfoyu bu seviyeyi tasimiyor.
                 Mevcut portfoyle ulasilabilir en yuksek seviye:{' '}
-                <strong>
-                  <span title={ratingTooltip(exec.achievableTarget ?? exec.achievableRating)}>
-                    {normalizeRatingForUi(exec.achievableTarget ?? exec.achievableRating)}
-                  </span>
-                </strong>.
+                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
               </div>
             </div>
           </div>
@@ -986,9 +968,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           <div>
             <div className="text-xs text-[#64748B] uppercase tracking-wide">Mevcut Not</div>
             <div className="text-2xl font-bold text-[#1E293B] mt-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              <span title={ratingTooltip(currentGrade)}>
-                {normalizeRatingForUi(currentGrade)}
-              </span>
+              {currentGrade}
             </div>
           </div>
           <div className="text-right">
@@ -1015,7 +995,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
                     key={uiRating}
                     onClick={() => {
                       setSelectedUiRating(uiRating)
-                      setTargetGrade(mapUiRatingToInternal(uiRating))
+                      setTargetGrade(uiRating)
                     }}
                     className="px-3 py-2 rounded-[8px] text-sm font-medium border transition-all"
                     style={{

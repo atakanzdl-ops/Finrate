@@ -34,6 +34,7 @@ import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 import type { RatingGrade } from './ratingReasoning'
 import {
   ACTION_CATEGORY_MAP,
+  RATING_ORDER,
   ratingToIndex,
 } from './ratingReasoning'
 import type {
@@ -435,8 +436,8 @@ function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
   const scenario = engineResult.reasoning.oneNotchScenario as NotchScenario
   const currentIdx = ratingToIndex(engineResult.currentRating)
   const targetRating = (
-    currentIdx + 1 < 22
-      ? ['D','C','CC','CCC-','CCC','CCC+','B-','B','B+','BB-','BB','BB+','BBB-','BBB','BBB+','A-','A','A+','AA-','AA','AA+','AAA'][currentIdx + 1]
+    currentIdx + 1 < RATING_ORDER.length
+      ? RATING_ORDER[currentIdx + 1]
       : 'AAA'
   ) as RatingGrade
 
@@ -470,9 +471,8 @@ function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
 function buildTwoNotchPlan(engineResult: EngineResult): NotchPlan {
   const scenario = engineResult.reasoning.twoNotchScenario as NotchScenario
   const currentIdx = ratingToIndex(engineResult.currentRating)
-  const targetIdx  = Math.min(currentIdx + 2, 21)
-  const ratingOrder = ['D','C','CC','CCC-','CCC','CCC+','B-','B','B+','BB-','BB','BB+','BBB-','BBB','BBB+','A-','A','A+','AA-','AA','AA+','AAA']
-  const targetRating = ratingOrder[targetIdx] as RatingGrade
+  const targetIdx  = Math.min(currentIdx + 2, RATING_ORDER.length - 1)
+  const targetRating = RATING_ORDER[targetIdx] as RatingGrade
 
   const requiredActions = scenario.requiredActions.slice(0, 4)
   const matchedInPortfolio = engineResult.portfolio.filter(

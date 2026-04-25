@@ -78,27 +78,34 @@ void 0 as unknown as SectorCode
 
 // ─── RATING GRADE ─────────────────────────────────────────────────────────────
 
-export type RatingGrade =
-  | 'AAA' | 'AA+' | 'AA' | 'AA-'
-  | 'A+' | 'A' | 'A-'
-  | 'BBB+' | 'BBB' | 'BBB-'
-  | 'BB+' | 'BB' | 'BB-'
-  | 'B+' | 'B' | 'B-'
-  | 'CCC+' | 'CCC' | 'CCC-'
-  | 'CC' | 'C' | 'D'
+/**
+ * V3.1 unified 10-kategori skalası.
+ * + / - notch sistemi kaldırıldı. Tek source of truth.
+ */
+export type RatingGrade = 'D' | 'C' | 'CC' | 'CCC' | 'B' | 'BB' | 'BBB' | 'A' | 'AA' | 'AAA'
 
 export const RATING_ORDER: RatingGrade[] = [
-  'D', 'C', 'CC',
-  'CCC-', 'CCC', 'CCC+',
-  'B-', 'B', 'B+',
-  'BB-', 'BB', 'BB+',
-  'BBB-', 'BBB', 'BBB+',
-  'A-', 'A', 'A+',
-  'AA-', 'AA', 'AA+', 'AAA',
+  'D', 'C', 'CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA',
 ]
 
-export function ratingToIndex(rating: RatingGrade): number {
-  return RATING_ORDER.indexOf(rating)
+/**
+ * Legacy 22-notch rating verilerini 10 kategori sistemine indirir.
+ * + ve - modifier'ları kaldırır, ana kategoriye dönüştürür.
+ * DB'deki eski kayıtlar (BBB-, B+, CCC- vs.) runtime'da normalize edilir.
+ *
+ * Örnekler:
+ *   "BBB-" → "BBB"    "B+"  → "B"    "CCC+" → "CCC"
+ *   "AAA"  → "AAA"    ""    → "C"    null   → "C"
+ */
+export function normalizeLegacyRating(rating?: string | null): RatingGrade {
+  if (!rating) return 'C'
+  const clean = rating.trim().toUpperCase().replace(/[+-]/g, '')
+  if ((RATING_ORDER as readonly string[]).includes(clean)) return clean as RatingGrade
+  return 'C'
+}
+
+export function ratingToIndex(rating: RatingGrade | string): number {
+  return RATING_ORDER.indexOf(normalizeLegacyRating(rating as string))
 }
 
 export function indexToRating(index: number): RatingGrade {
@@ -171,13 +178,13 @@ export function calculateProductivityCeiling(
   const evidence: string[] = []
 
   if (score < 0.20 && criticalCount >= 1) {
-    maxRating = 'B-'
-    reason    = 'Aktif uretkenligi kritik seviyede - rating tavani B- olarak sinirlanmistir'
+    maxRating = 'B'
+    reason    = 'Aktif uretkenligi kritik seviyede - rating tavani B olarak sinirlanmistir'
     evidence.push(`Productivity score: ${(score * 100).toFixed(0)}% (kritik esik: 20%)`)
     evidence.push(`${criticalCount} CRITICAL aktif kilitlenmesi tespit edildi`)
   } else if (score < 0.30 || severeCount >= 2) {
-    maxRating = 'B+'
-    reason    = 'Aktif uretkenligi zayif - rating tavani B+'
+    maxRating = 'B'
+    reason    = 'Aktif uretkenligi zayif - rating tavani B'
     evidence.push(`Productivity score: ${(score * 100).toFixed(0)}%`)
     if (severeCount >= 2) evidence.push(`${severeCount} SEVERE aktif kilitlenmesi`)
   } else if (score < 0.50) {
@@ -463,15 +470,16 @@ export function buildRatingTransition(
   else if (confidenceModifier >= 0.50) confidence = 'MEDIUM'
   else                                 confidence = 'LOW'
 
-  let explanation =
-    `${currentRating} -> ${finalTargetRating} (${notchesGained} kademe iyilesme).`
+  let explanation = notchesGained > 0
+    ? `${currentRating} seviyesinden ${finalTargetRating} seviyesine iyilesme (${notchesGained} kategori).`
+    : `${currentRating} kategorisi icinde guclenme.`
   if (blockedByCeiling && bindingCeiling) {
     explanation +=
       ` ${bindingCeiling.source} ceiling'i ${bindingCeiling.maxRating} seviyesinde sinirliyor: ${bindingCeiling.reason}.`
   }
   if (blockedByPortfolioCapacity) {
     explanation +=
-      ` Portfoy kapasitesi ${achievableByPortfolio} kademe tasiyor; hedef bu kapasitenin uzerinde.`
+      ` Portfoy kapasitesi ${achievableByPortfolio} kategori tasiyor; hedef bu kapasitenin uzerinde.`
   }
   if (confidenceReasons.length > 0) {
     explanation += ` Guven: ${confidenceReasons.join('; ')}.`
@@ -557,8 +565,8 @@ export function buildSensitivityAnalysis(
   const current      = productivityCeiling?.maxRating ?? 'AAA'
 
   const scenarios: SensitivityPoint[] = [
-    { ifProductivityScore: 0.20, wouldBeCeiling: 'B-',  deltaFromCurrent: 0 },
-    { ifProductivityScore: 0.30, wouldBeCeiling: 'B+',  deltaFromCurrent: 0 },
+    { ifProductivityScore: 0.20, wouldBeCeiling: 'B',   deltaFromCurrent: 0 },
+    { ifProductivityScore: 0.30, wouldBeCeiling: 'B',   deltaFromCurrent: 0 },
     { ifProductivityScore: 0.50, wouldBeCeiling: 'BB',  deltaFromCurrent: 0 },
     { ifProductivityScore: 0.70, wouldBeCeiling: 'BBB', deltaFromCurrent: 0 },
     { ifProductivityScore: 0.85, wouldBeCeiling: 'AAA', deltaFromCurrent: 0 },
@@ -610,7 +618,7 @@ export function buildOneNotchScenario(
       requiredActions:             [],
       requiredInefficiencyRepairs: [],
       isAchievable:                true,
-      narrative:                   'Mevcut portfoy 1 kademe iyilesme icin yeterli gorunuyor.',
+      narrative:                   'Mevcut portfoy 1 kategori iyilesme icin yeterli gorunuyor.',
     }
   }
 
@@ -623,7 +631,7 @@ export function buildOneNotchScenario(
     requiredInefficiencyRepairs: [topArea.inefficiencyType],
     isAchievable:                true,
     narrative:
-      `1 kademe iyilesme icin ${topArea.inefficiencyType} onarimi gerekli. ` +
+      `1 kategori iyilesme icin ${topArea.inefficiencyType} onarimi gerekli. ` +
       `Onerilen: ${actions.join(', ')}.`,
   }
 }
@@ -646,7 +654,7 @@ export function buildTwoNotchScenario(
 
   const needsStructural = productivity.productivityScore < 0.40
   const blockedBy       = needsStructural && composition.isCosmeticHeavy
-    ? 'Portfoy cosmetic-heavy; 2 not iyilesme icin structural aksiyonlar ' +
+    ? 'Portfoy cosmetic-heavy; 2 kategori iyilesme icin structural aksiyonlar ' +
       '(A18 satis artisi, A06 stok erime, A20 YYI monetization) zorunlu'
     : undefined
 
@@ -657,8 +665,8 @@ export function buildTwoNotchScenario(
     isAchievable:                !blockedBy,
     blockedBy,
     narrative: blockedBy
-      ? `2 kademe iyilesme mevcut portfoyle mumkun degil: ${blockedBy}.`
-      : `2 kademe iyilesme icin ${inefficiencies.length} kritik alan onarilmali. ` +
+      ? `2 kategori iyilesme mevcut portfoyle mumkun degil: ${blockedBy}.`
+      : `2 kategori iyilesme icin ${inefficiencies.length} kritik alan onarilmali. ` +
         `Aksiyonlar: ${Array.from(required).join(', ')}.`,
   }
 }
@@ -780,7 +788,10 @@ export function buildBankerSummary(
   const parts: string[] = []
 
   // Giris
-  parts.push(`${currentRating} -> ${transition.finalTargetRating} (${transition.notchesGained} kademe).`)
+  const girisText = transition.notchesGained > 0
+    ? `${currentRating} seviyesinden ${transition.finalTargetRating} seviyesine iyilesme (${transition.notchesGained} kategori).`
+    : `${currentRating} kategorisi icinde guclenme.`
+  parts.push(girisText)
 
   // Binding ceiling
   if (bindingCeiling) {
