@@ -11,6 +11,8 @@
  * Layer 6 — Rating Reasoning (final narrative)
  */
 
+import type { SectorBenchmark } from '../benchmarks'
+
 // ============ TEMEL TANIMLAR ============
 
 export type SectorCode =
@@ -234,6 +236,31 @@ export interface RatingReasoning {
   realityCheck: string
 }
 
+// ============ FIRM CONTEXT (minimal tip — circular import önleme) ============
+
+/**
+ * engineV3.ts içindeki FirmContext'in contracts.ts'e taşınan minimal formu.
+ * computeAmount fonksiyonunun imzasında parametre tipi olarak kullanılır.
+ *
+ * NOT: engineV3.ts'deki tam FirmContext buradan EXTEND etmez (circular import
+ * riski), ancak aynı alanları içerir. İki tip arası uyumu TypeScript structural
+ * typing garantiler.
+ */
+export interface FirmContext {
+  sector:            SectorCode
+  /** TDHP hesap kodu → tutar (TL) */
+  accountBalances:   Record<string, number>
+  totalAssets:       number
+  totalEquity:       number
+  totalRevenue:      number
+  netIncome:         number
+  netSales:          number
+  operatingProfit:   number
+  grossProfit:       number
+  interestExpense:   number
+  operatingCashFlow: number | null
+}
+
 // ============ ACTION TEMPLATE V3 ============
 
 /**
@@ -306,6 +333,33 @@ export interface ActionTemplateV3 {
   description: string
   cfoRationale: string           // Neden bu aksiyonu önerdik?
   bankerPerspective: string      // Banka bunu nasıl değerlendirir?
+
+  /**
+   * Opsiyonel rasyo-tabanlı tutar override.
+   * Tanımlanırsa engine bu fonksiyonu çağırarak aksiyon tutarını üretir.
+   * null dönerse engine eski yüzde mantığına fallback yapar.
+   * Henüz hiçbir aksiyonda kullanılmıyor — Faz 4'te A05 pilotunda devreye girer.
+   */
+  computeAmount?: (ctx: FirmContext) => number | null
+
+  /**
+   * Opsiyonel TCMB benchmark hedef metadata.
+   * UI transparency bloğunda "Hedef rasyo X gün, kaynak Y" gösterimi için.
+   */
+  targetRatio?: {
+    /** İnsan-okunur metrik adı: 'DSO', 'DIO', 'GROSS_MARGIN' */
+    metric: string
+    /** benchmarks.ts SectorBenchmark içindeki alan adı */
+    benchmarkField: keyof SectorBenchmark
+    /** Hangi gelir/aktif kalemine oranlanacak */
+    basis: 'netSales' | 'cogs' | 'totalAssets'
+    /** TCMB hedef gün sayısı */
+    targetDays?: number
+    /** Benchmark bulunamazsa kullanılacak default */
+    fallback?: number
+    /** Veri güvenilirliği */
+    reliability?: 'TCMB_DIRECT' | 'FINRATE_ESTIMATE'
+  }
 }
 
 /**
