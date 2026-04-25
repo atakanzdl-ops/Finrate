@@ -915,7 +915,7 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   cfoRationale:
     'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı net kâr üzerinde doğrudan olumlu etki yaratabilir ve yinelenen (operasyonel) kâr kalitesini güçlendirir.',
   bankerPerspective:
-    'En güçlü operasyonel dönüşüm sinyallerinden biridir. Sürdürülebilir marj artışı FAVÖK (faiz, vergi ve amortisman öncesi kâr) büyümesine doğrudan yansır ve yinelenen kâr kalitesini güçlendirir. Tek seferlik maliyet avantajlarının aksine yapısal iyileşmeler kalıcı etki yaratır.',
+    'En güçlü operasyonel dönüşüm sinyallerinden biridir. Sürdürülebilir marj artışı FAVÖK (faiz, vergi ve amortisman öncesi kâr) büyümesine yansıyabilir ve yinelenen kâr kalitesini güçlendirebilir. Tek seferlik maliyet avantajlarının aksine yapısal iyileşmeler kalıcı etki yaratabilir.',
 }
 
 // ── A13 ──────────────────────────────────────────────────────────────────────
@@ -1342,7 +1342,7 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   cfoRationale:
     'Güçlü büyüme kaynaklarından biridir. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşebilir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
   bankerPerspective:
-    'Satış büyümesi yinelenen gelir tabanını güçlendirir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
+    'Satış büyümesi yinelenen gelir tabanını güçlendirebilir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşebilir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
 }
 
 // ── A19 ──────────────────────────────────────────────────────────────────────
@@ -1477,7 +1477,7 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   cfoRationale:
     'İnşaat şirketlerinde YYİ hesabı birikmiş inşaat maliyetlerini temsil eder. Proje tamamlanma oranına göre hakediş kesilip tahsil edilmesi nakit akışını ve aktif kalitesini anlamlı ölçüde iyileştirebilir.',
   bankerPerspective:
-    'YYİ hakediş tahsilatı inşaat şirketleri için güçlü nakit dönüşüm araçlarından biridir. "Muhasebe gerçeği" ile "nakit gerçeği" arasındaki mesafe burada kapanır: proje ilerlemesi nakde kavuşur. Proje riski ve işveren ödeme güvenilirliği aksiyonun kalitesini belirleyen temel unsurlardır.',
+    'YYİ hakediş tahsilatı inşaat şirketleri için güçlü nakit dönüşüm araçlarından biridir. "Muhasebe gerçeği" ile "nakit gerçeği" arasındaki mesafenin kapanmasına yardımcı olur: proje ilerlemesi nakde kavuşabilir. Proje riski ve işveren ödeme güvenilirliği aksiyonun kalitesini belirleyen temel unsurlardır.',
 }
 
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────

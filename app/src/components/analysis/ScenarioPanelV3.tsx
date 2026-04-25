@@ -50,6 +50,7 @@ import {
   GitCompare,
 } from 'lucide-react'
 import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
+import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -986,7 +987,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           <div>
             <div className="text-xs text-[#64748B] uppercase tracking-wide">Mevcut Not</div>
             <div className="text-2xl font-bold text-[#1E293B] mt-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              {currentGrade}
+              {normalizeLegacyRating(currentGrade)}
             </div>
           </div>
           <div className="text-right">

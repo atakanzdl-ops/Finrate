@@ -882,7 +882,16 @@ function buildConsultantNarrative(
   const shownStructuralIds = new Set<string>()
 
   if (drivers && drivers.structural.length > 0) {
-    const structuralLabels = drivers.structural
+    // Önce unique (sırayı koruyarak), sonra slice(0,3) — üçüncü benzersiz aksiyon kaybolmasın
+    const uniqueInSection = new Set<string>()
+    const deduped: string[] = []
+    for (const id of drivers.structural) {
+      if (!uniqueInSection.has(id)) {
+        uniqueInSection.add(id)
+        deduped.push(id)
+      }
+    }
+    const structuralLabels = deduped
       .slice(0, 3)
       .filter(id => {
         if (shownStructuralIds.has(id)) return false
