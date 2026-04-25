@@ -152,9 +152,9 @@ const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
   description:
     'Kısa vadeli finansal borcun (300-304) banka refinansmanı ile uzun vadeli (400-404) olarak yeniden yapılandırılması. Cari oranı iyileştirir ancak nakit yaratmaz.',
   cfoRationale:
-    'Acil likidite baskısını azaltmak için banka ile refinansman anlaşması yapılır. KV faiz yükü kısmen azalabilir, vade profilini dengeler.',
+    'Acil likidite baskısını hafifletmek amacıyla finansal kuruluşlarla refinansman müzakeresi başlatılabilir. KV faiz yükü kısmen azalabilir; vade profili dengeli bir yapıya kavuşabilir.',
   bankerPerspective:
-    'Bankacı açısından sınırlı değer: gerçek bir ekonomik iyileşme değil, yalnızca vade uzatma. Asıl sorunun (operasyonel nakit üretimi) çözümü değildir. Kreditörlerin mutabakatı zorunludur.',
+    'Yalnızca vade profili değişir; toplam borç tutarı azalmaz. Bu aksiyon likidite baskısını geçici olarak hafifletebildiğinden, operasyonel nakit üretimini güçlendiren aksiyonlarla birlikte uygulandığında daha kalıcı etki yaratabilir. Mevcut finansal kuruluşların mutabakatı süreci belirler.',
 }
 
 // ── A02 ──────────────────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ const A02_TRADE_PAYABLE_TO_LT: ActionTemplateV3 = {
   cfoRationale:
     'Tedarikçilerle vade uzatma anlaşması KV baskısını azaltır. Tedarikçi ilişkileri güçlüyse düşük maliyetle uygulanabilir.',
   bankerPerspective:
-    'Geçici önlem olarak değerlendirilir. Tedarikçi ilişkilerinde bozulma riski ve tedarik sürekliliği sorgulanır. KV/UV dönüşüm oranı izlenir.',
+    'Geçici bir likidite müdahalesidir; kalıcı finansal güçlenme anlamına gelmez. Tedarikçi ilişkilerinin sağlıklı tutulması hem vade uzatmanın sürdürülebilirliğini hem de tedarik sürekliliğini doğrudan etkiler. KV/UV dönüşüm oranı düzenli olarak izlenmelidir.',
 }
 
 // ── A03 ──────────────────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ const A03_ADVANCE_TO_LT: ActionTemplateV3 = {
   cfoRationale:
     'Proje teslim süreleri 12 ayı aşıyorsa UV sınıflandırma cari oranı iyileştirir ve gerçeği yansıtır.',
   bankerPerspective:
-    'En zayıf ekonomik içerikli aksiyon. Gerçek bir güçlenme yoktur; sadece sınıf değişikliği yapılmıştır. Müşteri teslim beklentisi karşılanmazsa otomatik olarak tersine döner.',
+    'Ekonomik içerik sınırlıdır; bilanço içi sınıf değişikliği gerçek bir finansal güçlenme yaratmaz. Teslim takviminin gerçekçi biçimde belirlenmesi, sınıflandırmanın muhasebe doğruluğunu koruması açısından kritiktir.',
 }
 
 // ── A04 ──────────────────────────────────────────────────────────────────────
@@ -363,7 +363,7 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
   cfoRationale:
     'Fazla nakit varsa KV borcu kapatmak faiz yükünü azaltır, borçluluk oranını düşürür ve net borç pozisyonunu iyileştirir.',
   bankerPerspective:
-    'Nakit karşılığı borç kapatmayı bankacılar olumlu değerlendirir. Aktif–pasif her ikisi birlikte azalır; yeni bir finansman değil, disiplinli bilanço yönetimi sinyali.',
+    'Aktif ve pasif aynı anda azalır; bu yapı yeni bir finansman değil, disiplinli bilanço yönetiminin somut göstergesidir. Faiz yükü düşer, net borç pozisyonu iyileşir. Fazla nakdin borç ödemesinde kullanılması özkaynak/borç dengesini güçlü biçimde iyileştirebilir.',
 }
 
 // ── A05 ──────────────────────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
   cfoRationale:
     'Vadesi geçmiş alacaklar önceliklendirilir, iskonto programı veya tahsilat ekibi güçlendirilerek nakit döngüsü kısaltılır.',
   bankerPerspective:
-    'Gerçek nakit yaratır. DSO iyileşmesi operasyonel disiplinin göstergesidir. Rating analizinde alacak kalitesi (gecikme profili) de incelenir.',
+    'Gerçek nakit yaratır. Alacak tahsil süresi (DSO) kısaldıkça işletme sermayesi döngüsü hızlanır ve finansal esneklik artar. Alacak kalitesi — özellikle gecikme profili — bu aksiyonun sürdürülebilirlik boyutunu belirleyen kilit göstergedir.',
 }
 
 // ── A06 ──────────────────────────────────────────────────────────────────────
@@ -504,7 +504,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   cfoRationale:
     'Şişkin stok pozisyonu (özellikle imalat/ticaret) hem dönen varlık kalitesini hem nakit akışını bozar. Stok devir hızı aktif verimliliğinin temel göstergesidir.',
   bankerPerspective:
-    'Gerçek nakit yaratır ve işletme sermayesi yönetiminin iyileştiğini gösterir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire/eskime riski) incelenir.',
+    'Fazla stoku nakde çevirmek hem işletme sermayesini serbest bırakır hem de stok devir süresi (DIO) üzerinde ölçülebilir iyileşme sağlayabilir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire, eskime riski) aksiyonun gerçek etkisini doğrudan belirler.',
 }
 
 // ── A07 ──────────────────────────────────────────────────────────────────────
@@ -570,7 +570,7 @@ const A07_PREPAID_RELEASE: ActionTemplateV3 = {
   cfoRationale:
     'Aşırı peşin ödenmiş giderler çalışma sermayesini bağlar. Optimize edilmiş gider yönetimi nakit akışını iyileştirir.',
   bankerPerspective:
-    'Sınırlı etki; tutarlar genellikle küçüktür. Operasyonel disiplinin göstergesi olarak olumlu, ancak rating üzerinde düşük marjinal etki.',
+    'Bireysel etkisi sınırlı olabilir; ancak gider yönetimi disiplininin göstergesi olarak portföy içindeki değerini korur. Özellikle hizmet ve bilişim sektörlerinde çalışma sermayesi optimizasyonuna anlamlı katkı sağlayabilir.',
 }
 
 // ── A08 ──────────────────────────────────────────────────────────────────────
@@ -637,7 +637,7 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   cfoRationale:
     'Atıl varlıklar hem bakım maliyeti yaratır hem de sermayeyi bağlar. Satış nakit sağlar ve aktif verimliliğini (ROA) artırır.',
   bankerPerspective:
-    'Tek seferlik nakit giriş; tekrar edemez. Satış fiyatı net defter değerinin altındaysa zarar oluşur. Bilanço temizliği açısından olumlu sinyal.',
+    'Tek seferlik nakit girişi sağlar; yinelenebilir bir kaynak değildir. Satış bedelinin net defter değerinin altında kalması dönem kârını olumsuz etkileyebilir. Atıl aktifin elden çıkarılması aktif verimliliğini (ROA) güçlendirir ve bilanço kompozisyonunu sadeleştirir.',
 }
 
 // ── A09 ──────────────────────────────────────────────────────────────────────
@@ -706,7 +706,7 @@ const A09_SALE_LEASEBACK: ActionTemplateV3 = {
   cfoRationale:
     'Kısa vadeli nakit ihtiyacını karşılar ve bilanço varlık ağırlığını azaltır. Ancak uzun vadeli kira yükümlülüğü borç yükü yaratır.',
   bankerPerspective:
-    'Sat-geri kiralama bankacılar tarafından şüpheyle değerlendirilir: gerçek güçlenme değil, gelecek nakit akışlarını peşin alma. Kira yükümlülüğü yeni bir leverage kaynağıdır.',
+    'Anlık nakit ihtiyacını karşılar; ancak bu yapı özünde gelecek nakit akışlarının peşin değere dönüştürülmesidir. Doğan kira yükümlülüğü bilanço kaldıracını yeniden artırabileceğinden, uzun vadeli maliyet-fayda dengesi dikkatle analiz edilmelidir.',
 }
 
 // ── A10 ──────────────────────────────────────────────────────────────────────
@@ -771,7 +771,7 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
   cfoRationale:
     'Nakit sermaye artırımı likidite, özkaynak oranı ve borçluluk rasyolarını eş zamanlı iyileştiren tek aksiyondur. Kalite katsayısı 1.00 ancak tutar anlamlı düzeyde olmalı.',
   bankerPerspective:
-    'Kredi komitesi en güçlü sinyal olarak değerlendirir. Ortakların şirkete inanması ve nakit koymaya istekli olması güven göstergesidir. Ancak küçük tutarlı sermaye artışı (örn. 24M TL / 407M aktif) tek başına CCC→BB sıçramasını haklı kılmaz; diğer aksiyonlarla desteklenmeli.',
+    'Ortakların şirkete doğrudan nakit koyması taahhüt ve güven açısından güçlü bir sinyal taşır. Tutarın toplam aktife oranı kritik bir değişkendir: görece küçük bir sermaye enjeksiyonu tek başına çok kategorili bir iyileşmeyi desteklemeyebilir; operasyonel aksiyonlarla birlikte uygulandığında çarpan etkisi ortaya çıkabilir.',
 }
 
 // ── A11 ──────────────────────────────────────────────────────────────────────
@@ -842,7 +842,7 @@ const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
   cfoRationale:
     'Kâr dağıtımı yapmamak özkaynağı büyütür ve özkaynak oranını organik olarak iyileştirir. Ortakların kısa vadeli getiri beklentisini ertelemesi gerekir.',
   bankerPerspective:
-    'Kâr tutma disiplinini bankacılar olumlu değerlendirir. Kâr kalitesi (recurring vs olağandışı) kritik: 69M TL olağandışı gelirden gelen kâr tutmak zayıf sinyal.',
+    'Kâr tutma disiplini özkaynak yapısını organik olarak güçlendirir. Kâr kalitesi bu aksiyonun etkinliğini doğrudan belirler: yinelenen operasyonel faaliyetlerden gelen kâr, olağandışı gelirlerden gelen kâra kıyasla çok daha sağlam bir özkaynak tabanı oluşturur.',
 }
 
 // ── A12 ──────────────────────────────────────────────────────────────────────
@@ -913,9 +913,9 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   description:
     'Satış fiyatı optimizasyonu veya üretim/hammadde maliyeti düşüşünden kaynaklanan brüt kâr marjı iyileştirmesi. Not: Modeled entry — marj iyileşmesinin net dönem kârına etkisi temsil edilir.',
   cfoRationale:
-    'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı doğrudan net kâra yansır ve kaliteli (recurring) kâr yaratır.',
+    'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı doğrudan net kâra yansır ve yinelenen (operasyonel) kâr kalitesini güçlendirir.',
   bankerPerspective:
-    'En güçlü operasyonel sinyal. Bankacı sürdürülebilir marj artışını EBITDA büyümesi olarak okur. Geçici spot maliyet düşüşü değil, yapısal iyileşme görmek ister.',
+    'En güçlü operasyonel dönüşüm sinyallerinden biridir. Sürdürülebilir marj artışı FAVÖK (faiz, vergi ve amortisman öncesi kâr) büyümesine doğrudan yansır ve yinelenen kâr kalitesini güçlendirir. Tek seferlik maliyet avantajlarının aksine yapısal iyileşmeler kalıcı etki yaratır.',
 }
 
 // ── A13 ──────────────────────────────────────────────────────────────────────
@@ -984,9 +984,9 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
   description:
     'Genel yönetim, pazarlama ve diğer faaliyet giderlerinin optimize edilmesi. Not: Modeled OPEX reduction entry — gider azalışının net kâra etkisi temsil edilmektedir.',
   cfoRationale:
-    'İşletme giderlerinde verimlilik artırımı (personel, kira, idari giderler). Yapısal tasarruf programları EBITDA marjını kalıcı olarak iyileştirir.',
+    'İşletme giderlerinde verimlilik artırımı (personel, kira, idari giderler). Yapısal tasarruf programları FAVÖK marjını kalıcı olarak iyileştirebilir.',
   bankerPerspective:
-    'Kalıcı yapısal tasarruf olumlu değerlendirilir. Geçici kısıntı veya yatırım ertelemesinden kaynaklanan tasarruf düşük kaliteli sinyal. EBITDA büyümesi mi, yoksa yatırım dondurma mı? Sorusu sorulur.',
+    'Yapısal tasarruf programları FAVÖK marjını kalıcı biçimde güçlendirebilir. Geçici kısıntı veya yatırım ertelemesinden kaynaklanan tasarrufu organik verimlilik artışından ayırt etmek kritiktir; yatırım dondurmak kısa vadeli kâr yaratırken uzun vadeli büyüme kapasitesini zayıflatabilir.',
 }
 
 // ── A14 ──────────────────────────────────────────────────────────────────────
@@ -1052,7 +1052,7 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   cfoRationale:
     'Faiz maliyetini azaltmak doğrudan net kârı artırır. Refinansman veya borç azaltma yoluyla sağlanabilir.',
   bankerPerspective:
-    'Faiz karşılama oranı bankacı için kritik. Finansman gideri düşerse hem kârlılık hem kaldıraç rasyoları iyileşir. Refinansman olanakları ve piyasa faiz ortamı değerlendirilir.',
+    'Faiz karşılama oranı finansal sağlığın temel göstergelerinden biridir. Finansman giderinin düşürülmesi hem kârlılığı hem kaldıraç rasyolarını eş zamanlı güçlendirebilir. Refinansman olanakları ve mevcut piyasa faiz ortamı aksiyonun uygulanabilirliğini belirler.',
 }
 
 // ── A15 ──────────────────────────────────────────────────────────────────────
@@ -1118,7 +1118,7 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   cfoRationale:
     'Ortak borçları yüksek şirketlerde en hızlı ve düşük maliyetli özkaynak artış yöntemi. Nakit gerektirmez, yalnızca ortakların kararı yeterlidir.',
   bankerPerspective:
-    'Nakit gelmez, pasif içi sınıf değişimi. Bankacı "para dışarı çıkmışken içeri mi gelmiş gibi gösteriliyor?" sorusunu sorar. Yine de borç/özkaynak oranını iyileştirir. Yüksek kaliteli nakit sermaye artışından sonra değerlendirilmeli.',
+    'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
 }
 
 // ── A16 ──────────────────────────────────────────────────────────────────────
@@ -1195,7 +1195,7 @@ const A16_CASH_BUFFER_BUILD: ActionTemplateV3 = {
   cfoRationale:
     'Tek başına rating driver değildir. Likidite tamponunun yeterliliğini sinyal eder. Diğer aksiyonlar yeterli nakit yarattığında nakit oranı iyileşir.',
   bankerPerspective:
-    'Bu aksiyon bağımsız değil, diğer gerçek nakit üreten aksiyonların doğal çıktısıdır. Bankacı nakit tamponunu ayrı bir aksiyon olarak değil, portföyün sonucu olarak değerlendirir.',
+    'Bu aksiyon bağımsız uygulanamaz; gerçek nakit üreten aksiyonların birikimli çıktısıdır. Nakit tamponu portföy düzeyinde değerlendirilmelidir: alacak tahsilatı, stok nakde çevirme ve sermaye enjeksiyonu gibi aksiyonlar yeterli nakit yarattığında likidite tamponu doğal biçimde güçlenir.',
 }
 
 // ── A17 ──────────────────────────────────────────────────────────────────────
@@ -1267,7 +1267,7 @@ const A17_KKEG_CLEANUP: ActionTemplateV3 = {
   cfoRationale:
     'Yüksek KKEG oranı vergi planlamasının zayıflığını gösterir. KKEG temizliği efektif vergi yükünü azaltır ve gerçek kâr kalitesini artırır.',
   bankerPerspective:
-    'KKEG/gelir oranı incelenir. Yüksek KKEG, gerçek kârı olduğundan düşük göstermenin ve vergi kalitesizliğinin sinyali. Temizlik vergi kalitesini artırır ancak anlık nakit etkisi yoktur.',
+    'KKEG/gelir oranı kâr kalitesinin güvenilir bir göstergesidir. Yüksek KKEG yükü efektif vergi oranını artırır ve gerçek kârı olduğundan düşük gösterebilir. Temizlik çalışması vergi kalitesini ve raporlanan kârın güvenilirliğini güçlendirir; anlık nakit etkisi olmasa da özkaynak kalitesine katkı sağlayabilir.',
 }
 
 // ── A18 ──────────────────────────────────────────────────────────────────────
@@ -1340,9 +1340,9 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   description:
     'Şirketin net satış gelirini artırması. Hizmet/bilişim sektöründe nakit (102), imalat/ticaret/inşaat sektöründe alacak (120) bazlı modellenir.',
   cfoRationale:
-    'En kaliteli büyüme kaynağı. Hacim artışı + fiyat gücü kombinasyonuyla tüm rasyolar organik olarak iyileşir. DEKAM gibi düşük satışlı firmalarda (16.8M satış / 407M aktif → aktif devir hızı 0.04) öncelikli hedef.',
+    'En kaliteli büyüme kaynağı. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
   bankerPerspective:
-    'Bankacı satış büyümesini en çok sever: recurring gelir, aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik iyileşir. "Bu büyüme sürdürülebilir mi, nasıl finanse ediliyor?" sorusu sorulur.',
+    'Satış büyümesi yinelenen gelir tabanını güçlendirir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
 }
 
 // ── A19 ──────────────────────────────────────────────────────────────────────
@@ -1408,7 +1408,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   cfoRationale:
     'Avans → hasılat dönüşümü üretim/teslimat hızlanmasıyla sağlanır. Proje portföyünü aktifleştirir ve gelir tablosunu güçlendirir.',
   bankerPerspective:
-    'Avans dönüşümü iş hacminin gerçekleştiğinin kanıtı. Ancak çok hızlı hasılat tanıma (teslim olmadan) ihtiyatlı karşılanır. Teslim belgesi ve müşteri kabulü kritik.',
+    'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
 }
 
 // ── A20 ──────────────────────────────────────────────────────────────────────
@@ -1477,7 +1477,7 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   cfoRationale:
     'İnşaat şirketlerinde YYİ hesabı birikmiş inşaat maliyetlerini temsil eder. Proje tamamlanma oranına göre hakediş kesilip tahsil edilmesi nakit akışını ve aktif kalitesini ciddi ölçüde iyileştirir.',
   bankerPerspective:
-    'Bankacı YYİ hakediş tahsilatını güçlü nakit sinyali olarak okur. İnşaat sektöründe "muhasebe gerçeği" ile "nakit gerçeği" arasındaki fark burada kapanır. Proje riski ve işveren kreditörlüğü incelenir.',
+    'YYİ hakediş tahsilatı inşaat şirketleri için güçlü nakit dönüşüm araçlarından biridir. "Muhasebe gerçeği" ile "nakit gerçeği" arasındaki mesafe burada kapanır: proje ilerlemesi nakde kavuşur. Proje riski ve işveren ödeme güvenilirliği aksiyonun kalitesini belirleyen temel unsurlardır.',
 }
 
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────
