@@ -2,12 +2,116 @@
  * SCENARIO ENGINE V3 — Ratio Helpers
  *
  * computeAmount altyapısı için yardımcı fonksiyonlar.
- * Hiçbir aksiyonda henüz kullanılmıyor — Parça 4'te A05 pilotunda devreye girer.
  */
 
-import type { FirmContext } from './contracts'
+import type { FirmContext, ActionTemplateV3, RatioTransparency, AttributionSource } from './contracts'
 import { getSectorBenchmark } from '../benchmarks'
 import type { SectorBenchmark } from '../benchmarks'
+
+// ─── buildRatioTransparency ──────────────────────────────────────────────────
+
+/**
+ * UI transparency bloku için metadata üretir.
+ * Backend source of truth — UI sadece render eder.
+ *
+ * INTENTIONALLY GENERIC: Şu an A05 için. A06 (DIO), A12 (marj),
+ * A14 (finansman gideri) vb. aksiyonlar aynı pipeline'a bağlanacak.
+ * getCurrentBalanceForAction switch'i genişletilerek eklenir.
+ */
+export function buildRatioTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  capped: number
+): RatioTransparency | null {
+  if (!action.targetRatio) return null
+
+  const tr = action.targetRatio
+  const benchmark = getBenchmarkValue(ctx.sector, tr.benchmarkField)
+  const targetDays = benchmark?.value ?? tr.fallback ?? 90
+
+  const period = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+  const periodDays = period.days
+
+  const basisValue = getBasisValueForTransparency(ctx, tr.basis)
+  if (!basisValue || basisValue <= 0) return null
+
+  const currentBalance = getCurrentBalanceForAction(action, ctx)
+  if (currentBalance <= 0) return null
+
+  const sectorMedian = (basisValue * targetDays) / periodDays
+
+  // Math.max ile sıfıra clamp — realisticTarget asla negatif olmaz
+  const realisticTarget = Math.max(currentBalance - capped, 0)
+
+  const sourceType: AttributionSource = !benchmark
+    ? 'FALLBACK'
+    : (benchmark.reliability as AttributionSource)
+
+  return {
+    currentBalance,
+    realisticTarget,
+    sectorMedian,
+    capPercent: 0.25,
+    formula: {
+      targetLabel: getTargetLabelForAction(action, tr),
+      basisLabel: getBasisLabel(tr.basis),
+      basisValue,
+      targetDays,
+      periodDays,
+    },
+    attribution: {
+      sourceType,
+      sectorLabel: getSectorLabel(ctx.sector),
+      year: 2024,
+    },
+    method: 'period-end-balance',
+  }
+}
+
+function getBasisValueForTransparency(
+  ctx: FirmContext,
+  basis: 'netSales' | 'cogs' | 'totalAssets'
+): number | null {
+  if (basis === 'netSales') return (ctx as any).netSales ?? ctx.totalRevenue ?? null
+  if (basis === 'cogs') return getCogs(ctx)
+  if (basis === 'totalAssets') return ctx.totalAssets ?? null
+  return null
+}
+
+function getBasisLabel(basis: 'netSales' | 'cogs' | 'totalAssets'): string {
+  if (basis === 'netSales') return 'Net Satış'
+  if (basis === 'cogs') return 'Satılan Mal Maliyeti'
+  if (basis === 'totalAssets') return 'Toplam Aktif'
+  return basis
+}
+
+function getSectorLabel(sector: string): string {
+  const label = (SECTOR_CODE_TO_TR as Record<string, string>)[sector] ?? 'Genel'
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function getTargetLabelForAction(
+  action: ActionTemplateV3,
+  tr: NonNullable<ActionTemplateV3['targetRatio']>
+): string {
+  const id = action.id
+  if (id.includes('A05') || tr.metric === 'DSO') return 'Hedef Alacak'
+  if (tr.metric === 'DIO') return 'Hedef Stok'
+  if (tr.metric === 'GROSS_MARGIN') return 'Hedef Brüt Kâr'
+  return 'Hedef Tutar'
+}
+
+/**
+ * Aksiyon için "current balance" çeker.
+ * INTENTIONALLY GENERIC — A06/A12 için switch genişletilecek.
+ */
+function getCurrentBalanceForAction(action: ActionTemplateV3, ctx: FirmContext): number {
+  const id = action.id
+  if (id.includes('A05')) {
+    return (ctx.accountBalances?.['120'] ?? 0) + (ctx.accountBalances?.['121'] ?? 0)
+  }
+  return 0
+}
 
 // ─── getCogs ────────────────────────────────────────────────────────────────
 

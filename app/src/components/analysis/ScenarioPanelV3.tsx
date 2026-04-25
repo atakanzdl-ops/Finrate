@@ -51,6 +51,7 @@ import {
 } from 'lucide-react'
 import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
 import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
+import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -609,6 +610,11 @@ function AksiyonPlaniTab({
                       </div>
                       )
                     })()}
+
+                    {/* RatioTransparencyBlock — sadece computeAmount aktif aksiyonlarda */}
+                    {action.ratioTransparency != null && (
+                      <RatioTransparencyBlock data={action.ratioTransparency} />
+                    )}
 
                     {/* Banker Perspective */}
                     {action.bankerPerspective && (

@@ -13,6 +13,36 @@
 
 import type { SectorBenchmark } from '../benchmarks'
 
+// ============ RATIO TRANSPARENCY ============
+
+export type AttributionSource =
+  | 'TCMB_DIRECT'
+  | 'FINRATE_ESTIMATE'
+  | 'FALLBACK'
+
+export interface RatioTransparency {
+  currentBalance: number
+  realisticTarget: number      // Math.max(currentBalance - capped, 0)
+  sectorMedian: number
+  capPercent: number
+
+  formula: {
+    targetLabel: string         // 'Hedef Alacak'
+    basisLabel: string          // 'Net Satış'
+    basisValue: number
+    targetDays: number
+    periodDays: number
+  }
+
+  attribution: {
+    sourceType: AttributionSource
+    sectorLabel: string         // 'İnşaat'
+    year: number
+  }
+
+  method: 'period-end-balance'
+}
+
 // ============ TEMEL TANIMLAR ============
 
 export type SectorCode =

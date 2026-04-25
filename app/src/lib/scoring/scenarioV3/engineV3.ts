@@ -63,6 +63,8 @@ import {
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 
+import { buildRatioTransparency } from './ratioHelpers'
+
 import {
   applyTransactions,
 } from './ledgerEngine'
@@ -167,6 +169,9 @@ export interface SelectedAction {
   diversityPenaltyApplied:    number
 
   narrative:                  string
+
+  /** UI transparency bloku — sadece computeAmount aktif aksiyonlarda dolu */
+  ratioTransparency?:         import('./contracts').RatioTransparency
 }
 
 export interface HorizonPortfolio {
@@ -294,8 +299,9 @@ interface FirmContext {
 }
 
 interface AmountCandidate {
-  amountTRY: number
-  label:     'min' | 'typical' | 'aggressive' | 'maxRealistic'
+  amountTRY:          number
+  label:              'min' | 'typical' | 'aggressive' | 'maxRealistic' | 'rasyo-hedef'
+  ratioTransparency?: import('./contracts').RatioTransparency
 }
 
 interface ScoreBreakdown {
@@ -533,7 +539,12 @@ function calculateAmountCandidates(
       if (v !== null && v > 0) {
         // Materiality bypass: computeAmount aktif aksiyonlarda
         // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
-        return [{ amountTRY: v, label: 'rasyo-hedef' as unknown as AmountCandidate['label'] }]
+        const transparency = buildRatioTransparency(action, context, v)
+        return [{
+          amountTRY: v,
+          label: 'rasyo-hedef',
+          ratioTransparency: transparency ?? undefined,
+        }]
       }
     }
   }
@@ -1049,6 +1060,7 @@ function runGreedySelection(
       repeatDecayApplied:         selectedCandidate.breakdown.repeatDecay,
       diversityPenaltyApplied:    selectedCandidate.breakdown.diversityPenalty,
       narrative: `${selectedCandidate.action.name}: ${selectedCandidate.breakdown.breakdown}`,
+      ratioTransparency:          selectedCandidate.amountCandidate.ratioTransparency,
     }
 
     selected.push(sa)

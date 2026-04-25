@@ -103,6 +103,8 @@ export interface ActionPlanRow {
   cfoRationale: string
   /** Banker perspective (action template'den) */
   bankerPerspective: string
+  /** UI transparency bloku — sadece computeAmount aktif aksiyonlarda dolu */
+  ratioTransparency?: import('./contracts').RatioTransparency
 }
 
 // ─── NOTCH PLAN ──────────────────────────────────────────────────────────────
@@ -435,6 +437,7 @@ function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
       accountingEffect:         txDesc,
       cfoRationale:             template?.cfoRationale ?? action.narrative,
       bankerPerspective:        template?.bankerPerspective ?? '',
+      ratioTransparency:        action.ratioTransparency,
     })
   })
 
