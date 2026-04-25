@@ -1271,7 +1271,7 @@ function assessFeasibility(
     return {
       requestedTarget, achievableTarget,
       isFeasible: true,
-      reason:     'Istenen hedef rating ulasilabilir',
+      reason:     'İstenen hedef rating ulaşılabilir',
       requirements: [],
     }
   }
@@ -1282,15 +1282,15 @@ function assessFeasibility(
   const bc = bindingCeiling as { source?: string; maxRating?: string } | null
   if (bc?.source && bc?.maxRating) {
     requirements.push(
-      `${bc.source} ceiling ${bc.maxRating} seviyesinde - ` +
-      `bu tavani asmak icin ${bc.source.toLowerCase()} radikal iyilestirilmeli`
+      `${bc.source} tavanı ${bc.maxRating} seviyesinde — ` +
+      `bu tavanı aşmak için ${bc.source.toLowerCase()} köklü biçimde iyileştirilmeli`
     )
   }
 
   if (productivity.productivityScore < 0.30) {
     requirements.push(
-      'Aktif uretkenligi %30 altinda - ' +
-      'satis artisi, stok erime, duran varlik elden cikarma zorunlu'
+      'Aktif verimliliği %30 altında — ' +
+      'satış artışı, stok nakde dönüşüm ve atıl duran varlıkların elden çıkarılması önceliklendirilmeli'
     )
   }
 
@@ -1298,8 +1298,8 @@ function assessFeasibility(
     requestedTarget, achievableTarget,
     isFeasible: false,
     reason:
-      `Istenen hedef ${gap} kademe uzakta. ` +
-      `Mevcut bilanco ve operasyonel yapi bu kademede ulasilabilir degil.`,
+      `İstenen hedef ${gap} kategori uzakta. ` +
+      `Mevcut bilanço ve operasyonel yapıyla bu kategoriye ulaşmak mümkün görünmüyor.`,
     requirements,
   }
 }

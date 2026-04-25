@@ -190,21 +190,21 @@ export function calculateProductivityCeiling(
 
   if (score < 0.20 && criticalCount >= 1) {
     maxRating = 'B'
-    reason    = 'Aktif uretkenligi kritik seviyede - rating tavani B olarak sinirlanmistir'
-    evidence.push(`Productivity score: ${(score * 100).toFixed(0)}% (kritik esik: 20%)`)
+    reason    = 'Aktif verimliliği kritik seviyede — rating tavanı B olarak sınırlandırılmıştır'
+    evidence.push(`Productivity score: ${(score * 100).toFixed(0)}% (kritik eşik: 20%)`)
     evidence.push(`${criticalCount} CRITICAL aktif kilitlenmesi tespit edildi`)
   } else if (score < 0.30 || severeCount >= 2) {
     maxRating = 'B'
-    reason    = 'Aktif uretkenligi zayif - rating tavani B'
+    reason    = 'Aktif verimliliği zayıf — rating tavanı B'
     evidence.push(`Productivity score: ${(score * 100).toFixed(0)}%`)
     if (severeCount >= 2) evidence.push(`${severeCount} SEVERE aktif kilitlenmesi`)
   } else if (score < 0.50) {
     maxRating = 'BB'
-    reason    = 'Aktif uretkenligi orta-alti - rating tavani BB'
+    reason    = 'Aktif verimliliği orta seviyenin altında — rating tavanı BB'
     evidence.push(`Productivity score: ${(score * 100).toFixed(0)}%`)
   } else if (score < 0.70) {
     maxRating = 'BBB'
-    reason    = 'Aktif uretkenligi orta - rating tavani BBB'
+    reason    = 'Aktif verimliliği orta düzeyde — rating tavanı BBB'
     evidence.push(`Productivity score: ${(score * 100).toFixed(0)}%`)
   } else {
     return null  // ceiling yok
@@ -240,7 +240,7 @@ export function extractSustainabilityCeiling(
   return {
     source:    'SUSTAINABILITY',
     maxRating: c.maxAchievableRating as RatingGrade,
-    reason:    'Gelir kalitesi / sustainability zayif - rating tavani uygulandi',
+    reason:    'Sürdürülebilir gelir kalitesi zayıf — rating tavanı uygulandı',
     evidence:  c.ceilingReasons ?? [],
   }
 }
@@ -446,7 +446,7 @@ export function buildRatingTransition(
       // Iki bagimsiz problem birlesimi
       confidenceModifier *= 0.40
       confidenceReasons.push(
-        'Portfoy cosmetic-agirlikli VE aktif uretkenligi zayif - iki bagimsiz risk'
+        'Portföy muhasebe ağırlıklı VE aktif verimliliği zayıf — iki bağımsız risk'
       )
     } else {
       confidenceModifier *= 0.70
@@ -745,7 +745,7 @@ export function buildDrivers(
     consumption.productivityWeakness !== 'CONSUMED_BY_CEILING'
   ) {
     negative.push(
-      `Aktif uretkenligi kritik (%${(productivity.productivityScore * 100).toFixed(0)})`
+      `Aktif verimliliği kritik (%${(productivity.productivityScore * 100).toFixed(0)})`
     )
   }
 
@@ -776,7 +776,7 @@ export function buildDrivers(
     consumption.sustainabilityWeakness !== 'CONSUMED_BY_CEILING'
   ) {
     negative.push(
-      `Sustainability zayif: ${sustainability.constraints.ceilingReasons[0] ?? 'gelir kalitesi dusuk'}`
+      `Sürdürülebilir gelir kalitesi zayıf: ${sustainability.constraints.ceilingReasons[0] ?? 'gelir kalitesi düşük'}`
     )
   }
 

@@ -613,7 +613,7 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
       CASH_GENERATION_GAP:  'STRONG',
     },
     affectedComponents: ['workingCapitalLock', 'assetConversion', 'salesEfficiency', 'cashSupport'],
-    productivityNote: 'YYİ monetization inşaat firmasında aktif kilitlenmesini doğrudan çözer',
+    productivityNote: 'YYİ hakediş tahsilatı inşaat firmasında aktif kilitlenmesini anlamlı ölçüde çözebilir',
   },
 }
 
@@ -796,7 +796,7 @@ export function buildProductivityNarrative(
   } else if (score < 0.5) {
     bankerSummary =
       `Aktif verimliliği zayıf. Portföyde operasyonel dönüşüm aksiyonları ` +
-      `(satış, stok erime, YYİ monetization) ağırlıklı olmalı.`
+      `(satış büyümesi, stok nakde dönüşüm, YYİ hakediş tahsilatı) ağırlıklı olmalı.`
   } else if (score < 0.7) {
     bankerSummary =
       `Aktif verimliliği orta. Kısmi iyileştirme mümkün, operasyonel büyüme ile desteklenmeli.`

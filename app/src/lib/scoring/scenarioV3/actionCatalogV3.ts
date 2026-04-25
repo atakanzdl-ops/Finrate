@@ -454,7 +454,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     return [
       makeBalancedTransaction(
         'A06_MAIN',
-        `Fazla stok nakde dönüşüyor — Simplified Monetization Model (${inventoryCode} → 102)`,
+        `Fazla stok nakde dönüşüyor — basitleştirilmiş nakde dönüşüm modeli (${inventoryCode} → 102)`,
         'INVENTORY_MONETIZATION',
         [
           { accountCode: '102',          accountName: 'Bankalar',     side: 'DEBIT',  amount, description: 'Stok satışından nakit girişi'        },
@@ -500,7 +500,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   },
 
   description:
-    'Fazla veya yavaş dönen stokların (150-153) satışı yoluyla nakde dönüştürülmesi. Not: Simplified monetization model — gerçek satışta gelir tablosu da etkilenir; V3 katalog aşamasında net stok→nakit etkisi modellenmektedir.',
+    'Fazla veya yavaş dönen stokların (150-153) satışı yoluyla nakde dönüştürülmesi. Not: Basitleştirilmiş nakde dönüşüm modeli — gerçek satışta gelir tablosu da etkilenir; V3 katalog aşamasında net stok→nakit etkisi modellenmektedir.',
   cfoRationale:
     'Şişkin stok pozisyonu (özellikle imalat/ticaret) hem dönen varlık kalitesini hem nakit akışını bozar. Stok devir hızı aktif verimliliğinin temel göstergesidir.',
   bankerPerspective:
@@ -769,7 +769,7 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
   description:
     'Mevcut veya yeni ortakların şirkete nakit sermaye koyması. En yüksek kaliteli finansman kaynağı — hem nakit hem özkaynak artar, tüm rasyolar iyileşir.',
   cfoRationale:
-    'Nakit sermaye artırımı likidite, özkaynak oranı ve borçluluk rasyolarını eş zamanlı iyileştiren tek aksiyondur. Kalite katsayısı 1.00 ancak tutar anlamlı düzeyde olmalı.',
+    'Nakit sermaye artırımı likidite, özkaynak oranı ve borçluluk rasyolarını eş zamanlı iyileştirebilecek önemli aksiyonlardan biridir. Kalite katsayısı 1.00 olmakla birlikte tutarın toplam aktife oranı belirleyicidir.',
   bankerPerspective:
     'Ortakların şirkete doğrudan nakit koyması taahhüt ve güven açısından güçlü bir sinyal taşır. Tutarın toplam aktife oranı kritik bir değişkendir: görece küçük bir sermaye enjeksiyonu tek başına çok kategorili bir iyileşmeyi desteklemeyebilir; operasyonel aksiyonlarla birlikte uygulandığında çarpan etkisi ortaya çıkabilir.',
 }
@@ -913,7 +913,7 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   description:
     'Satış fiyatı optimizasyonu veya üretim/hammadde maliyeti düşüşünden kaynaklanan brüt kâr marjı iyileştirmesi. Not: Modeled entry — marj iyileşmesinin net dönem kârına etkisi temsil edilir.',
   cfoRationale:
-    'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı doğrudan net kâra yansır ve yinelenen (operasyonel) kâr kalitesini güçlendirir.',
+    'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı net kâr üzerinde doğrudan olumlu etki yaratabilir ve yinelenen (operasyonel) kâr kalitesini güçlendirir.',
   bankerPerspective:
     'En güçlü operasyonel dönüşüm sinyallerinden biridir. Sürdürülebilir marj artışı FAVÖK (faiz, vergi ve amortisman öncesi kâr) büyümesine doğrudan yansır ve yinelenen kâr kalitesini güçlendirir. Tek seferlik maliyet avantajlarının aksine yapısal iyileşmeler kalıcı etki yaratır.',
 }
@@ -1050,7 +1050,7 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   description:
     'Mevcut kredi faiz oranlarının refinansman, borç ödeme veya faiz riski yönetimi ile düşürülmesi. Net kâr ve faiz karşılama oranı (EBIT/faiz gideri) iyileşir.',
   cfoRationale:
-    'Faiz maliyetini azaltmak doğrudan net kârı artırır. Refinansman veya borç azaltma yoluyla sağlanabilir.',
+    'Faiz maliyetinin azaltılması net kâr üzerinde olumlu etki yaratabilir. Refinansman veya borç azaltma yoluyla hayata geçirilebilir.',
   bankerPerspective:
     'Faiz karşılama oranı finansal sağlığın temel göstergelerinden biridir. Finansman giderinin düşürülmesi hem kârlılığı hem kaldıraç rasyolarını eş zamanlı güçlendirebilir. Refinansman olanakları ve mevcut piyasa faiz ortamı aksiyonun uygulanabilirliğini belirler.',
 }
@@ -1191,7 +1191,7 @@ const A16_CASH_BUFFER_BUILD: ActionTemplateV3 = {
   },
 
   description:
-    'TÜRETİLMİŞ AKSİYON: Bu aksiyon bağımsız olarak uygulanamaz. A05 (alacak tahsili), A06 (stok monetizasyon), A08 (varlık satışı) veya A10 (sermaye artırımı) gibi gerçek nakit yaratan aksiyonların birikimli etkisini temsil eder.',
+    'TÜRETİLMİŞ AKSİYON: Bu aksiyon bağımsız olarak uygulanamaz. A05 (alacak tahsili), A06 (stok nakde dönüşüm), A08 (varlık satışı) veya A10 (sermaye artırımı) gibi gerçek nakit yaratan aksiyonların birikimli etkisini temsil eder.',
   cfoRationale:
     'Tek başına rating driver değildir. Likidite tamponunun yeterliliğini sinyal eder. Diğer aksiyonlar yeterli nakit yarattığında nakit oranı iyileşir.',
   bankerPerspective:
@@ -1340,7 +1340,7 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   description:
     'Şirketin net satış gelirini artırması. Hizmet/bilişim sektöründe nakit (102), imalat/ticaret/inşaat sektöründe alacak (120) bazlı modellenir.',
   cfoRationale:
-    'En kaliteli büyüme kaynağı. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
+    'Güçlü büyüme kaynaklarından biridir. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşebilir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
   bankerPerspective:
     'Satış büyümesi yinelenen gelir tabanını güçlendirir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
 }
@@ -1414,7 +1414,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
 // ── A20 ──────────────────────────────────────────────────────────────────────
 const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   id: 'A20_YYI_MONETIZATION',
-  name: 'Yıllara Yaygın İnşaat Hakediş Tahsilatı (YYİ Monetizasyon)',
+  name: 'Yıllara Yaygın İnşaat Hakediş Tahsilatı',
   family: 'INDUSTRY_SPECIFIC',
   semanticType: 'YYI_MONETIZATION',
   horizons: ['short', 'medium', 'long'],
@@ -1475,7 +1475,7 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   description:
     'İNŞAAT SEKTÖRÜNE ÖZGÜ: Yıllara yaygın inşaat maliyetleri (350-358) kapsamındaki projelerin hakediş kesilip tahsil edilmesiyle nakde dönüştürülmesi. İmalat/ticaret sektörü için uygun değildir.',
   cfoRationale:
-    'İnşaat şirketlerinde YYİ hesabı birikmiş inşaat maliyetlerini temsil eder. Proje tamamlanma oranına göre hakediş kesilip tahsil edilmesi nakit akışını ve aktif kalitesini ciddi ölçüde iyileştirir.',
+    'İnşaat şirketlerinde YYİ hesabı birikmiş inşaat maliyetlerini temsil eder. Proje tamamlanma oranına göre hakediş kesilip tahsil edilmesi nakit akışını ve aktif kalitesini anlamlı ölçüde iyileştirebilir.',
   bankerPerspective:
     'YYİ hakediş tahsilatı inşaat şirketleri için güçlü nakit dönüşüm araçlarından biridir. "Muhasebe gerçeği" ile "nakit gerçeği" arasındaki mesafe burada kapanır: proje ilerlemesi nakde kavuşur. Proje riski ve işveren ödeme güvenilirliği aksiyonun kalitesini belirleyen temel unsurlardır.',
 }
