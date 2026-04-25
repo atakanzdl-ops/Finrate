@@ -519,6 +519,8 @@ export interface MissedOpportunity {
   actionId:              string
   category:             DriverCategory
   reason:               string
+  /** UI'da gösterilecek kullanıcı dostu açıklama (raw reason yerine) */
+  reasonDisplay?:       string
   estimatedNotchImpact: number
   relatedInefficiency?: InefficiencyType
 }
@@ -537,10 +539,12 @@ export function identifyMissedOpportunities(
     ) {
       for (const recommendedId of area.recommendedActions) {
         if (!portfolioSet.has(recommendedId)) {
+          const actionLabel = actionIdToLabel(recommendedId)
           missed.push({
             actionId:             recommendedId,
             category:             ACTION_CATEGORY_MAP[recommendedId] ?? 'HYBRID',
             reason:               `${area.inefficiencyType} (${area.severity}) kapsanmamis - ${recommendedId} bu kilitlenmeyi onarir`,
+            reasonDisplay:        `${actionLabel} aksiyonu için gerekli koşullar mevcut bilanço yapısında karşılanmıyor.`,
             estimatedNotchImpact: area.severity === 'CRITICAL' ? 2 : area.severity === 'SEVERE' ? 1 : 0,
             relatedInefficiency:  area.inefficiencyType,
           })
@@ -714,21 +718,22 @@ export function buildDrivers(
   // ── POZITIF DRIVER'LAR ───────────────────────────────────────────────────
   if (productivity.productivityScore >= 0.50) {
     positive.push(
-      `Aktif uretkenligi ${(productivity.productivityScore * 100).toFixed(0)}% seviyesinde`
+      `Aktif verimlilik %${(productivity.productivityScore * 100).toFixed(0)} seviyesinde`
     )
   }
   if (composition.isStructuralHeavy) {
     positive.push(
-      `Portfoy structural-heavy (${composition.structuralCount}/${composition.totalActions} aksiyon)`
+      `Portföy yapısal ağırlıklı (${composition.structuralCount}/${composition.totalActions} aksiyon)`
     )
   }
   const fit = sector.benchmarkSnapshot.overallSectorFit
   if (fit === 'STRONG' || fit === 'TYPICAL') {
-    positive.push(`Sektor baglamina uyum: ${fit}`)
+    const fitLabel = fit === 'STRONG' ? 'güçlü' : 'tipik'
+    positive.push(`Sektörel bağlama uyum ${fitLabel} düzeyde`)
   }
   for (const repair of productivity.actionRepairAssessment) {
     if (repair.repairStrength === 'PRIMARY' || repair.repairStrength === 'STRONG') {
-      positive.push(`${repair.actionId}: ${repair.productivityNote}`)
+      positive.push(`${actionIdToLabel(repair.actionId)}: ${repair.productivityNote}`)
     }
   }
 
@@ -750,17 +755,18 @@ export function buildDrivers(
       .filter(f => f.severity === 'CRITICAL' || f.severity === 'SEVERE')
       .slice(0, 3)
     for (const flag of flagsToShow) {
-      negative.push(`${flag.type}: ${flag.description}`)
+      // flag.description zaten Türkçe ve insan okunabilir; flag.type (enum) gösterilmez
+      negative.push(flag.description)
     }
   }
 
-  // Cosmetic-heavy zayifligi confidence'ta tuketildiyse burada TEKRAR listelenmez
+  // Muhasebe ağırlıklı portföy — confidence'ta tüketildiyse tekrar listelenmez
   if (
     composition.isCosmeticHeavy &&
     consumption.cosmeticPortfolio !== 'CONSUMED_BY_CONFIDENCE'
   ) {
     negative.push(
-      `Portfoy cosmetic-heavy (${composition.cosmeticCount}/${composition.totalActions} reclass aksiyon)`
+      `Portföy muhasebe ağırlıklı (${composition.cosmeticCount}/${composition.totalActions} yeniden sınıflandırma aksiyonu)`
     )
   }
 
@@ -816,29 +822,29 @@ export function buildBankerSummary(
   // Supporting ceilings
   if (supportingCeilings.length > 0) {
     const supportingText = supportingCeilings
-      .map(c => `${c.source} (${c.maxRating})`)
+      .map(c => `${ceilingTypeToDisplay(c.source)} (${c.maxRating})`)
       .join(', ')
-    parts.push(`Ek baski kaynaklari: ${supportingText}.`)
+    parts.push(`Ek kısıt kaynakları: ${supportingText}.`)
   }
 
   // Portfoy degerlendirmesi
   if (composition.isCosmeticHeavy) {
     parts.push(
-      `Portfoy %${(composition.cosmeticShare * 100).toFixed(0)} cosmetic - ` +
-      `muhasebesel duzenleme agirlikli, operasyonel donusum sinirli.`
+      `Portföy %${(composition.cosmeticShare * 100).toFixed(0)} muhasebe ağırlıklı — ` +
+      `yapısal dönüşüm aksiyonları portföyü güçlendirecektir.`
     )
   } else if (composition.isStructuralHeavy) {
     parts.push(
-      `Portfoy %${(composition.structuralShare * 100).toFixed(0)} structural - ` +
-      `operasyonel donusum aksiyonlari agirlikli.`
+      `Portföy %${(composition.structuralShare * 100).toFixed(0)} yapısal ağırlıklı — ` +
+      `operasyonel dönüşüm odaklı.`
     )
   }
 
-  // Productivity vurgusu — "sermaye yetmez" mantigi
+  // Aktif verimlilik vurgusu
   if (productivity.productivityScore < 0.30) {
     parts.push(
-      `Aktif uretkenligi %${(productivity.productivityScore * 100).toFixed(0)} - ` +
-      `rating iyilesmesi icin likidite iyilesmesi tek basina yetmez, aktif donusumu zorunlu.`
+      `Aktif verimlilik %${(productivity.productivityScore * 100).toFixed(0)} — ` +
+      `nakit yaratma kapasitesinin artırılması için aktif dönüşümü zorunludur.`
     )
   }
 

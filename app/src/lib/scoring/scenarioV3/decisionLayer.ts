@@ -165,6 +165,8 @@ export interface RejectedInsight {
   actionId: string
   actionName: string
   reason: string
+  /** UI'da gösterilecek kullanıcı dostu açıklama (raw reason yerine) */
+  reasonDisplay?: string
   estimatedNotchImpact: number
   category: string
   isFromMissedOpportunities: boolean
@@ -181,7 +183,7 @@ export interface ConsultantNarrative {
   shortTermPriority: string
   /** "Kalıcı iyileşme için ne lazım?" — yapısal dönüşüm */
   structuralNeed: string
-  /** "Bankacı bunu nasıl görür?" — banka perspektifi */
+  /** "Finrate profesyonel değerlendirmesi" — şirket odaklı perspektif */
   bankerView: string
 }
 
@@ -744,6 +746,7 @@ function buildRejectedInsights(engineResult: EngineResult): RejectedInsight[] {
       actionId:                 rc.actionId,
       actionName:               template?.name ?? rc.actionId,
       reason:                   rc.reason,
+      reasonDisplay:            'Bu aksiyon mevcut veriyle uygun görülmedi.',
       estimatedNotchImpact:     0,
       category:                 cat,
       isFromMissedOpportunities: false,
@@ -762,6 +765,7 @@ function buildRejectedInsights(engineResult: EngineResult): RejectedInsight[] {
         actionId:                 m.actionId,
         actionName:               template?.name ?? m.actionId,
         reason:                   m.reason,
+        reasonDisplay:            m.reasonDisplay ?? `${template?.name ?? m.actionId} aksiyonu için gerekli koşullar mevcut bilanço yapısında karşılanmıyor.`,
         estimatedNotchImpact:     m.estimatedNotchImpact,
         category:                 m.category,
         isFromMissedOpportunities: true,
@@ -843,8 +847,9 @@ function buildConsultantNarrative(
   let structuralNeed   = ''
 
   if (drivers && drivers.structural.length > 0) {
+    const structuralLabels = drivers.structural.slice(0, 3).map(actionIdToLabel)
     structuralNeed =
-      `Kalıcı iyileşme için yapısal dönüşüm şart: ${drivers.structural.slice(0, 3).join(', ')}. `
+      `Kalıcı iyileşme için yapısal dönüşüm şart: ${structuralLabels.join(', ')}. `
   }
 
   if (longActions.length > 0) {
@@ -881,29 +886,28 @@ function buildConsultantNarrative(
   if (blockedByCapacity) {
     // Portfoy kapasitesi istenen hedefin altinda — asil kritik mesaj
     bankerView =
-      `Kredi komitesi bakışı: ${requestedTarget ?? finalTargetRating} hedefi teorik olarak tavan içinde görünüyor ` +
-      `ancak önerilen aksiyon portföyü en fazla ${capacityNotches} kategori iyileşme taşıyor ` +
-      `(toplam katkı: ${isFinite(rawCapacity) ? rawCapacity.toFixed(2) : '∞'}). ` +
+      `${requestedTarget ?? finalTargetRating} hedefi teorik olarak tavan içinde görünüyor, ` +
+      `ancak önerilen portföy en fazla ${capacityNotches} kategori iyileşme sağlıyor. ` +
       `Mevcut portföyle ulaşılabilir seviye: ${finalTargetRating}. ` +
-      `Daha yüksek bir hedefe ulaşmak için portföyün genişletilmesi — özellikle yapısal aksiyonların eklenmesi — gerekiyor. ` +
-      `Likidite iyileşmesi tek başına rating artırmaz; aktif verimliliği ve gelir kalitesi de gösterilmeli.`
+      `Daha yüksek bir hedefe ulaşmak için portföyün yapısal aksiyonlarla genişletilmesi gerekiyor. ` +
+      `Likidite iyileşmesi tek başına yeterli değildir; aktif verimlilik ve gelir kalitesinin de güçlenmesi gerekir.`
   } else if (notchesGained === 0) {
     bankerView =
-      `Kredi komitesi bakışı: Mevcut yapıda anlamlı rating iyileşmesi görülmedi. ` +
+      `Mevcut yapıda anlamlı rating iyileşmesi sağlanamıyor. ` +
       `${engineResult.reasoning.bankerSummary as string || 'Köklü operasyonel değişim gerekiyor.'}`
   } else {
     bankerView =
-      `Kredi komitesi bakışı: ${engineResult.currentRating} → ${finalTargetRating} ` +
-      `(${notchesGained} kategori) ${confidenceLabel} destekleniyor. `
+      `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
+      `${confidenceLabel} destekleniyor. `
 
     if (confidence === 'HIGH') {
-      bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa revizyon anlamlı olur.'
+      bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa iyileşme kalıcı olur.'
     } else if (confidence === 'MEDIUM') {
-      bankerView += 'Orta güven — uygulama riski var, takip mekanizması kurulmalı.'
+      bankerView += 'Orta güven — uygulama riski var, ilerlemenin düzenli izlenmesi önemli.'
     } else {
       bankerView +=
-        'Düşük güven — bilanço düzenlemeleri yeterli değil, köklü operasyonel değişim gerekiyor. ' +
-        'Bankacılar teminat ve nakit akışı analizine odaklanacak.'
+        'Düşük güven — bilanço düzenlemeleri tek başına yeterli değil, kalıcı operasyonel dönüşüm gerekiyor. ' +
+        'Teminat yapısı ve nakit üretim kapasitesi finansal sağlığın temel göstergeleridir.'
     }
   }
 

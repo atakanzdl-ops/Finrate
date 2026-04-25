@@ -35,12 +35,16 @@ export function ceilingTypeToDisplay(type: string): string {
  */
 export function confidenceToDisplay(level: string): string {
   const map: Record<string, string> = {
-    'HIGH':   'Yüksek',
-    'MEDIUM': 'Orta',
-    'LOW':    'Düşük',
-    'YUKSEK': 'Yüksek',
-    'ORTA':   'Orta',
-    'DUSUK':  'Düşük',
+    'HIGH':    'Yüksek',
+    'MEDIUM':  'Orta',
+    'LOW':     'Düşük',
+    'YUKSEK':  'Yüksek',
+    'ORTA':    'Orta',
+    'DUSUK':   'Düşük',
+    // Sector fit enum'ları
+    'STRONG':  'Güçlü',
+    'TYPICAL': 'Tipik',
+    'WEAK':    'Zayıf',
   }
   return map[level.toUpperCase()] ?? level
 }
@@ -52,14 +56,18 @@ export function confidenceToDisplay(level: string): string {
  */
 export function actionTypeToDisplay(type: string): string {
   const map: Record<string, string> = {
-    'structural':  'yapısal',
-    'cosmetic':    'yüzeysel',
-    'STRUCTURAL':  'Yapısal',
-    'COSMETIC':    'Yüzeysel',
-    'HYBRID':      'Karma',
-    'hybrid':      'karma',
-    'operational': 'operasyonel',
-    'financial':   'finansal',
+    'structural':       'yapısal',
+    'cosmetic':         'yüzeysel',
+    'STRUCTURAL':       'Yapısal',
+    'COSMETIC':         'Yüzeysel',
+    'HYBRID':           'Karma',
+    'hybrid':           'karma',
+    'operational':      'operasyonel',
+    'financial':        'finansal',
+    'structural-heavy': 'yapısal ağırlıklı',
+    'STRUCTURAL_HEAVY': 'Yapısal Ağırlıklı',
+    'cosmetic-heavy':   'muhasebe ağırlıklı',
+    'COSMETIC_HEAVY':   'Muhasebe Ağırlıklı',
   }
   return map[type] ?? type
 }

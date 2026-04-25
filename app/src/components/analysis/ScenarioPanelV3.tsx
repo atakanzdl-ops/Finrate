@@ -373,7 +373,7 @@ function OzetTab({ result }: { result: any }) {
           {consultant.bankerView && (
             <div className="pt-4 border-t border-[#E5E9F0]">
               <div className="text-xs uppercase tracking-wider text-[#0B3C5D] font-semibold mb-1">
-                Kredi Komitesi Bakisi
+                Finrate Yorumu
               </div>
               <div className="text-[#1E293B] leading-relaxed font-medium">{consultant.bankerView}</div>
             </div>
@@ -640,13 +640,13 @@ function AksiyonPlaniTab({
         <div className="space-y-3">
           <NotchPlanCard
             plan={da.oneNotchPlan}
-            title="1 Kademe Iyilesme Plani"
+            title="İlk İyileştirme Planı"
             expanded={expandedNotch.has('one')}
             onToggle={() => toggleNotch('one')}
           />
           <NotchPlanCard
             plan={da.twoNotchPlan}
-            title="2 Kademe Iyilesme Plani"
+            title="İleri İyileştirme Planı"
             expanded={expandedNotch.has('two')}
             onToggle={() => toggleNotch('two')}
           />
@@ -815,7 +815,7 @@ function DetayTab({
 
                   {(() => {
                     const displayReason =
-                      r.reasonDisplay || r.whyRejected || r.reason ||
+                      r.reasonDisplay ||
                       'Bu aksiyon mevcut veriyle uygun görülmedi.'
                     const reasons = toStringArray(displayReason)
                     if (reasons.length === 0) return null
