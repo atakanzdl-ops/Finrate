@@ -519,6 +519,23 @@ function calculateAmountCandidates(
   context:  FirmContext,
   horizon:  HorizonKey,
 ): AmountCandidate[] {
+  // ─── computeAmount override (feature flag korumalı) ───────────────────
+  // ŞART 1: Flag kontrolü computeAmount çağrısından ÖNCE.
+  // Flag kapalıyken action.computeAmount tanımlı OLSA BİLE çağrılmaz.
+  if (process.env.ENABLE_RATIO_BASED_AMOUNTS === 'true') {
+    // ŞART 2: Flag açık ama aksiyonda computeAmount yoksa eski yol devam eder.
+    if (action.computeAmount) {
+      const v = action.computeAmount(context)
+      // ŞART 3: null / 0 / negatif → fallback'e geç.
+      if (v !== null && v > 0) {
+        // Materiality bypass: computeAmount aktif aksiyonlarda
+        // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
+        return [{ amountTRY: v, label: 'rasyo-hedef' as unknown as AmountCandidate['label'] }]
+      }
+    }
+  }
+  // ─── eski yüzde mantığı (değiştirilmedi) ──────────────────────────────
+
   const sa        = action.suggestedAmount
   const basis     = getBasisAmount(action, context)
   const matLimit  = MATERIALITY_BY_HORIZON[horizon]
