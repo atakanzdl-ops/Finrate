@@ -851,7 +851,7 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   name: 'Brüt Kâr Marjı İyileştirme',
   family: 'EQUITY_PNL',
   semanticType: 'OPERATIONAL_MARGIN',
-  horizons: ['medium', 'long'],
+  horizons: ['medium'],
 
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 500_000)
