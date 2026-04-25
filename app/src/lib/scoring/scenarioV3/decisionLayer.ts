@@ -37,6 +37,7 @@ import {
   RATING_ORDER,
   ratingToIndex,
 } from './ratingReasoning'
+import { ceilingTypeToDisplay, confidenceToDisplay } from '../displayMaps'
 import type {
   CeilingConstraint,
   DriverGroup,
@@ -288,6 +289,14 @@ function categoryLabel(cat: string): string {
 }
 
 /**
+ * ActionId'yi aksiyon kataloğundaki Türkçe adına çevirir.
+ * UI-facing narrative'lerde raw actionId gösterilmemesi için kullanılır.
+ */
+function actionIdToLabel(actionId: string): string {
+  return ACTION_CATALOG_V3[actionId]?.name ?? actionId
+}
+
+/**
  * Ayni actionId + amountTRY kombinasyonu portfoyler arasi tekrar etmez.
  * Cumulative horizon yapisi nedeniyle short aksiyonlar medium + long'da da gorunur.
  * dedupeActions yalnizca unique kombinasyonlari dondurur.
@@ -364,16 +373,16 @@ function buildExecutiveAnswer(
     subtitle  = 'Mevcut koşullar altında rating iyileşmesi sağlanamıyor'
   } else if (achievedRequested) {
     headline = `${currentRating} → ${finalTargetRating} iyileşme mümkün`
-    subtitle  = `${notchesGained} kademe iyileşme — hedef ${requestedTarget} ulaşılabilir`
+    subtitle  = `${notchesGained} kategori iyileşme — hedef ${requestedTarget} ulaşılabilir`
   } else {
     headline = `${currentRating} → ${finalTargetRating} (hedef ${requestedTarget} kısıtlı)`
-    subtitle  = `${notchesGained} kademe iyileşme — tam hedef ceiling nedeniyle sınırlı`
+    subtitle  = `${notchesGained} kategori iyileşme — tam hedef tavanı nedeniyle sınırlı`
   }
 
   let executiveSummary = engineResult.reasoning.bankerSummary as string
 
   const ceilingNote = hasCeiling
-    ? `${bindingCeiling!.source} ceiling aktif: ${bindingCeiling!.reason} (max ${bindingCeiling!.maxRating})`
+    ? `${ceilingTypeToDisplay(bindingCeiling!.source)} tavanı aktif: ${bindingCeiling!.reason} (max ${bindingCeiling!.maxRating})`
     : undefined
 
   return {
@@ -584,8 +593,8 @@ function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
 
   if (trapped > 0.60) {
     parts.push(
-      `Varlıkların %${(trapped * 100).toFixed(0)}'i kilitli/atıl — ` +
-      'bu varlıklar monetize edilmeden nakit yaratma kapasitesi artmaz.'
+      `Varlıkların %${(trapped * 100).toFixed(0)}'i atıl durumda — ` +
+      'bu varlıklar nakde çevrilmeden nakit yaratma kapasitesi artmaz.'
     )
   }
 
@@ -620,19 +629,19 @@ function buildTargetFeasibilityExplanation(
   if (targetAchieved) {
     parts.push(
       `${currentRating} → ${requestedTarget} geçişi mümkün görünüyor. ` +
-      `${notchesGained} kademe iyileşme, güven: ${confidence} ` +
+      `${notchesGained} kategori iyileşme, güven: ${confidenceToDisplay(confidence)} ` +
       `(%${(confidenceModifier * 100).toFixed(0)}).`
     )
   } else {
     parts.push(
       `${requestedTarget} hedefine ulaşılamıyor — ulaşılabilir maksimum: ${finalTargetRating}. ` +
-      `${notchesGained} kademe iyileşme mümkün.`
+      `${notchesGained} kategori iyileşme mümkün.`
     )
   }
 
   if (bindingCeiling) {
     parts.push(
-      `${bindingCeiling.source} ceiling ${bindingCeiling.maxRating} seviyesinde aktif: ` +
+      `${ceilingTypeToDisplay(bindingCeiling.source)} tavanı ${bindingCeiling.maxRating} seviyesinde aktif: ` +
       `${bindingCeiling.reason}.`
     )
   }
@@ -660,8 +669,8 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 
   if (bindingCeiling) {
     parts.push(
-      `Mevcut ${bindingCeiling.source} ceiling aşılmazsa rating ${bindingCeiling.maxRating} ` +
-      `tavanında kalıcı olarak sıkışır.`
+      `Mevcut ${ceilingTypeToDisplay(bindingCeiling.source)} tavanı aşılmadığı sürece ` +
+      `firma ${bindingCeiling.maxRating} seviyesinin üzerine çıkamaz.`
     )
   }
 
@@ -673,10 +682,11 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 
   if (missed && missed.length > 0) {
     const topMissed = missed.slice(0, 2)
+    const topLabels = topMissed.map(m => actionIdToLabel(m.actionId)).join(', ')
     parts.push(
-      `Adreslenmeyen kritik alanlar: ${topMissed.map(m => m.actionId).join(', ')} ` +
+      `Adreslenmeyen kritik alanlar: ${topLabels} ` +
       `— bu aksiyonlar yapılmazsa ${topMissed[0].estimatedNotchImpact > 0
-        ? `yaklaşık ${topMissed[0].estimatedNotchImpact} not kayıp riski var`
+        ? `yaklaşık ${topMissed[0].estimatedNotchImpact} kategori gerileme riski var`
         : 'iyileşme sınırlı kalır'}.`
     )
   }
@@ -801,7 +811,7 @@ function buildConsultantNarrative(
   let coreIssue = ''
 
   if (bindingCeiling) {
-    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${bindingCeiling.source} ` +
+    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${ceilingTypeToDisplay(bindingCeiling.source)} ` +
       `(${bindingCeiling.reason}). Bu sorun çözülmeden ${bindingCeiling.maxRating} ` +
       `tavanını kırmanız mümkün değil.`
   } else if (sustainability?.constraints?.hasCeiling) {
@@ -872,8 +882,8 @@ function buildConsultantNarrative(
     // Portfoy kapasitesi istenen hedefin altinda — asil kritik mesaj
     bankerView =
       `Kredi komitesi bakışı: ${requestedTarget ?? finalTargetRating} hedefi teorik olarak tavan içinde görünüyor ` +
-      `ancak önerilen aksiyon portföyü en fazla ${capacityNotches} kademe iyileşme taşır ` +
-      `(toplam katkı: ${isFinite(rawCapacity) ? rawCapacity.toFixed(2) : '∞'} notch). ` +
+      `ancak önerilen aksiyon portföyü en fazla ${capacityNotches} kategori iyileşme taşıyor ` +
+      `(toplam katkı: ${isFinite(rawCapacity) ? rawCapacity.toFixed(2) : '∞'}). ` +
       `Mevcut portföyle ulaşılabilir seviye: ${finalTargetRating}. ` +
       `Daha yüksek bir hedefe ulaşmak için portföyün genişletilmesi — özellikle yapısal aksiyonların eklenmesi — gerekiyor. ` +
       `Likidite iyileşmesi tek başına rating artırmaz; aktif verimliliği ve gelir kalitesi de gösterilmeli.`
@@ -884,7 +894,7 @@ function buildConsultantNarrative(
   } else {
     bankerView =
       `Kredi komitesi bakışı: ${engineResult.currentRating} → ${finalTargetRating} ` +
-      `(${notchesGained} kademe) ${confidenceLabel} destekleniyor. `
+      `(${notchesGained} kategori) ${confidenceLabel} destekleniyor. `
 
     if (confidence === 'HIGH') {
       bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa revizyon anlamlı olur.'

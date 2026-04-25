@@ -387,7 +387,7 @@ function OzetTab({ result }: { result: any }) {
         >
           <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold text-sm">
             <Building2 size={16} />
-            Banka Perspektifi
+            Finrate Perspektifi
           </div>
           <BankerMetric label="Likidite"          value={assessLiquidity(productivity)} />
           <BankerMetric label="Yapisal Risk"       value={assessStructuralRisk(productivity)} />
@@ -441,6 +441,12 @@ function AksiyonPlaniTab({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actions: any[] = da.whatCompanyShouldDo ?? []
 
+  // AMAÇ ve TİP kolonları: hiçbir aksiyonda dolu değilse tamamen gizle
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasAmac = actions.some((a: any) => a.amac && a.amac !== '—' && a.amac !== '')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasTip  = actions.some((a: any) => a.tip  && a.tip  !== '—' && a.tip  !== '')
+
   const toggleAction = (idx: number) => {
     const newSet = new Set(expanded)
     if (newSet.has(idx)) newSet.delete(idx)
@@ -476,10 +482,10 @@ function AksiyonPlaniTab({
         <div className="hidden md:grid grid-cols-12 gap-3 px-6 py-3 bg-slate-50 border-b border-[#E5E9F0] text-xs uppercase tracking-wide text-[#64748B] font-medium">
           <div className="col-span-1">#</div>
           <div className="col-span-1">Ufuk</div>
-          <div className="col-span-4">Aksiyon</div>
+          <div style={{ gridColumn: `span ${hasAmac && hasTip ? 4 : hasAmac || hasTip ? 6 : 8}` }}>Aksiyon</div>
           <div className="col-span-2">Tutar</div>
-          <div className="col-span-3">Amac</div>
-          <div className="col-span-1 text-right">Tip</div>
+          {hasAmac && <div className="col-span-2">Amaç</div>}
+          {hasTip  && <div className="col-span-1 text-right">Tip</div>}
         </div>
 
         {/* Aksiyon satirlari */}
@@ -511,7 +517,10 @@ function AksiyonPlaniTab({
                     <HorizonBadge horizon={action.horizonLabel ?? '—'} />
                   </div>
                   {/* Aksiyon */}
-                  <div className="col-span-4 flex items-center">
+                  <div
+                    className="flex items-center"
+                    style={{ gridColumn: `span ${hasAmac && hasTip ? 4 : hasAmac || hasTip ? 6 : 8}` }}
+                  >
                     <div>
                       <div className="font-medium text-[#1E293B]">{action.actionName}</div>
                       {action.why && (
@@ -523,13 +532,15 @@ function AksiyonPlaniTab({
                   <div className="col-span-2 flex items-center">
                     <div className="font-semibold text-[#1E293B]">{action.amountFormatted ?? '—'}</div>
                   </div>
-                  {/* Amac */}
-                  <div className="col-span-3 flex items-center">
-                    <div className="text-sm text-[#64748B]">{action.ratingImpact ?? '—'}</div>
-                  </div>
+                  {/* Amac — sadece veri varsa */}
+                  {hasAmac && (
+                    <div className="col-span-2 flex items-center">
+                      <div className="text-sm text-[#64748B]">{action.amac || '—'}</div>
+                    </div>
+                  )}
                   {/* Tip + chevron */}
                   <div className="col-span-1 flex items-center justify-end gap-1">
-                    {action.structurality && <TypeBadge type={action.structurality} />}
+                    {hasTip && action.tip && <TypeBadge type={action.tip} />}
                     <ChevronDown
                       size={16}
                       className={`text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
@@ -602,7 +613,7 @@ function AksiyonPlaniTab({
                     {action.bankerPerspective && (
                       <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[8px] p-3">
                         <div className="text-xs uppercase tracking-wide text-[#0B3C5D] font-medium mb-1">
-                          Banker Yorumu
+                          Finrate Yorumu
                         </div>
                         <div className="text-sm text-slate-800">{action.bankerPerspective}</div>
                       </div>
@@ -802,16 +813,23 @@ function DetayTab({
                     </div>
                   </div>
 
-                  {toStringArray(r.whyRejected).length > 0 && (
-                    <ul className="space-y-1 mt-2">
-                      {toStringArray(r.whyRejected).map((reason: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-[#1E293B]">
-                          <X size={14} className="text-red-400 shrink-0 mt-0.5" />
-                          <span>{reason}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  {(() => {
+                    const displayReason =
+                      r.reasonDisplay || r.whyRejected || r.reason ||
+                      'Bu aksiyon mevcut veriyle uygun görülmedi.'
+                    const reasons = toStringArray(displayReason)
+                    if (reasons.length === 0) return null
+                    return (
+                      <ul className="space-y-1 mt-2">
+                        {reasons.map((reason: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-[#1E293B]">
+                            <X size={14} className="text-red-400 shrink-0 mt-0.5" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  })()}
 
                   {r.whatWouldHaveHappened && (
                     <div className="mt-3 p-3 bg-slate-50 rounded-[6px] text-xs text-[#64748B] italic">

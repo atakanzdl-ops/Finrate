@@ -72,9 +72,20 @@ import type {
   InefficiencyType,
 } from './assetProductivity'
 
+import { ACTION_CATALOG_V3 } from './actionCatalogV3'
+import { ceilingTypeToDisplay } from '../displayMaps'
+
 // Unused import guard — tipler tanimlanmis ama dogrudan kullanilmiyor
 void 0 as unknown as ActionTemplateV3
 void 0 as unknown as SectorCode
+
+/**
+ * ActionId'yi aksiyon kataloğundaki Türkçe adına çevirir.
+ * Narrative'lerde raw actionId gösterilmemesi için kullanılır.
+ */
+function actionIdToLabel(actionId: string): string {
+  return (ACTION_CATALOG_V3 as Record<string, { name: string }>)[actionId]?.name ?? actionId
+}
 
 // ─── RATING GRADE ─────────────────────────────────────────────────────────────
 
@@ -475,7 +486,7 @@ export function buildRatingTransition(
     : `${currentRating} kategorisi icinde guclenme.`
   if (blockedByCeiling && bindingCeiling) {
     explanation +=
-      ` ${bindingCeiling.source} ceiling'i ${bindingCeiling.maxRating} seviyesinde sinirliyor: ${bindingCeiling.reason}.`
+      ` ${ceilingTypeToDisplay(bindingCeiling.source)} tavanı ${bindingCeiling.maxRating} seviyesinde sınırlıyor: ${bindingCeiling.reason}.`
   }
   if (blockedByPortfolioCapacity) {
     explanation +=
@@ -625,14 +636,14 @@ export function buildOneNotchScenario(
   const topArea = highNotAddressed[0]
   const actions = topArea.recommendedActions.slice(0, 2)
 
+  const actionLabels = actions.map(actionIdToLabel)
   return {
     targetNotches:               1,
     requiredActions:             actions,
     requiredInefficiencyRepairs: [topArea.inefficiencyType],
     isAchievable:                true,
     narrative:
-      `1 kategori iyilesme icin ${topArea.inefficiencyType} onarimi gerekli. ` +
-      `Onerilen: ${actions.join(', ')}.`,
+      `1 kategori iyileşme için öncelikli aksiyonlar: ${actionLabels.join(', ')}.`,
   }
 }
 
@@ -653,11 +664,13 @@ export function buildTwoNotchScenario(
   }
 
   const needsStructural = productivity.productivityScore < 0.40
-  const blockedBy       = needsStructural && composition.isCosmeticHeavy
-    ? 'Portfoy cosmetic-heavy; 2 kategori iyilesme icin structural aksiyonlar ' +
-      '(A18 satis artisi, A06 stok erime, A20 YYI monetization) zorunlu'
+  const structuralExamples = ['A18_NET_SALES_GROWTH', 'A06_INVENTORY_MONETIZATION', 'A20_YYI_MONETIZATION']
+    .map(actionIdToLabel).join(', ')
+  const blockedBy = needsStructural && composition.isCosmeticHeavy
+    ? `Portföy muhasebe ağırlıklı; 2 kategori iyileşme için yapısal aksiyonlar zorunlu (${structuralExamples})`
     : undefined
 
+  const requiredLabels = Array.from(required).map(actionIdToLabel)
   return {
     targetNotches:               2,
     requiredActions:             Array.from(required),
@@ -665,9 +678,9 @@ export function buildTwoNotchScenario(
     isAchievable:                !blockedBy,
     blockedBy,
     narrative: blockedBy
-      ? `2 kategori iyilesme mevcut portfoyle mumkun degil: ${blockedBy}.`
-      : `2 kategori iyilesme icin ${inefficiencies.length} kritik alan onarilmali. ` +
-        `Aksiyonlar: ${Array.from(required).join(', ')}.`,
+      ? `2 kategori iyileşme mevcut portföyle mümkün değil — yapısal aksiyonlar portföye eklenmeli.`
+      : `2 kategori iyileşme için ${inefficiencies.length} kritik alan onarılmalı. ` +
+        `Önerilen aksiyonlar: ${requiredLabels.join(', ')}.`,
   }
 }
 
@@ -796,7 +809,7 @@ export function buildBankerSummary(
   // Binding ceiling
   if (bindingCeiling) {
     parts.push(
-      `Rating tavani: ${bindingCeiling.maxRating} (${bindingCeiling.source}). ${bindingCeiling.reason}.`
+      `Rating tavanı: ${bindingCeiling.maxRating} (${ceilingTypeToDisplay(bindingCeiling.source)}). ${bindingCeiling.reason}.`
     )
   }
 
@@ -831,18 +844,18 @@ export function buildBankerSummary(
 
   // Missed opportunities
   if (missed.length > 0) {
-    const topMissed = missed.slice(0, 2).map(m => m.actionId).join(', ')
-    parts.push(`Eksik kalan kritik aksiyonlar: ${topMissed}.`)
+    const topMissedLabels = missed.slice(0, 2).map(m => actionIdToLabel(m.actionId)).join(', ')
+    parts.push(`Adreslenmeyen kritik aksiyonlar: ${topMissedLabels}.`)
   }
 
   // Guven ozeti
   if (transition.confidence === 'LOW') {
     parts.push(
-      `Rating iyilesme guveni DUSUK - confidence modifier ` +
-      `${(transition.confidenceModifier * 100).toFixed(0)}% (minimum %25 tabaninda).`
+      `Rating iyileşme güveni düşük — güven katsayısı ` +
+      `%${(transition.confidenceModifier * 100).toFixed(0)} (minimum %25 tabanında).`
     )
   } else if (transition.confidence === 'HIGH') {
-    parts.push(`Rating iyilesme guveni YUKSEK.`)
+    parts.push(`Rating iyileşme güveni yüksek.`)
   }
 
   return parts.join(' ')
