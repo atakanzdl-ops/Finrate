@@ -10,6 +10,7 @@
  */
 
 import { computeTargetGap } from '../targetGap'
+import type { CategoryScoreMap } from '../scenarioV3/contracts'
 
 const DELTA = 0.15  // kabul edilebilir yuvarlama toleransı
 
@@ -180,5 +181,130 @@ describe('computeTargetGap — sınır rating eşikleri', () => {
     expect(result.targetCombinedScore).toBe(0)
     expect(result.requiredObjectiveImprovement).toBeLessThan(0)
     expect(result.isReachable).toBe(true)
+  })
+})
+
+// ─── FAZ 6a: weakestCategories testleri ──────────────────────────────────────
+
+const FAZ6A_BASE = {
+  currentObjectiveScore: 40,
+  currentSubjectiveTotal: 20,
+  targetRating: 'A',
+}
+
+const GOOD_SCORES: CategoryScoreMap = {
+  liquidity: 60,
+  activity: 30,       // en düşük ikinci
+  leverage: 80,
+  profitability: 20,  // en düşük birinci
+}
+
+describe('computeTargetGap — Faz 6a: weakestCategories', () => {
+  test('categoryScores yok → weakestCategories undefined', () => {
+    const r = computeTargetGap(FAZ6A_BASE)
+    expect(r.weakestCategories).toBeUndefined()
+  })
+
+  test('isReachable=false → weakestCategories undefined', () => {
+    // requiredObjective > 100: currentSubjectiveTotal=5, targetAAA=93 → (93-5)/0.70=125.7
+    const r = computeTargetGap({
+      currentObjectiveScore: 50,
+      currentSubjectiveTotal: 5,
+      targetRating: 'AAA',
+      categoryScores: GOOD_SCORES,
+    })
+    expect(r.isReachable).toBe(false)
+    expect(r.weakestCategories).toBeUndefined()
+  })
+
+  test('improvement<=0 (hedef üstünde) → weakestCategories undefined', () => {
+    // currentCombined = 90×0.70 + 25 = 88 → AA, target B=52 → improvement negatif
+    const r = computeTargetGap({
+      currentObjectiveScore: 90,
+      currentSubjectiveTotal: 25,
+      targetRating: 'B',
+      categoryScores: GOOD_SCORES,
+    })
+    expect(r.requiredObjectiveImprovement).toBeLessThan(0)
+    expect(r.weakestCategories).toBeUndefined()
+  })
+
+  test('categoryScores var + isReachable + improvement>0 → 2 zayıf kategori', () => {
+    // currentCombined = 40×0.70 + 10 = 38 → C, targetAAA=93 → required=(93-10)/0.70=118.6 → ulaşılamaz
+    // A eşiği ile dene: currentSubjectiveTotal=10, target A=76
+    // required = (76-10)/0.70 = 94.3 → > 100 → isReachable=false
+    // BBB ile dene: target BBB=65, required=(65-10)/0.70=78.57, improvement=78.57-40=38.57 > 0
+    const r = computeTargetGap({
+      currentObjectiveScore: 40,
+      currentSubjectiveTotal: 10,
+      targetRating: 'BBB',
+      categoryScores: GOOD_SCORES,
+    })
+    expect(r.isReachable).toBe(true)
+    expect(r.requiredObjectiveImprovement).toBeGreaterThan(0)
+    if (r.weakestCategories) {
+      expect(r.weakestCategories).toHaveLength(2)
+      expect(r.weakestCategories[0]).toBe('profitability')  // 20 en düşük
+      expect(r.weakestCategories[1]).toBe('activity')       // 30 ikinci
+    } else {
+      // weakestCategories tanımlı olmalı
+      expect(r.weakestCategories).toBeDefined()
+    }
+  })
+
+  test('tie-break: aynı skor → sabit SECTOR_TIEBREAK_ORDER sırası', () => {
+    const tieScores: CategoryScoreMap = {
+      liquidity: 50,
+      activity: 50,
+      leverage: 80,
+      profitability: 80,
+    }
+    // BBB hedefi, subjectiveTotal=5 → required=(65-5)/0.70=85.7, improvement=85.7-30=55.7 > 0
+    const r = computeTargetGap({
+      currentObjectiveScore: 30,
+      currentSubjectiveTotal: 5,
+      targetRating: 'BBB',
+      categoryScores: tieScores,
+    })
+    expect(r.isReachable).toBe(true)
+    if (r.weakestCategories) {
+      // liquidity ve activity eşit (50) → SECTOR_TIEBREAK_ORDER: liquidity önce
+      expect(r.weakestCategories[0]).toBe('liquidity')
+      expect(r.weakestCategories[1]).toBe('activity')
+    } else {
+      expect(r.weakestCategories).toBeDefined()
+    }
+  })
+
+  test('targetRating "a" → "A" ile aynı hesap sonucu (Kural 7 — bilinçli ASCII normalize)', () => {
+    const upper = computeTargetGap({ ...FAZ6A_BASE, targetRating: 'A' })
+    const lower = computeTargetGap({ ...FAZ6A_BASE, targetRating: 'a' })
+    // Aynı lookup sonucu — isReachable, improvement aynı
+    expect(upper.isReachable).toBe(lower.isReachable)
+    expect(upper.requiredObjectiveImprovement).toBe(lower.requiredObjectiveImprovement)
+    // ⚠️ Kural 7: OUTPUT targetRating alanı — ham girdi olarak korunur (normalize edilmez)
+    expect(upper.targetRating).toBe('A')
+    expect(lower.targetRating).toBe('a')
+  })
+
+  test('targetRating " A " boşluk → trim çalışıyor', () => {
+    const trimmed = computeTargetGap({ ...FAZ6A_BASE, targetRating: ' A ' })
+    const normal  = computeTargetGap({ ...FAZ6A_BASE, targetRating: 'A' })
+    expect(trimmed.isReachable).toBe(normal.isReachable)
+    expect(trimmed.requiredObjectiveImprovement).toBe(normal.requiredObjectiveImprovement)
+  })
+
+  test('bilinmeyen targetRating → isReachable=false, weakestCategories undefined', () => {
+    const r = computeTargetGap({ ...FAZ6A_BASE, targetRating: 'Z', categoryScores: GOOD_SCORES })
+    expect(r.isReachable).toBe(false)
+    expect(r.weakestCategories).toBeUndefined()
+  })
+
+  test('geriye uyumluluk: categoryScores olmadan eski çağrı AYNEN çalışır', () => {
+    const r = computeTargetGap(FAZ6A_BASE)
+    expect(r.currentRating).toBeDefined()
+    expect(r.isReachable).toBeDefined()
+    expect(r.requiredObjectiveImprovement).toBeDefined()
+    expect(r.weakestCategories).toBeUndefined()
   })
 })

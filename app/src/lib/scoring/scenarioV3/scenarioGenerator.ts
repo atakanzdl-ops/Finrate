@@ -43,7 +43,7 @@ import { mapSectorStringToId } from '../sectorStrategy/sectorIdMap'
 import { isActionEligibleForSector } from '../sectorStrategy/eligibilityMatrix'
 import type { SupportedActionId } from '../actionEffects'
 import type { ActionId, ScoreCategory } from '../scoreImpactProfile'
-import type { ScenarioV3, ScoreState, ObjectiveScoreBreakdown, AppliedAction } from './contracts'
+import type { ScenarioV3, ScoreState, ObjectiveScoreBreakdown, AppliedAction, CategoryScoreMap } from './contracts'
 import type { ScoreAttribution } from '../scoreAttribution'
 import type { SectorId } from '../sectorStrategy/sectorIdMap'
 
@@ -294,30 +294,25 @@ export function generateScenarios(
     )
   }
 
-  // Target category gap — computeTargetGap imzası: { currentObjectiveScore, currentSubjectiveTotal, targetRating }
+  // Target category gap — computeTargetGap categoryScores ile (Faz 6a)
   let targetCategoryGap: ScoreCategory[] = ['activity', 'profitability']
   try {
     if (options.targetRating) {
+      const categoryScores: CategoryScoreMap = {
+        liquidity:     beforeSR.liquidityScore,
+        activity:      beforeSR.activityScore,
+        leverage:      beforeSR.leverageScore,
+        profitability: beforeSR.profitabilityScore,
+      }
       const gapResult = computeTargetGap({
         currentObjectiveScore:  beforeSR.finalScore,
         currentSubjectiveTotal: subjectiveTotal,
         targetRating:           options.targetRating,
+        categoryScores,
       })
-      // computeTargetGap weakestCategories döndürmez; tüm 4 kategoriyi fallback olarak kullan
-      // Gerçek gap'e göre en zayıf kategorileri seç (mevcut skor en düşük olanlar)
-      const categoryScores: { cat: ScoreCategory; score: number }[] = [
-        { cat: 'liquidity',     score: beforeSR.liquidityScore },
-        { cat: 'activity',      score: beforeSR.activityScore },
-        { cat: 'leverage',      score: beforeSR.leverageScore },
-        { cat: 'profitability', score: beforeSR.profitabilityScore },
-      ]
-      if (gapResult.isReachable && gapResult.requiredObjectiveImprovement > 0) {
-        // En düşük skoru olan 2 kategoriyi hedefle
-        targetCategoryGap = categoryScores
-          .sort((a, b) => a.score - b.score)
-          .slice(0, 2)
-          .map(c => c.cat)
-      }
+      // Mantık B (sort+slice) computeTargetGap'e taşındı — Faz 6a
+      // Mantık A (default) fallback olarak burada kalır
+      targetCategoryGap = gapResult.weakestCategories ?? ['activity', 'profitability']
     }
   } catch {
     // fallback default kalır

@@ -15,7 +15,8 @@
  * Bu kasıtlı bir tasarım kararıdır (Faz 1 spec).
  */
 
-import type { TargetGap } from './scenarioV3/contracts'
+import type { CategoryScoreMap, TargetGap } from './scenarioV3/contracts'
+import type { ScoreCategory } from './scoreImpactProfile'
 import { RATING_BANDS } from './score'
 
 // RATING_BANDS → hızlı arama için map
@@ -24,6 +25,30 @@ const THRESHOLD_MAP: Record<string, number> = Object.fromEntries(
 )
 
 const OBJECTIVE_WEIGHT = 0.70  // finansal skorun birleşik skordaki payı
+
+// Tie-break için sabit kategori sırası
+const SECTOR_TIEBREAK_ORDER: ScoreCategory[] = ['liquidity', 'activity', 'leverage', 'profitability']
+
+function computeWeakestCategoriesInternal(
+  scores: CategoryScoreMap | undefined,
+  isReachable: boolean,
+  requiredObjectiveImprovement: number,
+): ScoreCategory[] | undefined {
+  if (!scores) return undefined
+  if (!isReachable) return undefined
+  if (requiredObjectiveImprovement <= 0) return undefined
+
+  const entries = SECTOR_TIEBREAK_ORDER.map(cat => ({
+    category: cat,
+    score: scores[cat],
+  }))
+  entries.sort((a, b) => {
+    if (a.score !== b.score) return a.score - b.score
+    // Tie-break: sabit SECTOR_TIEBREAK_ORDER sırası (zaten korunuyor)
+    return SECTOR_TIEBREAK_ORDER.indexOf(a.category) - SECTOR_TIEBREAK_ORDER.indexOf(b.category)
+  })
+  return entries.slice(0, 2).map(e => e.category)
+}
 
 /**
  * Birleşik skordan rating harfine çevir.
@@ -49,6 +74,7 @@ export function computeTargetGap(input: {
   currentObjectiveScore:   number
   currentSubjectiveTotal:  number
   targetRating:            string
+  categoryScores?:         CategoryScoreMap  // opsiyonel — Faz 6a
 }): TargetGap {
   const currentCombined =
     input.currentObjectiveScore * OBJECTIVE_WEIGHT + input.currentSubjectiveTotal
@@ -56,7 +82,10 @@ export function computeTargetGap(input: {
   const currentRating = ratingFromCombined(currentCombined)
 
   // Hedef rating bilinmiyor mu?
-  const targetCombined = THRESHOLD_MAP[input.targetRating]
+  // ASCII-safe normalize (Kural 7 — bilinçli değişiklik, 'a'→'A')
+  // Locale-sensitive toLocaleUpperCase YASAK (Türkçe İ/i)
+  const normalizedForLookup = input.targetRating.trim().toUpperCase()
+  const targetCombined = THRESHOLD_MAP[normalizedForLookup]
   if (targetCombined == null) {
     return {
       currentRating,
@@ -92,6 +121,12 @@ export function computeTargetGap(input: {
     reason = 'Firma zaten hedef rating üstünde'
   }
 
+  const weakestCategories = computeWeakestCategoriesInternal(
+    input.categoryScores,
+    isReachable,
+    improvement,
+  )
+
   return {
     currentRating,
     targetRating:                 input.targetRating,
@@ -103,5 +138,6 @@ export function computeTargetGap(input: {
     requiredObjectiveImprovement: improvement,
     isReachable,
     reason,
+    weakestCategories,
   }
 }

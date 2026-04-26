@@ -565,6 +565,13 @@ import type { ValidationResult } from '../sectorStrategy/entityValidation'
 
 export type { SupportedActionId as ActionId }
 
+export type CategoryScoreMap = {
+  liquidity: number
+  activity: number
+  leverage: number
+  profitability: number
+}
+
 export interface AppliedAction {
   actionId:          SupportedActionId
   narrativeCategory: ScoreCategory
@@ -669,4 +676,5 @@ export interface TargetGap {
 
   isReachable: boolean   // false: hedef gerçekçi değil
   reason?:     string    // isReachable false veya zaten üstündeyse açıklama
+  weakestCategories?: ScoreCategory[]  // en düşük 2 kategori (Faz 6a)
 }
