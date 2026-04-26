@@ -108,7 +108,12 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 1. **Sektör-aksiyon uyumluluk matrisi:** İnşaat → A06 önerilmemeli (work-in-progress mantığı). Her aksiyon için "uygulanabilir sektörler" listesi.
 2. **Sektörel eşik tablosu:** `badHigh = 180 gün` evrensel değil. İnşaat için DIO eşiği TCMB sektör verisine göre yeniden hesaplanmalı (muhtemelen 1500-2500 gün aralığı).
 
-**Düzeltme fazı:** Faz 5 (multi-scenario generator) — motor önerirken filtreleme yapacak.
+**Düzeltme fazı:** Faz 4b ⚠️ KISMEN ÇÖZÜLDÜ (commit `170014f`)
+- Eligibility tarafı (allow/discourage/block) tam çözüldü
+- Sektörel threshold tarafı kısmen — DEKAM A06 örüntüsü hâlâ açık
+- DEKAM DIO 2420→1815 her ikisi de bad=700 üstünde kalıyor → activity delta 0
+- Codex audit notu: Bu skor sisteminin gerçek bir hatası değil, model semantiği limiti
+- Faz 5'te selection/ranking kalibrasyonu olarak ele alınacak (score.ts revizyonu değil)
 
 ---
 
@@ -302,7 +307,7 @@ expectedSpillover: {
 | 3 | `ScenarioV3.finalScore` çakışması | Faz 1 | Faz 2 | ✅ Çözüldü | Yüksek |
 | 4 | `subjectiveTotal` DB'de yok | Faz 1 | Faz 6 | ⏳ Açık | Orta |
 | 5 | `combineScores()` ceiling/floor disiplini | Faz 1 | Faz 2-5 (canlı) | 🔄 Sürekli | Yüksek |
-| 6 | Sektör-aksiyon uyumluluğu yok | Faz 2 | Faz 5 | ⏳ Açık | Yüksek |
+| 6 | Sektör-aksiyon uyumluluğu yok | Faz 2 | Faz 4b + 5 | ⚠️ Kısmen | Yüksek |
 | 7 | `combineScores` yanlış dosyada | Faz 2 | Faz 6 | ⏳ Açık | Düşük |
 | 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
 | 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5 (karar) | ⏳ Açık | Yüksek |

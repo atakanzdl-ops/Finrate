@@ -23,6 +23,16 @@ import {
   TRADE_INPUT, TRADE_SECTOR, TRADE_SUBJECTIVE_TOTAL,
 } from '../__fixtures__/syntheticEntities'
 
+// Codex Faz 4b audit notu: Bu test pre-4b davranışını doğrular,
+// flag false olmalı. CI ortamında env "true" gelirse snapshot'lar kırılır.
+beforeAll(() => {
+  process.env.ENABLE_SECTOR_THRESHOLD_OVERRIDES = 'false'
+})
+
+afterAll(() => {
+  delete process.env.ENABLE_SECTOR_THRESHOLD_OVERRIDES
+})
+
 // Sayısal hassasiyet eşiği
 const DELTA_TOLERANCE = 0.5  // puan
 
