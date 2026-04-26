@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma }                    from '@/lib/db'
 import { getUserIdFromRequest }      from '@/lib/auth'
 import { runEngineV3 }               from '@/lib/scoring/scenarioV3/engineV3'
+import { selectScenarioEngine }      from '@/lib/scoring/selectScenarioEngine'
 import { buildDecisionAnswer }       from '@/lib/scoring/scenarioV3/decisionLayer'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
     const targetRating  = parseRatingGrade(targetGrade)
 
     // ── 8. V3 ENGINE ─────────────────────────────────────────────────────────
-    const engineResult = runEngineV3({
+    const engineResult = await selectScenarioEngine({
       sector,
       currentRating,
       targetRating,

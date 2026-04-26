@@ -13,3 +13,7 @@
 
 export const ENABLE_SECTOR_THRESHOLD_OVERRIDES =
   process.env.ENABLE_SECTOR_THRESHOLD_OVERRIDES === 'true'
+
+export function isMultiScenarioV3Enabled(): boolean {
+  return process.env.ENABLE_MULTI_SCENARIO_V3 === 'true'
+}

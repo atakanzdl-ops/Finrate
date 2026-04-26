@@ -61,8 +61,10 @@ export class ScenarioGenerationError extends Error {
 
 // Kural 4: RATING_BANDS yapısı array of { min, label } → label anahtarıyla ara
 function targetRatingToScore(rating: string): number | undefined {
-  const band = RATING_BANDS.find(b => b.label === rating)
-  return band?.min
+  const normalized = rating.trim().toUpperCase()
+  const band = RATING_BANDS.find(b => b.label === normalized)
+  if (!band) return undefined
+  return band.min
 }
 
 // Label üretimi (Türkçe)
