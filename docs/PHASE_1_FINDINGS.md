@@ -514,9 +514,11 @@ expectedSpillover: {
 
 ---
 
-## 31. Route HTTP Integration Test Eksik
+## 31. Route HTTP Integration Test Eksik ✅ ÇÖZÜLDÜ
 
 **Keşfedildiği Faz:** Faz 6b polish doğrulama (Codex)
+
+**Çözüldü:** Faz 6.5 (commit `7f65640`)
 
 **Sorun:** Polish'te `buildDecisionAnswer` `not.toThrow` ile shape uyumsuzluğu davranış seviyesinde test edildi. Gerçek HTTP layer (`POST /api/scenarios/v3` → 200/500) integration testi yok.
 
@@ -524,12 +526,11 @@ expectedSpillover: {
 - Codex audit notu: "flag true aktivasyonunda regresyon riski"
 - Faz 8 flag açma sırasında canlıda sürpriz olasılığı
 
-**Çözüm planı:**
-- `request(app).post('/api/scenarios/v3')` + status assert
+**Çözüm:** `route.test.ts` — 5 senaryo: 401 (auth fail) · 400 (body eksik) · 200 flag false (runEngineV3 çağrı assert) · 200 flag true (generateScenarios çağrı assert) · 500 DOUBLE FAIL (generateScenarios + runEngineV3 ikisi throw). Mock: `jest.doMock + resetModules + dynamic import`, `next/server` mock (testEnvironment:node), `selectScenarioEngine` MOCK EDİLMEDİ (gerçek try/catch). Tests: 13/13 suite, 358/358 test.
 
 **Düzeltme fazı:** Faz 6.5
 
-**Risk seviyesi:** Yüksek
+**Risk seviyesi:** Yüksek (çözüldü)
 
 ---
 
@@ -584,7 +585,7 @@ expectedSpillover: {
 | 28 | Faz 6b shape uyumsuzluğu + contract test + dead code | Faz 6b sonrası (Codex) | Faz 6b polish ✅ | ✅ Çözüldü | Yüksek |
 | 29 | scoreToRatingGrade tutarsızlığı (#1 follow-up) | Faz 1 → Faz 6.5 | Faz 6.5 (`29d900e`) | ✅ Çözüldü | Yüksek |
 | 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 (`5d2397e`) | ✅ Çözüldü | Yüksek |
-| 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 | ⏳ Açık | Yüksek |
+| 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 (`7f65640`) | ✅ Çözüldü | Yüksek |
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
 
 ---
