@@ -420,6 +420,22 @@ expectedSpillover: {
 
 ---
 
+## 26. Repo Hijyeni — Untracked Build Artefaktları ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6a sonrası (Codex audit notu)
+
+**Çözüldü:** Bulgu #26 mini-commit — `16a518e`
+
+**Sorun:**
+- `app/src/_site_home_raw.txt` — Vercel scrape artefaktı, repo'ya commit riski
+- `app/src/tsconfig.tsbuildinfo` — TypeScript incremental cache, tracked tutulmamalı
+
+**Çözüm yöntemi:** `16a518e` — `.gitignore`'a `*.tsbuildinfo` (genel repo policy) ve `app/src/_site_home_raw.txt` eklendi. `_site_home_raw.txt` fiziksel olarak silindi. `git check-ignore` ve `git status` ile doğrulandı.
+
+**Risk seviyesi:** Düşük
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
@@ -449,6 +465,7 @@ expectedSpillover: {
 | 23 | targetRating geçersiz sessiz fallback | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
 | 24 | 6-7 senaryo hedefi tutmuyor | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
 | 25 | Route runEngineV3'te (generateScenarios bağlı değil) | Faz 5.1 (Codex) | Faz 6b | ⏳ Açık | Beklenen |
+| 26 | Repo hijyeni — untracked artefaktlar | Faz 6a sonrası (Codex) | Bulgu #26 ✅ | ✅ Çözüldü | Düşük |
 
 ---
 
