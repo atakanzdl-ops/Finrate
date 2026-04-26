@@ -550,3 +550,69 @@ export const MATERIALITY_BY_HORIZON: Record<HorizonKey, MaterialityThreshold> = 
     minScoreDelta: 1.2,
   },
 }
+
+// ============ MULTI-SENARYO MOTORU — SKOR KONTRATLARI (FAZ 1) ============
+// Bu tipler Faz 2+'de tüketilecek. Mevcut kod etkilenmez.
+
+/**
+ * Objektif skor: rasyolardan hesaplanan finansal skor (0–100).
+ * calculateScore() tarafından üretilir. Aksiyonlar bunu doğrudan etkiler.
+ */
+export interface ObjectiveScoreBreakdown {
+  liquidity:     number  // 0–100
+  profitability: number  // 0–100
+  leverage:      number  // 0–100
+  activity:      number  // 0–100
+  total:         number  // ağırlıklı toplam, 0–100
+}
+
+/**
+ * Subjektif skor: mali müşavirin doldurduğu kart (0–30 puan).
+ * 4 kategori: KKB, Banka İlişkileri, Kurumsal Yapı, Uyum & Risk.
+ * Aksiyonlardan ETKİLENMEZ — sabit girdi.
+ */
+export interface SubjectiveScoreBreakdown {
+  kkb:         number  // 0–10
+  bankRelations: number  // 0–10
+  corporate:   number  // 0–5
+  compliance:  number  // 0–5
+  total:       number  // 0–30
+}
+
+/**
+ * Birleşik skor: rating eşiklerine karşılaştırılan değer.
+ * Formül (gap hesabında): combinedScore = (objectiveScore × 0.70) + subjectiveTotal
+ * Not: combineScores() ceiling/floor uyguladığı için bu formül
+ * invertible gap hesabına özgüdür.
+ */
+export interface CombinedScore {
+  objectiveScore:  number  // 0–100
+  subjectiveTotal: number  // 0–30
+  combined:        number  // 0–100, rating eşiği için kullanılan
+  rating:          string  // 'AAA' | 'AA' | 'A' | ... | 'D'
+}
+
+/**
+ * Hedef rating için boşluk hesabı.
+ * Multi-senaryo motoru bunu kullanarak senaryolar üretir.
+ *
+ * Formül:
+ *   combinedScore = (objectiveScore × 0.70) + subjectiveTotal
+ *   requiredObjectiveScore = (targetCombinedScore − subjectiveTotal) / 0.70
+ *   requiredObjectiveImprovement = requiredObjectiveScore − currentObjectiveScore
+ */
+export interface TargetGap {
+  currentRating:  string
+  targetRating:   string
+
+  currentObjectiveScore:  number
+  currentSubjectiveTotal: number
+  currentCombinedScore:   number
+
+  targetCombinedScore:            number  // hedef rating eşiği
+  requiredObjectiveScore:         number  // hedef için gereken objektif skor
+  requiredObjectiveImprovement:   number  // mevcut → hedef boşluk
+
+  isReachable: boolean   // false: hedef gerçekçi değil
+  reason?:     string    // isReachable false veya zaten üstündeyse açıklama
+}
