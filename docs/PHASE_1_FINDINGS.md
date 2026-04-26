@@ -145,7 +145,7 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 - UI'da: eksik alan varsa aksiyon "uygulanamaz" işaretiyle gösterilir, neden açıklanır
 - Motor önerme aşamasında: eksik alanı olan aksiyonları otomatik filtreler
 
-**Düzeltme fazı:** Faz 4 (sectorStrategyProfiles.ts ile birlikte — sektör-aksiyon-validation hepsi tek katman olabilir)
+**Düzeltme fazı:** Faz 5.0 ✅ ÇÖZÜLDÜ (commit `32e0790`) — minimum guardrail uygulandı: hard fail (sector, revenue, totalAssets) + aksiyon-spesifik skip kararları (A05/A06/A10/A12/A18). 40 test, 291 toplam test geçti.
 
 ---
 
@@ -309,7 +309,7 @@ expectedSpillover: {
 | 5 | `combineScores()` ceiling/floor disiplini | Faz 1 | Faz 2-5 (canlı) | 🔄 Sürekli | Yüksek |
 | 6 | Sektör-aksiyon uyumluluğu yok | Faz 2 | Faz 4b + 5 | ⚠️ Kısmen | Yüksek |
 | 7 | `combineScores` yanlış dosyada | Faz 2 | Faz 6 | ⏳ Açık | Düşük |
-| 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
+| 8 | Entity validation katmanı yok | Faz 2 | Faz 5.0 ✅ | ✅ Çözüldü | Orta |
 | 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5.0 ✅ + 5.1 | ✅ Karar verildi | Yüksek |
 | 10 | CCC likidite kategorisinde (DSO/DIO sızıntısı) | Faz 3 (Codex audit) | Faz 6+ (shadow run) | ⏳ Açık | Yüksek |
 | 11 | DIO/DSO eşikleri global, sektörel değil | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Yüksek |
