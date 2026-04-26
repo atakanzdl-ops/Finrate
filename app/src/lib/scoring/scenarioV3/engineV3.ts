@@ -1200,7 +1200,7 @@ function runLocalRepair(
         evaluatedCandidates: [{
           actionId: action.id, amountTRY: typical.amountTRY, amountLabel: typical.label,
           rawScore: 0, qualityScore: 0, productivityRepairStrength: 'PRIMARY',
-          diversityPenalty: 0, repeatDecay: 1.0, finalScore: 0,
+          diversityPenalty: 0, repeatDecay: 1.0, optimizerScore: 0,
           rejected: true, rejectionReason: reason,
         }],
         selectedActionId: null, selectedAmountTRY: null,
