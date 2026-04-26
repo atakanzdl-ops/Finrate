@@ -259,7 +259,14 @@ export function calculateRatios(d: FinancialInput): RatioResult {
       ? (avgAdvancesReceived / revenue) * 365
       : null
 
-  // Düzeltilmiş NDS = Standart NDS - Alınan Avans Süresi
+  /**
+   * ÖLÜ ALAN — Faz 4b'de bağlanmadı.
+   * Bu hesap inşaat sektörüne özel CCC düzeltmesidir, ancak calculateScore tarafından
+   * kullanılmıyor (standart cashConversionCycle kullanılıyor).
+   * Faz 6+ skor sistemi revizyonunda Bulgu #10 (CCC kategori ataması) ile birlikte
+   * yeniden değerlendirilecek. Silme — bağlanacaksa Faz 4b/Faz 6 kararı gerekir.
+   * Ref: docs/PHASE_1_FINDINGS.md (Bulgu #10, #12)
+   */
   const adjustedCashConversionCycle =
     cashConversionCycle != null && customerAdvanceDays != null
       ? cashConversionCycle - customerAdvanceDays

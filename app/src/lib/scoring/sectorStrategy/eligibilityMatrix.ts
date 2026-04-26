@@ -22,12 +22,14 @@
  */
 
 import type { ActionId } from '../scoreImpactProfile'
+// SectorId canonical kaynağı sectorIdMap.ts — score.ts'in döngüsel bağımlılıktan korunması için
+import type { SectorId } from './sectorIdMap'
+
+export type { SectorId }  // backward compat re-export
 
 export const ELIGIBILITY_STRATEGY_VERSION = '4a-2026-04-26'
 
 export type EligibilityDecision = 'allow' | 'discourage' | 'block'
-
-export type SectorId = 'CONSTRUCTION' | 'TRADE' | 'MANUFACTURING' | 'AUTOMOTIVE'
 
 export interface EligibilityRule {
   decision: EligibilityDecision

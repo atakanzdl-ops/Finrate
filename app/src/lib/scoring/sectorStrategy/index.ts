@@ -7,6 +7,8 @@
 
 export * from './narrativeProfiles'
 export * from './eligibilityMatrix'
-// Faz 4b dosyaları sonradan eklenecek:
-// export * from './thresholdOverrides'
-// export * from './expectedSpillovers'
+// Faz 4b
+export * from './sectorIdMap'
+export * from './featureFlags'
+export * from './thresholdOverrides'
+export * from './expectedSpillovers'

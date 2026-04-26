@@ -26,6 +26,9 @@
 
 import { RatioResult } from './ratios'
 import { getSectorBenchmark, getSectorWeights, getSectorThresholds, SectorBenchmark } from './benchmarks'
+// Faz 4b: sektörel DIO/DSO eşik override'ları (ENABLE_SECTOR_THRESHOLD_OVERRIDES flag ile)
+import { mapSectorStringToId } from './sectorStrategy/sectorIdMap'
+import { getDioThresholds, getDsoThresholds } from './sectorStrategy/thresholdOverrides'
 
 export interface CategoryScores {
   liquidityScore:     number
@@ -409,6 +412,11 @@ function calcLeverage(r: RatioResult, bm: SectorBenchmark | null): { score: numb
 // Duran varlık devir, DPO → dengeli (benchmark eksik veya sektör bağımsız)
 function calcActivity(r: RatioResult, bm: SectorBenchmark | null, sector?: string | null): { score: number; coverage: number; insufficient: boolean } {
   const t = getSectorThresholds(sector)
+  // Faz 4b: sektörel DIO/DSO eşikleri — flag false ise GLOBAL_DEFAULTS (pre-4b birebir aynı)
+  const sectorId = mapSectorStringToId(sector)
+  const dioT = getDioThresholds(sectorId)
+  const dsoT = getDsoThresholds(sectorId)
+
   return weightedAvgCov([
     // Aktif Devir Hızı — sektöre bağımlı
     [hybridMetricScore(r.assetTurnover,
@@ -416,15 +424,15 @@ function calcActivity(r: RatioResult, bm: SectorBenchmark | null, sector?: strin
       bm?.assetTurnover,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Stok Devir Süresi (DIO) — sektöre bağımlı, gün bazlı
+    // Stok Devir Süresi (DIO) — sektörel eşik (Faz 4b, flag=false → global bad=180 good=60)
     [hybridMetricScore(r.inventoryTurnoverDays,
-      { bad: 180, good: 60, lowerIsBetter: true, sf: 0.15 },
+      dioT,
       bm?.inventoryDays,
       HYBRID_BM_HEAVY), 1.0],
 
-    // Alacak Tahsil Süresi (DSO) — sektöre bağımlı
+    // Alacak Tahsil Süresi (DSO) — sektörel eşik (Faz 4b, flag=false → global bad=120 good=30)
     [hybridMetricScore(r.receivablesTurnoverDays,
-      { bad: 120, good: 30, lowerIsBetter: true, sf: 0.15 },
+      dsoT,
       bm?.receivablesDays,
       HYBRID_BM_HEAVY), 1.0],
 

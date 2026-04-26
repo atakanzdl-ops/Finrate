@@ -1,0 +1,331 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) DEKAM × A05 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A05",
+  "afterObjective": {
+    "activity": 46.7,
+    "leverage": 17.53,
+    "liquidity": 31.24,
+    "profitability": 34.11,
+    "total": 30.02,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 44.18,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 29.05,
+  },
+  "categoryDelta": {
+    "activity": 2.520000000000003,
+    "leverage": 0,
+    "liquidity": 1.6999999999999993,
+    "profitability": 0.00999999999999801,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 0.97,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) DEKAM × A06 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A06",
+  "afterObjective": {
+    "activity": 44.18,
+    "leverage": 18.18,
+    "liquidity": 45.31,
+    "profitability": 34.57,
+    "total": 34.85,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 44.18,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 29.05,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 0.6499999999999986,
+    "liquidity": 15.770000000000003,
+    "profitability": 0.46999999999999886,
+  },
+  "combinedDelta": 4,
+  "objectiveDelta": 5.8,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) DEKAM × A10 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A10",
+  "afterObjective": {
+    "activity": 44.18,
+    "leverage": 20.01,
+    "liquidity": 35.1,
+    "profitability": 34.1,
+    "total": 31.73,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 44.18,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 29.05,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 2.4800000000000004,
+    "liquidity": 5.560000000000002,
+    "profitability": 0,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 2.68,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) DEKAM × A12 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A12",
+  "afterObjective": {
+    "activity": 44.02,
+    "leverage": 22.26,
+    "liquidity": 35.87,
+    "profitability": 34.19,
+    "total": 32.67,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 44.18,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 29.05,
+  },
+  "categoryDelta": {
+    "activity": -0.1599999999999966,
+    "leverage": 4.73,
+    "liquidity": 6.329999999999998,
+    "profitability": 0.0899999999999963,
+  },
+  "combinedDelta": 3,
+  "objectiveDelta": 3.62,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) DEKAM × A18 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A18",
+  "afterObjective": {
+    "activity": 43.1,
+    "leverage": 18.7,
+    "liquidity": 29.49,
+    "profitability": 41.36,
+    "total": 30.67,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 44.18,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 29.05,
+  },
+  "categoryDelta": {
+    "activity": -1.0799999999999983,
+    "leverage": 1.1699999999999982,
+    "liquidity": -0.05000000000000071,
+    "profitability": 7.259999999999998,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 1.62,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`post-4b: Trade × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) Trade × A05 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A05",
+  "afterObjective": {
+    "activity": 70.49,
+    "leverage": 58.3,
+    "liquidity": 70.26,
+    "profitability": 81.15,
+    "total": 70.05,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 68.06,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 68.78,
+  },
+  "categoryDelta": {
+    "activity": 2.4299999999999926,
+    "leverage": 0.20999999999999375,
+    "liquidity": 2.3000000000000114,
+    "profitability": 0.15000000000000568,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 1.27,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`post-4b: Trade × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) Trade × A06 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A06",
+  "afterObjective": {
+    "activity": 71.29,
+    "leverage": 58.53,
+    "liquidity": 75.29,
+    "profitability": 81.27,
+    "total": 71.59,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 68.06,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 68.78,
+  },
+  "categoryDelta": {
+    "activity": 3.230000000000004,
+    "leverage": 0.4399999999999977,
+    "liquidity": 7.3300000000000125,
+    "profitability": 0.269999999999996,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 2.81,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`post-4b: Trade × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) Trade × A10 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A10",
+  "afterObjective": {
+    "activity": 68.06,
+    "leverage": 60.06,
+    "liquidity": 78.94,
+    "profitability": 81,
+    "total": 72.01,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 68.06,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 68.78,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 1.9699999999999989,
+    "liquidity": 10.980000000000004,
+    "profitability": 0,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 3.23,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`post-4b: Trade × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) Trade × A12 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A12",
+  "afterObjective": {
+    "activity": 67.26,
+    "leverage": 63.66,
+    "liquidity": 77.95,
+    "profitability": 79.48,
+    "total": 72.09,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 68.06,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 68.78,
+  },
+  "categoryDelta": {
+    "activity": -0.7999999999999972,
+    "leverage": 5.569999999999993,
+    "liquidity": 9.990000000000009,
+    "profitability": -1.519999999999996,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 3.31,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`post-4b: Trade × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true) Trade × A18 snapshot (post-4b canonical) 1`] = `
+{
+  "actionId": "A18",
+  "afterObjective": {
+    "activity": 67.33,
+    "leverage": 63.67,
+    "liquidity": 67.73,
+    "profitability": 91.06,
+    "total": 72.45,
+  },
+  "applied": true,
+  "beforeObjective": {
+    "activity": 68.06,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 68.78,
+  },
+  "categoryDelta": {
+    "activity": -0.730000000000004,
+    "leverage": 5.579999999999998,
+    "liquidity": -0.22999999999998977,
+    "profitability": 10.060000000000002,
+  },
+  "combinedDelta": 3,
+  "objectiveDelta": 3.67,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
