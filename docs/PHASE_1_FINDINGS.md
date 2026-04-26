@@ -170,6 +170,66 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 ---
 
+## 10. CCC Likidite Kategorisinde, DSO/DIO Etkisi Otomatik Likiditeye Sızıyor
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit (commit `5ff07c8` üzerine değerlendirme)
+
+**Sorun:** Cash Conversion Cycle (CCC) skor sisteminde **likidite kategorisinde** tanımlı (`src/lib/scoring/score.ts:285`). DSO ve DIO bu döngünün parçası olduğu için, faaliyet rasyolarındaki iyileşme otomatik olarak likidite skorunu da etkiliyor.
+
+**Sonuç:** A05 (DSO iyileştirme) ve A06 (DIO iyileştirme) gibi "faaliyet aksiyonları" likidite kategorisinde de güçlü puan üretiyor. Bu bilinçli bir mimari karar mı yoksa eski bir tasarım kalıntısı mı belirsiz.
+
+**Risk:** Bulgu #9'un (profil tutarsızlığı) doğrudan kök nedenlerinden biri. CCC bağlantısı kalırken Yaklaşım 3 (iki katmanlı profil) ile semptom yönetilebilir, ama yapısal çözüm CCC'nin kategori atamasının yeniden değerlendirilmesini gerektirir.
+
+**Çözüm seçenekleri:**
+1. CCC'yi sadece faaliyet kategorisinde tut (likidite skorundan çıkar)
+2. CCC'yi her iki kategoriye dağıt (weighted attribution)
+3. Mevcut tasarımı koru, Yaklaşım 3 ile UI katmanında açıkla
+
+**Düzeltme fazı:** Faz 6+ (skor sistemi revizyonu, shadow run gerekli)
+
+**Risk seviyesi:** Yüksek
+
+---
+
+## 11. DIO/DSO Eşikleri Global, Sektörel Değil
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** DIO ve DSO için "kötü eşik" değerleri global tanımlı (`src/lib/scoring/score.ts:420` ve `:426`) — DIO badHigh=180, DSO badHigh=120. Sektörel eşik sistemi sadece DPO ve OPEX tarafında mevcut (`src/lib/scoring/benchmarks.ts:540`).
+
+**Sonuç:** İnşaat sektöründe DIO ortalama 2400+ gün (work-in-progress mantığı), bu eşiğin çok üstünde. Sonuç: DEKAM gibi inşaat firmalarında stok aksiyonları (A06) skor üretemiyor (skor tabanı 0).
+
+**Risk:** Bulgu #6 (sektör-aksiyon uyumluluğu) ile aynı kök nedenden besleniyor. Multi-senaryo motoru sektörel anlamda kör çalışıyor.
+
+**Çözüm:** `sectorThresholdOverrides` katmanı (Codex önerisi). Her sektör için DIO/DSO bad/good eşikleri TCMB benchmark verisinden türetilmeli.
+
+**Düzeltme fazı:** Faz 4 (sectorStrategyProfiles ile birlikte) — Bulgu #6 ile birleştirilebilir.
+
+**Risk seviyesi:** Yüksek
+
+---
+
+## 12. `adjustedCashConversionCycle` İnşaat İçin Hesaplanıyor Ama Skora Bağlanmamış
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** `src/lib/scoring/ratios.ts:263` içinde inşaat sektörüne özel `adjustedCashConversionCycle` hesabı var. Bu hesap CCC'yi inşaatın WIP doğasına göre düzeltiyor. Ancak bu adjusted değer skor hesaplamasına bağlanmamış — calculateScore hâlâ standart CCC kullanıyor.
+
+**Sonuç:** Kod inşaatın farklı olduğunu biliyor, hesaplıyor, ama kullanmıyor. Eksik bağlantı veya iptal edilmiş bir özellik.
+
+**Risk:** Düşük (mevcut işlevsellik bozuk değil), ama tasarım borç işareti. Bulgu #11 ile birlikte düşünülmeli — sektörel eşik sistemi gelirse adjustedCashConversionCycle ya bağlanır ya silinir.
+
+**Çözüm seçenekleri:**
+1. Faz 4 sectorThresholdOverrides ile birlikte adjustedCashConversionCycle'ı skora bağla
+2. Bağlamayacaksak ölü kod olarak sil
+3. Yorumla işaretle, Faz 6'ya bırak
+
+**Düzeltme fazı:** Faz 4 (Bulgu #11 ile birlikte değerlendir)
+
+**Risk seviyesi:** Düşük
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
@@ -183,6 +243,25 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 | 7 | `combineScores` yanlış dosyada | Faz 2 | Faz 6 | ⏳ Açık | Düşük |
 | 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
 | 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5 (karar) | ⏳ Açık | Yüksek |
+| 10 | CCC likidite kategorisinde (DSO/DIO sızıntısı) | Faz 3 (Codex audit) | Faz 6+ (shadow run) | ⏳ Açık | Yüksek |
+| 11 | DIO/DSO eşikleri global, sektörel değil | Faz 3 (Codex audit) | Faz 4 (#6 ile birleşik) | ⏳ Açık | Yüksek |
+| 12 | adjustedCashConversionCycle skora bağlanmamış | Faz 3 (Codex audit) | Faz 4 (#11 ile) | ⏳ Açık | Düşük |
+
+---
+
+## Faz 3 Çıkışı — Kritik Mimari Soru
+
+Faz 3 tamamlandığında Bulgu #9 ortaya çıktı: faaliyet aksiyonlarının likidite kategorisinde baskın skor üretmesi. Bu sorunun kök nedeni araştırıldı.
+
+### Codex Audit Sonrası Ek Keşifler
+
+Faz 3 mimari sorusu Codex'e soruldu, audit sonucunda 3 yeni yapısal sorun ortaya çıktı (Bulgu #10, #11, #12). Bunlar Bulgu #9'un kök nedenlerini açıklıyor:
+
+- **#10 (CCC sızıntısı)** → Bulgu #9'un kök nedeni; faaliyet aksiyonlarının likiditeye sızması bilinçli/tesadüfi tasarım sonucu
+- **#11 (Global eşik)** → Bulgu #6'nın kök nedeni; sektörel eşik eksikliği inşaat sektöründe sıfır skor üretimine yol açıyor
+- **#12 (Ölü adjusted CCC)** → Yarım kalmış sektörel düzeltme girişimi
+
+Codex önerisi: Faz 4 "Sector Strategy Layer" olarak yeniden konumlandırılsın — sektör uygunluk + eşik + narrative/measured profil sözleşmesi tek katmanda. Bu öneri GPT'ye danışıldıktan sonra Faz 4 scope'u kararlaştırılacak.
 
 ---
 
