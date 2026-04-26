@@ -169,7 +169,7 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 **Mevcut durum:** Faz 3'te ampirik yaklaşım benimsendi — profil gerçek skor zirvesine göre yazıldı. Bu Faz 5 başlangıcında yeniden değerlendirilecek.
 
-**Düzeltme fazı:** Faz 5 (mimari karar) — üç olası yaklaşım: (1) skor sistemi revize, (2) kavramsal profil + UI açıklaması, (3) iki katmanlı profil (narrative + score impact).
+**Düzeltme fazı:** Faz 5.0 ✅ KARAR VERİLDİ — Yaklaşım 3 (İki katmanlı profil) — narrative-first candidate selection + attribution rerank. Detay: docs/PHASE_5_DECISIONS.md (Karar #1). İmplementasyon Faz 5.1.
 
 **Risk seviyesi:** Yüksek
 
@@ -310,7 +310,7 @@ expectedSpillover: {
 | 6 | Sektör-aksiyon uyumluluğu yok | Faz 2 | Faz 4b + 5 | ⚠️ Kısmen | Yüksek |
 | 7 | `combineScores` yanlış dosyada | Faz 2 | Faz 6 | ⏳ Açık | Düşük |
 | 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
-| 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5 (karar) | ⏳ Açık | Yüksek |
+| 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5.0 ✅ + 5.1 | ✅ Karar verildi | Yüksek |
 | 10 | CCC likidite kategorisinde (DSO/DIO sızıntısı) | Faz 3 (Codex audit) | Faz 6+ (shadow run) | ⏳ Açık | Yüksek |
 | 11 | DIO/DSO eşikleri global, sektörel değil | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Yüksek |
 | 12 | adjustedCashConversionCycle skora bağlanmamış | Faz 3 (Codex audit) | Faz 4b (#11 ile) | ⏳ Açık | Düşük |
