@@ -1,0 +1,61 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Test 12 — Snapshot DEKAM target=A snapshot 1`] = `
+[
+  {
+    "actionCount": 1,
+    "actions": [
+      "A12",
+    ],
+    "label": "Kaldıraç odaklı senaryo (A12)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 1,
+    "actions": [
+      "A10",
+    ],
+    "label": "Kaldıraç odaklı senaryo (A10)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 2,
+    "actions": [
+      "A10",
+      "A12",
+    ],
+    "label": "Kaldıraç odaklı kombinasyon",
+    "targetReached": false,
+  },
+]
+`;
+
+exports[`Test 12 — Snapshot TRADE target=A snapshot 1`] = `
+[
+  {
+    "actionCount": 1,
+    "actions": [
+      "A12",
+    ],
+    "label": "Kaldıraç odaklı senaryo (A12)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 1,
+    "actions": [
+      "A10",
+    ],
+    "label": "Kaldıraç odaklı senaryo (A10)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 2,
+    "actions": [
+      "A10",
+      "A12",
+    ],
+    "label": "Kaldıraç odaklı kombinasyon",
+    "targetReached": false,
+  },
+]
+`;

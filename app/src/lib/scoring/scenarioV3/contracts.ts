@@ -554,6 +554,60 @@ export const MATERIALITY_BY_HORIZON: Record<HorizonKey, MaterialityThreshold> = 
 // ============ MULTI-SENARYO MOTORU — SKOR KONTRATLARI (FAZ 1) ============
 // Bu tipler Faz 2+'de tüketilecek. Mevcut kod etkilenmez.
 
+// ============ FAZ 5.1 — MULTI-SCENARIO GENERATOR TİPLERİ ============
+
+import type { SupportedActionId } from '../actionEffects'
+import type { ScoreCategory } from '../scoreImpactProfile'
+import type { ScoreAttribution } from '../scoreAttribution'
+import type { EligibilityRule } from '../sectorStrategy/eligibilityMatrix'
+import type { ExpectedSpillover } from '../sectorStrategy/expectedSpillovers'
+import type { ValidationResult } from '../sectorStrategy/entityValidation'
+
+export type { SupportedActionId as ActionId }
+
+export interface AppliedAction {
+  actionId:          SupportedActionId
+  narrativeCategory: ScoreCategory
+  expectedSpillover?: ExpectedSpillover  // SADECE rapor için
+  attribution:       ScoreAttribution
+  eligibility:       EligibilityRule
+}
+
+/**
+ * Bir senaryonun skor durumu — before veya after.
+ * objective: ObjectiveScoreBreakdown (flat: liquidity, profitability, leverage, activity, total)
+ * combined: number (combineScores() çıktısı)
+ */
+export interface ScoreState {
+  ratios:    unknown  // RatioResult
+  objective: ObjectiveScoreBreakdown
+  combined:  number   // combined score (0–100)
+}
+
+export interface ScenarioV3 {
+  id:            string
+  label:         string
+  targetRating?: string
+  targetReached: boolean
+  actions:       AppliedAction[]
+  beforeState:   ScoreState
+  afterState:    ScoreState
+  combinedDelta: number
+  objectiveDelta: number
+  rating: { before: string; after: string }
+  warnings:      string[]
+  strategyVersions: {
+    narrative:   string
+    eligibility: string
+    threshold:   string
+    spillover:   string
+    validation:  string
+  }
+}
+
+// Validation tipi re-export (test ve generator tarafından kullanılır)
+export type { ValidationResult }
+
 /**
  * Objektif skor: rasyolardan hesaplanan finansal skor (0–100).
  * calculateScore() tarafından üretilir. Aksiyonlar bunu doğrudan etkiler.
