@@ -495,22 +495,22 @@ expectedSpillover: {
 
 ---
 
-## 30. UI Logout Butonu (Bulgu #19 follow-up)
+## 30. UI Logout Butonu (Bulgu #19 follow-up) ✅ ÇÖZÜLDÜ
 
 **İlişkili bulgu:** #19 — orijinal kayıt değişmedi, bu madde Faz 6.5 aktif çözümü
+
+**Çözüldü:** Faz 6.5 (commit `5d2397e`)
 
 **Sorun:**
 - `FinrateShell`'de logout butonu YOK
 - Backend `/api/auth/logout` hazır
 - Kullanıcı oturum kapatamıyor
 
-**Çözüm planı:**
-- `FinrateShell`'e logout butonu ekle
-- `fetch('/api/auth/logout')` + redirect `/login`
+**Çözüm:** `FinrateShell.tsx` — `handleLogout` handler eklendi (fetch POST `/api/auth/logout`, `credentials: 'include'`, koşulsuz `window.location.href = '/giris'` redirect). `LogOut` ikonu (lucide-react, strokeWidth=2.5). Buton "Ayarlar" altına `nav-link` stiliyle eklendi. Testler: 353/353, drift yok.
 
 **Düzeltme fazı:** Faz 6.5
 
-**Risk seviyesi:** Yüksek (UX kritik)
+**Risk seviyesi:** Yüksek (UX kritik, çözüldü)
 
 ---
 
@@ -583,7 +583,7 @@ expectedSpillover: {
 | 27 | targetRatingToScore normalize — Faz 6a kalan | Faz 6a (bilinçli defer) | Faz 6b ✅ | ✅ Çözüldü | Düşük |
 | 28 | Faz 6b shape uyumsuzluğu + contract test + dead code | Faz 6b sonrası (Codex) | Faz 6b polish ✅ | ✅ Çözüldü | Yüksek |
 | 29 | scoreToRatingGrade tutarsızlığı (#1 follow-up) | Faz 1 → Faz 6.5 | Faz 6.5 (`29d900e`) | ✅ Çözüldü | Yüksek |
-| 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 | ⏳ Açık | Yüksek |
+| 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 (`5d2397e`) | ✅ Çözüldü | Yüksek |
 | 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 | ⏳ Açık | Yüksek |
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
 
