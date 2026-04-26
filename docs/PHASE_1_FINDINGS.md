@@ -414,7 +414,7 @@ expectedSpillover: {
 
 **Çözüm:** Faz 6a computeTargetGap interface + Faz 6b route + ENABLE_MULTI_SCENARIO_V3 flag + rollback plan.
 
-**Düzeltme fazı:** Faz 6b
+**Düzeltme fazı:** Faz 6b ✅ ÇÖZÜLDÜ (commit `697b432`) — selectScenarioEngine wrapper ile generateScenarios API route'a bağlandı. ENABLE_MULTI_SCENARIO_V3 flag (default false). Fallback: v3 fail → v2 + log. Double fail: original v3 throw + HTTP 500. Production aktivasyonu Faz 8.
 
 **Risk seviyesi:** Beklenen (scope defer)
 
@@ -433,6 +433,20 @@ expectedSpillover: {
 **Çözüm yöntemi:** `16a518e` — `.gitignore`'a `*.tsbuildinfo` (genel repo policy) ve `app/src/_site_home_raw.txt` eklendi. `_site_home_raw.txt` fiziksel olarak silindi. `git check-ignore` ve `git status` ile doğrulandı.
 
 **Risk seviyesi:** Düşük
+
+---
+
+## 27. targetRatingToScore Normalize — Faz 6a Kalan ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6a — bilinçli hizasızlık notu
+
+**Çözüldü:** Faz 6b (commit `697b432`)
+
+**Sorun:** Faz 6a'da computeTargetGap normalize ederken targetRatingToScore exact-match kullanıyordu. "a" gibi küçük harf input'lar farklı davranabilirdi.
+
+**Çözüm:** targetRatingToScore'a `trim().toUpperCase()` eklendi. Bulgu #20 tam kapandı.
+
+**Risk seviyesi:** Düşük (Faz 6a bilinçli defer)
 
 ---
 
@@ -464,8 +478,9 @@ expectedSpillover: {
 | 22 | Pair AppliedAction.attribution boş obje (BLOCKER) | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Yüksek |
 | 23 | targetRating geçersiz sessiz fallback | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
 | 24 | 6-7 senaryo hedefi tutmuyor | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
-| 25 | Route runEngineV3'te (generateScenarios bağlı değil) | Faz 5.1 (Codex) | Faz 6b | ⏳ Açık | Beklenen |
+| 25 | Route runEngineV3'te (generateScenarios bağlı değil) | Faz 5.1 (Codex) | Faz 6b ✅ | ✅ Çözüldü | Beklenen |
 | 26 | Repo hijyeni — untracked artefaktlar | Faz 6a sonrası (Codex) | Bulgu #26 ✅ | ✅ Çözüldü | Düşük |
+| 27 | targetRatingToScore normalize — Faz 6a kalan | Faz 6a (bilinçli defer) | Faz 6b ✅ | ✅ Çözüldü | Düşük |
 
 ---
 
