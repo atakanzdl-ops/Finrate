@@ -32,3 +32,4 @@ app/dev-*.out.log
 # Claude worktree
 app/.claude/
 .claude/
+.vercel
