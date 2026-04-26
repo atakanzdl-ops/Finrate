@@ -476,22 +476,22 @@ expectedSpillover: {
 
 ---
 
-## 29. scoreToRatingGrade Tutarsızlığı (Bulgu #1 follow-up)
+## 29. scoreToRatingGrade Tutarsızlığı (Bulgu #1 follow-up) ✅ ÇÖZÜLDÜ
 
 **İlişkili bulgu:** #1 — orijinal kayıt değişmedi, bu madde Faz 6.5 aktif çözümü
+
+**Çözüldü:** Faz 6.5 (commit `29d900e`)
 
 **Sorun:**
 - `route.ts`'te yerel `scoreToRatingGrade` (AAA ≥95)
 - `score.ts`'te `RATING_BANDS` (AAA ≥93)
 - Şu an aktif tutarsızlık (Codex audit: yüksek etki)
 
-**Çözüm planı:**
-- Tek source-of-truth: `route.ts` yerelini siler, `score.ts`'ten import eder
-- Snapshot drift kontrollü yönetilir
+**Çözüm:** `route.ts` yerel `scoreToRatingGrade` fonksiyonu + JSDoc silindi. Çağrı `normalizeLegacyRating(scoreToRating(baseScore))` olarak güncellendi. `score.ts` RATING_BANDS tek source-of-truth. Drift: yok (353 test, 22 snapshot — tümü yeşil).
 
 **Düzeltme fazı:** Faz 6.5
 
-**Risk seviyesi:** Yüksek
+**Risk seviyesi:** Yüksek (çözüldü)
 
 ---
 
@@ -533,6 +533,23 @@ expectedSpillover: {
 
 ---
 
+## 32. UI Rating Skalası Uyum Kontrolü
+
+**Keşfedildiği Faz:** Faz 6.5 Bulgu #29 sırasında (Atakan)
+
+**Sorun:**
+- `score.ts` skalası (AAA ≥93) baz alındı.
+- UI/web/pazarlama tarafında farklı skala gösterimi olabilir.
+
+**Çözüm planı:**
+- Faz 7'de UI, web ve pazarlama skala metinleri `score.ts` ile hizalanacak.
+
+**Düzeltme fazı:** Faz 7
+
+**Risk seviyesi:** Orta (UX tutarlılığı)
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
@@ -565,9 +582,10 @@ expectedSpillover: {
 | 26 | Repo hijyeni — untracked artefaktlar | Faz 6a sonrası (Codex) | Bulgu #26 ✅ | ✅ Çözüldü | Düşük |
 | 27 | targetRatingToScore normalize — Faz 6a kalan | Faz 6a (bilinçli defer) | Faz 6b ✅ | ✅ Çözüldü | Düşük |
 | 28 | Faz 6b shape uyumsuzluğu + contract test + dead code | Faz 6b sonrası (Codex) | Faz 6b polish ✅ | ✅ Çözüldü | Yüksek |
-| 29 | scoreToRatingGrade tutarsızlığı (#1 follow-up) | Faz 1 → Faz 6.5 | Faz 6.5 | ⏳ Açık | Yüksek |
+| 29 | scoreToRatingGrade tutarsızlığı (#1 follow-up) | Faz 1 → Faz 6.5 | Faz 6.5 (`29d900e`) | ✅ Çözüldü | Yüksek |
 | 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 | ⏳ Açık | Yüksek |
 | 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 | ⏳ Açık | Yüksek |
+| 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
 
 ---
 
