@@ -298,6 +298,128 @@ expectedSpillover: {
 
 ---
 
+## 17. distanceToTarget Metric (Faz 5.1 Reranking)
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — GPT audit
+
+**Sorun:** Kural 13 reranking targetReached binary. Edge case: +0.2 hedef üstü senaryosu, +8 hedef altı senaryosunun önüne geçiyor. Continuous distance metric daha adil sıralama verir.
+
+**Çözüm:** distanceToTarget = targetCombinedScore - afterState.combined.total (negatif = hedefe ulaşıldı).
+
+**Düzeltme fazı:** Faz 5.3 / 6
+
+**Risk seviyesi:** Düşük
+
+---
+
+## 18. attributionCache Scope Guard ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — GPT + Codex audit
+
+**Çözüldü:** Faz 5.2
+
+**Sorun:** entity.ratios varsayımı (FinancialInput flat'te alan yok). Function/Date/BigInt JSON.stringify'da hatalı. Circular referans risk.
+
+**Çözüm:** SCORING_RELEVANT_FIELDS whitelist (FinancialInput hizalı) + JSON-safe normalize (bigint/Date/function/symbol) + WeakSet circular guard + sentinel entropi. Shared-ref __circular__ trade-off dokümante edildi.
+
+**Risk seviyesi:** Düşük
+
+---
+
+## 19. UI Logout Butonu Eksik
+
+**Keşfedildiği Faz:** Faz 5.1 sonrası (2026-04-26)
+
+**Sorun:** Dashboard'da logout butonu yok veya çalışmıyor. Kullanıcı oturumu kapatamıyor.
+
+**Çözüm:** UI header logout, session/cookie destroy, /login redirect.
+
+**Düzeltme fazı:** Faz 7
+
+**Risk seviyesi:** Yüksek
+
+---
+
+## 20. computeTargetGap Interface Uyumsuzluğu
+
+**Keşfedildiği Faz:** Faz 5.1 — Adım 0 keşfi
+
+**Sorun:** computeTargetGap çıktısında weakestCategories yok. Faz 5.1 motoru en düşük skorlu 2 kategoriyi elle hesapladı.
+
+**Çözüm:** computeTargetGap çıktısını genişlet (weakestCategories ekle) veya identifyCategoryGaps helper yaz.
+
+**Düzeltme fazı:** Faz 6a
+
+**Risk seviyesi:** Orta
+
+---
+
+## 21. computeScoreAttribution Promise.all (Yanlış Kayıt)
+
+**Keşfedildiği Faz:** Faz 5.1 — Codex audit
+
+**Status:** ❌ İPTAL — computeScoreAttribution zaten senkron. Promise.all davranışı Promise.all([sync]) ile doğru çalışır. Gerçek sorun yok.
+
+**Risk seviyesi:** Yok
+
+---
+
+## 22. Pair AppliedAction.attribution Boş Obje (BLOCKER) ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — Codex BLOCKER
+
+**Çözüldü:** Faz 5.2
+
+**Sorun:** Pair senaryolarda attribution `{} as any` ile dolduruluyordu. UI/raporlama'da runtime crash riski.
+
+**Çözüm:** buildAppliedAction helper + undefined guard (throw) + sectorId undefined için tip-güvenli ternary fallback. singleAttributionMap: Map<ActionId, ScoreAttribution>. Pair-level skor hâlâ applyMultipleActions (Kural 11 korundu).
+
+**Risk seviyesi:** Yüksek (Faz 5.2'de çözüldü)
+
+---
+
+## 23. targetRating Geçersiz Sessiz Fallback ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — Codex audit
+
+**Çözüldü:** Faz 5.2
+
+**Sorun:** Geçersiz targetRating sessizce ignore ediliyordu. Debug imkânsız.
+
+**Çözüm:** Geçersiz rating → ScenarioV3.warnings array'e mesaj (console.warn yok). ScenarioV3.warnings spread kopya (shared-reference değil, immutable).
+
+**Risk seviyesi:** Orta
+
+---
+
+## 24. 6-7 Senaryo Hedefi Tutmuyor ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — Codex audit
+
+**Çözüldü:** Faz 5.2
+
+**Sorun:** Dar targetCategoryGap → 1-2 candidate → 3 senaryo. Hedef 6-7.
+
+**Çözüm:** ensureMinimumCandidates (senkron, { candidates, expanded }). Block + skipActions korunur, discourage geçer. __testOnly__ ile unit test (5 case) + E2E.
+
+**Risk seviyesi:** Orta
+
+---
+
+## 25. Route runEngineV3'te (generateScenarios Bağlı Değil)
+
+**Keşfedildiği Faz:** Faz 5.1 (commit d494802) — Codex audit
+
+**Sorun:** generateScenarios API route'a bağlı değil. Motor çalışıyor ama endpoint'e ulaşılmıyor.
+
+**Çözüm:** Faz 6a computeTargetGap interface + Faz 6b route + ENABLE_MULTI_SCENARIO_V3 flag + rollback plan.
+
+**Düzeltme fazı:** Faz 6b
+
+**Risk seviyesi:** Beklenen (scope defer)
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
@@ -318,6 +440,15 @@ expectedSpillover: {
 | 14 | Faz 4b feature flag disiplini | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Yüksek |
 | 15 | strategyVersion damgası eksik | Faz 3 (Codex audit) | Faz 4a | ⏳ Açık | Düşük |
 | 16 | expectedSpillover üç katmanlı modelleme | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Orta |
+| 17 | distanceToTarget metric | Faz 5.1 (GPT) | Faz 5.3/6 | ⏳ Açık | Düşük |
+| 18 | attributionCache scope guard | Faz 5.1 (GPT+Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Düşük |
+| 19 | UI logout butonu eksik | Faz 5.1 sonrası | Faz 7 | ⏳ Açık | Yüksek |
+| 20 | computeTargetGap interface uyumsuzluğu | Faz 5.1 (Adım 0) | Faz 6a | ⏳ Açık | Orta |
+| 21 | computeScoreAttribution Promise.all (yanlış kayıt) | Faz 5.1 | İPTAL | ❌ İptal | Yok |
+| 22 | Pair AppliedAction.attribution boş obje (BLOCKER) | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Yüksek |
+| 23 | targetRating geçersiz sessiz fallback | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
+| 24 | 6-7 senaryo hedefi tutmuyor | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
+| 25 | Route runEngineV3'te (generateScenarios bağlı değil) | Faz 5.1 (Codex) | Faz 6b | ⏳ Açık | Beklenen |
 
 ---
 
