@@ -9,6 +9,7 @@ import {
   RATING_ORDER,
   normalizeLegacyRating,
 }                                    from '@/lib/scoring/scenarioV3/ratingReasoning'
+import { scoreToRating }             from '@/lib/scoring/score'
 
 // ─── SECTOR STRING → SECTORCODE MAPPING ──────────────────────────────────────
 
@@ -90,24 +91,6 @@ function buildIncomeStatement(balances: Record<string, number>) {
 }
 
 // ─── CURRENT RATING HELPER ───────────────────────────────────────────────────
-
-/**
- * Skor => V3 RatingGrade eslemesi (10 kategori).
- * V2 scoreToRating ile yakin kalibrasyon.
- * Her 3 notch grubu → tek kategori.
- */
-function scoreToRatingGrade(score: number): RatingGrade {
-  if (score >= 95) return 'AAA'
-  if (score >= 86) return 'AA'
-  if (score >= 76) return 'A'
-  if (score >= 66) return 'BBB'
-  if (score >= 54) return 'BB'
-  if (score >= 42) return 'B'
-  if (score >= 30) return 'CCC'
-  if (score >= 25) return 'CC'
-  if (score >= 20) return 'C'
-  return 'D'
-}
 
 /**
  * targetGrade string'i V3 RatingGrade'e parse eder.
@@ -215,7 +198,7 @@ export async function POST(req: NextRequest) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rawScoreFinal = (analysis as any).scoreFinal
             const baseScore     = rawScoreFinal != null ? Number(rawScoreFinal) : 50
-            return scoreToRatingGrade(baseScore)
+            return normalizeLegacyRating(scoreToRating(baseScore))
           })()
     const targetRating  = parseRatingGrade(targetGrade)
 
