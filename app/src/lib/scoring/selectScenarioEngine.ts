@@ -11,6 +11,7 @@
 import { isMultiScenarioV3Enabled } from './sectorStrategy/featureFlags'
 import { generateScenarios } from './scenarioV3/scenarioGenerator'
 import { runEngineV3 } from './scenarioV3/engineV3'
+import { adaptScenariosV3ToEngineResult, isEngineResultLike } from './scenarioV3/adaptToEngineResult'
 import { logEvent, generateCorrelationId } from '../logger'
 
 export async function selectScenarioEngine(input: any): Promise<any> {
@@ -20,7 +21,11 @@ export async function selectScenarioEngine(input: any): Promise<any> {
     let v3Error: Error | undefined
 
     try {
-      const result = await generateScenarios(input)
+      const scenarios = await generateScenarios(input)
+      const result = adaptScenariosV3ToEngineResult(scenarios, input)
+      if (!isEngineResultLike(result)) {
+        throw new Error('Scenario adapter output is not compatible with EngineResult contract')
+      }
       logEvent('engine_selected', { engine: 'v3', correlationId, latency_ms: Date.now() - startTime })
       return result
     } catch (err) {

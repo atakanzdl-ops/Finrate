@@ -4,6 +4,57 @@
 
 import { isMultiScenarioV3Enabled } from '../sectorStrategy/featureFlags'
 
+function createMockScenario(overrides: Record<string, unknown> = {}): any {
+  return {
+    id: 'scenario-1',
+    label: 'Likidite odakli senaryo',
+    targetRating: 'A',
+    targetReached: true,
+    actions: [
+      {
+        actionId: 'A05',
+        narrativeCategory: 'activity',
+        attribution: { objectiveDelta: 2.1, combinedDelta: 1.4 },
+        eligibility: { decision: 'allow' },
+      },
+    ],
+    beforeState: {
+      ratios: {},
+      objective: {
+        liquidity: 45,
+        activity: 40,
+        leverage: 38,
+        profitability: 42,
+        total: 41,
+      },
+      combined: 54,
+    },
+    afterState: {
+      ratios: {},
+      objective: {
+        liquidity: 58,
+        activity: 52,
+        leverage: 45,
+        profitability: 50,
+        total: 52,
+      },
+      combined: 63,
+    },
+    combinedDelta: 9,
+    objectiveDelta: 11,
+    rating: { before: 'BB', after: 'A' },
+    warnings: [],
+    strategyVersions: {
+      narrative: 'test',
+      eligibility: 'test',
+      threshold: 'test',
+      spillover: 'test',
+      validation: 'test',
+    },
+    ...overrides,
+  }
+}
+
 // Process.env izolasyonu
 let originalFlag: string | undefined
 beforeEach(() => {
@@ -55,6 +106,51 @@ describe('targetRatingToScore normalize (Bulgu #20 kalan)', () => {
     const r1 = generateScenarios(FULL_DEKAM, { targetRating: ' A ' })
     const r2 = generateScenarios(FULL_DEKAM, { targetRating: 'A' })
     expect(r1.length).toBe(r2.length)
+  })
+})
+
+describe('selectScenarioEngine — flag=true (adapter contract)', () => {
+  test('v3 success path EngineResult shape d\u00f6ner ve decision layer crash etmez', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'true'
+    jest.resetModules()
+
+    const loggedEvents: string[] = []
+    const mockScenario = createMockScenario()
+
+    jest.mock('../scenarioV3/scenarioGenerator', () => ({
+      generateScenarios: jest.fn().mockResolvedValue([mockScenario]),
+    }))
+    jest.mock('../scenarioV3/engineV3', () => ({
+      runEngineV3: jest.fn().mockResolvedValue({ shouldNotBeUsed: true }),
+    }))
+    jest.mock('../../logger', () => ({
+      logEvent: jest.fn((event: string) => { loggedEvents.push(event) }),
+      generateCorrelationId: jest.fn(() => 'test-corr'),
+    }))
+
+    const { selectScenarioEngine } = await import('../selectScenarioEngine')
+    const { buildDecisionAnswer } = await import('../scenarioV3/decisionLayer')
+
+    const result = await selectScenarioEngine({
+      sector: 'CONSTRUCTION',
+      currentRating: 'BB',
+      targetRating: 'A',
+      accountBalances: { 100: 1_000_000, 500: 1_000_000 },
+      incomeStatement: {
+        netSales: 5_000_000,
+        costOfGoodsSold: 3_000_000,
+        grossProfit: 2_000_000,
+        operatingProfit: 1_000_000,
+        netIncome: 700_000,
+        interestExpense: 200_000,
+      },
+    })
+
+    expect(result).toHaveProperty('version', 'v3')
+    expect(result).toHaveProperty('reasoning')
+    expect(result).toHaveProperty('horizons.short.actions')
+    expect(() => buildDecisionAnswer(result, 'A', null, { 100: 1_000_000 })).not.toThrow()
+    expect(loggedEvents).toEqual(['engine_selected'])
   })
 })
 
