@@ -22,6 +22,8 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 **Düzeltme fazı:** Faz 6 (API endpoint)
 
+**Faz 6.5 notu:** `scoreToRatingGrade` de-duplikasyon Faz 6.5 Konsolidasyon kapsamına alındı. `route.ts` kendi kopyasını kaldırıp `score.ts` RATING_BANDS'i import edecek.
+
 ---
 
 ## 2. `analysisRecord.finalScore` İsimlendirme Tuzağı
@@ -336,6 +338,8 @@ expectedSpillover: {
 
 **Düzeltme fazı:** Faz 7
 
+**Faz 6.5 notu:** Logout butonu (`FinrateShell.tsx` logout action) Faz 6.5 Konsolidasyon kapsamına alındı. Session destroy + `/login` redirect Faz 7'de tamamlanır.
+
 **Risk seviyesi:** Yüksek
 
 ---
@@ -450,11 +454,67 @@ expectedSpillover: {
 
 ---
 
+## 28. Route Shape Sınırı — API Adaptör Eksik ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6b — Faz 6b polish audit (commit `586179a`)
+
+**Çözüldü:** Faz 6b (commit `586179a`)
+
+**Sorun:** `route.ts` `ScenarioV3[]` array'ini doğrudan API response olarak dönüyordu. Motor iç yapısı (`afterState`, `attribution` detayları vb.) API contract sınırını aşıyordu. Motor iç tipi değişince API şeması kırılır.
+
+**Çözüm:** `adaptToEngineResult.ts` — `ScenarioV3 → API shape` dönüşüm adaptörü oluşturuldu. `route.ts` yalnızca adaptörden çıkan shape'i döner; motor iç tipleri API katmanına sızmaz.
+
+**Risk seviyesi:** Orta (motor bağımsızlığı)
+
+---
+
+## 29. selectScenarioEngine PRIMARY Fallback Guard Eksik ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6b — `selectScenarioEngine` tasarım aşaması (commit `586179a`)
+
+**Çözüldü:** Faz 6b (commit `586179a`)
+
+**Sorun:** `ENABLE_MULTI_SCENARIO_V3=true` iken v3 motoru çökerse kullanıcıya direkt HTTP 500 dönüyor, v2 motoru hiç denenmiyordu.
+
+**Çözüm:** PRIMARY fallback: v3 hata → v2 çalıştır + 3 log event (`engine_selected`, `engine_error`, `fallback`). v2 başarılı → response döner, production etkilenmez. Correlation ID her geçiş için üretilir.
+
+**Risk seviyesi:** Yüksek (production güvenilirliği)
+
+---
+
+## 30. selectScenarioEngine DOUBLE FAIL Guard Eksik ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6b — PRIMARY fallback tasarımından doğan eksik (commit `586179a`)
+
+**Çözüldü:** Faz 6b (commit `586179a`)
+
+**Sorun:** v3 ve v2 aynı anda başarısız olursa sessiz hata veya belirsiz response riski. Hata kaynağı izlenemez.
+
+**Çözüm:** SECONDARY/DOUBLE FAIL: v3+v2 ikisi de fırlatırsa 4 log event (`engine_selected`, `engine_error`, `fallback`, `engine_double_fail`) + orijinal v3 hatası yeniden fırlatılır → HTTP 500. Hata izlenebilir, sessiz kayıp yok.
+
+**Risk seviyesi:** Yüksek (hata görünürlüğü)
+
+---
+
+## 31. Engine Selection Structured Log Disiplini Eksik ✅ ÇÖZÜLDÜ
+
+**Keşfedildiği Faz:** Faz 6b — `selectScenarioEngine` fallback guard tasarımı (commit `586179a`)
+
+**Çözüldü:** Faz 6b (commit `586179a`)
+
+**Sorun:** Motor seçim kararları (v3/v2, fallback, hata) loglanmıyordu. Production'da hangi motorun çalıştığı, kaç fallback gerçekleştiği izlenemezdi.
+
+**Çözüm:** `logger.ts` — `LogEvent` tipi (`engine_selected | engine_error | fallback | engine_double_fail | targetRating_normalized_miss`), `logEvent()` (JSON console.log), `generateCorrelationId()` (base36 random). Her motor geçişi correlation ID ile etiketlenir.
+
+**Risk seviyesi:** Orta (operasyonel görünürlük)
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
 |---|-------|------------------|---------------|-------|------|
-| 1 | Rating eşik uyumsuzluğu | Faz 1 | Faz 6 | ⏳ Açık | Orta |
+| 1 | Rating eşik uyumsuzluğu | Faz 1 | Faz 6.5 → 8 | ⏳ Açık | Orta |
 | 2 | `finalScore` isim tuzağı | Faz 1 | Faz 2 (yorum) + Faz 6 (rename) | ⚠️ Kısmen | Yüksek |
 | 3 | `ScenarioV3.finalScore` çakışması | Faz 1 | Faz 2 | ✅ Çözüldü | Yüksek |
 | 4 | `subjectiveTotal` DB'de yok | Faz 1 | Faz 6 | ⏳ Açık | Orta |
@@ -472,7 +532,7 @@ expectedSpillover: {
 | 16 | expectedSpillover üç katmanlı modelleme | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Orta |
 | 17 | distanceToTarget metric | Faz 5.1 (GPT) | Faz 5.3/6 | ⏳ Açık | Düşük |
 | 18 | attributionCache scope guard | Faz 5.1 (GPT+Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Düşük |
-| 19 | UI logout butonu eksik | Faz 5.1 sonrası | Faz 7 | ⏳ Açık | Yüksek |
+| 19 | UI logout butonu eksik | Faz 5.1 sonrası | Faz 6.5 → 7 | ⏳ Açık | Yüksek |
 | 20 | computeTargetGap interface uyumsuzluğu | Faz 5.1 (Adım 0) | Faz 6a ✅ | ✅ Çözüldü | Orta |
 | 21 | computeScoreAttribution Promise.all (yanlış kayıt) | Faz 5.1 | İPTAL | ❌ İptal | Yok |
 | 22 | Pair AppliedAction.attribution boş obje (BLOCKER) | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Yüksek |
@@ -481,6 +541,10 @@ expectedSpillover: {
 | 25 | Route runEngineV3'te (generateScenarios bağlı değil) | Faz 5.1 (Codex) | Faz 6b ✅ | ✅ Çözüldü | Beklenen |
 | 26 | Repo hijyeni — untracked artefaktlar | Faz 6a sonrası (Codex) | Bulgu #26 ✅ | ✅ Çözüldü | Düşük |
 | 27 | targetRatingToScore normalize — Faz 6a kalan | Faz 6a (bilinçli defer) | Faz 6b ✅ | ✅ Çözüldü | Düşük |
+| 28 | Route shape sınırı — API adaptör eksik | Faz 6b | Faz 6b ✅ | ✅ Çözüldü | Orta |
+| 29 | selectScenarioEngine PRIMARY fallback guard | Faz 6b | Faz 6b ✅ | ✅ Çözüldü | Yüksek |
+| 30 | selectScenarioEngine DOUBLE FAIL guard | Faz 6b | Faz 6b ✅ | ✅ Çözüldü | Yüksek |
+| 31 | Engine selection structured log disiplini | Faz 6b | Faz 6b ✅ | ✅ Çözüldü | Orta |
 
 ---
 
