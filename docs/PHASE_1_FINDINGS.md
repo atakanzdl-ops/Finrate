@@ -144,6 +144,32 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 ---
 
+## 9. Profil Kategorisi vs Gerçek Skor Etkisi Tutarsızlığı
+
+**Keşfedildiği Faz:** Faz 3 (commit `5ff07c8`)
+
+**Sorun:** Faz 3'te 5 pilot aksiyondan 3'ünde profil zirvesi ile gerçek skor etkisi tutarsız çıktı. Aksiyonun "mali müşavir zihnindeki kategorisi" ile "skor sisteminde gerçekten en çok etkilediği kategori" farklı.
+
+**Somut veriler (Faz 2 snapshot'larından):**
+
+| Aksiyon | Mali müşavir kategorisi | Skor zirvesi (DEKAM) | Skor zirvesi (Trade) |
+|---------|------------------------|----------------------|----------------------|
+| A05 (alacak tahsilatı) | Faaliyet | likidite (+1.70) | likidite (+2.30) |
+| A06 (stok devir) | Faaliyet | likidite (+15.77) | likidite (+7.33) |
+| A12 (sermaye artırımı) | Kaldıraç | likidite (+6.33) | likidite (+9.99) |
+
+**Sebep:** Bir aksiyon rasyoyu değiştirince (örn. AR azalır) Cari Oran payı doğrudan etkileniyor → likidite skoru zirveye çıkıyor. DSO/DIO iyileşmesi faaliyeti etkiliyor ama eşik mantığı (Bulgu #5 akrabası) tam puana çevirmiyor.
+
+**Risk:** Faz 5 motoru `rankActionsForCategoryGap("activity")` çağırdığında mali müşavirin "faaliyet açığım var" sorusuna A05/A06 önerecek. Mali müşavir uygulayıp "faaliyet az arttı, likidite çok arttı, neden?" sorduğunda cevap belirsiz.
+
+**Mevcut durum:** Faz 3'te ampirik yaklaşım benimsendi — profil gerçek skor zirvesine göre yazıldı. Bu Faz 5 başlangıcında yeniden değerlendirilecek.
+
+**Düzeltme fazı:** Faz 5 (mimari karar) — üç olası yaklaşım: (1) skor sistemi revize, (2) kavramsal profil + UI açıklaması, (3) iki katmanlı profil (narrative + score impact).
+
+**Risk seviyesi:** Yüksek
+
+---
+
 ## Bulgu Özeti Tablosu (Tüm Fazlar)
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
@@ -156,6 +182,7 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 | 6 | Sektör-aksiyon uyumluluğu yok | Faz 2 | Faz 5 | ⏳ Açık | Yüksek |
 | 7 | `combineScores` yanlış dosyada | Faz 2 | Faz 6 | ⏳ Açık | Düşük |
 | 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
+| 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5 (karar) | ⏳ Açık | Yüksek |
 
 ---
 
