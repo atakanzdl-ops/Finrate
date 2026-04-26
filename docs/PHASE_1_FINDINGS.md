@@ -203,7 +203,7 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 **Çözüm:** `sectorThresholdOverrides` katmanı (Codex önerisi). Her sektör için DIO/DSO bad/good eşikleri TCMB benchmark verisinden türetilmeli.
 
-**Düzeltme fazı:** Faz 4 (sectorStrategyProfiles ile birlikte) — Bulgu #6 ile birleştirilebilir.
+**Düzeltme fazı:** Faz 4b (Bulgu #6 ile birleşik)
 
 **Risk seviyesi:** Yüksek
 
@@ -224,9 +224,72 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 2. Bağlamayacaksak ölü kod olarak sil
 3. Yorumla işaretle, Faz 6'ya bırak
 
-**Düzeltme fazı:** Faz 4 (Bulgu #11 ile birlikte değerlendir)
+**Düzeltme fazı:** Faz 4b (Bulgu #11 ile birlikte değerlendir)
 
 **Risk seviyesi:** Düşük
+
+---
+
+## 13. `expectedSpillover`'ın Karar Verici Olarak Yanlış Kullanılma Riski
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** Faz 4b'de eklenecek `expectedSpillover` sadece açıklayıcı katman olmalı. Candidate selection'ı override etmemeli — ancak yanlışlıkla Faz 5 selection mantığına girerse motor yanlış aksiyon önerebilir.
+
+**Çözüm:** `expectedSpillover` read-only metadata olarak tasarlanmalı. Faz 5 selection mantığında bu alana asla bakılmamalı; sadece UI ve açıklama katmanı kullanabilir.
+
+**Düzeltme fazı:** Faz 4b (önleyici tasarım), Faz 5 (selection disiplini), Faz 7 (UI uyumu)
+
+**Risk seviyesi:** Orta
+
+---
+
+## 14. Faz 4b Feature Flag Disiplini
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** Faz 4b `sectorThresholdOverrides` `calculateScore` davranışını değiştirecek. Ani prod davranış değişimi geriye dönük rating tutarsızlığı yaratır — aynı firma için farklı zaman dilimlerinde farklı skor çıkabilir.
+
+**Çözüm:** `ENABLE_SECTOR_THRESHOLD_OVERRIDES` feature flag. Pattern referansı: `ENABLE_RATIO_BASED_AMOUNTS` (A05 pilot). Flag kapalıyken mevcut global eşik davranışı korunur.
+
+**Düzeltme fazı:** Faz 4b (uygulama sırasında)
+
+**Risk seviyesi:** Yüksek
+
+---
+
+## 15. `strategyVersion` Damgası Konfigürasyonlara Eklenecek
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** Sektörel strateji konfigürasyonları zaman içinde değişecek. Hangi snapshot hangi version'da yazıldı, debug için kritik — ancak versiyon bilgisi şu anda hiçbir yerde saklanmıyor.
+
+**Çözüm:** `strategyVersion` alanı (örn. `"4a-2026-04-26"`). Snapshot ve `scoreAttribution` çıktılarına damga olarak eklenmeli.
+
+**Düzeltme fazı:** Faz 4a (kontrat tanımlanırken)
+
+**Risk seviyesi:** Düşük
+
+---
+
+## 16. `expectedSpillover` Üç Katmanlı Modelleme
+
+**Keşfedildiği Faz:** Faz 3 sonrası Codex audit
+
+**Sorun:** Tek alan dominant kategori (örn. `"liquidity"`) gerçek finansal etkiyi yansıtmıyor. A12 ve A18 gibi aksiyonlar çift yönlü etki üretiyor — birincil kategori iyileşirken başka kategoriler negatif etkilenebilir.
+
+**Çözüm:**
+```ts
+expectedSpillover: {
+  primary:          ScoreCategory
+  secondary?:       ScoreCategory
+  possibleNegative?: ScoreCategory
+}
+```
+
+**Düzeltme fazı:** Faz 4b (uygulama sırasında bu yapı kullanılacak)
+
+**Risk seviyesi:** Orta
 
 ---
 
@@ -244,8 +307,12 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 | 8 | Entity validation katmanı yok | Faz 2 | Faz 4 | ⏳ Açık | Orta |
 | 9 | Profil kategorisi vs gerçek skor etkisi tutarsızlığı | Faz 3 | Faz 5 (karar) | ⏳ Açık | Yüksek |
 | 10 | CCC likidite kategorisinde (DSO/DIO sızıntısı) | Faz 3 (Codex audit) | Faz 6+ (shadow run) | ⏳ Açık | Yüksek |
-| 11 | DIO/DSO eşikleri global, sektörel değil | Faz 3 (Codex audit) | Faz 4 (#6 ile birleşik) | ⏳ Açık | Yüksek |
-| 12 | adjustedCashConversionCycle skora bağlanmamış | Faz 3 (Codex audit) | Faz 4 (#11 ile) | ⏳ Açık | Düşük |
+| 11 | DIO/DSO eşikleri global, sektörel değil | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Yüksek |
+| 12 | adjustedCashConversionCycle skora bağlanmamış | Faz 3 (Codex audit) | Faz 4b (#11 ile) | ⏳ Açık | Düşük |
+| 13 | expectedSpillover yanlış selection riski | Faz 3 (Codex audit) | Faz 4b + 5 + 7 | ⏳ Açık | Orta |
+| 14 | Faz 4b feature flag disiplini | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Yüksek |
+| 15 | strategyVersion damgası eksik | Faz 3 (Codex audit) | Faz 4a | ⏳ Açık | Düşük |
+| 16 | expectedSpillover üç katmanlı modelleme | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Orta |
 
 ---
 
@@ -255,13 +322,26 @@ Faz 3 tamamlandığında Bulgu #9 ortaya çıktı: faaliyet aksiyonlarının lik
 
 ### Codex Audit Sonrası Ek Keşifler
 
-Faz 3 mimari sorusu Codex'e soruldu, audit sonucunda 3 yeni yapısal sorun ortaya çıktı (Bulgu #10, #11, #12). Bunlar Bulgu #9'un kök nedenlerini açıklıyor:
+Faz 3 mimari sorusu Codex'e soruldu. Audit sonucunda 7 yeni bulgu ortaya çıktı (#10-#16). İki gruba ayrılır:
+
+**Kök neden bulguları (#10, #11, #12):** Bulgu #9 ve #6'nın yapısal kök nedenleri. CCC kategori ataması, global eşikler, ölü adjusted CCC kodu.
+
+**Mimari disiplin bulguları (#13, #14, #15, #16):** Faz 4 uygulanırken takip edilecek tasarım kuralları.
 
 - **#10 (CCC sızıntısı)** → Bulgu #9'un kök nedeni; faaliyet aksiyonlarının likiditeye sızması bilinçli/tesadüfi tasarım sonucu
 - **#11 (Global eşik)** → Bulgu #6'nın kök nedeni; sektörel eşik eksikliği inşaat sektöründe sıfır skor üretimine yol açıyor
 - **#12 (Ölü adjusted CCC)** → Yarım kalmış sektörel düzeltme girişimi
+- **#13 (expectedSpillover override yasak)** → Açıklayıcı metadata, selection mantığına girmemeli
+- **#14 (Feature flag)** → sectorThresholdOverrides prod'a flag ile açılmalı
+- **#15 (strategyVersion)** → Konfigürasyon versiyonu snapshot'a damgalanmalı
+- **#16 (Üç katmanlı spillover)** → primary / secondary / possibleNegative ayrımı
 
-Codex önerisi: Faz 4 "Sector Strategy Layer" olarak yeniden konumlandırılsın — sektör uygunluk + eşik + narrative/measured profil sözleşmesi tek katmanda. Bu öneri GPT'ye danışıldıktan sonra Faz 4 scope'u kararlaştırılacak.
+**Faz 4 yapısı (üç audit hizalandı):**
+- Faz 4a = narrativeCategoryByAction + sectorEligibility (orchestration metadata, düşük risk)
+- Faz 4b = sectorThresholdOverrides + expectedSpillover (score semantics, yüksek risk, feature flag ile)
+- Mantıksal olarak tek "Sector Strategy Layer", fiziksel olarak 4 dosya, commit olarak 2 atomik adım
+
+Codex önerisi: GPT'ye danışıldıktan sonra Faz 4 scope'u kararlaştırılacak.
 
 ---
 
