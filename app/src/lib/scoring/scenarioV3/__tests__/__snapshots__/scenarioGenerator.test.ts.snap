@@ -1,7 +1,15 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`Test 12 — Snapshot DEKAM target=A snapshot 1`] = `
+exports[`Test 12 — Snapshot DEKAM target=A snapshot (Faz 5.2) 1`] = `
 [
+  {
+    "actionCount": 1,
+    "actions": [
+      "A06",
+    ],
+    "label": "Faaliyet odaklı senaryo (A06)",
+    "targetReached": false,
+  },
   {
     "actionCount": 1,
     "actions": [
@@ -19,12 +27,37 @@ exports[`Test 12 — Snapshot DEKAM target=A snapshot 1`] = `
     "targetReached": false,
   },
   {
+    "actionCount": 1,
+    "actions": [
+      "A18",
+    ],
+    "label": "Kârlılık odaklı senaryo (A18)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 1,
+    "actions": [
+      "A05",
+    ],
+    "label": "Faaliyet odaklı senaryo (A05)",
+    "targetReached": false,
+  },
+  {
     "actionCount": 2,
     "actions": [
-      "A10",
+      "A06",
       "A12",
     ],
-    "label": "Kaldıraç odaklı kombinasyon",
+    "label": "Karma senaryo",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 2,
+    "actions": [
+      "A06",
+      "A10",
+    ],
+    "label": "Karma senaryo",
     "targetReached": false,
   },
 ]
@@ -35,6 +68,14 @@ exports[`Test 12 — Snapshot TRADE target=A snapshot 1`] = `
   {
     "actionCount": 1,
     "actions": [
+      "A18",
+    ],
+    "label": "Kârlılık odaklı senaryo (A18)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 1,
+    "actions": [
       "A12",
     ],
     "label": "Kaldıraç odaklı senaryo (A12)",
@@ -49,12 +90,37 @@ exports[`Test 12 — Snapshot TRADE target=A snapshot 1`] = `
     "targetReached": false,
   },
   {
+    "actionCount": 1,
+    "actions": [
+      "A06",
+    ],
+    "label": "Faaliyet odaklı senaryo (A06)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 1,
+    "actions": [
+      "A05",
+    ],
+    "label": "Faaliyet odaklı senaryo (A05)",
+    "targetReached": false,
+  },
+  {
+    "actionCount": 2,
+    "actions": [
+      "A18",
+      "A12",
+    ],
+    "label": "Karma senaryo",
+    "targetReached": false,
+  },
+  {
     "actionCount": 2,
     "actions": [
       "A10",
-      "A12",
+      "A18",
     ],
-    "label": "Kaldıraç odaklı kombinasyon",
+    "label": "Karma senaryo",
     "targetReached": false,
   },
 ]

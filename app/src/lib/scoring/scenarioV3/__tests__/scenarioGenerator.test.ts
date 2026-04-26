@@ -285,7 +285,7 @@ describe('Test 11 — strategyVersions', () => {
 // ─── TEST 12 — Snapshot ──────────────────────────────────────────────────────
 
 describe('Test 12 — Snapshot', () => {
-  test('DEKAM target=A snapshot', () => {
+  test('DEKAM target=A snapshot (Faz 5.2)', () => {
     const scenarios = generateScenarios(FULL_DEKAM, { targetRating: 'A', maxScenarios: 7 })
     expect(scenarios.map(s => ({
       label:        s.label,
@@ -303,5 +303,126 @@ describe('Test 12 — Snapshot', () => {
       targetReached: s.targetReached,
       actionCount:  s.actions.length,
     }))).toMatchSnapshot()
+  })
+})
+
+// ─── TEST 13 — İş 1: BLOCKER #22 pair attribution ────────────────────────────
+
+describe('İş 1 — BLOCKER #22: pair attribution', () => {
+  test('pair senaryolarda attribution boş değil', () => {
+    const scenarios = generateScenarios(FULL_DEKAM, { targetRating: 'A' })
+    const pairs = scenarios.filter(s => s.actions.length === 2)
+    if (pairs.length > 0) {
+      pairs.forEach(p => {
+        p.actions.forEach(a => {
+          expect(a.attribution).toBeDefined()
+          expect(a.attribution).not.toEqual({})
+          expect(typeof (a.attribution as any).objectiveDelta).toBe('number')
+        })
+      })
+    }
+  })
+
+  test('buildAppliedAction: attribution map eksik → error', () => {
+    const { buildAppliedAction } = require('../scenarioGenerator').__testOnly__
+    const emptyMap = new Map()
+    expect(() => buildAppliedAction('A05', undefined, emptyMap)).toThrow()
+  })
+
+  test('buildAppliedAction: sectorId=undefined → tip patlamaz', () => {
+    const { buildAppliedAction } = require('../scenarioGenerator').__testOnly__
+    const mockAttrib = { objectiveDelta: 1, categoryDelta: {}, combinedDelta: 1 }
+    const map = new Map([['A05', mockAttrib]])
+    const result = buildAppliedAction('A05', undefined, map)
+    expect(result.expectedSpillover).toBeUndefined()
+    expect(result.eligibility).toBeDefined()
+  })
+})
+
+// ─── TEST 14 — İş 2: targetRating validation + warnings immutability ──────────
+
+describe('İş 2 — targetRating validation + warnings immutability', () => {
+  test("'Z' rating → warnings dolu, motor devam eder", () => {
+    const scenarios = generateScenarios(FULL_DEKAM, { targetRating: 'Z' })
+    expect(scenarios.length).toBeGreaterThan(0)
+    expect(scenarios[0].warnings.some(w => w.includes('Z'))).toBe(true)
+  })
+
+  test('warnings immutability: bir senaryonun warnings değişikliği diğerini etkilemez', () => {
+    const scenarios = generateScenarios(FULL_DEKAM, { targetRating: 'A' })
+    if (scenarios.length >= 2) {
+      const firstWarnings = [...scenarios[0].warnings]
+      scenarios[0].warnings.push('MUTATE_TEST')
+      expect(scenarios[1].warnings).toEqual(firstWarnings)
+    }
+  })
+})
+
+// ─── TEST 15 — İş 3: ensureMinimumCandidates unit ────────────────────────────
+
+describe('İş 3 — ensureMinimumCandidates unit', () => {
+  const { ensureMinimumCandidates } = require('../scenarioGenerator').__testOnly__
+  const emptyValidation = { valid: true, errors: [], warnings: [], skipActions: [] }
+
+  test('1 candidate → expanded=true', () => {
+    const warnings: string[] = []
+    const r = ensureMinimumCandidates(FULL_DEKAM, ['A05'], emptyValidation, warnings)
+    expect(r.expanded).toBe(true)
+    expect(r.candidates.length).toBeGreaterThan(1)
+  })
+
+  test('3+ candidate → expanded=false', () => {
+    const warnings: string[] = []
+    const r = ensureMinimumCandidates(FULL_DEKAM, ['A05', 'A10', 'A12'], emptyValidation, warnings)
+    expect(r.expanded).toBe(false)
+  })
+
+  test('skipActions expand sonrası yok', () => {
+    const warnings: string[] = []
+    const validation = { ...emptyValidation, skipActions: ['A06'] as any }
+    const r = ensureMinimumCandidates(FULL_DEKAM, ['A05'], validation, warnings)
+    expect(r.candidates).not.toContain('A06')
+  })
+
+  test('discourage edilmiş aksiyon expand sonrası VAR (block değil)', () => {
+    // İnşaat sektöründe A06 discourage edilir ama block değil
+    // isActionEligibleForSector(A06, CONSTRUCTION) = true (discourage ≠ block)
+    const warnings: string[] = []
+    const r = ensureMinimumCandidates(FULL_DEKAM, ['A05'], emptyValidation, warnings)
+    // DEKAM inşaat — A06 discourage ama listede olmalı
+    expect(r.candidates).toContain('A06')
+  })
+
+  test('E2E: DEKAM scenarios.length >= 5', () => {
+    const scenarios = generateScenarios(FULL_DEKAM, { targetRating: 'A' })
+    expect(scenarios.length).toBeGreaterThanOrEqual(5)
+  })
+})
+
+// ─── TEST 16 — İş 4: stableStringify circular guard ─────────────────────────
+
+describe('İş 4 — stableStringify circular guard', () => {
+  let stableStringify: (obj: unknown) => string
+
+  beforeAll(async () => {
+    const mod = await import('../attributionCache')
+    stableStringify = mod.stableStringify
+  })
+
+  test('circular ref → __circular__ döner, throw değil', () => {
+    const obj: any = { a: 1 }
+    obj.self = obj
+    expect(() => stableStringify(obj)).not.toThrow()
+    expect(stableStringify(obj)).toContain('__circular__')
+  })
+
+  test('shared ref → __circular__ trade-off (WeakSet davranışı)', () => {
+    const shared = { x: 1 }
+    const obj = { a: shared, b: shared }
+    // shared-ref'ler de __circular__ olarak işaretlenir — kabul edilen trade-off
+    const result = stableStringify(obj)
+    expect(result).toBeDefined()
+    // En az bir __circular__ veya her ikisi de serialize edilmiş olabilir
+    // Her iki durumda da throw olmaz
   })
 })

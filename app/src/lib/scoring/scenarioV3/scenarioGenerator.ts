@@ -40,9 +40,12 @@ import {
   VALIDATION_STRATEGY_VERSION,
 } from '../sectorStrategy/entityValidation'
 import { mapSectorStringToId } from '../sectorStrategy/sectorIdMap'
+import { isActionEligibleForSector } from '../sectorStrategy/eligibilityMatrix'
 import type { SupportedActionId } from '../actionEffects'
-import type { ScoreCategory } from '../scoreImpactProfile'
+import type { ActionId, ScoreCategory } from '../scoreImpactProfile'
 import type { ScenarioV3, ScoreState, ObjectiveScoreBreakdown, AppliedAction } from './contracts'
+import type { ScoreAttribution } from '../scoreAttribution'
+import type { SectorId } from '../sectorStrategy/sectorIdMap'
 
 export interface GenerateOptions {
   targetRating?: string
@@ -95,6 +98,62 @@ const STRATEGY_VERSIONS = {
   validation:  VALIDATION_STRATEGY_VERSION,
 }
 
+// ─── İş 1: buildAppliedAction helper (BLOCKER #22) ───────────────────────────
+// Pair senaryolarda attribution {} as any yerine gerçek ScoreAttribution kullanılır.
+function buildAppliedAction(
+  actionId: ActionId,
+  sectorId: SectorId | undefined,
+  attributionMap: Map<ActionId, ScoreAttribution>,
+): AppliedAction {
+  const attribution = attributionMap.get(actionId)
+  if (!attribution) {
+    throw new Error(`buildAppliedAction: '${actionId}' attribution map'te yok. BLOCKER #22 ihlali.`)
+  }
+  return {
+    actionId,
+    narrativeCategory: getNarrativeCategory(actionId),
+    expectedSpillover: sectorId ? getExpectedSpillover(actionId, sectorId) : undefined,
+    attribution,
+    eligibility: sectorId ? getEligibility(actionId, sectorId) : { decision: 'allow' as const },
+  }
+}
+
+// ─── İş 3: ensureMinimumCandidates ───────────────────────────────────────────
+const MIN_CANDIDATES_FOR_TARGET_SCENARIOS = 3
+
+function ensureMinimumCandidates(
+  entity: any,
+  initialCandidates: ActionId[],
+  validation: { valid: boolean; errors: unknown[]; warnings: unknown[]; skipActions: ActionId[] },
+  warnings: string[],
+): { candidates: ActionId[]; expanded: boolean } {
+  if (initialCandidates.length >= MIN_CANDIDATES_FOR_TARGET_SCENARIOS) {
+    return { candidates: initialCandidates, expanded: false }
+  }
+
+  const allPilots: ActionId[] = ['A05', 'A06', 'A10', 'A12', 'A18']
+  const sectorId = mapSectorStringToId(entity?.sector)
+
+  const expandedList = allPilots.filter(a => {
+    if (validation.skipActions.includes(a)) return false
+    if (sectorId && !isActionEligibleForSector(a, sectorId)) return false
+    return true
+  })
+
+  const merged = [...new Set([...initialCandidates, ...expandedList])]
+  const grew = merged.length > initialCandidates.length
+  if (grew) {
+    warnings.push(
+      `Hedef kategoriler için yeterli aday yok. Genişletilmiş aday havuzu kullanıldı (${merged.length} aday).`
+    )
+  }
+
+  return {
+    candidates: merged,
+    expanded: grew,
+  }
+}
+
 type EntityInput = Partial<FinancialInput> & { id?: string; subjective?: number }
 
 function buildScenarios(params: {
@@ -109,6 +168,11 @@ function buildScenarios(params: {
   const { entity, singleResults, pairResults, beforeState, options, warnings, targetCombinedScore } = params
   const sectorId = mapSectorStringToId(entity?.sector ?? null)
   const scenarios: ScenarioV3[] = []
+
+  // İş 1: single attribution map — pair senaryolarda boş obje yerine gerçek attribution
+  const singleAttributionMap = new Map<ActionId, ScoreAttribution>(
+    singleResults.map(r => [r.actionId, r.attribution])
+  )
 
   // Single-action senaryolar
   for (const { actionId, attribution } of singleResults) {
@@ -158,18 +222,10 @@ function buildScenarios(params: {
     const beforeObjectiveTotal = beforeState.objective.total
     const afterObjectiveTotal  = afterState.objective.total
 
-    const appliedActions: AppliedAction[] = actions.map(actionId => {
-      // getExpectedSpillover: SADECE burada (Kural 5)
-      const spillover   = sectorId ? getExpectedSpillover(actionId, sectorId) : undefined
-      const eligibility = sectorId ? getEligibility(actionId, sectorId) : { decision: 'allow' as const }
-      return {
-        actionId,
-        narrativeCategory: getNarrativeCategory(actionId),
-        expectedSpillover: spillover,
-        attribution:       {} as ReturnType<AttributionCache['getOrCompute']>,  // pair combined attribution N/A
-        eligibility,
-      }
-    })
+    // İş 1: buildAppliedAction ile gerçek attribution — {} as any yerine
+    const appliedActions: AppliedAction[] = actions.map(actionId =>
+      buildAppliedAction(actionId, sectorId, singleAttributionMap)
+    )
 
     scenarios.push({
       id:            randomUUID(),
@@ -224,10 +280,19 @@ export function generateScenarios(
     combined:  beforeCombined,
   }
 
-  // Target combined score
+  // Target combined score + İş 2: geçersiz targetRating warning
   const targetCombinedScore = options.targetRating
     ? targetRatingToScore(options.targetRating)
     : undefined
+
+  const globalWarnings: string[] = []
+  if (options.targetRating && targetCombinedScore === undefined) {
+    globalWarnings.push(
+      `Geçersiz hedef rating '${options.targetRating}'. Geçerli ratingler: ${
+        RATING_BANDS.map(b => b.label).join(', ')
+      }. Varsayılan kategori önceliği kullanıldı.`
+    )
+  }
 
   // Target category gap — computeTargetGap imzası: { currentObjectiveScore, currentSubjectiveTotal, targetRating }
   let targetCategoryGap: ScoreCategory[] = ['activity', 'profitability']
@@ -261,10 +326,16 @@ export function generateScenarios(
   const primaryTargetCategory = targetCategoryGap[0]
 
   // Candidate selection (getExpectedSpillover çağrılmaz — Kural 5)
-  const { candidates, validation, warnings } = selectCandidates(entity, targetCategoryGap)
+  const { candidates: initialCandidates, validation, warnings: selectionWarnings } = selectCandidates(entity, targetCategoryGap)
   if (!validation.valid) {
     throw new ScenarioGenerationError(validation)
   }
+
+  // globalWarnings + selectionWarnings birleştir (İş 2: mutable global array)
+  selectionWarnings.forEach(w => globalWarnings.push(w))
+
+  // İş 3: ensureMinimumCandidates
+  const { candidates } = ensureMinimumCandidates(entity, initialCandidates, validation, globalWarnings)
 
   // Single-action attribution (cache)
   const singleResults = candidates.map(a => ({
@@ -296,13 +367,14 @@ export function generateScenarios(
   }
 
   // Senaryo nesneleri (buildScenarios — getExpectedSpillover BURADA izinli)
+  // İş 2: globalWarnings spread kopya — her ScenarioV3 kendi kopyasını alır
   const scenarios = buildScenarios({
     entity,
     singleResults,
     pairResults,
     beforeState,
     options,
-    warnings,
+    warnings: globalWarnings,
     targetCombinedScore,
   })
 
@@ -319,4 +391,11 @@ export function generateScenarios(
       return b.objectiveDelta - a.objectiveDelta
     })
     .slice(0, options.maxScenarios ?? 7)
+}
+
+// ─── __testOnly__ export ─────────────────────────────────────────────────────
+// Yalnızca test ortamında kullanılır. Prod kodu bu export'a bağımlı olmamalı.
+export const __testOnly__ = {
+  buildAppliedAction,
+  ensureMinimumCandidates,
 }
