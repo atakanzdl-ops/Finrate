@@ -21,6 +21,13 @@ app/.next/
 app/tmp/
 app/backups/
 
+# Repo policy: tsbuildinfo artefaktları hiçbir koşulda tracked tutulmaz
+# (TypeScript incremental cache — src/ dahil tüm dizinler)
+*.tsbuildinfo
+
+# Local debug/scrape artifacts
+app/src/_site_home_raw.txt
+
 # Debug scripts — hardcoded DB bağlantısı içeriyor
 app/scripts/
 
