@@ -10,10 +10,24 @@ import {
   GitBranch,
   FileText,
   Settings,
+  LogOut,
 } from 'lucide-react'
 
 export default function FinrateShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+    // Redirect koşulsuz: sunucu cookie cleanup garantili, /dashboard auth guard'lı
+    window.location.href = '/giris'
+  }
 
   function navClass(base: string) {
     const isActive =
@@ -70,6 +84,14 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
             <Settings size={18} strokeWidth={2.5} />
             <span>Ayarlar</span>
           </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="nav-link w-full bg-transparent border-0 text-left cursor-pointer"
+          >
+            <LogOut size={18} strokeWidth={2.5} />
+            <span>Çıkış Yap</span>
+          </button>
         </div>
       </aside>
 
