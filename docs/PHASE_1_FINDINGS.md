@@ -348,7 +348,7 @@ expectedSpillover: {
 
 **Çözüm:** computeTargetGap çıktısını genişlet (weakestCategories ekle) veya identifyCategoryGaps helper yaz.
 
-**Düzeltme fazı:** Faz 6a
+**Düzeltme fazı:** Faz 6a ✅ ÇÖZÜLDÜ (commit `62e115c`) — computeTargetGap çıktısı opsiyonel weakestCategories ile genişletildi. Mantık B (sort+slice) taşındı, Mantık A (default) scenarioGenerator fallback. Sorumluluk ayrımı: kontrat saf, default sahibi generator. targetRating: input ASCII-safe (bilinçli değişim, 'a'→'A'), output mevcut davranış. ⚠️ targetRatingToScore Faz 6b'de tam hizalanacak (geçici bilinçli hizasızlık). Geriye uyumlu, snapshot AYNEN.
 
 **Risk seviyesi:** Orta
 
@@ -443,7 +443,7 @@ expectedSpillover: {
 | 17 | distanceToTarget metric | Faz 5.1 (GPT) | Faz 5.3/6 | ⏳ Açık | Düşük |
 | 18 | attributionCache scope guard | Faz 5.1 (GPT+Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Düşük |
 | 19 | UI logout butonu eksik | Faz 5.1 sonrası | Faz 7 | ⏳ Açık | Yüksek |
-| 20 | computeTargetGap interface uyumsuzluğu | Faz 5.1 (Adım 0) | Faz 6a | ⏳ Açık | Orta |
+| 20 | computeTargetGap interface uyumsuzluğu | Faz 5.1 (Adım 0) | Faz 6a ✅ | ✅ Çözüldü | Orta |
 | 21 | computeScoreAttribution Promise.all (yanlış kayıt) | Faz 5.1 | İPTAL | ❌ İptal | Yok |
 | 22 | Pair AppliedAction.attribution boş obje (BLOCKER) | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Yüksek |
 | 23 | targetRating geçersiz sessiz fallback | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Orta |
