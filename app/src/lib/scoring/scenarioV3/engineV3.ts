@@ -211,7 +211,8 @@ export interface DecisionTraceNode {
     productivityRepairStrength: string
     diversityPenalty:           number
     repeatDecay:                number
-    finalScore:                 number
+    /** Optimizer karar skoru (0-1 arası): quality × productivity × decay × diversity. analysisRecord.finalScore ile KARISTIRILMAMALI. Faz 1 Bulgu #3. */
+    optimizerScore:             number
     rejected:                   boolean
     rejectionReason?:           string
   }>
@@ -1042,7 +1043,7 @@ function runGreedySelection(
         productivityRepairStrength: c.breakdown.productivityRepairStrength,
         diversityPenalty:           c.breakdown.diversityPenalty,
         repeatDecay:                c.breakdown.repeatDecay,
-        finalScore:                 c.score,
+        optimizerScore:             c.score,
         rejected:                   c.rejected,
         rejectionReason:            c.rejectionReason,
       })),
@@ -1137,7 +1138,7 @@ function runLocalRepair(
         evaluatedCandidates: [{
           actionId: missed.actionId, amountTRY: 0, amountLabel: 'n/a',
           rawScore: 0, qualityScore: 0, productivityRepairStrength: 'n/a',
-          diversityPenalty: 0, repeatDecay: 0, finalScore: 0,
+          diversityPenalty: 0, repeatDecay: 0, optimizerScore: 0,
           rejected: true, rejectionReason: 'Already in portfolio (duplicate guard)',
         }],
         selectedActionId: null, selectedAmountTRY: null,
@@ -1162,7 +1163,7 @@ function runLocalRepair(
         evaluatedCandidates: [{
           actionId: action.id, amountTRY: 0, amountLabel: 'n/a',
           rawScore: 0, qualityScore: 0, productivityRepairStrength: 'n/a',
-          diversityPenalty: 0, repeatDecay: 0, finalScore: 0,
+          diversityPenalty: 0, repeatDecay: 0, optimizerScore: 0,
           rejected: true, rejectionReason: applicability.reason,
         }],
         selectedActionId: null, selectedAmountTRY: null,
@@ -1247,7 +1248,7 @@ function runLocalRepair(
         actionId: action.id, amountTRY: typical.amountTRY, amountLabel: typical.label,
         rawScore: repairQualityScore, qualityScore: repairQualityScore,
         productivityRepairStrength: 'PRIMARY',
-        diversityPenalty: 0, repeatDecay: 1.0, finalScore: repairQualityScore,
+        diversityPenalty: 0, repeatDecay: 1.0, optimizerScore: repairQualityScore,
         rejected: false,
       }],
       selectedActionId: action.id, selectedAmountTRY: typical.amountTRY,

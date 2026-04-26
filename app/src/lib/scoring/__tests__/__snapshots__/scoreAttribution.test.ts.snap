@@ -1,0 +1,361 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`DEKAM (İnşaat) × A05 — Alacak tahsilatı snapshot 1`] = `
+{
+  "actionId": "A05",
+  "afterAR": 10432374.75,
+  "afterObjective": {
+    "activity": 44.12,
+    "leverage": 17.53,
+    "liquidity": 31.24,
+    "profitability": 34.11,
+    "total": 29.63,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 13909833,
+  "beforeObjective": {
+    "activity": 42.85,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 28.85,
+  },
+  "categoryDelta": {
+    "activity": 1.269999999999996,
+    "leverage": 0,
+    "liquidity": 1.6999999999999993,
+    "profitability": 0.00999999999999801,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 0.78,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`DEKAM (İnşaat) × A06 — Stok devir hızı snapshot 1`] = `
+{
+  "actionId": "A06",
+  "afterAR": 13909833,
+  "afterObjective": {
+    "activity": 42.85,
+    "leverage": 18.18,
+    "liquidity": 45.31,
+    "profitability": 34.57,
+    "total": 34.65,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 13909833,
+  "beforeObjective": {
+    "activity": 42.85,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 28.85,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 0.6499999999999986,
+    "liquidity": 15.770000000000003,
+    "profitability": 0.46999999999999886,
+  },
+  "combinedDelta": 4,
+  "objectiveDelta": 5.8,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`DEKAM (İnşaat) × A10 — KV→UV borç dönüşümü snapshot 1`] = `
+{
+  "actionId": "A10",
+  "afterAR": 13909833,
+  "afterObjective": {
+    "activity": 42.85,
+    "leverage": 20.01,
+    "liquidity": 35.1,
+    "profitability": 34.1,
+    "total": 31.53,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 13909833,
+  "beforeObjective": {
+    "activity": 42.85,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 28.85,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 2.4800000000000004,
+    "liquidity": 5.560000000000002,
+    "profitability": 0,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 2.68,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`DEKAM (İnşaat) × A12 — Sermaye artırımı snapshot 1`] = `
+{
+  "actionId": "A12",
+  "afterAR": 13909833,
+  "afterObjective": {
+    "activity": 42.69,
+    "leverage": 22.26,
+    "liquidity": 35.87,
+    "profitability": 34.19,
+    "total": 32.47,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 13909833,
+  "beforeObjective": {
+    "activity": 42.85,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 28.85,
+  },
+  "categoryDelta": {
+    "activity": -0.1600000000000037,
+    "leverage": 4.73,
+    "liquidity": 6.329999999999998,
+    "profitability": 0.0899999999999963,
+  },
+  "combinedDelta": 3,
+  "objectiveDelta": 3.62,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`DEKAM (İnşaat) × A18 — Brüt marj iyileştirme snapshot 1`] = `
+{
+  "actionId": "A18",
+  "afterAR": 13909833,
+  "afterObjective": {
+    "activity": 41.78,
+    "leverage": 18.7,
+    "liquidity": 29.49,
+    "profitability": 41.36,
+    "total": 30.47,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 13909833,
+  "beforeObjective": {
+    "activity": 42.85,
+    "leverage": 17.53,
+    "liquidity": 29.54,
+    "profitability": 34.1,
+    "total": 28.85,
+  },
+  "categoryDelta": {
+    "activity": -1.0700000000000003,
+    "leverage": 1.1699999999999982,
+    "liquidity": -0.05000000000000071,
+    "profitability": 7.259999999999998,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 1.62,
+  "ratingChange": {
+    "after": "CCC",
+    "before": "CC",
+  },
+}
+`;
+
+exports[`Trade × A05 — Alacak tahsilatı snapshot 1`] = `
+{
+  "actionId": "A05",
+  "afterAR": 2027397.2602739725,
+  "afterObjective": {
+    "activity": 75.32,
+    "leverage": 58.3,
+    "liquidity": 70.26,
+    "profitability": 81.15,
+    "total": 71.26,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 2350000,
+  "beforeObjective": {
+    "activity": 73.37,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 70.11,
+  },
+  "categoryDelta": {
+    "activity": 1.9499999999999886,
+    "leverage": 0.20999999999999375,
+    "liquidity": 2.3000000000000114,
+    "profitability": 0.15000000000000568,
+  },
+  "combinedDelta": 1,
+  "objectiveDelta": 1.15,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`Trade × A06 — Stok devir hızı snapshot 1`] = `
+{
+  "actionId": "A06",
+  "afterAR": 2350000,
+  "afterObjective": {
+    "activity": 75.95,
+    "leverage": 58.53,
+    "liquidity": 75.29,
+    "profitability": 81.27,
+    "total": 72.76,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 2350000,
+  "beforeObjective": {
+    "activity": 73.37,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 70.11,
+  },
+  "categoryDelta": {
+    "activity": 2.5799999999999983,
+    "leverage": 0.4399999999999977,
+    "liquidity": 7.3300000000000125,
+    "profitability": 0.269999999999996,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 2.65,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`Trade × A10 — KV→UV borç dönüşümü snapshot 1`] = `
+{
+  "actionId": "A10",
+  "afterAR": 2350000,
+  "afterObjective": {
+    "activity": 73.37,
+    "leverage": 60.06,
+    "liquidity": 78.94,
+    "profitability": 81,
+    "total": 73.34,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 2350000,
+  "beforeObjective": {
+    "activity": 73.37,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 70.11,
+  },
+  "categoryDelta": {
+    "activity": 0,
+    "leverage": 1.9699999999999989,
+    "liquidity": 10.980000000000004,
+    "profitability": 0,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 3.23,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`Trade × A12 — Sermaye artırımı snapshot 1`] = `
+{
+  "actionId": "A12",
+  "afterAR": 2350000,
+  "afterObjective": {
+    "activity": 72.56,
+    "leverage": 63.66,
+    "liquidity": 77.95,
+    "profitability": 79.48,
+    "total": 73.41,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 2350000,
+  "beforeObjective": {
+    "activity": 73.37,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 70.11,
+  },
+  "categoryDelta": {
+    "activity": -0.8100000000000023,
+    "leverage": 5.569999999999993,
+    "liquidity": 9.990000000000009,
+    "profitability": -1.519999999999996,
+  },
+  "combinedDelta": 2,
+  "objectiveDelta": 3.3,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;
+
+exports[`Trade × A18 — Brüt marj iyileştirme snapshot 1`] = `
+{
+  "actionId": "A18",
+  "afterAR": 2350000,
+  "afterObjective": {
+    "activity": 72.76,
+    "leverage": 63.67,
+    "liquidity": 67.73,
+    "profitability": 91.06,
+    "total": 73.81,
+  },
+  "applied": true,
+  "applyReason": undefined,
+  "beforeAR": 2350000,
+  "beforeObjective": {
+    "activity": 73.37,
+    "leverage": 58.09,
+    "liquidity": 67.96,
+    "profitability": 81,
+    "total": 70.11,
+  },
+  "categoryDelta": {
+    "activity": -0.6099999999999994,
+    "leverage": 5.579999999999998,
+    "liquidity": -0.22999999999998977,
+    "profitability": 10.060000000000002,
+  },
+  "combinedDelta": 3,
+  "objectiveDelta": 3.7,
+  "ratingChange": {
+    "after": "BBB",
+    "before": "BBB",
+  },
+}
+`;

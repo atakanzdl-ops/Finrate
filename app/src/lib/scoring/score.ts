@@ -35,6 +35,12 @@ export interface CategoryScores {
 }
 
 export interface ScoringResult extends CategoryScores {
+  /**
+   * UYARI: İsim yanıltıcı. Bu alan OBJEKTİF skordur (sadece finansal rasyolardan, 0-100).
+   * Kombine skor (objektif × 0.70 + subjektif, ceiling/floor dahil) DEĞİLDİR.
+   * Faz 1 Bulgu #2 — docs/PHASE_1_FINDINGS.md
+   * Tam rename Faz 6'da yapılacak.
+   */
   finalScore:  number
   finalRating: string
   // Coverage (0–1): eksik veri kalitesi
