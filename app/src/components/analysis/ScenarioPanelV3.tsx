@@ -45,7 +45,6 @@ import {
   Check,
   ChevronDown,
   Lightbulb,
-  Calculator,
   X,
   GitCompare,
 } from 'lucide-react'
@@ -446,12 +445,6 @@ function AksiyonPlaniTab({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actions: any[] = da.whatCompanyShouldDo ?? []
 
-  // AMAÇ ve TİP kolonları: hiçbir aksiyonda dolu değilse tamamen gizle
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hasAmac = actions.some((a: any) => a.amac && a.amac !== '—' && a.amac !== '')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hasTip  = actions.some((a: any) => a.tip  && a.tip  !== '—' && a.tip  !== '')
-
   const toggleAction = (idx: number) => {
     const newSet = new Set(expanded)
     if (newSet.has(idx)) newSet.delete(idx)
@@ -483,14 +476,13 @@ function AksiyonPlaniTab({
           </p>
         </div>
 
-        {/* Tablo baslik */}
-        <div className="hidden md:grid grid-cols-12 gap-3 px-6 py-3 bg-slate-50 border-b border-[#E5E9F0] text-xs uppercase tracking-wide text-[#64748B] font-medium">
-          <div className="col-span-1">#</div>
-          <div className="col-span-1">Ufuk</div>
-          <div style={{ gridColumn: `span ${hasAmac && hasTip ? 4 : hasAmac || hasTip ? 6 : 8}` }}>Aksiyon</div>
-          <div className="col-span-2">Tutar</div>
-          {hasAmac && <div className="col-span-2">Amaç</div>}
-          {hasTip  && <div className="col-span-1 text-right">Tip</div>}
+        {/* Tablo baslik — V3 flex header */}
+        <div className="hidden md:flex items-center gap-4 px-6 py-3 bg-slate-50 border-b border-[#E5E9F0] text-xs uppercase tracking-wide text-[#64748B] font-medium">
+          <div className="w-6 flex-shrink-0">#</div>
+          <div className="flex-1">Aksiyon</div>
+          <div className="flex-shrink-0">Ufuk / Tip</div>
+          <div className="w-24 text-right flex-shrink-0">Tutar</div>
+          <div className="w-4 flex-shrink-0" />
         </div>
 
         {/* Aksiyon satirlari */}
@@ -504,48 +496,34 @@ function AksiyonPlaniTab({
             const isOpen = expanded.has(idx)
             return (
               <div key={idx}>
+                {/* V3 başlık şeridi: # + aksiyon adı + neden seçildi tek satır + sağda ufuk/tip/tutar */}
                 <button
                   onClick={() => toggleAction(idx)}
-                  className="w-full grid grid-cols-12 gap-3 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
                 >
-                  {/* # */}
-                  <div className="col-span-1 flex items-center">
-                    <div
-                      className="flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ width: 20, height: 20, borderRadius: 9999, background: '#0B3C5D' }}
-                    >
-                      {action.priority ?? idx + 1}
-                    </div>
-                  </div>
-                  {/* Ufuk */}
-                  <div className="col-span-1 flex items-center">
-                    <HorizonBadge horizon={action.horizonLabel ?? '—'} />
-                  </div>
-                  {/* Aksiyon */}
+                  {/* # rozeti */}
                   <div
-                    className="flex items-center"
-                    style={{ gridColumn: `span ${hasAmac && hasTip ? 4 : hasAmac || hasTip ? 6 : 8}` }}
+                    className="flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ width: 24, height: 24, borderRadius: 9999, background: '#0B3C5D' }}
                   >
-                    <div>
-                      <div className="font-medium text-[#1E293B]">{action.actionName}</div>
-                      {action.why && (
-                        <div className="text-xs text-[#64748B] mt-0.5">{action.why}</div>
-                      )}
-                    </div>
+                    {action.priority ?? idx + 1}
                   </div>
-                  {/* Tutar */}
-                  <div className="col-span-2 flex items-center">
-                    <div className="font-semibold text-[#1E293B]">{action.amountFormatted ?? '—'}</div>
+                  {/* Aksiyon adı + neden seçildi tek satır */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-[#1E293B]">{action.actionName}</div>
+                    {(action.why ?? toStringArray(action.whySelected)[0]) && (
+                      <div className="text-xs text-[#64748B] mt-0.5 truncate">
+                        {action.why ?? toStringArray(action.whySelected)[0]}
+                      </div>
+                    )}
                   </div>
-                  {/* Amac — sadece veri varsa */}
-                  {hasAmac && (
-                    <div className="col-span-2 flex items-center">
-                      <div className="text-sm text-[#64748B]">{action.amac || '—'}</div>
-                    </div>
-                  )}
-                  {/* Tip + chevron */}
-                  <div className="col-span-1 flex items-center justify-end gap-1">
-                    {hasTip && action.tip && <TypeBadge type={action.tip} />}
+                  {/* Sağda: ufuk badge + tip + tutar + chevron */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <HorizonBadge horizon={action.horizonLabel ?? '—'} />
+                    {action.tip && <TypeBadge type={action.tip} />}
+                    <span className="font-semibold text-[#1E293B] text-sm min-w-[80px] text-right">
+                      {action.amountFormatted ?? '—'}
+                    </span>
                     <ChevronDown
                       size={16}
                       className={`text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
@@ -553,13 +531,14 @@ function AksiyonPlaniTab({
                   </div>
                 </button>
 
-                {/* Expand detay */}
+                {/* Expand detay — V3 kart layout: iki sütun (Bilanço | Rasyo Etkisi) */}
                 {isOpen && (
-                  <div className="px-6 pb-5 bg-slate-50/50 space-y-4">
-                    {/* Why Selected — toStringArray: backend string or string[] → safe array */}
+                  <div className="px-6 pb-5 bg-slate-50/50 space-y-4 border-t border-slate-100 pt-4">
+
+                    {/* Neden Seçildi — tam liste (başlık şeridinde zaten tek satır) */}
                     {toStringArray(action.whySelected).length > 0 && (
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2 mt-4">
+                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
                           Neden Bu Aksiyon Secildi?
                         </div>
                         <ul className="space-y-1.5">
@@ -573,53 +552,63 @@ function AksiyonPlaniTab({
                       </div>
                     )}
 
-                    {/* Muhasebe Bacaklari — accountingLegsByAction lookup */}
-                    {(() => {
-                      const legs  = da.accountingLegsByAction?.[action.actionId]
-                      const debs  = legs?.debits  ?? []
-                      const creds = legs?.credits ?? []
-                      if (debs.length === 0 && creds.length === 0) {
-                        return (
-                          <p className="text-sm text-[#94A3B8] mt-4">
-                            Bu aksiyon için muhasebe detayı mevcut değil.
-                          </p>
-                        )
-                      }
-                      return (
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2 mt-4">
-                          Muhasebe Etkisi
+                    {/* V3 İki Sütun: Sol=Bilanço (Muhasebe Kaydı), Sağ=Rasyo Etkisi */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      {/* Sol Sütun: Muhasebe Kaydı — accountingLegsByAction */}
+                      <div className="space-y-2">
+                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium">
+                          Muhasebe Kaydı
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
-                            <div className="text-xs text-[#64748B] mb-2">Borc</div>
-                            {debs.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                              <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
-                                <span>{leg.accountCode} {leg.accountName}</span>
-                                <span className="ml-3 text-[#2EC4B6] font-semibold">{leg.amountFormatted}</span>
+                        {(() => {
+                          const legs  = da.accountingLegsByAction?.[action.actionId]
+                          const debs  = legs?.debits  ?? []
+                          const creds = legs?.credits ?? []
+                          if (debs.length === 0 && creds.length === 0) {
+                            return (
+                              <p className="text-sm text-[#94A3B8] italic">
+                                Muhasebe etkisi mevcut değil
+                              </p>
+                            )
+                          }
+                          return (
+                            <div className="space-y-2">
+                              <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
+                                <div className="text-xs text-[#64748B] mb-2">Borç</div>
+                                {debs.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                                  <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
+                                    <span>{leg.accountCode} {leg.accountName}</span>
+                                    <span className="ml-3 text-[#2EC4B6] font-semibold">{leg.amountFormatted}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                          <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
-                            <div className="text-xs text-[#64748B] mb-2">Alacak</div>
-                            {creds.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                              <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
-                                <span>{leg.accountCode} {leg.accountName}</span>
-                                <span className="ml-3 text-red-500 font-semibold">{leg.amountFormatted}</span>
+                              <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
+                                <div className="text-xs text-[#64748B] mb-2">Alacak</div>
+                                {creds.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
+                                  <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
+                                    <span>{leg.accountCode} {leg.accountName}</span>
+                                    <span className="ml-3 text-red-500 font-semibold">{leg.amountFormatted}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
+                            </div>
+                          )
+                        })()}
                       </div>
-                      )
-                    })()}
 
-                    {/* RatioTransparencyBlock — sadece computeAmount aktif aksiyonlarda */}
-                    {action.ratioTransparency != null && (
-                      <RatioTransparencyBlock data={action.ratioTransparency} />
-                    )}
+                      {/* Sağ Sütun: Rasyo Etkisi — ratioTransparency yoksa blok gizlenir (silent skip) */}
+                      {action.ratioTransparency != null && (
+                        <div className="space-y-2">
+                          <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium">
+                            Rasyo Etkisi
+                          </div>
+                          <RatioTransparencyBlock data={action.ratioTransparency} />
+                        </div>
+                      )}
 
-                    {/* Banker Perspective */}
+                    </div>
+
+                    {/* Alt: Finrate Yorumu (bankerPerspective) — boşsa gizlenir */}
                     {action.bankerPerspective && (
                       <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[8px] p-3">
                         <div className="text-xs uppercase tracking-wide text-[#0B3C5D] font-medium mb-1">
@@ -628,6 +617,7 @@ function AksiyonPlaniTab({
                         <div className="text-sm text-slate-800">{action.bankerPerspective}</div>
                       </div>
                     )}
+
                   </div>
                 )}
               </div>
@@ -691,100 +681,15 @@ function DetayTab({
   setRejectedExpanded: (v: boolean) => void
 }) {
   const da         = result.decisionAnswer
-  // Aksiyon Planı chevron ile AYNI kaynak: whatCompanyShouldDo + accountingLegsByAction
-  // accountingImpactTable KULLANILMAZ — flat rows, .debits/.credits yok → kutular boş
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const consolidatedActions: any[] = Array.isArray(da.whatCompanyShouldDo) ? da.whatCompanyShouldDo : []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rejected:   any[] = Array.isArray(da.rejectedInsights) ? da.rejectedInsights : []
   const comparison = da.comparisonWithV2
-
-  // Muhasebe verisi olan aksiyonlar (en az bir BORÇ veya ALACAK bacağı olmalı)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actionsWithLegs = consolidatedActions.filter((action: any) => {
-    const legs = da.accountingLegsByAction?.[action.actionId]
-    return (legs?.debits?.length ?? 0) > 0 || (legs?.credits?.length ?? 0) > 0
-  })
+  // Muhasebe Etki Tablosu AksiyonPlaniTab expanded bölümüne taşındı (Faz 7.3)
 
   return (
     <div className="space-y-6">
 
-      {/* A. ACCOUNTING IMPACT TABLE — accountingLegsByAction datasource */}
-      {actionsWithLegs.length > 0 && (
-        <div
-          className="bg-white border border-[#E5E9F0] rounded-[12px] overflow-hidden"
-          style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
-        >
-          <div className="p-6 border-b border-[#E5E9F0]">
-            <h3
-              className="text-lg font-bold text-[#0B3C5D] flex items-center gap-2"
-              style={{ fontFamily: 'Outfit, sans-serif' }}
-            >
-              <Calculator size={18} />
-              Muhasebesel Etki Tablosu
-            </h3>
-            <p className="text-sm text-[#64748B] mt-1">
-              Her aksiyonun bilanco uzerindeki cift tarafli etkisi.
-            </p>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {actionsWithLegs.map((action: any, idx: number) => {
-              const legs  = da.accountingLegsByAction?.[action.actionId]
-              const debs  = legs?.debits  ?? []
-              const creds = legs?.credits ?? []
-              return (
-                <div key={idx} className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="font-medium text-[#1E293B]">{action.actionName}</div>
-                    <div className="text-sm font-semibold text-[#1E293B]">
-                      {action.amountFormatted ?? formatAmount(action.amountTRY)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-slate-50 rounded-[8px] p-3">
-                      <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Borc</div>
-                      {debs.length === 0
-                        ? <div className="text-xs text-slate-400 italic">Borç kaydı yok</div>
-                        : debs.map((d: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                          <div key={i} className="flex items-center justify-between text-sm py-1">
-                            <span className="text-[#1E293B] font-mono text-xs">
-                              {d.accountCode} {d.accountName}
-                            </span>
-                            <span className="font-semibold ml-2" style={{ color: '#2EC4B6' }}>
-                              {d.amountFormatted}
-                            </span>
-                          </div>
-                        ))
-                      }
-                    </div>
-                    <div className="bg-slate-50 rounded-[8px] p-3">
-                      <div className="text-xs text-[#64748B] uppercase font-medium mb-2">Alacak</div>
-                      {creds.length === 0
-                        ? <div className="text-xs text-slate-400 italic">Alacak kaydı yok</div>
-                        : creds.map((c: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                          <div key={i} className="flex items-center justify-between text-sm py-1">
-                            <span className="text-[#1E293B] font-mono text-xs">
-                              {c.accountCode} {c.accountName}
-                            </span>
-                            <span className="text-red-500 font-semibold ml-2">
-                              {c.amountFormatted}
-                            </span>
-                          </div>
-                        ))
-                      }
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* B. REJECTED INSIGHTS */}
+      {/* A. REJECTED INSIGHTS — Muhasebesel Etki Tablosu AksiyonPlaniTab'a taşındı (Faz 7.3) */}
       {rejected.length > 0 && (
         <div
           className="bg-white border border-[#E5E9F0] rounded-[12px] overflow-hidden"
