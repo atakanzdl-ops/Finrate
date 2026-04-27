@@ -236,3 +236,91 @@ describe('selectScenarioEngine — DOUBLE FAIL (v3 + v2 throw)', () => {
     expect(loggedEvents).toContain('engine_double_fail')
   })
 })
+
+describe('selectScenarioEngineWithScenarios — wrapper', () => {
+  test('v3 success → { engineResult, scenarios } döner, loggedEvents=[engine_selected]', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'true'
+    jest.resetModules()
+
+    const loggedEvents: string[] = []
+    const mockScenario = createMockScenario()
+
+    jest.mock('../scenarioV3/scenarioGenerator', () => ({
+      generateScenarios: jest.fn().mockResolvedValue([mockScenario]),
+    }))
+    jest.mock('../scenarioV3/engineV3', () => ({
+      runEngineV3: jest.fn().mockResolvedValue({ shouldNotBeUsed: true }),
+    }))
+    jest.mock('../../logger', () => ({
+      logEvent: jest.fn((event: string) => { loggedEvents.push(event) }),
+      generateCorrelationId: jest.fn(() => 'test-corr-w1'),
+    }))
+
+    const { selectScenarioEngineWithScenarios } = await import('../selectScenarioEngine')
+
+    const result = await selectScenarioEngineWithScenarios({
+      sector: 'CONSTRUCTION',
+      currentRating: 'BB',
+      targetRating: 'A',
+      accountBalances: { 100: 1_000_000, 500: 1_000_000 },
+      incomeStatement: {
+        netSales: 5_000_000,
+        costOfGoodsSold: 3_000_000,
+        grossProfit: 2_000_000,
+        operatingProfit: 1_000_000,
+        netIncome: 700_000,
+        interestExpense: 200_000,
+      },
+    })
+
+    expect(result).toHaveProperty('engineResult')
+    expect(result).toHaveProperty('scenarios')
+    expect(result.engineResult).toHaveProperty('version', 'v3')
+    expect(result.scenarios).toEqual([mockScenario])
+    expect(loggedEvents).toEqual(['engine_selected'])
+  })
+
+  test('v3 fail → v2 success → { engineResult: v2Result, scenarios: [] }, 3 log events', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'true'
+    jest.resetModules()
+
+    const v3Error = new Error('v3 simulated failure')
+    const mockV2Result = { scenarios: [], engine: 'v2-fallback' }
+    const loggedEvents: string[] = []
+
+    jest.mock('../scenarioV3/scenarioGenerator', () => ({
+      generateScenarios: jest.fn().mockRejectedValue(v3Error),
+    }))
+    jest.mock('../scenarioV3/engineV3', () => ({
+      runEngineV3: jest.fn().mockResolvedValue(mockV2Result),
+    }))
+    jest.mock('../../logger', () => ({
+      logEvent: jest.fn((event: string) => { loggedEvents.push(event) }),
+      generateCorrelationId: jest.fn(() => 'test-corr-w2'),
+    }))
+
+    const { selectScenarioEngineWithScenarios } = await import('../selectScenarioEngine')
+
+    const result = await selectScenarioEngineWithScenarios({
+      sector: 'TRADE',
+      currentRating: 'B',
+      targetRating: 'BB',
+      accountBalances: {},
+      incomeStatement: {
+        netSales: 0,
+        costOfGoodsSold: 0,
+        grossProfit: 0,
+        operatingProfit: 0,
+        netIncome: 0,
+        interestExpense: 0,
+      },
+    })
+
+    expect(result.engineResult).toEqual(mockV2Result)
+    expect(result.scenarios).toEqual([])
+    expect(loggedEvents).toContain('engine_error')
+    expect(loggedEvents).toContain('fallback')
+    expect(loggedEvents).toContain('engine_selected')
+    expect(loggedEvents).toHaveLength(3)
+  })
+})

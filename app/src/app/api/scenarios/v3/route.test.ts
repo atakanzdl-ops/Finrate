@@ -40,6 +40,7 @@ function setupMocks(opts: {
   analysis?:                  object | null
   runEngineV3Behavior?:       'success' | 'throw'
   generateScenariosBehavior?: 'success' | 'throw'
+  generatedScenarios?:        object[]
 }) {
   // next/server — NextResponse.json global yok (testEnvironment: 'node')
   jest.doMock('next/server', () => ({
@@ -74,8 +75,12 @@ function setupMocks(opts: {
   jest.doMock('@/lib/scoring/scenarioV3/scenarioGenerator', () => ({
     generateScenarios: jest.fn(async () => {
       if (opts.generateScenariosBehavior === 'throw') throw new Error('generateScenarios fail')
-      return []
+      return opts.generatedScenarios ?? []
     }),
+  }))
+
+  jest.doMock('@/lib/scoring/scenarioV3/responseMapper', () => ({
+    formatScenariosForResponse: jest.fn((scens: unknown[]) => scens),
   }))
 
   jest.doMock('@/lib/scoring/scenarioV3/adaptToEngineResult', () => ({
@@ -201,5 +206,48 @@ describe('POST /api/scenarios/v3', () => {
     const res = await callPost(req)
 
     expect(res.status).toBe(500)
+  })
+
+  // ── Test F: v3 success → response.scenarios formatScenariosForResponse çıktısıyla eşleşir ──
+
+  test('F — v3 success → response.scenarios generatedScenarios ile eşleşir', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'true'
+    const generatedScenarios = [{ id: 'sc-1' }, { id: 'sc-2' }]
+    setupMocks({
+      userId:                    'user-1',
+      analysis:                  VALID_ANALYSIS,
+      runEngineV3Behavior:       'success',
+      generateScenariosBehavior: 'success',
+      generatedScenarios,
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.engine).toBe('v3')
+    expect(body.scenarios).toEqual(generatedScenarios)
+  })
+
+  // ── Test G: Flag false → response.scenarios = [] ──────────────────────────
+
+  test('G — Flag false → response.scenarios = [], v2Comparison mevcut', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:                    'user-1',
+      analysis:                  VALID_ANALYSIS,
+      runEngineV3Behavior:       'success',
+      generateScenariosBehavior: 'success',
+    })
+
+    const req = createMockRequest({ ...VALID_BODY, includeV2Comparison: true })
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.engine).toBe('v3')
+    expect(body.scenarios).toEqual([])
+    expect(body.v2Comparison).toBeDefined()
   })
 })

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma }                    from '@/lib/db'
 import { getUserIdFromRequest }      from '@/lib/auth'
-import { selectScenarioEngine }      from '@/lib/scoring/selectScenarioEngine'
+import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioEngine'
+import { formatScenariosForResponse }        from '@/lib/scoring/scenarioV3/responseMapper'
 import { buildDecisionAnswer }       from '@/lib/scoring/scenarioV3/decisionLayer'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
@@ -203,7 +204,7 @@ export async function POST(req: NextRequest) {
     const targetRating  = parseRatingGrade(targetGrade)
 
     // ── 8. V3 ENGINE ─────────────────────────────────────────────────────────
-    const engineResult = await selectScenarioEngine({
+    const { engineResult, scenarios } = await selectScenarioEngineWithScenarios({
       sector,
       currentRating,
       targetRating,
@@ -248,6 +249,9 @@ export async function POST(req: NextRequest) {
           ? engineResult.debug
           : undefined,
       },
+
+      // Senaryo kartları — Faz 7.1B additive alan
+      scenarios: formatScenariosForResponse(scenarios),
 
       // Opsiyonel V2 karsilastirma — henuz desteklenmiyor bu route'ta
       v2Comparison: includeV2Comparison
