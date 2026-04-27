@@ -7,7 +7,7 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 ---
 
-## 1. Rating Eşik Uyumsuzluğu
+## 1. Rating Eşik Uyumsuzluğu (Bulgu #29 follow-up) ✅ ÇÖZÜLDÜ
 
 **Keşfedildiği Faz:** Faz 1 (commit `e8d351a`)
 
@@ -20,9 +20,11 @@ Bu dosya kalıcı bir TODO listesidir. Her bulgu için: ne olduğu, neden öneml
 
 **Çözüm:** Tek source of truth — `score.ts` RATING_BANDS sabiti. `route.ts` bunu import etmeli, kendi kopyasını silmeli.
 
+**Çözüldü:** Faz 6.5 (`29d900e`) — Bulgu #29 ile follow-up tamamlandı
+
 **Düzeltme fazı:** Faz 6 (API endpoint)
 
-**Faz 6.5 notu:** `scoreToRatingGrade` de-duplikasyon Faz 6.5 Konsolidasyon kapsamına alındı. `route.ts` kendi kopyasını kaldırıp `score.ts` RATING_BANDS'i import edecek.
+**Faz 6.5 notu:** `scoreToRatingGrade` de-duplikasyon Faz 6.5 Konsolidasyon kapsamına alındı. `route.ts` kendi kopyasını kaldırıp `score.ts` RATING_BANDS'i import edildi.
 
 ---
 
@@ -328,7 +330,7 @@ expectedSpillover: {
 
 ---
 
-## 19. UI Logout Butonu Eksik
+## 19. UI Logout Butonu Eksik (Bulgu #30 follow-up) ✅ ÇÖZÜLDÜ
 
 **Keşfedildiği Faz:** Faz 5.1 sonrası (2026-04-26)
 
@@ -336,9 +338,11 @@ expectedSpillover: {
 
 **Çözüm:** UI header logout, session/cookie destroy, /login redirect.
 
+**Çözüldü:** Faz 6.5 (`5d2397e`) — Bulgu #30 ile follow-up tamamlandı
+
 **Düzeltme fazı:** Faz 7
 
-**Faz 6.5 notu:** Logout butonu (`FinrateShell.tsx` logout action) Faz 6.5 Konsolidasyon kapsamına alındı. Session destroy + `/login` redirect Faz 7'de tamamlanır.
+**Faz 6.5 notu:** Logout butonu (`FinrateShell.tsx` logout action) Faz 6.5 Konsolidasyon kapsamına alındı. Session destroy + `/giris` redirect Faz 6.5'te tamamlandı.
 
 **Risk seviyesi:** Yüksek
 
@@ -555,7 +559,7 @@ expectedSpillover: {
 
 | # | Bulgu | Keşfedildiği Faz | Düzeltme Fazı | Durum | Risk |
 |---|-------|------------------|---------------|-------|------|
-| 1 | Rating eşik uyumsuzluğu (Faz 6.5 aktif çözüm: #29) | Faz 1 | Faz 6 | ⏳ Açık | Orta |
+| 1 | Rating eşik uyumsuzluğu (Faz 6.5 aktif çözüm: #29) | Faz 1 | Faz 6.5 `29d900e` | ✅ Çözüldü | Yüksek |
 | 2 | `finalScore` isim tuzağı | Faz 1 | Faz 2 (yorum) + Faz 6 (rename) | ⚠️ Kısmen | Yüksek |
 | 3 | `ScenarioV3.finalScore` çakışması | Faz 1 | Faz 2 | ✅ Çözüldü | Yüksek |
 | 4 | `subjectiveTotal` DB'de yok | Faz 1 | Faz 6 | ⏳ Açık | Orta |
@@ -573,7 +577,7 @@ expectedSpillover: {
 | 16 | expectedSpillover üç katmanlı modelleme | Faz 3 (Codex audit) | Faz 4b | ⏳ Açık | Orta |
 | 17 | distanceToTarget metric | Faz 5.1 (GPT) | Faz 5.3/6 | ⏳ Açık | Düşük |
 | 18 | attributionCache scope guard | Faz 5.1 (GPT+Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Düşük |
-| 19 | UI logout butonu eksik (Faz 6.5 aktif çözüm: #30) | Faz 5.1 sonrası | Faz 7 | ⏳ Açık | Yüksek |
+| 19 | UI logout butonu eksik (Faz 6.5 aktif çözüm: #30) | Faz 5.1 sonrası | Faz 6.5 `5d2397e` | ✅ Çözüldü | Yüksek |
 | 20 | computeTargetGap interface uyumsuzluğu | Faz 5.1 (Adım 0) | Faz 6a ✅ | ✅ Çözüldü | Orta |
 | 21 | computeScoreAttribution Promise.all (yanlış kayıt) | Faz 5.1 | İPTAL | ❌ İptal | Yok |
 | 22 | Pair AppliedAction.attribution boş obje (BLOCKER) | Faz 5.1 (Codex) | Faz 5.2 ✅ | ✅ Çözüldü | Yüksek |
