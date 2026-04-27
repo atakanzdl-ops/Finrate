@@ -52,6 +52,7 @@ import {
 import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
 import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
+import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,8 @@ interface ScenarioPanelV3Props {
   currentScore: number
   currentGrade: string
 }
+
+type ApiErrorResponse = { error?: string }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -920,8 +923,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
   const [activeTab,           setActiveTab]           = useState<'ozet' | 'aksiyon' | 'detay'>('ozet')
   const [includeV2Comparison, setIncludeV2Comparison] = useState<boolean>(false)
   const [loading,             setLoading]             = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [result,              setResult]              = useState<any>(null)
+  const [result,              setResult]              = useState<ScenarioV3ApiResponse | null>(null)
   const [error,               setError]               = useState<string | null>(null)
   const [expandedActions,     setExpandedActions]     = useState<Set<number>>(new Set())
   const [expandedNotchPlans,  setExpandedNotchPlans]  = useState<Set<'one' | 'two'>>(new Set())
@@ -941,10 +943,12 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Hesaplama basarisiz')
+        const errorData = data as ApiErrorResponse
+        setError(errorData.error ?? 'Hesaplama basarisiz')
         return
       }
-      setResult(data)
+      const successData = data as ScenarioV3ApiResponse
+      setResult(successData)
       setActiveTab('ozet')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata')
