@@ -513,6 +513,644 @@ function parseFallback(text: string, year: number, period: string): ParsedRow[] 
   return [{ year, period, fields, unmapped: [] }]
 }
 
+// ─── TDHP Ayrıntılı Bilanço/Gelir Tablosu Parser ────────────────────────────
+
+// Ana bölüm türleri
+type TdhpMainSection = 'AKTIF' | 'PASIF' | 'INCOME_STATEMENT' | null
+
+// Alt bölüm türleri
+type TdhpSubSection =
+  // AKTİF alt bölümleri
+  | 'HAZIR_DEGERLER'
+  | 'TICARI_ALACAKLAR'
+  | 'DIGER_ALACAKLAR'
+  | 'STOKLAR'
+  | 'GELECEK_AYLARA_AIT_GIDERLER'
+  | 'DIGER_DONEN_VARLIKLAR'
+  | 'TICARI_ALACAKLAR_UV'
+  | 'DIGER_ALACAKLAR_UV'
+  | 'MALI_DURAN_VARLIKLAR'
+  | 'MADDI_DURAN_VARLIKLAR'
+  | 'MADDI_OLMAYAN_DURAN_VARLIKLAR'
+  | 'GELECEK_YILLARA_AIT_GIDERLER'
+  // PASİF alt bölümleri
+  | 'MALI_BORCLAR_KV'
+  | 'TICARI_BORCLAR_KV'
+  | 'DIGER_BORCLAR_KV'
+  | 'ALINAN_AVANSLAR_KV'
+  | 'YILLARA_YAYGIN_INSAAT_KV'
+  | 'ODENEN_VERGI_KV'
+  | 'MALI_BORCLAR_UV'
+  | 'TICARI_BORCLAR_UV'
+  | 'DIGER_BORCLAR_UV'
+  | 'OZKAYNAKLAR'
+  // GELİR TABLOSU alt bölümleri
+  | 'BRUT_SATISLAR'
+  | 'SATIS_INDIRIMLERI'
+  | 'SATIS_MALIYETI'
+  | 'FAALIYET_GIDERLERI'
+  | 'DIGER_OLAGAN_GELIR_KARLAR'
+  | 'DIGER_OLAGAN_GIDER_ZARARLAR'
+  | 'FINANSMAN_GIDERLERI'
+  | 'OLAGANDISI_GELIR_KARLAR'
+  | 'OLAGANDISI_GIDER_ZARARLAR'
+  | 'DONEM_KARI_VERGI'
+  | null
+
+interface TdhpContext {
+  main: TdhpMainSection
+  sub: TdhpSubSection
+}
+
+// ─── TDHP Ana Bölüm Tespiti ───────────────────────────────────────────────────
+
+function detectTdhpMainSection(n: string): TdhpMainSection | null {
+  // Aktif tarafı — bilanço bölüm başlıkları (I/II ile başlar veya tek kelime başlık)
+  if (/^i[\s.\-]\s*donen\s*varlik/.test(n) && !n.includes('toplam')) return 'AKTIF'
+  if (/^ii[\s.\-]\s*duran\s*varlik/.test(n) && !n.includes('toplam')) return 'AKTIF'
+  // Prefix'siz donen/duran varlık: Sadece başlık satırı olarak — çok kısa satırlar (veri yok)
+  if (/^donen\s*varliklar?$/.test(n)) return 'AKTIF'
+  if (/^duran\s*varliklar?$/.test(n)) return 'AKTIF'
+  // Pasif tarafı — "yabancı kaynaklar" ile birlikte gelir (veri satırları sadece bir kavram içerir)
+  if (/^iii[\s.\-]\s*kisa\s*vadeli/.test(n) && !n.includes('toplam')) return 'PASIF'
+  if (/^iv[\s.\-]\s*uzun\s*vadeli/.test(n) && !n.includes('toplam')) return 'PASIF'
+  // Prefix'siz kisa/uzun: sadece "yabancı kaynaklar" ile birlikte olan başlıklar
+  if (/^kisa\s*vadeli\s*(yabanci|kaynaklar)/.test(n) && !n.includes('toplam')) return 'PASIF'
+  if (/^uzun\s*vadeli\s*(yabanci|kaynaklar)/.test(n) && !n.includes('toplam')) return 'PASIF'
+  if (/^(v[\s.\-]\s*)?oz\s*(kaynak|serma)/.test(n) && !n.includes('toplam')) return 'PASIF'
+  // Gelir tablosu
+  if (/^(ayrintili\s*)?gelir\s*tablosu/.test(n)) return 'INCOME_STATEMENT'
+  if (/^a[\s.\-]\s*brut\s*satis/.test(n)) return 'INCOME_STATEMENT'
+  return null
+}
+
+// ─── TDHP Alt Bölüm Tespiti ───────────────────────────────────────────────────
+
+function detectTdhpSubSection(n: string, main: TdhpMainSection, isUzunVadeli = false): TdhpSubSection | null {
+  if (main === 'AKTIF') {
+    // Dönen varlık alt bölümleri (A-H harfleriyle başlayan başlıklar)
+    if (/^a[\s.\-]\s*hazir\s*deger/.test(n))                     return 'HAZIR_DEGERLER'
+    if (/^c[\s.\-]\s*ticari\s*alacak/.test(n))                   return 'TICARI_ALACAKLAR'
+    if (/^d[\s.\-]\s*diger\s*alacak/.test(n))                    return 'DIGER_ALACAKLAR'
+    if (/^e[\s.\-]\s*stoklar/.test(n))                           return 'STOKLAR'
+    if (/^g[\s.\-]\s*gelecek\s*ay/.test(n))                      return 'GELECEK_AYLARA_AIT_GIDERLER'
+    if (/^h[\s.\-]\s*diger\s*donen/.test(n))                     return 'DIGER_DONEN_VARLIKLAR'
+    // Duran varlık alt bölümleri (A-G harfleriyle başlayan başlıklar)
+    if (/^a[\s.\-]\s*ticari\s*alacak/.test(n))                   return 'TICARI_ALACAKLAR_UV'
+    if (/^b[\s.\-]\s*diger\s*alacak/.test(n))                    return 'DIGER_ALACAKLAR_UV'
+    if (/^c[\s.\-]\s*mali\s*duran/.test(n))                      return 'MALI_DURAN_VARLIKLAR'
+    if (/^d[\s.\-]\s*maddi\s*duran/.test(n))                     return 'MADDI_DURAN_VARLIKLAR'
+    if (/^e[\s.\-]\s*maddi\s*olmayan/.test(n))                   return 'MADDI_OLMAYAN_DURAN_VARLIKLAR'
+    if (/^g[\s.\-]\s*gelecek\s*yil/.test(n))                     return 'GELECEK_YILLARA_AIT_GIDERLER'
+    // Keyword fallback: sadece başlık satırları olarak gelen tam eşleşmeler
+    // (veri satırlarından ayırt etmek için sayı içermeyen kısa satırlar)
+    if (/^hazir\s*degerler?$/.test(n))                            return 'HAZIR_DEGERLER'
+    if (/^(e[\s.\-]\s*)?stoklar$/.test(n))                       return 'STOKLAR'
+    if (/^maddi\s*olmayan\s*duran\s*varliklar?$/.test(n))         return 'MADDI_OLMAYAN_DURAN_VARLIKLAR'
+    if (/^maddi\s*duran\s*varliklar?$/.test(n))                   return 'MADDI_DURAN_VARLIKLAR'
+    if (/^mali\s*duran\s*varliklar?$/.test(n))                    return 'MALI_DURAN_VARLIKLAR'
+  }
+
+  if (main === 'PASIF') {
+    // Uzun vadeli bölümdeyiz → UV sub-section'ları döndür
+    if (isUzunVadeli) {
+      if (/^a[\s.\-]\s*mali\s*bor/.test(n))    return 'MALI_BORCLAR_UV'
+      if (/^b[\s.\-]\s*ticari\s*bor/.test(n))  return 'TICARI_BORCLAR_UV'
+      if (/^c[\s.\-]\s*diger\s*bor/.test(n))   return 'DIGER_BORCLAR_UV'
+    }
+    // Kısa vadeli (veya UV öncesi) bölüm
+    if (/^a[\s.\-]\s*mali\s*bor/.test(n))      return 'MALI_BORCLAR_KV'
+    if (/^b[\s.\-]\s*ticari\s*bor/.test(n))    return 'TICARI_BORCLAR_KV'
+    if (/^c[\s.\-]\s*diger\s*bor/.test(n))     return 'DIGER_BORCLAR_KV'
+    if (/^d[\s.\-]\s*alinan\s*avans/.test(n))  return 'ALINAN_AVANSLAR_KV'
+    if (/^e[\s.\-]\s*yillara\s*yaygin/.test(n)) return 'YILLARA_YAYGIN_INSAAT_KV'
+    if (/^f[\s.\-]\s*odenecek/.test(n))           return 'ODENEN_VERGI_KV'
+    if (/^(v[\s.\-]\s*)?oz\s*(kaynak|serma)/.test(n) && !n.includes('toplam')) return 'OZKAYNAKLAR'
+    if (/^oz\s*(kaynak|serma)/.test(n) && !n.includes('toplam'))               return 'OZKAYNAKLAR'
+  }
+
+  if (main === 'INCOME_STATEMENT') {
+    if (/^a[\s.\-]\s*brut\s*satis/.test(n))           return 'BRUT_SATISLAR'
+    if (/^b[\s.\-]\s*satis\s*indiri/.test(n))         return 'SATIS_INDIRIMLERI'
+    if (/^[cd][\s.\-]\s*satis.*(maliyet|smm)/.test(n)) return 'SATIS_MALIYETI'
+    if (/^d[\s.\-]\s*faaliyet\s*gider/.test(n))       return 'FAALIYET_GIDERLERI'
+    if (/^e[\s.\-]\s*diger.*olagan.*gelir/.test(n))   return 'DIGER_OLAGAN_GELIR_KARLAR'
+    if (/^f[\s.\-]\s*diger.*olagan.*gider/.test(n))   return 'DIGER_OLAGAN_GIDER_ZARARLAR'
+    if (/^g[\s.\-]\s*finansman\s*gider/.test(n))      return 'FINANSMAN_GIDERLERI'
+    if (/^h[\s.\-]\s*olagandisi.*gelir/.test(n))      return 'OLAGANDISI_GELIR_KARLAR'
+    if (/^i[\s.\-]\s*olagandisi.*gider/.test(n))      return 'OLAGANDISI_GIDER_ZARARLAR'
+    if (/donem\s*kari\s*vergi/.test(n))               return 'DONEM_KARI_VERGI'
+    // keyword fallback
+    if (n.includes('brut satis') && !n.includes('toplam')) return 'BRUT_SATISLAR'
+    if (n.includes('satis indiri'))                        return 'SATIS_INDIRIMLERI'
+    if (n.includes('finansman gider'))                     return 'FINANSMAN_GIDERLERI'
+    if (n.includes('faaliyet gider') && !n.includes('toplam')) return 'FAALIYET_GIDERLERI'
+  }
+
+  return null
+}
+
+// ─── TDHP Sayı Parse ──────────────────────────────────────────────────────────
+
+function parseTdhpNum(s: string): number | null {
+  if (!s) return null
+  // Türkçe format: 1.234.567,89 → 1234567.89
+  const t = s.trim().replace(/\./g, '').replace(',', '.')
+  const n = parseFloat(t)
+  return isNaN(n) ? null : Math.abs(n) // POZİTİF MUTLAK
+}
+
+/**
+ * KVB beyanname sütun formatı:
+ *   2022: [önceki(2021)] [cari(2022)]
+ *   2023: [önceki(2022)] [cari(2023)] [enflasyon_düz(2023)]
+ *   2024: [önceki(2023_enfl)] [cari(2024)]
+ *
+ * Satırdaki cari dönem değeri = 2. TR sayısı (virgülle biten format zorunlu).
+ * Tek sayı varsa onu döndür (zaten cari dönem).
+ * Virgülsüz sayılar (satır numaraları "1.", "2.") yakalanmaz.
+ */
+function cariDonemNum(line: string): number | null {
+  // Sadece virgüllü TR formatı: 1.234.567,89 veya 0,00 — satır numarası "1." atlanır
+  const m = line.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
+  if (!m || m.length === 0) return null
+  const val = m.length >= 2 ? m[1] : m[0]   // index 1 = cari dönem
+  return parseTdhpNum(val)
+}
+
+// ─── TDHP Satır → Hesap Kodu Eşlemesi ───────────────────────────────────────
+
+type TdhpRowEntry = { code: string; patterns: string[] }
+
+// Her satır için: label norm edilmiş pattern listesi → hesap kodu
+// Daha spesifik pattern'lar önce yazılır (ilk eşleşen kazanır)
+const TDHP_ROW_MAP: Array<{ sub: TdhpSubSection; entries: TdhpRowEntry[] }> = [
+  {
+    sub: 'HAZIR_DEGERLER',
+    entries: [
+      { code: '100', patterns: ['kasa'] },
+      { code: '101', patterns: ['alinan cekler'] },
+      { code: '102', patterns: ['bankalar'] },
+      { code: '103', patterns: ['verilen cekler', 'odeme emirleri'] },
+    ],
+  },
+  {
+    sub: 'TICARI_ALACAKLAR',
+    entries: [
+      { code: '120', patterns: ['alicilar'] },
+      { code: '122', patterns: ['alacak senetleri reeskontu'] }, // reeskont önce (122)
+      { code: '121', patterns: ['alacak senetleri'] }, // sonra net (121)
+      { code: '126', patterns: ['verilen depozito', 'teminatlar'] },
+      { code: '129', patterns: ['supheli ticari alacaklar karsil'] }, // karşılık önce (129)
+      { code: '128', patterns: ['supheli ticari alacaklar'] }, // sonra brüt (128)
+    ],
+  },
+  {
+    sub: 'DIGER_ALACAKLAR',
+    entries: [
+      { code: '131', patterns: ['ortaklardan alacaklar'] },
+      { code: '132', patterns: ['istiraklerden alacaklar'] },
+      { code: '133', patterns: ['bagli ortakliklardan alacaklar'] },
+      { code: '135', patterns: ['personelden alacaklar'] },
+      { code: '136', patterns: ['diger cesitli alacaklar'] },
+      { code: '139', patterns: ['supheli diger alacaklar karsil'] }, // karşılık önce (139)
+      { code: '138', patterns: ['supheli diger alacaklar'] }, // sonra brüt (138)
+    ],
+  },
+  {
+    sub: 'STOKLAR',
+    entries: [
+      { code: '150', patterns: ['ilk madde ve malzeme'] },
+      { code: '151', patterns: ['yari mamuller'] },
+      { code: '152', patterns: ['mamuller'] },
+      { code: '153', patterns: ['ticari mallar'] },
+      { code: '157', patterns: ['diger stoklar'] },
+      { code: '158', patterns: ['stok deger dusukl'] },
+      { code: '159', patterns: ['verilen siparis avanslari'] },
+      { code: '170', patterns: ['yillara yaygin insaat ve onarim maliyetleri', 'yillara yaygin insaat maliyetleri'] },
+    ],
+  },
+  {
+    sub: 'GELECEK_AYLARA_AIT_GIDERLER',
+    entries: [
+      { code: '180', patterns: ['gelecek aylara ait giderler'] },
+      { code: '181', patterns: ['gelir tahakkuklari'] },
+    ],
+  },
+  {
+    sub: 'DIGER_DONEN_VARLIKLAR',
+    entries: [
+      { code: '191', patterns: ['indirilecek kdv'] },
+      { code: '190', patterns: ['devreden kdv', 'indirilecek kdv'] }, // indirilecek fallback
+      { code: '196', patterns: ['personel avanslari'] },
+    ],
+  },
+  {
+    sub: 'TICARI_ALACAKLAR_UV',
+    entries: [
+      { code: '226', patterns: ['verilen depozito', 'teminatlar'] },
+    ],
+  },
+  {
+    sub: 'DIGER_ALACAKLAR_UV',
+    entries: [
+      { code: '231', patterns: ['ortaklardan alacaklar'] },
+      { code: '232', patterns: ['istiraklerden alacaklar'] },
+      { code: '233', patterns: ['bagli ortakliklardan alacaklar'] },
+      { code: '236', patterns: ['diger cesitli alacaklar'] },
+    ],
+  },
+  {
+    sub: 'MALI_DURAN_VARLIKLAR',
+    entries: [
+      { code: '240', patterns: ['bagli menkul kiymetler'] },
+      { code: '242', patterns: ['istirakler'] },
+      { code: '245', patterns: ['bagli ortakliklar'] },
+    ],
+  },
+  {
+    sub: 'MADDI_DURAN_VARLIKLAR',
+    entries: [
+      { code: '250', patterns: ['arazi ve arsalar'] },
+      { code: '251', patterns: ['yeralti ve yerüstü', 'yerüstü duzenl'] },
+      { code: '252', patterns: ['binalar'] },
+      { code: '253', patterns: ['tesis, makine', 'tesis makine', 'makine ve cihaz'] },
+      { code: '254', patterns: ['tasitlar'] },
+      { code: '255', patterns: ['demirbas'] },
+      { code: '256', patterns: ['diger maddi duran varliklar'] },
+      { code: '257', patterns: ['birikm'] }, // Birikmiş Amortismanlar (MDV altında)
+      { code: '258', patterns: ['yapilmakta olan yatirimlar'] },
+      { code: '259', patterns: ['verilen avanslar'] },
+    ],
+  },
+  {
+    sub: 'MADDI_OLMAYAN_DURAN_VARLIKLAR',
+    entries: [
+      { code: '260', patterns: ['haklar'] },
+      { code: '261', patterns: ['serefiye'] },
+      { code: '262', patterns: ['kurulus ve orgutlenme giderleri'] },
+      { code: '263', patterns: ['arastirma ve gelistirme giderleri'] },
+      { code: '264', patterns: ['ozel maliyetler'] },
+      { code: '267', patterns: ['diger maddi olmayan duran varliklar'] },
+      { code: '268', patterns: ['birikm'] }, // Birikmiş Amortismanlar (MODV altında)
+    ],
+  },
+  {
+    sub: 'GELECEK_YILLARA_AIT_GIDERLER',
+    entries: [
+      { code: '280', patterns: ['gelecek yillara ait giderler'] },
+    ],
+  },
+  {
+    sub: 'MALI_BORCLAR_KV',
+    entries: [
+      { code: '300', patterns: ['banka kredileri'] },
+      { code: '301', patterns: ['finansal kiralama islemlerinden borclar'] },
+      { code: '302', patterns: ['ertelenmis finansal kiralama'] },
+      { code: '309', patterns: ['diger mali borclar'] },
+    ],
+  },
+  {
+    sub: 'TICARI_BORCLAR_KV',
+    entries: [
+      { code: '320', patterns: ['saticilar'] },
+      { code: '321', patterns: ['bor senetleri', 'borc senetleri'] },
+      { code: '326', patterns: ['alinan depozito', 'teminatlar'] },
+      { code: '329', patterns: ['diger ticari borclar'] },
+    ],
+  },
+  {
+    sub: 'DIGER_BORCLAR_KV',
+    entries: [
+      { code: '331', patterns: ['ortaklara borclar'] },
+      { code: '332', patterns: ['iştiraklere borclar', 'istiraklere borclar'] },
+      { code: '333', patterns: ['bagli ortakl'] },
+      { code: '335', patterns: ['personele borclar'] },
+      { code: '336', patterns: ['diger cesitli borclar'] },
+    ],
+  },
+  {
+    sub: 'ALINAN_AVANSLAR_KV',
+    entries: [
+      { code: '340', patterns: ['alinan siparis avanslari'] },
+      { code: '349', patterns: ['alinan diger avanslar'] },
+    ],
+  },
+  {
+    sub: 'YILLARA_YAYGIN_INSAAT_KV',
+    entries: [
+      { code: '350', patterns: ['yillara yaygin insaat ve onarim hakedis', 'yillara yaygin insaat ve onarim hakedle'] },
+      { code: '358', patterns: ['yillara yaygin insaat enflasyon', 'enflasyon duzeltme'] },
+    ],
+  },
+  {
+    sub: 'ODENEN_VERGI_KV',
+    entries: [
+      { code: '360', patterns: ['odenecek vergi ve fonlar'] },
+      { code: '361', patterns: ['odenecek sosyal guvenlik'] },
+      { code: '370', patterns: ['donem kari vergi ve diger yasal yukuml'] },
+      { code: '371', patterns: ['donem karinin pesin odenen vergi'] },
+      { code: '391', patterns: ['hesaplanan kdv'] },
+    ],
+  },
+  {
+    sub: 'MALI_BORCLAR_UV',
+    entries: [
+      { code: '400', patterns: ['banka kredileri'] },
+      { code: '401', patterns: ['finansal kiralama islemlerinden borclar'] },
+      { code: '405', patterns: ['cikarilmis tahviller'] },
+    ],
+  },
+  {
+    sub: 'TICARI_BORCLAR_UV',
+    entries: [
+      { code: '420', patterns: ['saticilar'] },
+      { code: '421', patterns: ['bor senetleri', 'borc senetleri'] },
+    ],
+  },
+  {
+    sub: 'DIGER_BORCLAR_UV',
+    entries: [
+      { code: '431', patterns: ['ortaklara borclar'] },
+      { code: '436', patterns: ['diger cesitli borclar'] },
+    ],
+  },
+  {
+    sub: 'OZKAYNAKLAR',
+    entries: [
+      { code: '501', patterns: ['odenmemis sermaye'] },           // daha spesifik önce
+      { code: '502', patterns: ['sermaye duzeltmesi olumlu'] },   // daha spesifik önce
+      { code: '500', patterns: ['sermaye'] },                     // en geniş en son
+      { code: '520', patterns: ['hisse senedi ihrac primleri'] },
+      { code: '522', patterns: ['m.d.v. yeniden degerleme', 'mdv yeniden degerleme'] },
+      { code: '523', patterns: ['istirakler yeniden degerleme'] },
+      { code: '529', patterns: ['diger sermaye yedekleri'] },
+      { code: '540', patterns: ['yasal yedekler'] },
+      { code: '541', patterns: ['statu yedekleri'] },
+      { code: '542', patterns: ['olaganustu yedekler'] },
+      { code: '548', patterns: ['diger kar yedekleri'] },
+      { code: '549', patterns: ['ozel fonlar'] },
+      { code: '570', patterns: ['gecmis yil karlari'] },
+      { code: '580', patterns: ['gecmis yillar zararlari'] },
+      { code: '590', patterns: ['donem net kari'] },
+      { code: '591', patterns: ['donem net zarari'] },
+    ],
+  },
+  {
+    sub: 'BRUT_SATISLAR',
+    entries: [
+      { code: '600', patterns: ['yurtici satislar', 'yurt ici satislar', 'yurticisatislar'] },
+      { code: '601', patterns: ['yurtdisi satislar', 'yurt disi satislar'] },
+      { code: '602', patterns: ['diger gelirler'] },
+    ],
+  },
+  {
+    sub: 'SATIS_INDIRIMLERI',
+    entries: [
+      { code: '610', patterns: ['satistan iadeler'] },
+      { code: '611', patterns: ['satis iskontoları', 'satis iskontolari'] },
+      { code: '612', patterns: ['diger indirimler'] },
+    ],
+  },
+  {
+    sub: 'SATIS_MALIYETI',
+    entries: [
+      { code: '620', patterns: ['satilan mamuller maliyeti'] },
+      { code: '621', patterns: ['satilan ticari mallar maliyeti'] },
+      { code: '622', patterns: ['satilan hizmet maliyeti'] },
+    ],
+  },
+  {
+    sub: 'FAALIYET_GIDERLERI',
+    entries: [
+      { code: '630', patterns: ['arastirma ve gelistirme giderleri'] },
+      { code: '631', patterns: ['pazarlama, satis ve dagitim giderleri', 'pazarlama satis ve dagitim'] },
+      { code: '632', patterns: ['genel yonetim giderleri'] },
+    ],
+  },
+  {
+    sub: 'DIGER_OLAGAN_GELIR_KARLAR',
+    entries: [
+      { code: '640', patterns: ['istiraklerden temettu gelirleri'] },
+      { code: '642', patterns: ['faiz gelirleri'] },
+      { code: '644', patterns: ['konusu kalmayan karsil'] },
+      { code: '646', patterns: ['kambiyo karlari'] },
+      { code: '648', patterns: ['enflasyon duzeltmesi karlari'] },
+      { code: '649', patterns: ['diger olagan gelir ve karlar'] },
+    ],
+  },
+  {
+    sub: 'DIGER_OLAGAN_GIDER_ZARARLAR',
+    entries: [
+      { code: '654', patterns: ['karsilik giderleri'] },
+      { code: '656', patterns: ['kambiyo zararlari'] },
+      { code: '658', patterns: ['enflasyon duzeltmesi zararlari'] },
+      { code: '659', patterns: ['diger olagan gider ve zararlar'] },
+    ],
+  },
+  {
+    sub: 'FINANSMAN_GIDERLERI',
+    entries: [
+      { code: '660', patterns: ['kisa vadeli borclanma giderleri'] },
+      { code: '661', patterns: ['uzun vadeli borclanma giderleri'] },
+    ],
+  },
+  {
+    sub: 'OLAGANDISI_GELIR_KARLAR',
+    entries: [
+      { code: '671', patterns: ['onceki donem gelir ve karlari'] },
+      { code: '679', patterns: ['diger olagandisi gelir ve karlar'] },
+    ],
+  },
+  {
+    sub: 'OLAGANDISI_GIDER_ZARARLAR',
+    entries: [
+      { code: '680', patterns: ['calismayan kisim gider ve zararlari'] },
+      { code: '681', patterns: ['onceki donem gider ve zararlari'] },
+      { code: '689', patterns: ['diger olagandisi gider ve zararlar'] },
+    ],
+  },
+  {
+    sub: 'DONEM_KARI_VERGI',
+    entries: [
+      { code: '691', patterns: ['donem kari vergi ve diger yasal yukuml'] },
+      // 692 SKIP — üretilmez
+    ],
+  },
+]
+
+// TDHP_ROW_MAP'i sub bölümüne göre hızlı erişim için Map'e dönüştür
+const TDHP_SUB_MAP = new Map<TdhpSubSection, TdhpRowEntry[]>()
+for (const group of TDHP_ROW_MAP) {
+  TDHP_SUB_MAP.set(group.sub, group.entries)
+}
+
+// ─── TDHP satır eşleme yardımcı fonksiyonu ───────────────────────────────────
+
+function matchTdhpCode(labelNorm: string, sub: TdhpSubSection | null): string | null {
+  if (!sub) return null
+  const entries = TDHP_SUB_MAP.get(sub)
+  if (!entries) return null
+
+  for (const entry of entries) {
+    for (const pat of entry.patterns) {
+      if (labelNorm.includes(pat)) return entry.code
+    }
+  }
+  return null
+}
+
+// ─── TDHP Ana Parser ─────────────────────────────────────────────────────────
+
+/**
+ * TDHP ayrıntılı bilanço ve gelir tablosu satırlarından ham hesap kodlarını çıkarır.
+ * - Tüm amount değerleri POZİTİF MUTLAK (Math.abs)
+ * - 692 üretilmez (SKIP)
+ * - 0 tutarlar yazılmaz
+ * - Code deduplikasyon: ilk eşleşen kazanır
+ */
+export function extractTdhpRawAccountsFromText(
+  text: string
+): Array<{ code: string; amount: number }> {
+  const resultMap = new Map<string, number>()
+
+  const ctx: TdhpContext = { main: null, sub: null }
+  let isDuranVarlik = false  // Duran varlık bölümündeyiz mi?
+  let isUzunVadeli = false   // Uzun vadeli pasif bölümündeyiz mi?
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.length < 3) continue
+
+    const n = norm(line)
+      .replace(/^[\s.]+/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    // ── Ana bölüm tespiti ────────────────────────────────────────────────────
+    const detectedMain = detectTdhpMainSection(n)
+    if (detectedMain !== null) {
+      ctx.main = detectedMain
+      // Duran varlık takibi
+      if (/^ii[\s.\-]\s*duran\s*varlik/.test(n) || /^duran\s*varliklar?$/.test(n)) {
+        isDuranVarlik = true
+        isUzunVadeli = false
+      } else if (/^i[\s.\-]\s*donen\s*varlik/.test(n) || /^donen\s*varliklar?$/.test(n)) {
+        isDuranVarlik = false
+        isUzunVadeli = false
+      } else if (/^iii[\s.\-]\s*kisa\s*vadeli/.test(n) || /^kisa\s*vadeli\s*(yabanci|kaynaklar)/.test(n)) {
+        isDuranVarlik = false
+        isUzunVadeli = false
+      } else if (/^iv[\s.\-]\s*uzun\s*vadeli/.test(n) || /^uzun\s*vadeli\s*(yabanci|kaynaklar)/.test(n)) {
+        isDuranVarlik = false
+        isUzunVadeli = true
+      } else if (/^(v[\s.\-]\s*)?oz\s*(kaynak|serma)/.test(n)) {
+        isUzunVadeli = false
+      }
+      // Aynı satır hem ana bölüm hem alt bölüm olabilir (örn. "A- Brüt Satışlar")
+      // Bu nedenle sub-section tespitini ana bölüm sonrasında da dene
+      const subOnMainLine = detectTdhpSubSection(n, ctx.main, isUzunVadeli)
+      ctx.sub = subOnMainLine ?? null
+      continue
+    }
+
+    // ── Sayı var mı? ─────────────────────────────────────────────────────────
+    const amount = cariDonemNum(line)
+
+    // Alt bölüm tespiti: sayısı olmayan satırlar OR sayı var ama önce sub-section dene
+    if (amount === null || amount === 0) {
+      const detectedSub = detectTdhpSubSection(n, ctx.main, isUzunVadeli)
+      if (detectedSub !== null) {
+        ctx.sub = detectedSub
+      }
+      continue
+    }
+
+    // Satır etiketini temizle (sayıları çıkar, (-) temizle)
+    const labelRaw = line
+      .replace(/-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?/g, '')
+      .replace(/\(-\)/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!labelRaw || labelRaw.length < 2) continue
+
+    const labelNorm = norm(labelRaw).replace(/^[\s.]+/, '').trim()
+
+    // Önce bu satırın sub-section başlığı olup olmadığını da kontrol et
+    // (bazı satırlar hem bölüm başlığı hem veri içerir — örn. "Dönem Karı Vergi... 320.000")
+    // Bu durumda sub-section'ı güncelle ama data olarak da işle
+    const detectedSubWithData = detectTdhpSubSection(n, ctx.main, isUzunVadeli)
+    if (detectedSubWithData !== null) {
+      ctx.sub = detectedSubWithData
+    }
+
+    // ── Hesap kodu eşleme ────────────────────────────────────────────────────
+    let code: string | null = null
+
+    // AKTIF tarafında context'e göre UV alacak alt bölümlerini düzelt
+    if (ctx.main === 'AKTIF' && isDuranVarlik) {
+      // Duran varlık bölümünde "Verilen Depozito" → 226
+      if (ctx.sub === null || ctx.sub === 'TICARI_ALACAKLAR_UV') {
+        if (labelNorm.includes('verilen depozito') || (labelNorm.includes('verilen') && labelNorm.includes('teminat'))) {
+          code = '226'
+        }
+      }
+      // Duran varlık alacaklar bölümü
+      if (!code && ctx.sub === 'DIGER_ALACAKLAR_UV') {
+        code = matchTdhpCode(labelNorm, 'DIGER_ALACAKLAR_UV')
+      }
+    }
+
+    if (!code) {
+      // Dönen varlik bölümü "Verilen Depozito" → 126
+      if (ctx.main === 'AKTIF' && !isDuranVarlik && ctx.sub === 'TICARI_ALACAKLAR') {
+        if (labelNorm.includes('verilen depozito') || (labelNorm.includes('verilen') && labelNorm.includes('teminat'))) {
+          code = '126'
+        }
+      }
+    }
+
+    // Genel alt bölüm eşleme
+    if (!code) {
+      code = matchTdhpCode(labelNorm, ctx.sub)
+    }
+
+    // Bağımsız duran varlık kalemleri: Yıllara Yaygın (AKTIF tarafında)
+    if (!code && ctx.main === 'AKTIF') {
+      if (labelNorm.includes('yillara yaygin insaat ve onarim maliyetleri') || labelNorm.includes('yillara yaygin insaat maliyetleri')) {
+        code = '170'
+      }
+    }
+
+    // İndirilecek KDV özel durumu
+    if (!code && ctx.sub === 'DIGER_DONEN_VARLIKLAR') {
+      if (labelNorm.includes('indirilecek kdv')) {
+        code = '191'
+      } else if (labelNorm.includes('devreden kdv') || labelNorm.includes('kdv')) {
+        code = '190'
+      }
+    }
+
+    if (!code) continue
+
+    // 692 SKIP
+    if (code === '692') continue
+
+    // 590/591 karşılıklı dışlama: Dönem Net Zararı (591) yazılırsa Dönem Net Kârı (590) silinir
+    // KVB PDF'lerinde 590 başlığı altında 591 değeri de gözüktüğünden her ikisi eşleşebilir.
+    // Zarar (591) baskın — 590 override.
+    if (code === '591' && resultMap.has('590')) { resultMap.delete('590') }
+    if (code === '590' && resultMap.has('591')) continue
+
+    // Code deduplikasyon: ilk eşleşen kazanır
+    if (!resultMap.has(code)) {
+      resultMap.set(code, amount)
+    }
+  }
+
+  return Array.from(resultMap.entries()).map(([code, amount]) => ({ code, amount }))
+}
+
 // ─── Bölüm arama yardımcısı ───────────────────────────────────────────────────
 // norm'd text üzerinde index bulup orijinal text'i slice eder
 
@@ -532,6 +1170,9 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     console.error('[pdf] getText() failed:', e)
     throw e
   }
+
+  // TDHP ayrıntılı bilanço/gelir tablosu ham hesap kodlarını çıkar
+  const tdhpRawAccounts = extractTdhpRawAccountsFromText(text)
 
   // 1) PDF Mizan
   if (detectPdfMizan(text)) return parsePdfMizan(text)
@@ -564,25 +1205,28 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     const fromLeft  = { ...bilFields.onceki, ...gelFields.onceki }  // sol sütun
     const fromRight = { ...bilFields.cari,   ...gelFields.cari   }  // sağ sütun
     const fields1001A = Object.keys(fromLeft).length > 0 ? fromLeft : fromRight
-    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [] }]
+    const rawAcc1001A = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
+    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [], rawAccounts: rawAcc1001A }]
     return []
   }
 
   // 3) Geçici Gelir Vergisi (1032-GV)
   if (type === 'gelir_gecici') {
+    const rawAccGV = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
     const gelIdx = findNormIdx(text, 'gelir tablosu')
     if (gelIdx !== -1) {
       const { cari } = parseEkSection(text.slice(gelIdx, gelIdx + 4000))
-      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [] }]
+      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [], rawAccounts: rawAccGV }]
     }
     const full = parseEkSection(text)
-    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [] }]
-    return [{ year, period, fields: parseTaxForm(text), unmapped: [] }]
+    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [], rawAccounts: rawAccGV }]
+    return [{ year, period, fields: parseTaxForm(text), unmapped: [], rawAccounts: rawAccGV }]
   }
 
   // 4) Kurumlar Vergisi Yıllık (1010)
   if (type === 'kurumlar_yillik') {
     const taxFields = parseTaxForm(text)
+    const rawAccKV = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
     // 'ayrintili bilanco' ile arama: form referansını değil gerçek tablo başlığını bulur
     let ekIdx = findNormIdx(text, 'ayrintili bilanco')
     if (ekIdx === -1) ekIdx = findNormIdx(text, 'tek duzen hesap plani')
@@ -594,20 +1238,21 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
       console.log('[pdf] raw.cari=', JSON.stringify(raw.cari))
       console.log('[pdf] raw.onceki keys=', Object.keys(raw.onceki))
       // raw.cari = her satırın SON sayısı = cari dönem (2 sütunluda sağ, tek sütunluda tek)
-      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [] }]
+      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV }]
     }
-    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [] }]
+    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [], rawAccounts: rawAccKV }]
   }
 
   // 5) Kurumlar Geçici Vergi (1032-KV)
   if (type === 'kurumlar_gecici') {
     const taxFields = parseTaxForm(text)
+    const rawAccKVG = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
     const gelirIdx  = findNormIdx(text, 'tek duzen hesap planina uygun gelir tablosu')
     if (gelirIdx !== -1) {
       const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
       // Geçici vergide taxExpense gelir tablosu kalemi değil
       const { taxExpense: _t, ...taxNoTax } = taxFields
-      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [] }]
+      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG }]
     }
     const rawFull = parseEkSection(text)
     const { taxExpense: _t2, ...taxNoTax2 } = taxFields
@@ -617,11 +1262,13 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
         hasRevenue: rawFull.cari.revenue != null,
         hasCogs: rawFull.cari.cogs != null,
       })
-      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [] }]
+      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG }]
     }
-    return [{ year, period, fields: taxNoTax2, unmapped: [] }]
+    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG }]
   }
 
   // 6) Bilinmeyen: satır bazlı fallback
-  return parseFallback(text, year, period)
+  const fallbackRows = parseFallback(text, year, period)
+  const rawAccFallback = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
+  return fallbackRows.map(r => ({ ...r, rawAccounts: rawAccFallback }))
 }
