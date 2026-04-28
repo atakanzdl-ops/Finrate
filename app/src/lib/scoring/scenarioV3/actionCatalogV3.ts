@@ -91,6 +91,25 @@ function sumAccountsByPrefix(analysis: unknown, prefixes: string[]): number {
     .reduce((sum, acc) => sum + acc.amount, 0)
 }
 
+/**
+ * Net nakit bakiyesi: kasa (100) + PTT (101) + bankalar (102) + diğer likit (108)
+ * eksi verilen çekler ve ödeme emirleri (103, kontra hesap).
+ *
+ * Invariant: RawAccount.amount her zaman pozitif mutlak değerdir;
+ * kontra hesaplar çıkarılır, Math.abs KULLANILMAZ.
+ *
+ * Faz 7.3.4F — A04 ve A16 eligibility düzeltmesi
+ */
+function getNetCashBalance(analysis: unknown): number {
+  const a = analysis as AnalysisInput
+  if (!a?.accounts) return 0
+  const amountOf = (prefix: string): number =>
+    a.accounts!
+      .filter(acc => acc.accountCode.startsWith(prefix))
+      .reduce((sum, acc) => sum + acc.amount, 0)
+  return amountOf('100') + amountOf('101') + amountOf('102') + amountOf('108') - amountOf('103')
+}
+
 // ─── 20 Aksiyon Tanımları ─────────────────────────────────────────────────────
 
 // ── A01 ──────────────────────────────────────────────────────────────────────
@@ -320,12 +339,10 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
     requiredAccountCodes: ['102', '300'],
     minSourceAmountTRY: 500_000,
     customCheck: (analysis) => {
-      if (!hasAnyAccount(analysis, ['102', '103'])) {
-        return { pass: false, reason: 'Nakit hesabı (102/103) bulunamadı' }
-      }
-      const cash = sumAccountsByPrefix(analysis, ['102', '103'])
-      if (cash < 500_000) {
-        return { pass: false, reason: `Yetersiz nakit: ${cash.toLocaleString('tr-TR')} TL < min 500K TL` }
+      // Faz 7.3.4F: Net nakit = 100+101+102+108−103 (kontra çıkarılır)
+      const netCash = getNetCashBalance(analysis)
+      if (netCash < 500_000) {
+        return { pass: false, reason: `Yetersiz net nakit: ${netCash.toLocaleString('tr-TR')} TL < min 500K TL` }
       }
       return { pass: true }
     },
@@ -1194,8 +1211,9 @@ const A16_CASH_BUFFER_BUILD: ActionTemplateV3 = {
   preconditions: {
     minSourceAmountTRY: 500_000,
     customCheck: (analysis) => {
-      const cash = sumAccountsByPrefix(analysis, ['102', '103'])
-      if (cash <= 0) {
+      // Faz 7.3.4F: Net nakit = 100+101+102+108−103 (kontra çıkarılır)
+      const netCash = getNetCashBalance(analysis)
+      if (netCash <= 0) {
         return {
           pass: false,
           reason: 'Nakit tamponu aksiyonu için önce nakit yaratan aksiyonlar (A05/A06/A08/A10) uygulanmalı',
