@@ -592,6 +592,7 @@ expectedSpillover: {
 | 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 (`7f65640`) | ✅ Çözüldü | Yüksek |
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
 | 33 | SubjectiveMissingBanner pasif UX | Faz 7.3.4C audit (2026-04-28) | Mini Faz 7.3.4D | ✅ Çözüldü (`6db964f`) | Düşük |
+| 34 | combineScores ceiling/floor kalibrasyon kararı | Faz 7.3.4D sonrası audit (2026-04-28) | Ürün Kararı | ⏳ Beklemede | Orta |
 
 ---
 
@@ -939,6 +940,38 @@ V3 engine kontra hesap düzeltmesi Faz 7.3.4B0'da tamamlandı.
 - Renk paleti polish (Faz 7.3.5)
 
 **Risk seviyesi:** Düşük — çözüldü
+
+---
+
+### 🔲 Bulgu #34 — combineScores Kalibrasyon (Ürün Kararı Bekleniyor)
+**Kaynak:** Codex CCC ceiling/floor keşfi (2026-04-28)
+
+**Bulgu:** Bug yok, tasarım gereği. Ama 2 kalibrasyon sorusu açık:
+
+**1. f=55 sınırı sıçrama:**
+- `54.9` → BB (max combined 67, ceiling aktif)
+- `55.0` → BBB (ceiling kalkar)
+
+Sert sıçrama mali müşavir gözünden tartışmalı.
+
+**2. DEKAM 2024 örneği:**
+- Finansal: 33.36 → C
+- Subjektif yok: combined 23 → D
+- Subjektif tam (30/30): combined 52 → B
+
+"Finansal C olan şirket subjektif tam ile B olur mu?"
+
+**Karar gerekiyor:**
+- A) Mevcut korunsun, sadece dokümante edilsin
+- B) Kalibrasyon yapılsın (eşikler revize)
+- C) Hibrit (UI açıklama + ileride kalibrasyon)
+
+**Etkilenen dosyalar:** `subjective.ts`, `score.ts`, `ratios.ts` (referans)
+**Süre:** A=1-2 saat, B=1 gün, C=2-3 saat
+**Öncelik:** Orta (Faz 7.3.5 görsel öncesi düşünülmeli)
+**Faz adı önerisi:** Faz 7.3.4E
+
+**Risk seviyesi:** Orta — ürün kararı bekleniyor, mevcut kod çalışıyor
 
 ---
 
