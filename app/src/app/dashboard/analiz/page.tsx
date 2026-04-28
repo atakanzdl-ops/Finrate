@@ -514,8 +514,13 @@ function AnalizPageContent() {
   }, [entityId])
 
   function combinedScore(a: Analysis) {
-    const subj = a.entity?.id ? (subjectiveScores[a.entity.id] ?? 0) : 0
-    return combineScores(a.finalScore, subj)
+    const subj     = a.entity?.id ? (subjectiveScores[a.entity.id] ?? 0) : 0
+    // Faz 7.3.4C: Double-application fix.
+    // POST /subjective, DB.finalScore'u combined ile eziyor ama orijinal finansal
+    // skoru ratios.__financialScore'da saklıyor. Burada o orijinal değeri kullanarak
+    // combineScores'un ikinci kez uygulanmasını önlüyoruz.
+    const financial = a.ratios?.__financialScore ?? a.finalScore
+    return combineScores(financial, subj)
   }
   function combinedRating(s: number) { return scoreToRating(s) }
 
