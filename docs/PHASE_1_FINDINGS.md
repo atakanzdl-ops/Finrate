@@ -623,6 +623,72 @@ Codex önerisi: GPT'ye danışıldıktan sonra Faz 4 scope'u kararlaştırılaca
 
 ---
 
+## Faz Kronolojisi
+
+### ✅ Faz 7.3.4A — pdf.ts TDHP rawAccounts Üretimi
+**Commit:** `2691883`
+**Tarih:** 2026-04-28
+**Codex audit:** GO
+
+**Amaç:**
+pdf.ts parser'ını KV beyannamesi ayrıntılı bilanço/gelir tablosu
+satırlarını TDHP rawAccounts olarak (POZİTİF MUTLAK) okuyacak
+şekilde genişletmek.
+
+**Çıktı:**
+- `extractTdhpRawAccountsFromText(rawText)` public helper export
+- State machine ana + alt bölüm takibi
+- 70+ TDHP eşleştirme kuralı
+- 3 fixture (DEKAM 2022/2023/2024 KV) — gerçek PDF veriden
+- 57 yeni unit test (toplam 370 → 427)
+- Snapshot drift YOK (22 → 22)
+
+**Faz boyunca bulunan ve düzeltilen 4 bug:**
+1. `firstTdhpNum` bug — parser cari dönem yerine önceki dönemi alıyordu. `cariDonemNum` (ikinci sayı) ile düzeltildi.
+2. 590/591 mutual exclusion eksikti — 692 SKIP vardı ama 590/591 arası yoktu. Mutual exclusion eklendi.
+3. SATIS_MALIYETI regex çok dar — KVB PDF'inde "D. Satışların Maliyeti" yazıyor, regex sadece "C." beklerken kaçıyordu. `[cd]` olarak genişletildi.
+4. 302 (Ertelenmiş Finansal Kiralama) pattern çok uzun string match'iyordu, kısa eşleşmeye çevrildi.
+
+**Audit zinciri:**
+- 5 tur Codex audit (revize 1, 2, 3, 4 + ek düzeltme)
+- 16 blocker bulundu, hepsi düzeltildi
+- Claude Code uygulamada 4 ek bug yakaladı
+
+**DEKAM doğrulama:**
+- 2022: 42 hesap, 591 = 357,848.44 (zarar yılı)
+- 2023: 41 hesap, 591 = 352,542.83 (zarar yılı)
+- 2024: 42 hesap, 590 = 22,097,244.29 (kâr yılı)
+- 350/358 ayrı sınıflandırılıyor
+- 257 = 552,171.98 (POZİTİF mutlak doğrulandı)
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- V1/V2/V3 motorları dokunulmadı
+- `excel.ts`, `accountMapper.ts` dokunulmadı
+- DB migration YOK
+- Rating yeniden hesaplama YOK
+- `financial_data` Prisma şeması dokunulmadı
+
+**Çözülen önceki sorun:**
+- Sentetik 20 hesap problemi → 40+ gerçek TDHP hesap (yeni PDF upload'larında)
+
+---
+
+### ⏳ 7.3.4B Ön Koşul — V3 Math.abs / Kontra Hesap Audit'i
+
+**Ön koşul notu:** 7.3.4B ön koşulu: V3 Math.abs / kontra hesap audit'i
+
+V3 engine içinde `Math.abs` / `sumByPrefix` kullanımı kontra hesapları
+(103, 257, 268, 580, 591) yanlış pozitif varlık gibi sayabilir.
+DEKAM backfill VEYA herhangi bir DB migration ÖNCESİ V3 kontra hesap
+yorumu mutlaka audit edilmeli.
+
+**Bilinen riskler:**
+- Yeni PDF yüklemeleri 40+ hesap üretir → V3 Math.abs riski runtime'a girer (DB migration olmasa bile)
+- 350/358 aynı değer durumu (DEKAM 2024'te 46,896,296.36) muhtemelen alt-kalem ilişkisi → çift sayım kontrol edilmeli
+
+---
+
 ## Notlar
 
 - Bu dosya Faz 8 (production hazırlık) tamamlanana kadar canlı tutulacak.
