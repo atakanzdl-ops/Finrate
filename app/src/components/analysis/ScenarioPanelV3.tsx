@@ -174,78 +174,6 @@ function TypeBadge({ type }: { type: string }) {
   )
 }
 
-// ─── NotchPlanCard ────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: string; expanded: boolean; onToggle: () => void }) {
-  return (
-    <div className="border border-[#E5E9F0] rounded-[8px] overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold
-              ${plan?.isAchievable ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-[#64748B]'}`}
-          >
-            {plan?.targetNotches ?? '?'}
-          </div>
-          <div className="text-left">
-            <div className="font-medium text-[#1E293B]">{title}</div>
-            <div className="text-xs text-[#64748B] mt-0.5">
-              {plan?.isAchievable ? 'Ulaşılabilir' : 'Mevcut portföyle ulaşılamaz'}
-            </div>
-          </div>
-        </div>
-        <ChevronDown
-          size={16}
-          className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {expanded && (
-        <div className="px-5 pb-4 space-y-3 border-t border-slate-100 pt-4">
-          {/* Narrative — hide degenerate backend text when requiredActionNames is empty */}
-          {toStringArray(plan?.requiredActionNames).length > 0
-            ? plan?.narrative && (
-                <div className="text-sm text-[#1E293B]">{plan.narrative}</div>
-              )
-            : (
-              <div className="text-sm text-[#64748B] italic">
-                {plan?.isAchievable
-                  ? 'Mevcut portföy bu seviyeye ulaşmak için yeterli görünüyor.'
-                  : 'Spesifik aksiyon önerisi üretilemedi.'}
-              </div>
-            )
-          }
-
-          {toStringArray(plan?.requiredActionNames).length > 0 && (
-            <div>
-              <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
-                Gerekli Aksiyonlar
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {toStringArray(plan?.requiredActionNames).map((a: string, i: number) => (
-                  <span key={i} className="text-xs px-2 py-1 rounded-[6px] bg-slate-100 text-[#1E293B]">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {plan?.blockedBy && (
-            <div className="bg-amber-50 border border-amber-200 rounded-[6px] p-3 text-xs text-amber-800">
-              {plan.blockedBy}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── OZET TAB ────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -359,36 +287,36 @@ function OzetTab({ result }: { result: any }) {
 
         {/* SOL — Consultant Narrative 2/3 */}
         <div className="lg:col-span-2 bg-slate-50 border border-[#E5E9F0] rounded-[12px] p-6 space-y-5">
-          <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold">
+          <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold text-sm">
             <MessageSquare size={16} />
-            Danisman Yorumu
+            Danışman Yorumu
           </div>
 
           {consultant.problem && (
             <div>
               <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Temel Problem</div>
-              <div className="text-slate-800 leading-relaxed italic">{consultant.problem}</div>
+              <div className="text-sm text-slate-800 leading-relaxed">{consultant.problem}</div>
             </div>
           )}
 
           {consultant.coreIssue && (
             <div>
-              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Cekirdek Mesele</div>
-              <div className="text-slate-800 leading-relaxed italic">{consultant.coreIssue}</div>
+              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Çekirdek Mesele</div>
+              <div className="text-sm text-slate-800 leading-relaxed">{consultant.coreIssue}</div>
             </div>
           )}
 
           {consultant.shortTermPriority && (
             <div>
-              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Kisa Vadede Oncelik</div>
-              <div className="text-slate-800 leading-relaxed italic">{consultant.shortTermPriority}</div>
+              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Kısa Vadede Öncelik</div>
+              <div className="text-sm text-slate-800 leading-relaxed">{consultant.shortTermPriority}</div>
             </div>
           )}
 
           {consultant.structuralNeed && (
             <div>
               <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Yapısal İhtiyaç</div>
-              <div className="text-slate-800 leading-relaxed italic">{consultant.structuralNeed}</div>
+              <div className="text-sm text-slate-800 leading-relaxed">{consultant.structuralNeed}</div>
             </div>
           )}
 
@@ -431,11 +359,11 @@ function OzetTab({ result }: { result: any }) {
           className="bg-white border border-[#E5E9F0] rounded-[12px] p-6"
           style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
         >
-          <div className="flex items-center gap-2 text-[#1E293B] font-semibold mb-2">
+          <div className="flex items-center gap-2 text-[#1E293B] font-semibold text-sm mb-2">
             <TrendingDown size={16} className="text-red-500" />
-            Aksiyon Alinmazsa
+            Aksiyon Alınmazsa
           </div>
-          <div className="text-[#1E293B] leading-relaxed">{da.ifNotDoneRisk}</div>
+          <div className="text-sm text-[#1E293B] leading-relaxed">{da.ifNotDoneRisk}</div>
         </div>
       )}
 
@@ -449,15 +377,11 @@ function AksiyonPlaniTab({
   result,
   expanded,
   setExpanded,
-  expandedNotch,
-  setExpandedNotch,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any
   expanded: Set<number>
   setExpanded: (s: Set<number>) => void
-  expandedNotch: Set<'one' | 'two'>
-  setExpandedNotch: (s: Set<'one' | 'two'>) => void
 }) {
   const da      = result.decisionAnswer
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -470,13 +394,6 @@ function AksiyonPlaniTab({
     setExpanded(newSet)
   }
 
-  const toggleNotch = (plan: 'one' | 'two') => {
-    const newSet = new Set(expandedNotch)
-    if (newSet.has(plan)) newSet.delete(plan)
-    else newSet.add(plan)
-    setExpandedNotch(newSet)
-  }
-
   return (
     <div className="space-y-6">
 
@@ -487,10 +404,10 @@ function AksiyonPlaniTab({
       >
         <div className="p-6 border-b border-[#E5E9F0]">
           <h3 className="text-lg font-bold text-[#0B3C5D]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Firma Ne Yapmali?
+            Firma Ne Yapmalı?
           </h3>
           <p className="text-sm text-[#64748B] mt-1">
-            Oncelik sirasina gore {actions.length} aksiyon onerisi.
+            Öncelik sırasına göre {actions.length} aksiyon önerisi.
           </p>
         </div>
 
@@ -507,7 +424,7 @@ function AksiyonPlaniTab({
         <div className="divide-y divide-slate-100">
           {actions.length === 0 && (
             <div className="px-6 py-8 text-center text-sm text-[#64748B]">
-              Bu analiz icin aksiyon onerisi bulunamadi.
+              Bu analiz için aksiyon önerisi bulunamadı.
             </div>
           )}
           {actions.map((action, idx) => {
@@ -661,41 +578,14 @@ function AksiyonPlaniTab({
         </div>
       </div>
 
-      {/* B. NOTCH PLANLARI */}
-      <div
-        className="bg-white border border-[#E5E9F0] rounded-[12px] p-6"
-        style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
-      >
-        <h3
-          className="text-lg font-bold text-[#0B3C5D] mb-4"
-          style={{ fontFamily: 'Outfit, sans-serif' }}
-        >
-          Iyilestirme Senaryolari
-        </h3>
-        <div className="space-y-3">
-          <NotchPlanCard
-            plan={da.oneNotchPlan}
-            title="İlk İyileştirme Planı"
-            expanded={expandedNotch.has('one')}
-            onToggle={() => toggleNotch('one')}
-          />
-          <NotchPlanCard
-            plan={da.twoNotchPlan}
-            title="İleri İyileştirme Planı"
-            expanded={expandedNotch.has('two')}
-            onToggle={() => toggleNotch('two')}
-          />
-        </div>
-      </div>
-
-      {/* C. WHY CAPITAL ALONE IS NOT ENOUGH */}
+      {/* B. WHY CAPITAL ALONE IS NOT ENOUGH */}
       {da.whyCapitalAloneIsNotEnough && (
         <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[12px] p-6">
-          <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold mb-3">
+          <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold text-sm mb-3">
             <Lightbulb size={18} />
             Neden Sadece Sermaye Yetmez?
           </div>
-          <div className="text-slate-800 leading-relaxed">{da.whyCapitalAloneIsNotEnough}</div>
+          <div className="text-sm text-slate-800 leading-relaxed">{da.whyCapitalAloneIsNotEnough}</div>
         </div>
       )}
 
@@ -740,7 +630,7 @@ function DetayTab({
                 style={{ fontFamily: 'Outfit, sans-serif' }}
               >
                 <X size={18} className="text-red-500" />
-                Neden Bu Aksiyonlar Secilmedi?
+                Neden Bu Aksiyonlar Seçilmedi?
               </h3>
               <p className="text-sm text-[#64748B] mt-1">
                 Yüksek skor alıp reddedilen {rejected.length} aksiyon.
@@ -865,7 +755,6 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
   const [result,              setResult]              = useState<ScenarioV3ApiResponse | null>(null)
   const [error,               setError]               = useState<string | null>(null)
   const [expandedActions,     setExpandedActions]     = useState<Set<number>>(new Set())
-  const [expandedNotchPlans,  setExpandedNotchPlans]  = useState<Set<'one' | 'two'>>(new Set())
   const [rejectedExpanded,    setRejectedExpanded]    = useState<boolean>(false)
 
   const handleRun = async () => {
@@ -883,7 +772,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       const data = await res.json()
       if (!res.ok) {
         const errorData = data as ApiErrorResponse
-        setError(errorData.error ?? 'Hesaplama basarisiz')
+        setError(errorData.error ?? 'Hesaplama başarısız')
         return
       }
       const successData = data as ScenarioV3ApiResponse
@@ -897,8 +786,8 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
   }
 
   const TABS = [
-    { id: 'ozet'    as const, label: 'Ozet',          Icon: FileText   },
-    { id: 'aksiyon' as const, label: 'Aksiyon Plani', Icon: ListChecks },
+    { id: 'ozet'    as const, label: 'Özet',           Icon: FileText   },
+    { id: 'aksiyon' as const, label: 'Aksiyon Planı', Icon: ListChecks },
     { id: 'detay'   as const, label: 'Detay',         Icon: Layers     },
   ]
 
@@ -1056,8 +945,6 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
               result={result}
               expanded={expandedActions}
               setExpanded={setExpandedActions}
-              expandedNotch={expandedNotchPlans}
-              setExpandedNotch={setExpandedNotchPlans}
             />
           )}
           {activeTab === 'detay' && (
