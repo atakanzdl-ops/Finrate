@@ -983,7 +983,63 @@ Rating bozulmaz ama güvenilirlik bozulur.
 
 ---
 
-### ✅ 7.3.4B + 7.3.4C + 7.3.4D TAMAMLANDI
+### ✅ Faz 7.3.5A — Türkçe Karakter ve Realistik Düzeltmesi
+**Commit:** `fae172b`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (3 audit turu, 4 blocker düzeltildi)
+
+**Sorun:**
+`ScenarioPanelV3.tsx` ve `RatioTransparencyBlock.tsx` dosyalarında
+Türkçe karakter eksiklikleri (`Yapisal`, `Ulasilabilir`, `Olustur` vs.)
+ve "Realistik" yerine doğal Türkçe karşılık eksikti.
+
+**Çıktı:**
+- `ScenarioPanelV3.tsx`: 13 görünür string düzeltildi
+- `RatioTransparencyBlock.tsx`: 1 düzeltme (`Realistik` → `Gerçekçi`)
+- "AI Destekli" → "Yapay Zeka Destekli" (kullanıcı kararı)
+- "Hedef Rating" KORUNDU (kullanıcı kararı)
+- V2 checkbox KORUNDU (Faz 7.3.5B'ye ait)
+
+**Düzeltme listesi:**
+- `Yapisal` → `Yapısal`
+- `Ulasilabilir` → `Ulaşılabilir`
+- `Mevcut portfoyle ulasilamaz` → `Mevcut portföyle ulaşılamaz`
+- `Gercekci Ust Sinir` → `Gerçekçi Üst Sınır`
+- `Hedef Ulasilabilir` → `Hedef Ulaşılabilir`
+- `Hedef Sinirli` → `Hedef Sınırlı`
+- `Yapisal Ihtiyac` → `Yapısal İhtiyaç`
+- `V2 vs V3 Karsilastirmasi` → `V2 vs V3 Karşılaştırması`
+- `V3 Akilli Analiz` → `V3 Akıllı Analiz`
+- `Akilli Yol Haritasi` → `Akıllı Yol Haritası`
+- `AI Destekli Yapisal Analiz` → `Yapay Zeka Destekli Yapısal Analiz`
+- `V2 ile karsilastir` → `V2 ile karşılaştır`
+- `Yol Haritasi Olustur` → `Yol Haritası Oluştur`
+- `Realistik hedef` → `Gerçekçi hedef`
+
+**Test:** 512 → 512 (değişmedi), snapshot drift yok
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- `engineV3.ts` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- Renk/CSS dokunulmadı
+- Layout dokunulmadı
+- V2 checkbox dokunulmadı
+
+**Bonus bulgular (UI dışı, kapsam dışı bırakıldı):**
+ADIM 0 grep sırasında kod yorumları ve PDF metinlerinde de
+Türkçe karakter eksiklikleri tespit edildi:
+- `reportPdf.ts` (PDF çıktı metni — kullanıcı görür)
+- `decisionLayer.ts` (JSDoc yorumu)
+- `engineV3.ts` (yorum)
+- `ratingReasoning.ts` (yorum)
+- `route.ts/scenarios` (yorum)
+
+Bu bulgular Faz 7.3.5D (Rapor/PDF Dil Polish) kapsamına ait.
+
+---
+
+### ✅ 7.3.4B-F + 7.3.5A TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
 
@@ -1069,6 +1125,21 @@ Sert sıçrama mali müşavir gözünden tartışmalı.
 **Etkilenen:** `engineV3.ts` (`findBalanceInGroup`)
 **Süre:** 1-2 saat
 **Öncelik:** Düşük
+
+---
+
+### 🔲 PDF/Rapor Dil Polish (Faz 7.3.5D adayı)
+**Kaynak:** Faz 7.3.5A ADIM 0 grep çıktısı (2026-04-28)
+
+**Bulgu:** PDF çıktı metinlerinde Türkçe karakter eksiklikleri (`olusturulan` vs.).
+Kullanıcıya görünür PDF içeriği etkileniyor.
+
+**Etkilenen dosyalar:**
+- `lib/reporting/reportPdf.ts` (kullanıcıya görünür)
+
+**Süre:** 1-2 saat
+**Risk:** PDF layout değişebilir, dikkatli test gerekir
+**Öncelik:** Orta (kullanıcı PDF'i görüyor)
 
 ---
 
