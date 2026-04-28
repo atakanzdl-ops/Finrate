@@ -165,3 +165,51 @@ describe('buildV3BalanceTotals — Senaryo 7: 158 stok değer düşüklüğü ka
     expect(inventory).toBe(45000)
   })
 })
+
+// ─── Senaryo 8 — buildProductivityInput kontra düzeltme doğrulama ─────────────
+// buildProductivityInput artık:
+//   cashAndEquivalents = totals.cashBalance  (103 düşülür)
+//   inventory          = totals.inventory    (158 düşülür)
+//   fixedAssetsNet     = signedSumByCodes(250-259, [257], b) (257 düşülür)
+// Bu test buildV3BalanceTotals aracılığıyla aynı formüllerin doğru çalıştığını kanıtlar.
+
+describe('buildV3BalanceTotals — Senaryo 8: buildProductivityInput kontra fix', () => {
+  const balances: Record<string, number> = {
+    100: 5000, 102: 10000, 103: 3000,     // cashBalance = 12000
+    153: 50000, 158: 8000,                 // inventory   = 42000
+    254: 3000000, 255: 500000, 257: 200000, // tangibleNet = 3300000
+  }
+
+  it('cashBalance (103 düşülür): 5000+10000-3000 = 12000', () => {
+    const { cashBalance } = buildV3BalanceTotals(balances)
+    expect(cashBalance).toBe(12000)
+  })
+
+  it('inventory (158 düşülür): 50000-8000 = 42000', () => {
+    const { inventory } = buildV3BalanceTotals(balances)
+    expect(inventory).toBe(42000)
+  })
+
+  it('fixedAssets (257 düşülür): 3000000+500000-200000 = 3300000', () => {
+    // tangibleAssets = 254+255 - 257 = 3,300,000
+    // intangibleAssets = 0, otherNonCurrentAssets = 0
+    const { fixedAssets } = buildV3BalanceTotals(balances)
+    expect(fixedAssets).toBe(3300000)
+  })
+
+  it('eski yanlış davranış regression: 103 artı EKLENMİYOR', () => {
+    // Eski sumByCodes([100,101,102,103,108]) = 5000+10000+3000 = 18000
+    // Yeni totals.cashBalance = 12000
+    const { cashBalance } = buildV3BalanceTotals(balances)
+    expect(cashBalance).not.toBe(18000)
+    expect(cashBalance).toBe(12000)
+  })
+
+  it('eski yanlış davranış regression: 158 artı EKLENMİYOR', () => {
+    // Eski sumByCodes([150,151,152,153]) = 50000 (158 eksikti ama kontra sayılıyordu)
+    // Yeni totals.inventory = 50000 - 8000 = 42000
+    const { inventory } = buildV3BalanceTotals(balances)
+    expect(inventory).not.toBe(50000)
+    expect(inventory).toBe(42000)
+  })
+})

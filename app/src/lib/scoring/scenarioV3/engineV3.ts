@@ -1548,22 +1548,31 @@ function assessFeasibility(
 
 function buildProductivityInput(ctx: FirmContext, portfolio: SelectedAction[]) {
   const b = ctx.accountBalances
+  // buildV3BalanceTotals: kontra hesaplar POZİTİF MUTLAK'tan çıkarılır (Faz 7.3.4B0)
+  const totals = buildV3BalanceTotals(b)
+  // fixedAssetsNet: accountMapper.ts tangibleAssets formülü (satır 162-163)
+  // positive: 250-256,258,259 | negative: 257 (birikmiş amortisman MDV)
+  const fixedAssetsNet = signedSumByCodes(
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257'],
+    b,
+  )
   return {
-    sector:            ctx.sector,
-    totalAssets:       ctx.totalAssets,
-    cashAndEquivalents: sumByCodes(b, ['100','101','102','103','108']),
-    tradeReceivables:  sumByCodes(b, ['120','121']),
-    inventory:         sumByCodes(b, ['150','151','152','153']),
-    workInProgress:    sumByCodes(b, ['350','351','352','353','354','355','356','357','358']),
-    advancesGiven:     sumByCodes(b, ['159','179','259']),
-    prepaidExpenses:   sumByCodes(b, ['180']),
-    fixedAssetsNet:    sumByCodes(b, ['252','253','254','255']),
-    netSales:          ctx.netSales,
-    costOfGoodsSold:   ctx.netSales - ctx.grossProfit,
-    grossProfit:       ctx.grossProfit,
-    operatingProfit:   ctx.operatingProfit,
-    operatingCashFlow: ctx.operatingCashFlow ?? undefined,
-    proposedActions:   portfolio.map(p => ({ actionId: p.actionId, amountTRY: p.amountTRY })),
+    sector:             ctx.sector,
+    totalAssets:        ctx.totalAssets,
+    cashAndEquivalents: totals.cashBalance,   // 103 (verilen çekler) düşüldü
+    tradeReceivables:   sumByCodes(b, ['120','121']),
+    inventory:          totals.inventory,     // 158 (stok değer düşüklüğü) düşüldü
+    workInProgress:     sumByCodes(b, ['350','351','352','353','354','355','356','357','358']),
+    advancesGiven:      sumByCodes(b, ['159','179','259']),
+    prepaidExpenses:    sumByCodes(b, ['180']),
+    fixedAssetsNet,                           // 257 (birikmiş amortisman) düşüldü; 250-259 tam liste
+    netSales:           ctx.netSales,
+    costOfGoodsSold:    ctx.netSales - ctx.grossProfit,
+    grossProfit:        ctx.grossProfit,
+    operatingProfit:    ctx.operatingProfit,
+    operatingCashFlow:  ctx.operatingCashFlow ?? undefined,
+    proposedActions:    portfolio.map(p => ({ actionId: p.actionId, amountTRY: p.amountTRY })),
   }
 }
 
