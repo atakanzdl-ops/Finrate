@@ -186,6 +186,9 @@ export function rebuildAggregateFromAccounts(
     // Alınan avanslar
     advancesReceived: get(['340', '349']),
 
+    // Yıllara yaygın inşaat ve onarım hakedişleri (KV yükümlülük)
+    constructionProgressBillings: get(['350', '358']),
+
     // Vergi yükümlülükleri
     taxPayables:
       get(['360', '361', '368', '369', '370', '372', '373', '379']) - get(['371']),
@@ -224,7 +227,7 @@ export function rebuildAggregateFromAccounts(
              + r.inventory + r.prepaidSuppliers + r.otherCurrentAssets
   const tnca = r.tangibleAssets + r.intangibleAssets + r.otherNonCurrentAssets
   const tcl  = r.shortTermFinancialDebt + r.tradePayables + r.otherShortTermPayables
-             + r.advancesReceived + r.taxPayables
+             + r.advancesReceived + r.constructionProgressBillings + r.taxPayables
   const tncl = r.longTermFinancialDebt + r.otherNonCurrentLiabilities
   const teq  = r.paidInCapital + r.capitalReserves + r.profitReserves
              + r.retainedEarnings - r.retainedLosses + r.netProfitCurrentYear
@@ -266,7 +269,7 @@ export function checkBalance(
 
   const totalLiabilities =
     r.shortTermFinancialDebt + r.tradePayables + r.otherShortTermPayables +
-    r.advancesReceived + r.taxPayables +
+    r.advancesReceived + r.constructionProgressBillings + r.taxPayables +
     r.longTermFinancialDebt + r.otherNonCurrentLiabilities
 
   const totalEquity =

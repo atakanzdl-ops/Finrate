@@ -525,6 +525,13 @@ export function buildV3BalanceTotals(
     balances,
   )
 
+  // accountMapper.ts:constructionProgressBillings — Yıllara yaygın inşaat ve onarım hakedişleri (KV)
+  const constructionProgressBillings = signedSumByCodes(
+    ['350', '358'],
+    [],
+    balances,
+  )
+
   // accountMapper.ts:190-191 — r.taxPayables (net: 371 çıkarılır)
   const taxPayables = signedSumByCodes(
     ['360', '361', '368', '369', '370', '372', '373', '379'],
@@ -567,7 +574,7 @@ export function buildV3BalanceTotals(
   const totalAssets = currentAssets + fixedAssets
 
   const stLiabilities = shortTermFinancialDebt + tradePayables + otherShortTermPayables
-    + advancesReceived + taxPayables
+    + advancesReceived + constructionProgressBillings + taxPayables
 
   const ltLiabilities = longTermFinancialDebt + otherNonCurrentLiabilities
 

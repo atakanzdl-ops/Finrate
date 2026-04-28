@@ -166,6 +166,47 @@ describe('buildV3BalanceTotals — Senaryo 7: 158 stok değer düşüklüğü ka
   })
 })
 
+// ─── Senaryo 9 — 350/358 Yıllara Yaygın İnşaat KV Yükümlülük ────────────────
+
+describe('buildV3BalanceTotals — Senaryo 9: 350/358 Yıllara Yaygın İnşaat KV Yükümlülük', () => {
+  it('stLiabilities 350 ve 358 dahil edilir', () => {
+    const balances: Record<string, number> = {
+      100: 100,
+      102: 200,
+      500: 1000,
+      300: 1000000,
+      320: 500000,
+      340: 5000000,
+      350: 30000000,
+      358: 16896296.36,
+    }
+    const totals = buildV3BalanceTotals(balances)
+    // 300 + 320 + 340 + 350 + 358
+    // = 1,000,000 + 500,000 + 5,000,000 + 30,000,000 + 16,896,296.36
+    // = 53,396,296.36
+    expect(totals.stLiabilities).toBeCloseTo(53_396_296.36, 2)
+  })
+
+  it('350/358 olmadan stLiabilities sadece 6,500,000', () => {
+    const balances: Record<string, number> = {
+      300: 1000000,
+      320: 500000,
+      340: 5000000,
+    }
+    const totals = buildV3BalanceTotals(balances)
+    expect(totals.stLiabilities).toBeCloseTo(6_500_000, 2)
+  })
+
+  it('DEKAM 2024 benzeri: 350=358=46,896,296.36 — stLiabilities 93,792,592.72 katkı', () => {
+    const balances: Record<string, number> = {
+      350: 46896296.36,
+      358: 46896296.36,
+    }
+    const totals = buildV3BalanceTotals(balances)
+    expect(totals.stLiabilities).toBeCloseTo(93_792_592.72, 2)
+  })
+})
+
 // ─── Senaryo 8 — buildProductivityInput kontra düzeltme doğrulama ─────────────
 // buildProductivityInput artık:
 //   cashAndEquivalents = totals.cashBalance  (103 düşülür)
