@@ -144,7 +144,7 @@ function HorizonBadge({ horizon }: { horizon: string }) {
 // ─── TypeBadge ───────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: string }) {
-  const label = type === 'STRUCTURAL' ? 'Yapisal' : type === 'COSMETIC' ? 'Reclass' : 'Karma'
+  const label = type === 'STRUCTURAL' ? 'Yapısal' : type === 'COSMETIC' ? 'Reclass' : 'Karma'
   const color =
     type === 'STRUCTURAL'
       ? 'bg-[#2EC4B6]/10 text-[#0B7B70] border-[#2EC4B6]/30'
@@ -176,7 +176,7 @@ function NotchPlanCard({ plan, title, expanded, onToggle }: { plan: any; title: 
           <div className="text-left">
             <div className="font-medium text-[#1E293B]">{title}</div>
             <div className="text-xs text-[#64748B] mt-0.5">
-              {plan?.isAchievable ? 'Ulasilabilir' : 'Mevcut portfoyle ulasilamaz'}
+              {plan?.isAchievable ? 'Ulaşılabilir' : 'Mevcut portföyle ulaşılamaz'}
             </div>
           </div>
         </div>
@@ -251,7 +251,7 @@ function OzetTab({ result }: { result: any }) {
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="text-xs uppercase tracking-wider text-[#2EC4B6] font-semibold mb-2">
-              Gercekci Ust Sinir
+              Gerçekçi Üst Sınır
             </div>
             <div className="text-4xl font-bold">
               {exec.achievableTarget ?? exec.achievableRating}
@@ -270,7 +270,7 @@ function OzetTab({ result }: { result: any }) {
                 ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                 : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}
           >
-            {exec.targetMatchesRequest ?? exec.isTargetFeasible ? 'Hedef Ulasilabilir' : 'Hedef Sinirli'}
+            {exec.targetMatchesRequest ?? exec.isTargetFeasible ? 'Hedef Ulaşılabilir' : 'Hedef Sınırlı'}
           </div>
         </div>
 
@@ -369,7 +369,7 @@ function OzetTab({ result }: { result: any }) {
 
           {consultant.structuralNeed && (
             <div>
-              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Yapisal Ihtiyac</div>
+              <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Yapısal İhtiyaç</div>
               <div className="text-slate-800 leading-relaxed italic">{consultant.structuralNeed}</div>
             </div>
           )}
@@ -769,7 +769,7 @@ function DetayTab({
             style={{ fontFamily: 'Outfit, sans-serif' }}
           >
             <GitCompare size={18} />
-            V2 vs V3 Karsilastirmasi
+            V2 vs V3 Karşılaştırması
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -781,7 +781,7 @@ function DetayTab({
             </div>
             <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[8px] p-4">
               <div className="text-xs uppercase tracking-wide text-[#0B3C5D] font-medium mb-2">
-                V3 Akilli Analiz
+                V3 Akıllı Analiz
               </div>
               <div className="text-slate-800">{comparison.v3View}</div>
             </div>
@@ -877,7 +877,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           className="text-xl font-black text-[#0B3C5D] tracking-tight"
           style={{ fontFamily: 'Outfit, sans-serif' }}
         >
-          Akilli Yol Haritasi
+          Akıllı Yol Haritası
         </h2>
         <span
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
@@ -889,7 +889,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           }}
         >
           <Sparkles size={12} />
-          AI Destekli Yapisal Analiz
+          Yapay Zeka Destekli Yapısal Analiz
         </span>
       </div>
 
@@ -955,7 +955,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
               className="rounded border-slate-300 focus:ring-[#0B3C5D]"
               style={{ accentColor: '#0B3C5D' }}
             />
-            V2 ile karsilastir
+            V2 ile karşılaştır
           </label>
 
           <button
@@ -967,7 +967,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
             onMouseEnter={e => { if (!loading && targetGrade) (e.currentTarget as HTMLButtonElement).style.background = '#07263D' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#0B3C5D' }}
           >
-            {loading ? 'Analiz ediliyor...' : 'Yol Haritasi Olustur'}
+            {loading ? 'Analiz ediliyor...' : 'Yol Haritası Oluştur'}
           </button>
         </div>
       </div>

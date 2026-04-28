@@ -76,7 +76,7 @@ export function RatioTransparencyBlock({ data }: Props) {
       <div style={{ margin: '12px 0', padding: '10px 12px', background: '#F0F9FF', borderRadius: 6, display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#5A7A96', lineHeight: 1.5 }}>
         <span style={{ flexShrink: 0 }} aria-hidden="true">ℹ️</span>
         <span>
-          Realistik hedef, 12 ay içinde uygulanabilir görülen iyileştirme seviyesidir.
+          Gerçekçi hedef, 12 ay içinde uygulanabilir görülen iyileştirme seviyesidir.
           Uzun vadeli referans ise sektör ortalamasına uzanan yön gösterici seviyedir.
         </span>
       </div>
