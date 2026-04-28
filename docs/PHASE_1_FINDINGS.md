@@ -591,7 +591,7 @@ expectedSpillover: {
 | 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 (`5d2397e`) | ✅ Çözüldü | Yüksek |
 | 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 (`7f65640`) | ✅ Çözüldü | Yüksek |
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
-| 33 | SubjectiveMissingBanner pasif UX | Faz 7.3.4C audit (2026-04-28) | Mini Faz | ⏳ Açık | Düşük |
+| 33 | SubjectiveMissingBanner pasif UX | Faz 7.3.4C audit (2026-04-28) | Mini Faz 7.3.4D | ✅ Çözüldü (`6db964f`) | Düşük |
 
 ---
 
@@ -858,7 +858,56 @@ UI `app/dashboard/analiz/page.tsx` satır 517-518:
 
 ---
 
-### ✅ 7.3.4B + 7.3.4C TAMAMLANDI
+### ✅ Faz 7.3.4D — SubjectiveMissingBanner Aksiyon Butonu
+**Commit:** `6db964f`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (2 audit turu, 1 blocker düzeltildi)
+
+**Sorun:**
+`SubjectiveMissingBanner` pasif:
+- Sekmeye yönlendiren link/buton yoktu
+- Mesaj soyut ("Niteliksel veriler girilmedi")
+- Yazım hatası: "sekmesindan"
+- Banner inline tanımlı ama `setActiveTab` scope dışında
+
+Bulgu kaynağı: Faz 7.3.4C `combineScores` audit raporu (Bulgu #33)
+
+**Çıktı:**
+- `SubjectiveMissingBanner` imzası genişletildi:
+  `onOpenSubjective: () => void` prop eklendi
+- "Subjektif Doldur →" butonu eklendi (inline style, indigo `#4f46e5`)
+- Mesaj iki satıra bölünerek netleştirildi:
+  - "Subjektif değerlendirme eksik olduğu için skor yalnızca finansal verilerle sınırlı gösteriliyor."
+  - "KKB, banka ilişkileri ve kurumsal yapı bilgileri için subjektif sekmesinden bilgileri doldurun."
+- "sekmesindan" → "sekmesinden" yazım hatası düzeltildi
+- İki render lokasyonu güncellendi (özet tabı + rasyolar tabı)
+- 470 test korundu, snapshot drift yok
+
+**Stil kararı:**
+Tailwind class yerine inline style kullanıldı.
+Sebep: mevcut banner zaten inline style kullanıyor,
+CLAUDE.md "inline > Tailwind" konvansiyonu.
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- `subjective.ts` dokunulmadı
+- `combineScores.ts` dokunulmadı
+- POST `/subjective` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- `pdf.ts`/`engineV3.ts`/`accountMapper.ts` dokunulmadı
+- Yeni component dosyası oluşturulmadı (banner inline kaldı)
+- Yeni dependency YOK
+- Yeni global CSS YOK
+- DB değişiklik YOK
+
+**Açık kalan UX bulguları (gelecek mini fazlar için):**
+- "Tahmin rating" / "Tam rating" iki ayrı gösterim (Faz 7.3.4C audit Seçenek B/D — kapsam dışı)
+- Tooltip ile detaylı açıklama (Seçenek C — kapsam dışı)
+- Tema/renk paleti polish (Faz 7.3.5'e ait)
+
+---
+
+### ✅ 7.3.4B + 7.3.4C + 7.3.4D TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
 
@@ -876,22 +925,20 @@ V3 engine kontra hesap düzeltmesi Faz 7.3.4B0'da tamamlandı.
 
 ## Açık Mini Faz Adayları
 
-### 🔲 Bulgu #33 — Banner UX İyileştirme (Mini Faz Adayı)
+### ✅ Bulgu #33 — Banner UX İyileştirme — TAMAMLANDI (Faz 7.3.4D, `6db964f`)
 **Kaynak:** Faz 7.3.4C `combineScores` audit raporu (2026-04-28)
 
-**Sorun:**
-- `SubjectiveMissingBanner` pasif — sekmeye tıklanabilir link/buton yok
-- Gösterilen skor "tahmin rating" (sadece finansal) mi "tam rating" (kombine) mi belirsiz
-- Kullanıcı uyarıyı görür ama aksiyonu tek tıkla alamaz
+**Çözüldü:**
+- `onOpenSubjective` prop + "Subjektif Doldur →" butonu eklendi
+- "sekmesindan" yazım hatası düzeltildi
+- Mesaj iki satırla netleştirildi
 
-**Önerilen çözüm:**
-- Banner'a "Subjektif Sekmeye Git →" butonu/link eklenir
-- Skor gösteriminde "finansal skor (tam veri eksik)" etiketi
+**Açık kalan (kapsam dışı bırakıldı):**
+- "Tahmin rating" / "Tam rating" ayrımı (Seçenek B/D)
+- Tooltip detayı (Seçenek C)
+- Renk paleti polish (Faz 7.3.5)
 
-**Etkilenen dosyalar:**
-- `app/src/app/dashboard/analiz/page.tsx` (`SubjectiveMissingBanner` bileşeni)
-
-**Risk seviyesi:** Düşük — UX iyileştirme, fonksiyonel hata değil
+**Risk seviyesi:** Düşük — çözüldü
 
 ---
 
