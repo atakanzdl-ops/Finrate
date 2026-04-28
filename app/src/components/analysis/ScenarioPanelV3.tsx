@@ -42,7 +42,6 @@ import {
   MessageSquare,
   Building2,
   TrendingDown,
-  Check,
   ChevronDown,
   Lightbulb,
   X,
@@ -109,6 +108,25 @@ function toStringArray(value: unknown): string[] {
   }
   if (typeof value === 'string' && value.trim()) return [value]
   return []
+}
+
+// ─── classifyLeg ─────────────────────────────────────────────────────────────
+
+/**
+ * TDHP hesap koduna ve kayıt yönüne göre bilanço hareketinin
+ * görünür yönünü belirler. Faz 7.3.5C1.
+ * Aktif (1xx/2xx) : Borç=artan(yeşil),  Alacak=azalan(pembe)
+ * Pasif (3xx-5xx)  : Alacak=artan(yeşil), Borç=azalan(pembe)
+ * Gelir (6xx)      : Alacak=artan(yeşil), Borç=azalan(pembe)
+ * Gider (7xx)      : Borç=artan(pembe),   Alacak=azalan(yeşil)
+ */
+function classifyLeg(accountCode: string, side: 'DEBIT' | 'CREDIT'): 'increase' | 'decrease' {
+  const p = accountCode.charAt(0)
+  if (p === '1' || p === '2') return side === 'DEBIT'  ? 'increase' : 'decrease'
+  if (p === '3' || p === '4' || p === '5') return side === 'CREDIT' ? 'increase' : 'decrease'
+  if (p === '6') return side === 'CREDIT' ? 'increase' : 'decrease'
+  if (p === '7') return side === 'DEBIT'  ? 'decrease' : 'increase'
+  return side === 'DEBIT' ? 'increase' : 'decrease'
 }
 
 // ─── BankerMetric ─────────────────────────────────────────────────────────────
@@ -531,95 +549,112 @@ function AksiyonPlaniTab({
                   </div>
                 </button>
 
-                {/* Expand detay — V3 kart layout: iki sütun (Bilanço | Rasyo Etkisi) */}
-                {isOpen && (
-                  <div className="px-6 pb-5 bg-slate-50/50 space-y-4 border-t border-slate-100 pt-4">
+                {/* Expand detay — Faz 7.3.5C1: Aksiyon kart yeni iki sütun layout */}
+                {isOpen && (() => {
+                  // Leg sınıflama: debit/credit → aktif/pasif/gelir + yön
+                  const legData = da.accountingLegsByAction?.[action.actionId]
+                  const debs: { accountCode: string; accountName: string; amountFormatted: string }[] = legData?.debits  ?? []
+                  const creds: { accountCode: string; accountName: string; amountFormatted: string }[] = legData?.credits ?? []
+                  type CL = { code: string; name: string; amountFormatted: string; direction: 'increase' | 'decrease' }
+                  const allLegs: CL[] = [
+                    ...debs.map(l  => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'DEBIT')  })),
+                    ...creds.map(l => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'CREDIT') })),
+                  ]
+                  const activeLegs  = allLegs.filter(l => l.code.charAt(0) === '1' || l.code.charAt(0) === '2')
+                  const passiveLegs = allLegs.filter(l => ['3','4','5'].includes(l.code.charAt(0)))
+                  const incomeLegs  = allLegs.filter(l => l.code.charAt(0) === '6' || l.code.charAt(0) === '7')
 
-                    {/* Neden Seçildi — tam liste (başlık şeridinde zaten tek satır) */}
-                    {toStringArray(action.whySelected).length > 0 && (
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium mb-2">
-                          Neden Bu Aksiyon Secildi?
-                        </div>
-                        <ul className="space-y-1.5">
-                          {toStringArray(action.whySelected).map((reason: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-[#1E293B]">
-                              <Check size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
-                              <span>{reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* V3 İki Sütun: Sol=Bilanço (Muhasebe Kaydı), Sağ=Rasyo Etkisi */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                      {/* Sol Sütun: Muhasebe Kaydı — accountingLegsByAction */}
-                      <div className="space-y-2">
-                        <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium">
-                          Muhasebe Kaydı
-                        </div>
-                        {(() => {
-                          const legs  = da.accountingLegsByAction?.[action.actionId]
-                          const debs  = legs?.debits  ?? []
-                          const creds = legs?.credits ?? []
-                          if (debs.length === 0 && creds.length === 0) {
-                            return (
-                              <p className="text-sm text-[#94A3B8] italic">
-                                Muhasebe etkisi mevcut değil
-                              </p>
-                            )
-                          }
-                          return (
-                            <div className="space-y-2">
-                              <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
-                                <div className="text-xs text-[#64748B] mb-2">Borç</div>
-                                {debs.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                                  <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
-                                    <span>{leg.accountCode} {leg.accountName}</span>
-                                    <span className="ml-3 text-[#2EC4B6] font-semibold">{leg.amountFormatted}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="bg-white border border-[#E5E9F0] rounded-[8px] p-3">
-                                <div className="text-xs text-[#64748B] mb-2">Alacak</div>
-                                {creds.map((leg: { accountCode: string; accountName: string; amountFormatted: string }, i: number) => (
-                                  <div key={i} className="flex justify-between text-sm text-slate-800 font-mono py-0.5">
-                                    <span>{leg.accountCode} {leg.accountName}</span>
-                                    <span className="ml-3 text-red-500 font-semibold">{leg.amountFormatted}</span>
-                                  </div>
-                                ))}
-                              </div>
+                  const renderLegGroup = (group: CL[]) =>
+                    group.length === 0
+                      ? <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>Etkilenmez</p>
+                      : <>{group.map((leg, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              background: leg.direction === 'increase' ? '#F0FDFA' : '#FEF2F2',
+                              borderRadius: 6,
+                              padding: '8px 12px',
+                              marginBottom: 6,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontSize: 11, color: '#94A3B8', marginRight: 6, fontFamily: 'monospace' }}>{leg.code}</span>
+                              <span style={{ fontSize: 13, color: leg.direction === 'increase' ? '#115E59' : '#991B1B', fontWeight: 500 }}>
+                                {leg.name}
+                              </span>
                             </div>
-                          )
-                        })()}
+                            <span style={{ fontSize: 13, fontWeight: 600, color: leg.direction === 'increase' ? '#0F766E' : '#B91C1C', whiteSpace: 'nowrap' }}>
+                              {leg.direction === 'increase' ? '+' : '−'}{leg.amountFormatted}
+                            </span>
+                          </div>
+                        ))}</>
+
+                  return (
+                    <div style={{ borderTop: '1px solid #E5E9F0', padding: '1.25rem 1.5rem', background: '#FAFBFC' }}>
+
+                      {/* İki sütun grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+
+                        {/* SOL — BİLANÇO / GELİR TABLOSU */}
+                        <div>
+                          {allLegs.length === 0 ? (
+                            <p style={{ margin: 0, fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>
+                              Muhasebe etkisi mevcut değil
+                            </p>
+                          ) : (
+                            <>
+                              <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                                Bilanço — aktif taraf
+                              </p>
+                              {renderLegGroup(activeLegs)}
+
+                              <div style={{ marginTop: 14 }}>
+                                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                                  Pasif taraf
+                                </p>
+                                {renderLegGroup(passiveLegs)}
+                              </div>
+
+                              <div style={{ marginTop: 14 }}>
+                                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                                  Gelir tablosu
+                                </p>
+                                {renderLegGroup(incomeLegs)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* SAĞ — RASYO ETKİSİ */}
+                        {action.ratioTransparency != null && (
+                          <div>
+                            <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                              Rasyo Etkisi
+                            </p>
+                            <RatioTransparencyBlock data={action.ratioTransparency} />
+                          </div>
+                        )}
+
                       </div>
 
-                      {/* Sağ Sütun: Rasyo Etkisi — ratioTransparency yoksa blok gizlenir (silent skip) */}
-                      {action.ratioTransparency != null && (
-                        <div className="space-y-2">
-                          <div className="text-xs uppercase tracking-wide text-[#64748B] font-medium">
-                            Rasyo Etkisi
-                          </div>
-                          <RatioTransparencyBlock data={action.ratioTransparency} />
+                      {/* FOOTER — FİNRATE YORUMU */}
+                      {action.bankerPerspective && (
+                        <div style={{ marginTop: '1.25rem', padding: '14px 16px', background: '#0B3C5D', borderRadius: 6 }}>
+                          <p style={{ margin: '0 0 4px', fontSize: 11, color: '#2EC4B6', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                            Finrate Yorumu
+                          </p>
+                          <p style={{ margin: 0, fontSize: 13, color: 'white', lineHeight: 1.65 }}>
+                            {action.bankerPerspective}
+                          </p>
                         </div>
                       )}
 
                     </div>
-
-                    {/* Alt: Finrate Yorumu (bankerPerspective) — boşsa gizlenir */}
-                    {action.bankerPerspective && (
-                      <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[8px] p-3">
-                        <div className="text-xs uppercase tracking-wide text-[#0B3C5D] font-medium mb-1">
-                          Finrate Yorumu
-                        </div>
-                        <div className="text-sm text-slate-800">{action.bankerPerspective}</div>
-                      </div>
-                    )}
-
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             )
           })}
