@@ -357,7 +357,14 @@ function InsufficientBanner({ categories }: { categories?: string[] }) {
 }
 
 /* ─── SubjectiveMissingBanner ───────────────────────── */
-function SubjectiveMissingBanner({ missing }: { missing?: boolean }) {
+// Faz 7.3.4D: onOpenSubjective prop eklendi (Bulgu #33)
+function SubjectiveMissingBanner({
+  missing,
+  onOpenSubjective,
+}: {
+  missing?: boolean
+  onOpenSubjective: () => void
+}) {
   if (!missing) return null
   return (
     <div style={{
@@ -367,10 +374,29 @@ function SubjectiveMissingBanner({ missing }: { missing?: boolean }) {
       border: '1px solid rgba(99,102,241,0.30)',
     }}>
       <span style={{ fontSize: 16, lineHeight: 1.4 }}>ℹ️</span>
-      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#3730a3' }}>
-        Niteliksel veriler girilmedi — skor güvenilirliği düşük.{' '}
-        Subjektif sekmesindan KKB, banka ilişkileri ve kurumsal yapı bilgilerini doldurun.
-      </p>
+      <div>
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#3730a3' }}>
+          Subjektif değerlendirme eksik olduğu için skor yalnızca finansal verilerle sınırlı gösteriliyor.
+        </p>
+        <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: '#3730a3' }}>
+          KKB, banka ilişkileri ve kurumsal yapı bilgileri için subjektif sekmesinden bilgileri doldurun.
+        </p>
+        <button
+          onClick={onOpenSubjective}
+          style={{
+            marginTop: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '5px 12px', borderRadius: 6, border: 'none',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            background: '#4f46e5', color: '#ffffff',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#4338ca' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#4f46e5' }}
+        >
+          Subjektif Doldur →
+        </button>
+      </div>
     </div>
   )
 }
@@ -1134,7 +1160,7 @@ function AnalizPageContent() {
 
                     <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
-                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} />
+                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} onOpenSubjective={() => setActiveTab('subjective')} />
 
                     {/* ── Row 3: Aktif & Pasif Dağılımı ──────────────── */}
                     {fd && (
@@ -1182,7 +1208,7 @@ function AnalizPageContent() {
                   <div className="card" style={{ overflow: 'visible' }}>
                     <InsufficientBanner categories={selected?.insufficientCategories} />
                     <CoverageBanner coverage={selected?.overallCoverage} />
-                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} />
+                    <SubjectiveMissingBanner missing={selected?.entity?.id ? subjectiveMissing[selected.entity.id] : undefined} onOpenSubjective={() => setActiveTab('subjective')} />
                     {/* Başlık */}
                     <div className="card-head">
                       <div className="card-head-left">
