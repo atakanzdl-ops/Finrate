@@ -593,6 +593,7 @@ expectedSpillover: {
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
 | 33 | SubjectiveMissingBanner pasif UX | Faz 7.3.4C audit (2026-04-28) | Mini Faz 7.3.4D | ✅ Çözüldü (`6db964f`) | Düşük |
 | 34 | combineScores ceiling/floor kalibrasyon kararı | Faz 7.3.4D sonrası audit (2026-04-28) | Ürün Kararı | ⏳ Beklemede | Orta |
+| 35 | actionCatalogV3 102/103 nakit eligibility | Faz 7.3.4B0 audit notu (2026-04-28) | Faz 7.3.4F | ✅ Çözüldü (64e693f) | Düşük |
 
 ---
 
@@ -946,6 +947,42 @@ kalibrasyon kararı beklemeye devam ediyor.
 
 ---
 
+### ✅ Faz 7.3.4F — actionCatalogV3 Nakit Eligibility Kontra Düzeltme
+**Commit:** `64e693f`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (3 audit turu, 7 blocker düzeltildi)
+
+**Sorun:**
+actionCatalogV3'te 2 yer kontra hesap mantığını ihlal ediyordu:
+- A04_CASH_PAYDOWN_ST: `sumAccountsByPrefix(['102','103'])` — toplam
+- A16_CASH_BUFFER_BUILD: aynı bug
+
+103 (Verilen Çekler) pozitif sayılıyordu, düşülmesi gerekirken.
+
+**Risk:**
+Sadece 103 yüklü olan şirket "nakit var" görünür.
+Yanlış aksiyon önerileri kullanıcıya gider.
+Rating bozulmaz ama güvenilirlik bozulur.
+
+**Çıktı:**
+- `getNetCashBalance` lokal helper (private, `actionCatalogV3` içinde)
+  Formül: `100 + 101 + 102 + 108 - 103` (Math.abs YOK)
+- A04 `customCheck`: `netCash >= 500_000` (eşik korundu)
+- A16 `customCheck`: `netCash > 0` (eşik korundu)
+- `actionCatalogV3-cash.test.ts` (yeni dosya, 8 test)
+- 504 → 512 test (+8), snapshot drift yok
+
+**Disiplin notu:**
+- `engineV3` import YASAK (circular dependency riski) — uyuldu
+- `signedSumByCodes` private helper, export YASAK — uyuldu
+- Lokal helper olarak yazıldı, DRY için `engineV3`'e dokunulmadı
+
+**Açık kalan ayrı bug'lar (gelecek mini fazlar):**
+- `requiredAccountCodes` pattern (A04: `['102', '300']` basis havuzu)
+- `findBalanceInGroup` fallback exact match yoksa 10x grup eşleşmesi
+
+---
+
 ### ✅ 7.3.4B + 7.3.4C + 7.3.4D TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
@@ -1010,6 +1047,28 @@ Sert sıçrama mali müşavir gözünden tartışmalı.
 **Faz adı önerisi:** Faz 7.3.4E
 
 **Risk seviyesi:** Orta — ürün kararı bekleniyor, mevcut kod çalışıyor
+
+---
+
+### 🔲 actionCatalogV3 requiredAccountCodes Pattern Revizyonu
+**Kaynak:** Faz 7.3.4F audit notu (2026-04-28)
+
+**Bulgu:** A04 `requiredAccountCodes: ['102', '300']` hem nakit hem borç aynı basis havuzunda. Ayrı tasarım kokusu, ana bug değil.
+
+**Etkilenen:** `actionCatalogV3.ts` (basis hesaplama mantığı)
+**Süre:** 1-2 saat
+**Öncelik:** Düşük
+
+---
+
+### 🔲 findBalanceInGroup Fallback Exact Match
+**Kaynak:** Faz 7.3.4F audit notu (2026-04-28)
+
+**Bulgu:** 102 aranırken başka 10x hesaplarla eşleşme ihtimali (ilk iki hane grup fallback). Risk: yanlış hesap seçimi.
+
+**Etkilenen:** `engineV3.ts` (`findBalanceInGroup`)
+**Süre:** 1-2 saat
+**Öncelik:** Düşük
 
 ---
 
