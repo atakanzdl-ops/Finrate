@@ -393,6 +393,199 @@ function sumByCodes(balances: Record<string, number>, codes: string[]): number {
   return codes.reduce((sum, code) => sum + Math.abs(balances[code] ?? 0), 0)
 }
 
+// ─── SIGNED BALANCE HELPERS ───────────────────────────────────────────────────
+
+/**
+ * Pozitif ve negatif hesap kodlarını POZİTİF MUTLAK bakiye varsayımıyla toplar.
+ * Math.abs KULLANILMAZ — balances değerleri zaten pozitif mutlak (Faz 7.3.4A invariant'ı).
+ * negativeCodes içindeki kodlar çıkarılır (kontra hesaplar: 103, 257, 268, 580, 591 vb.).
+ */
+function signedSumByCodes(
+  positiveCodes: string[],
+  negativeCodes: string[],
+  balances: Record<string, number>,
+): number {
+  const positive = positiveCodes.reduce(
+    (sum, code) => sum + (balances[code] ?? 0), 0
+  )
+  const negative = negativeCodes.reduce(
+    (sum, code) => sum + (balances[code] ?? 0), 0
+  )
+  return positive - negative
+}
+
+/**
+ * TDHP hesap kodlarından bilanço toplamlarını hesaplar.
+ * Hesap kodu listeleri accountMapper.ts rebuildAggregateFromAccounts'tan BİREBİR alındı.
+ * POZİTİF MUTLAK varsayımı (Faz 7.3.4A invariant'ı) — kontra hesaplar çıkarılır.
+ *
+ * Kaynak: accountMapper.ts rebuildAggregateFromAccounts (her satır için referans verildi).
+ */
+export function buildV3BalanceTotals(
+  balances: Record<string, number>,
+): {
+  currentAssets:    number
+  fixedAssets:      number
+  totalAssets:      number
+  stLiabilities:    number
+  ltLiabilities:    number
+  totalLiabilities: number
+  totalEquity:      number
+  cashBalance:      number
+  inventory:        number
+} {
+  // accountMapper.ts:140 — r.cash
+  const cashBalance = signedSumByCodes(
+    ['100', '101', '102', '108'],
+    ['103'],
+    balances,
+  )
+
+  // accountMapper.ts:143-144 — r.tradeReceivables
+  const tradeReceivables = signedSumByCodes(
+    ['120', '121', '126', '127', '128'],
+    ['122', '129'],
+    balances,
+  )
+
+  // accountMapper.ts:147-148 — r.otherReceivables
+  const otherReceivables = signedSumByCodes(
+    ['131', '132', '133', '135', '136', '138'],
+    ['137', '139'],
+    balances,
+  )
+
+  // accountMapper.ts:151-152 — r.inventory
+  const inventory = signedSumByCodes(
+    ['150', '151', '152', '153', '157'],
+    ['158'],
+    balances,
+  )
+
+  // accountMapper.ts:155 — r.prepaidSuppliers
+  const prepaidSuppliers = signedSumByCodes(
+    ['159'],
+    [],
+    balances,
+  )
+
+  // accountMapper.ts:158-159 — r.otherCurrentAssets
+  const otherCurrentAssets = signedSumByCodes(
+    ['180', '181', '190', '191', '193', '195', '196', '197', '198'],
+    [],
+    balances,
+  )
+
+  // accountMapper.ts:162-163 — r.tangibleAssets (net: 257 çıkarılır)
+  const tangibleAssets = signedSumByCodes(
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257'],
+    balances,
+  )
+
+  // accountMapper.ts:166-167 — r.intangibleAssets (net: 268 çıkarılır)
+  const intangibleAssets = signedSumByCodes(
+    ['260', '261', '262', '263', '264', '267', '269'],
+    ['268'],
+    balances,
+  )
+
+  // accountMapper.ts:170-171 — r.otherNonCurrentAssets
+  const otherNonCurrentAssets = signedSumByCodes(
+    ['220', '221', '226', '240', '242', '245', '280', '281', '294', '295'],
+    [],
+    balances,
+  )
+
+  // accountMapper.ts:174-175 — r.shortTermFinancialDebt (net: 302, 308 çıkarılır)
+  const shortTermFinancialDebt = signedSumByCodes(
+    ['300', '301', '303', '304', '305', '306', '309'],
+    ['302', '308'],
+    balances,
+  )
+
+  // accountMapper.ts:178-179 — r.tradePayables (net: 322 çıkarılır)
+  const tradePayables = signedSumByCodes(
+    ['320', '321', '326', '329'],
+    ['322'],
+    balances,
+  )
+
+  // accountMapper.ts:182-184 — r.otherShortTermPayables (net: 337 çıkarılır)
+  const otherShortTermPayables = signedSumByCodes(
+    ['331', '332', '333', '335', '336', '380', '381', '391', '392', '393', '397', '399'],
+    ['337'],
+    balances,
+  )
+
+  // accountMapper.ts:187 — r.advancesReceived
+  const advancesReceived = signedSumByCodes(
+    ['340', '349'],
+    [],
+    balances,
+  )
+
+  // accountMapper.ts:190-191 — r.taxPayables (net: 371 çıkarılır)
+  const taxPayables = signedSumByCodes(
+    ['360', '361', '368', '369', '370', '372', '373', '379'],
+    ['371'],
+    balances,
+  )
+
+  // accountMapper.ts:194-195 — r.longTermFinancialDebt (net: 402, 408 çıkarılır)
+  const longTermFinancialDebt = signedSumByCodes(
+    ['400', '401', '405', '407', '409'],
+    ['402', '408'],
+    balances,
+  )
+
+  // accountMapper.ts:198-200 — r.otherNonCurrentLiabilities (net: 422, 437 çıkarılır)
+  const otherNonCurrentLiabilities = signedSumByCodes(
+    ['420', '421', '426', '429', '431', '432', '433', '436', '472', '479', '480', '481', '492'],
+    ['422', '437'],
+    balances,
+  )
+
+  // accountMapper.ts:203-208 — teq = paidInCapital + capitalReserves + profitReserves
+  //   + retainedEarnings - retainedLosses + netProfitCurrentYear
+  //   paidInCapital = 500+502 - 501-503
+  //   retainedLosses = 580 (çıkarılır)
+  //   netProfitCurrentYear = 590 - 591
+  const totalEquity = signedSumByCodes(
+    ['500', '502', '520', '521', '522', '523', '524', '529',
+     '540', '541', '542', '548', '549', '570', '590'],
+    ['501', '503', '580', '591'],
+    balances,
+  )
+
+  // Aggregate toplamlar (accountMapper.ts:223-230 mantığıyla tutarlı)
+  const currentAssets = cashBalance + tradeReceivables + otherReceivables
+    + inventory + prepaidSuppliers + otherCurrentAssets
+
+  const fixedAssets = tangibleAssets + intangibleAssets + otherNonCurrentAssets
+
+  const totalAssets = currentAssets + fixedAssets
+
+  const stLiabilities = shortTermFinancialDebt + tradePayables + otherShortTermPayables
+    + advancesReceived + taxPayables
+
+  const ltLiabilities = longTermFinancialDebt + otherNonCurrentLiabilities
+
+  const totalLiabilities = stLiabilities + ltLiabilities
+
+  return {
+    currentAssets,
+    fixedAssets,
+    totalAssets,
+    stLiabilities,
+    ltLiabilities,
+    totalLiabilities,
+    totalEquity,
+    cashBalance,
+    inventory,
+  }
+}
+
 function recordToAccountBalances(rec: Record<string, number>): AccountBalance[] {
   return Object.entries(rec).map(([accountCode, amount]) => ({ accountCode, amount }))
 }
@@ -408,13 +601,8 @@ function accountBalancesToRecord(balances: AccountBalance[]): Record<string, num
 function buildInitialFirmContext(input: EngineInput): FirmContext {
   const b = input.accountBalances
 
-  // TDHP hesap gruplari
-  const currentAssets = sumByPrefix(b, '1')   // 1xx donen varliklar
-  const fixedAssets   = sumByPrefix(b, '2')   // 2xx duran varliklar
-  const totalAssets   = currentAssets + fixedAssets
-
-  // Ozkaynak: 5xx hesaplar
-  const totalEquity = sumByPrefix(b, '5')
+  // buildV3BalanceTotals: kontra hesaplar (103, 257, 268, 501, 580, 591 vb.) POZİTİF MUTLAK'tan çıkarılır
+  const { totalAssets, totalEquity } = buildV3BalanceTotals(b)
 
   return {
     sector:           input.sector,
@@ -448,10 +636,8 @@ function updateFirmContextFromTransactions(
 
   const updatedBalances = accountBalancesToRecord(ledgerResult.finalBalances)
 
-  const currentAssets = sumByPrefix(updatedBalances, '1')
-  const fixedAssets   = sumByPrefix(updatedBalances, '2')
-  const totalAssets   = currentAssets + fixedAssets
-  const totalEquity   = sumByPrefix(updatedBalances, '5')
+  // buildV3BalanceTotals: kontra hesaplar doğru çıkarılır (Faz 7.3.4B0)
+  const { totalAssets, totalEquity } = buildV3BalanceTotals(updatedBalances)
 
   return {
     ...context,
@@ -481,15 +667,19 @@ function snapshotContext(ctx: FirmContext): DecisionTraceNode['contextAfter'] {
 function computeSectorMetrics(ctx: FirmContext): Record<SectorMetricKey, number> {
   const b = ctx.accountBalances
 
-  const currentAssets  = sumByPrefix(b, '1')
-  const stLiabilities  = sumByPrefix(b, '3')
-  const ltLiabilities  = sumByPrefix(b, '4')
-  const totalLiabilities = stLiabilities + ltLiabilities
-  const equity         = ctx.totalEquity || 1
-  const totalAssets    = ctx.totalAssets || 1
+  // buildV3BalanceTotals: kontra hesaplar (103, 158, 302, 322, 337, 371, 402, 422 vb.)
+  // POZİTİF MUTLAK'tan doğru çıkarılır (Faz 7.3.4B0 düzeltmesi)
+  const {
+    currentAssets,
+    stLiabilities,
+    ltLiabilities,
+    totalLiabilities,
+    cashBalance,
+    inventory,
+  } = buildV3BalanceTotals(b)
 
-  const inventory      = sumByCodes(b, ['150','151','152','153','157','158'])
-  const cashBalance    = sumByCodes(b, ['100','101','102','103','108'])
+  const equity      = ctx.totalEquity || 1
+  const totalAssets = ctx.totalAssets || 1
 
   const safe = (n: number, d: number, fallback = 0) => d > 0 ? n / d : fallback
 
