@@ -674,18 +674,89 @@ satırlarını TDHP rawAccounts olarak (POZİTİF MUTLAK) okuyacak
 
 ---
 
-### ⏳ 7.3.4B Ön Koşul — V3 Math.abs / Kontra Hesap Audit'i
+### ✅ Faz 7.3.4B0 — V3 Engine Kontra Hesap Düzeltme
+**Commits:** `6545040` + `a330807`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (3 audit turu, 7 blocker hepsi düzeltildi)
 
-**Ön koşul notu:** 7.3.4B ön koşulu: V3 Math.abs / kontra hesap audit'i
+**Sorun:**
+engineV3 `sumByPrefix`/`sumByCodes` `Math.abs` kullanıyor, kontra
+hesaplar (103, 257, 268, 580, 591, 158) yanlış pozitif
+varlık/özkaynak lehine ekleniyordu. Mevcut DEKAM 2022
+sentetik 20'de bile özkaynak yaklaşık 985 bin TL şişikti.
 
-V3 engine içinde `Math.abs` / `sumByPrefix` kullanımı kontra hesapları
-(103, 257, 268, 580, 591) yanlış pozitif varlık gibi sayabilir.
-DEKAM backfill VEYA herhangi bir DB migration ÖNCESİ V3 kontra hesap
-yorumu mutlaka audit edilmeli.
+**Çıktı:**
+- `signedSumByCodes` helper (Math.abs YOK)
+- `buildV3BalanceTotals` public export
+- `accountMapper.ts` TEK KAYNAK (17 toplam birebir kopyalanmış)
+- `computeSectorMetrics` düzeltildi
+- `buildProductivityInput` düzeltildi (`cashAndEquivalents`, `inventory`, `fixedAssetsNet`)
+- 7 senaryo + Senaryo 8 unit test
+- 427 → 449 test (+22), snapshot drift YOK
 
-**Bilinen riskler:**
-- Yeni PDF yüklemeleri 40+ hesap üretir → V3 Math.abs riski runtime'a girer (DB migration olmasa bile)
-- 350/358 aynı değer durumu (DEKAM 2024'te 46,896,296.36) muhtemelen alt-kalem ilişkisi → çift sayım kontrol edilmeli
+**Sayısal doğrulama (DEKAM 2022 sentetik):**
+- Eski yanlış totalEquity: 3,992,493.93
+- Yeni doğru totalEquity: 3,007,506.07
+- Düzeltme: −984,987.86 TL
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- `pdf.ts` dokunulmadı (Faz 7.3.4A korundu)
+- `accountMapper.ts` dokunulmadı (TEK KAYNAK olarak okundu)
+- DB migration YOK
+- Rating güncelleme YOK
+
+---
+
+### ✅ Faz 7.3.4B0.1 — accountMapper + engineV3: 350/358 KV Yükümlülük
+**Commit:** `c315244`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (3 audit turu, 7 blocker hepsi düzeltildi)
+
+**Sorun:**
+350 (Yıllara Yaygın İnşaat Hakedişleri) ve 358 (Enflasyon Düzeltme) hesapları:
+- `pdf.ts` parser üretiyor (Faz 7.3.4A) ✓
+- `accountMapper.ts` `rebuildAggregateFromAccounts` İÇİNDE YOKTU ✗
+- `accountMapper.ts` `checkBalance()` İÇİNDE YOKTU ✗
+- `engineV3` `buildV3BalanceTotals` `stLiabilities` İÇİNDE YOKTU ✗
+
+DEKAM 2024'te 350 + 358 = 46,896,296.36 TL — KV yükümlülük
+olarak görünmüyordu, Borç/Özkaynak yanlış düşük çıkıyordu.
+
+**Çıktı:**
+- `constructionProgressBillings` alt bileşen helper
+  (DRY: `accountMapper.ts` içinde tek helper, iki yerde kullanım)
+- `rebuildAggregateFromAccounts` `totalCurrentLiabilities` güncellendi
+- `checkBalance()` güncellendi
+- `engineV3` `buildV3BalanceTotals` `stLiabilities` listesine 350/358 eklendi
+- Senaryo 9 + `accountMapper.test.ts` yeni dosya (7 test)
+- 449 → 459 test (+10), snapshot drift YOK
+
+**Sayısal doğrulama (Senaryo 9):**
+- 350=30M + 358=16.9M dahil stLiabilities = 53,396,296.36
+
+**Disiplin notu:**
+`accountMapper.ts` bu fazda zorunlu olarak değişti.
+Önceki "accountMapper dokunulmaz" kuralı parser/V3 motor
+düzeltmeleri için geçerliydi. Bu faz `accountMapper.ts`'in KENDİSİNDE
+eksik olan 350/358 hesaplarını eklemek için tasarlandı.
+
+---
+
+### ⏳ 7.3.4B Ön Koşul — ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
+
+**Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
+
+V3 engine kontra hesap düzeltmesi Faz 7.3.4B0'da tamamlandı.
+350/358 KV yükümlülük eksikliği Faz 7.3.4B0.1'de tamamlandı.
+
+**Codex audit raporundan — Faz 7.3.4B prompt'u şu şartlarla yazılmalı:**
+- PDF/fixture kaynağı net
+- `calculateRatiosFromAccounts(current, previous)` + `calculateScore`
+- `finalScore` + `finalRating` + `ratios` + kategori skorları
+  (`liquidity`, `profitability`, `leverage`, `activity`) + `optimizerSnapshot`
+- Migration öncesi rollback snapshot
 
 ---
 
