@@ -1039,6 +1039,28 @@ Bu bulgular Faz 7.3.5D (Rapor/PDF Dil Polish) kapsamına ait.
 
 ---
 
+### ⏭️ Faz 7.3.5D — PDF/Rapor Dil Polish (ATLANDI)
+**Codex keşif raporu:** NO-GO (2026-04-28)
+
+**Bulgu:**
+Aktif kullanıcı PDF rapor akışı `app/dashboard/analiz/rapor/page.tsx`
+üzerinden çalışıyor. Bu sayfada Türkçe karakter eksikliği YOK,
+metinler doğru.
+
+Eksiklikler `lib/reporting/reportPdf.ts` ve `reportPdf.next.ts`
+içinde mevcut, ancak bu dosyalar repo'da hiçbir yerden import
+edilmiyor (legacy/unused).
+
+**Karar:**
+Faz atlandı. Kullanıcıya görünen rapor zaten temiz.
+Legacy dosya temizliği herhangi bir kullanıcı etkisi yaratmıyor;
+gerekirse ileride küçük bir mini fazla yapılır.
+
+Faz 7.3.5A'daki "Bonus bulgu" notunda belirtilen PDF/yorum dil
+eksiklikleri bu kararla kapanmış sayılır.
+
+---
+
 ### ✅ 7.3.4B-F + 7.3.5A TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
