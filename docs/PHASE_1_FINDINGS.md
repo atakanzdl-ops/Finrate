@@ -591,6 +591,7 @@ expectedSpillover: {
 | 30 | UI logout butonu (#19 follow-up) | Faz 5.1 sonrası | Faz 6.5 (`5d2397e`) | ✅ Çözüldü | Yüksek |
 | 31 | Route HTTP integration test eksik | Faz 6b polish doğrulama | Faz 6.5 (`7f65640`) | ✅ Çözüldü | Yüksek |
 | 32 | UI rating skalası uyum kontrolü | Faz 6.5 Bulgu #29 sırasında | Faz 7 | ⏳ Açık | Orta |
+| 33 | SubjectiveMissingBanner pasif UX | Faz 7.3.4C audit (2026-04-28) | Mini Faz | ⏳ Açık | Düşük |
 
 ---
 
@@ -744,7 +745,120 @@ eksik olan 350/358 hesaplarını eklemek için tasarlandı.
 
 ---
 
-### ⏳ 7.3.4B Ön Koşul — ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
+### ✅ Faz 7.3.4B — DEKAM Backfill + Rating Yeniden Hesaplama
+**Commit:** `33a141c`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (3 audit turu, 1 runtime blocker düzeltildi)
+
+**Sorun:**
+DEKAM 2022/2023/2024 DB'de 20 sentetik hesap kayıtlıydı.
+Faz 7.3.4A pdf.ts parser ile 40+ gerçek hesap üretebilmesine
+rağmen mevcut analizler eski sentetik veriyle çalışıyordu.
+Rating'ler V3 motoru bug'larından (Faz 7.3.4B0 öncesi) etkilenmişti.
+
+**Çıktı:**
+- `scripts/backfill_dekam_pdf_accounts.ts` (.ts, tsx ile çalıştırılır)
+- `tsx` devDependency eklendi
+- ADIM 0 import gate (`extractTdhpRawAccountsFromText`,
+  `calculateRatiosFromAccounts`, `calculateScore`, `createOptimizerSnapshot`)
+- Dry-run modu: `scripts/backfill_dekam_dry_run_report.json`
+- Kullanıcı onayı gate (`--confirm` flag zorunlu)
+- Rollback snapshot: `scripts/backfill_dekam_rollback_snapshot.json`
+  (60 hesap kaydı + analyses scoring alanları)
+- `prisma.$transaction` (3 analiz birden, interactive callback form)
+- Post-migration doğrulama
+- Audit log: eski → yeni karşılaştırma
+
+**Sayısal sonuç (DEKAM):**
+- 2022: 20 → 42 hesap, C (35) → D (13.6)
+- 2023: 20 → 41 hesap, CCC (45) → D (18.8)
+- 2024: 20 → 42 hesap, CCC (50) → C (33.4)
+
+**PDF doğrulama (DEKAM 2023):**
+- Parser PDF bilançosuyla %99.85 uyumlu
+- 4 küçük hesap eksik (370/371/362/479) = KV %0.15
+- Borç/Özkaynak 100.17 gerçek mali durum (140M alınan avans + 75M ortaklara borç)
+
+**FK constraint hatası:**
+İlk çalıştırmada hardcoded analysisId'ler yanlıştı.
+Düzeltme: `$queryRaw` ile dinamik DB sorgusu + interactive
+transaction callback. Prisma otomatik rollback yaptı, manuel
+müdahale gerekmedi.
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- `pdf.ts` dokunulmadı (Faz 7.3.4A kapalı)
+- `engineV3.ts` dokunulmadı (Faz 7.3.4B0 kapalı)
+- `accountMapper.ts` dokunulmadı (Faz 7.3.4B0.1 kapalı)
+- DEKAM 2025 Q4 dokunulmadı (mizan kaynaklı)
+- Diğer entity'ler dokunulmadı
+- `SubjectiveInput` tablosu dokunulmadı
+- 459 test korundu, snapshot drift yok
+
+**Bulunan latent bug (Faz 7.3.4C'ye taşındı):**
+POST /subjective DB.finalScore'u combined ile eziyor ve
+`__financialScore`'a saklıyor. UI tekrar `combineScores(a.finalScore, subj)`
+çağırıyor → DOUBLE APPLICATION.
+
+---
+
+### ✅ Faz 7.3.4C — combineScores Double-Application Bug Fix
+**Commit:** `a05a3a1`
+**Tarih:** 2026-04-28
+**Codex audit:** GO (2 audit turu, 3 blocker düzeltildi)
+
+**Sorun:**
+POST `/api/entities/[id]/subjective` endpoint'i:
+- `financialScore = ratios.__financialScore ?? a.finalScore`
+- `DB.finalScore = combineScores(financialScore, subjectiveTotal)`
+- Orijinal finansal skor `ratios.__financialScore`'da saklanır
+
+UI `app/dashboard/analiz/page.tsx` satır 517-518:
+- `return combineScores(a.finalScore, subj)`
+- `a.finalScore` ZATEN combined → ikinci kez uygulama
+
+**Etki:**
+- Subjektif GİRİLMEMİŞ şirketler (DEKAM gibi): `__financialScore` yok,
+  fallback `finalScore` = ham finansal skor → davranış DEĞİŞMEZ
+- Subjektif GİRİLMİŞ şirketler: rating yanlış hesaplanıyor
+
+**Çıktı:**
+- `analiz/page.tsx` `combinedScore()` düzeltildi:
+  ```typescript
+  const financial = a.ratios?.__financialScore ?? a.finalScore
+  return combineScores(financial, subj)
+  ```
+- `lib/scoring/__tests__/combineScores.test.ts` (yeni dosya)
+- 11 senaryo (8 temel + 3 regression)
+- 459 → 470 test (+11), snapshot drift yok
+
+**Test senaryoları:**
+- Senaryo 1: `combineScores(50, 0)` = 35
+- Senaryo 2: `combineScores(50, 30)` = 63 (ceiling devreye)
+- Senaryo 3: `combineScores(100, 30)` = 100 (capped)
+- Senaryo 4: `combineScores(13.6, 0)` = 10 (DEKAM 2022 benzeri)
+- Senaryo 5: `combineScores(40, 0)` = 28
+- Senaryo 6: `combineScores(70, 30)` = 79
+- Senaryo 7: `combineScores(0, 30)` = 30
+- Senaryo 8: `combineScores(-5, 30)` = 27 (negatif input)
+- Senaryo 9a-c: Double-application regression
+
+**Disiplin:**
+- `score.ts` dokunulmadı
+- `subjective.ts` (`combineScores` formülü) dokunulmadı
+- POST `/subjective` `route.ts` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- `pdf.ts`/`engineV3.ts`/`accountMapper.ts` dokunulmadı
+- DEKAM invariant korundu (D/D/D, fallback `finalScore` çalıştı)
+
+**combineScores audit raporundan açık kalan UX bulgusu:**
+`SubjectiveMissingBanner` pasif — sekmeye yönlendiren link/buton yok,
+"tahmin rating" vurgusu yok. Mini faz olarak ele alınacak (Bulgu #33).
+
+---
+
+### ✅ 7.3.4B + 7.3.4C TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
 
@@ -757,6 +871,27 @@ V3 engine kontra hesap düzeltmesi Faz 7.3.4B0'da tamamlandı.
 - `finalScore` + `finalRating` + `ratios` + kategori skorları
   (`liquidity`, `profitability`, `leverage`, `activity`) + `optimizerSnapshot`
 - Migration öncesi rollback snapshot
+
+---
+
+## Açık Mini Faz Adayları
+
+### 🔲 Bulgu #33 — Banner UX İyileştirme (Mini Faz Adayı)
+**Kaynak:** Faz 7.3.4C `combineScores` audit raporu (2026-04-28)
+
+**Sorun:**
+- `SubjectiveMissingBanner` pasif — sekmeye tıklanabilir link/buton yok
+- Gösterilen skor "tahmin rating" (sadece finansal) mi "tam rating" (kombine) mi belirsiz
+- Kullanıcı uyarıyı görür ama aksiyonu tek tıkla alamaz
+
+**Önerilen çözüm:**
+- Banner'a "Subjektif Sekmeye Git →" butonu/link eklenir
+- Skor gösteriminde "finansal skor (tam veri eksik)" etiketi
+
+**Etkilenen dosyalar:**
+- `app/src/app/dashboard/analiz/page.tsx` (`SubjectiveMissingBanner` bileşeni)
+
+**Risk seviyesi:** Düşük — UX iyileştirme, fonksiyonel hata değil
 
 ---
 
