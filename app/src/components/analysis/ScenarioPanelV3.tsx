@@ -826,7 +826,6 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
   const [targetGrade,         setTargetGrade]         = useState<string>('')
   const [selectedUiRating,    setSelectedUiRating]    = useState<string>('')
   const [activeTab,           setActiveTab]           = useState<'ozet' | 'aksiyon' | 'detay'>('ozet')
-  const [includeV2Comparison, setIncludeV2Comparison] = useState<boolean>(false)
   const [loading,             setLoading]             = useState(false)
   const [result,              setResult]              = useState<ScenarioV3ApiResponse | null>(null)
   const [error,               setError]               = useState<string | null>(null)
@@ -844,7 +843,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       const res = await fetch('/api/scenarios/v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisId, targetGrade, currentGrade, includeV2Comparison }),
+        body: JSON.stringify({ analysisId, targetGrade, currentGrade }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -946,18 +945,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
           })()}
         </div>
 
-        <div className="mt-5 flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm text-[#64748B] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeV2Comparison}
-              onChange={e => setIncludeV2Comparison(e.target.checked)}
-              className="rounded border-slate-300 focus:ring-[#0B3C5D]"
-              style={{ accentColor: '#0B3C5D' }}
-            />
-            V2 ile karşılaştır
-          </label>
-
+        <div className="mt-5 flex items-center justify-end">
           <button
             onClick={handleRun}
             disabled={loading || !targetGrade}
