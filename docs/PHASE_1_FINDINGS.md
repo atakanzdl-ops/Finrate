@@ -908,6 +908,44 @@ CLAUDE.md "inline > Tailwind" konvansiyonu.
 
 ---
 
+### ✅ Mini Faz — scoreToRating Eşik Sınır Testleri
+**Commit:** `74ff351`
+**Tarih:** 2026-04-28
+**Codex audit:** GO
+
+**Sorun:**
+`scoreToRating` fonksiyonu için doğrudan unit test yoktu.
+Sınır vakaları (`43.99 → CC`, `44 → CCC`, `51.99 → CCC`, `52 → B` vs.)
+test edilmemiş, gelecek refactoring riski vardı.
+
+**Çıktı:**
+- `app/src/lib/scoring/__tests__/scoreToRating.test.ts` (yeni dosya)
+- 34 yeni test:
+  - 9 bant × 3 nokta sınır vakaları (`29.99`/`30`/`30.01` vs.)
+  - Tipik değerler (0, 50, 70, 100)
+  - DEKAM gerçek değerleri (13.6 / 18.8 / 33.4 / 56)
+  - Edge case: negatif → D, NaN → D, `+Infinity` → AAA, >100 → AAA
+- 470 → 504 test (+34), snapshot drift yok
+- `score.ts` dokunulmadı
+
+**ADIM 0 doğrulamaları:**
+- İmza: `scoreToRating(score: number): string`
+- `RatingLetter` type yok, return `string`
+- Eşikler: AAA≥93, AA≥84, A≥76, BBB≥68, BB≥60, B≥52, CCC≥44, CC≥36, C≥30, D≥0
+- Edge: negatif/NaN → `return 'D'` fallback; >100/`+Infinity` → AAA; clamp yok
+
+**Disiplin notu:**
+Audit turu sırasında Codex disiplin ihlali yaparak test dosyasını
+yazdı (uygulamacı rolüne girdi). Tekrar hizalandı: Codex SADECE
+audit, Claude Code uygulama. Tüm sonraki audit prompt'larına
+"SADECE AUDIT. Kod yazma, commit, push YASAK" satırı eklenecek.
+
+**Not:** Bulgu #34 (combineScores kalibrasyon) ile ALAKASIZ —
+bu mini faz `score.ts` mevcut davranışını koruyan regression testidir,
+kalibrasyon kararı beklemeye devam ediyor.
+
+---
+
 ### ✅ 7.3.4B + 7.3.4C + 7.3.4D TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
