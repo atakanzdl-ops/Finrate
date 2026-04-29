@@ -1061,6 +1061,102 @@ eksiklikleri bu kararla kapanmış sayılır.
 
 ---
 
+### ✅ Faz 7.3.5C1 — ScenarioPanelV3 Aksiyon Kart UI Yenileme
+**Commit:** `101f414`
+**Codex audit:** GO (2 audit turu, 3 blocker düzeltildi)
+
+**Çıktı:**
+- Eski accordion + 4 alt blok yapısı kaldırıldı
+- Yeni iki sütun yapı (sol bilanço, sağ rasyo + hedef)
+- `classifyLeg` helper: TDHP hesap kodu → yön
+  - 1xx/2xx aktif, 3xx-5xx pasif, 6xx gelir, 7xx gider
+  - DEBIT/CREDIT semantiği grup bazında
+- Yeşil arka plan (`#F0FDFA`) artan, pembe (`#FEF2F2`) azalan
+- Veri yokken "Etkilenmez" fallback
+- Footer lacivert kutu (sonradan Faz 7.3.5C1.2'de kaldırıldı)
+- 1 dosya, 115 ekleme / 80 silme
+
+**Disiplin:**
+- `score.ts`/`decisionLayer.ts`/`engineV3.ts` dokunulmadı
+- V1/V2 motorları dokunulmadı
+- Mock/uyduruk değer YOK
+- 512 test korundu
+
+---
+
+### ✅ Faz 7.3.5C1.1 — Görsel/Font Düzeltme
+**Commit:** `10c98df`
+**Codex audit:** GO
+
+**Çıktı:**
+- 10 Türkçe karakter eksikliği düzeltildi
+  (Danışman, Çekirdek, Kısa Vadede Öncelik, Aksiyon Alınmazsa,
+   Yapmalı, sırasına/önerisi/bulunamadı/Seçilmedi, Aksiyon Planı,
+   Özet, başarısız)
+- "Danışman Yorumu" + "Aksiyon Alınmazsa" font Finrate Perspektifi'ne
+  eşitlendi (`text-sm` + `italic` kaldırıldı)
+- "İyileştirme Senaryoları" bloğu tamamen kaldırıldı (clean removal):
+  - `NotchPlanCard` component silindi
+  - `toggleNotch` fonksiyonu silindi
+  - `expandedNotch` state/props/prop geçişi temizlendi
+- "Neden Sadece Sermaye Yetmez?" font düzeltildi (`text-sm`)
+- 1 dosya, 21 ekleme / 134 silme
+
+---
+
+### ✅ Faz 7.3.5C1.2 — Vade Pill + Footer Bel1.docx Aynı
+**Commit:** `a21e789`
+**Codex audit:** GO
+
+**Çıktı:**
+- `HorizonBadge` tek palet:
+  - Kısa/Orta/Uzun → `bg-[#E5E9F0]` + `text-[#0B3C5D]`
+  - Mavi/mor varyantlar kaldırıldı
+- Footer lacivert kutu kaldırıldı:
+  - Yeni: `borderTop: 1px solid #E5E9F0`
+  - Başlık: `#0B3C5D` uppercase `font-semibold`
+  - Metin: `#0B3C5D` `font-size: 14`
+- `bankerPerspective` conditional render korundu
+- "···" menü EKLENMEDİ (kullanıcı kararı)
+- "↓" ok EKLENMEDİ (kullanıcı kararı)
+- 1 dosya, 5 ekleme / 9 silme
+
+---
+
+### ✅ Faz 7.3.5C1.3 — RatioTransparencyBlock Sadeleştirme
+**Commit:** `06fd81b`
+**Codex audit:** GO
+
+**Sorun:** Block çok karmaşıktı: BUGÜNKÜ SEVİYE / REALİSTİK 12 AY /
+UZUN VADELİ REFERANS başlıkları, oklar, mavi bilgi kutusu,
+Kaynak/Yöntem metadata satırları, `-25%` rozet, `AttributionBadge`,
+`attributionText`, `MetaLine` helper.
+
+**Çıktı:**
+- Sade 3 satır liste: Bugünkü / Gerçekçi 12 ay / TCMB sektör
+- Renkli nokta işaretleri: gri `#94A3B8` / turkuaz `#2EC4B6` / lacivert `#0B3C5D`
+- Formül satırı: gri italic monospace, dashed `borderTop #E5E9F0`
+- "Mn TL" → "Mn"
+- "REALİSTİK 12 AY" → "Gerçekçi 12 ay"
+- Kaldırılanlar: `capPct` rozet, `AttributionBadge`, `attributionText`,
+  `MetaLine`, mavi bilgi kutusu, Kaynak/Yöntem satırları, oklar,
+  alt başlıklar (uygulanabilir hedef / TCMB sektör medyanı)
+- `contracts.ts` / `ScenarioPanelV3.tsx` dokunulmadı
+- 1 dosya, 55 ekleme / 107 silme
+
+---
+
+### ✅ Faz 7.3.5C1.4 — Tablo Başlığı Sadeleştirme
+**Commit:** `593a94f`
+**Codex audit:** GO
+
+**Çıktı:**
+- `#` sütun başlık hücresi kaldırıldı (row lacivert daire badge korundu)
+- "Ufuk / Tip" → "Vade"
+- 1 dosya, 1 ekleme / 2 silme
+
+---
+
 ### ✅ 7.3.4B-F + 7.3.5A TAMAMLANDI
 
 **Ön koşul notu:** 7.3.4B ön koşulu: ✅ TAMAMLANDI (Faz 7.3.4B0 + B0.1)
