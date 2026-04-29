@@ -409,9 +409,8 @@ function AksiyonPlaniTab({
 
         {/* Tablo baslik — V3 flex header */}
         <div className="hidden md:flex items-center gap-4 px-6 py-3 bg-slate-50 border-b border-[#E5E9F0] text-xs uppercase tracking-wide text-[#64748B] font-medium">
-          <div className="w-6 flex-shrink-0">#</div>
           <div className="flex-1">Aksiyon</div>
-          <div className="flex-shrink-0">Ufuk / Tip</div>
+          <div className="flex-shrink-0">Vade</div>
           <div className="w-24 text-right flex-shrink-0">Tutar</div>
           <div className="w-4 flex-shrink-0" />
         </div>
