@@ -150,12 +150,8 @@ function BankerMetric({ label, value }: { label: string; value: string }) {
 // ─── HorizonBadge ─────────────────────────────────────────────────────────────
 
 function HorizonBadge({ horizon }: { horizon: string }) {
-  const color =
-    horizon === 'Kisa'  ? 'bg-slate-100 text-[#1E293B]' :
-    horizon === 'Orta'  ? 'bg-blue-50 text-blue-700'    :
-    'bg-purple-50 text-purple-700'
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-[6px] font-medium ${color}`}>{horizon}</span>
+    <span className="text-xs px-2 py-0.5 rounded-[6px] font-medium bg-[#E5E9F0] text-[#0B3C5D]">{horizon}</span>
   )
 }
 
@@ -559,11 +555,11 @@ function AksiyonPlaniTab({
 
                       {/* FOOTER — FİNRATE YORUMU */}
                       {action.bankerPerspective && (
-                        <div style={{ marginTop: '1.25rem', padding: '14px 16px', background: '#0B3C5D', borderRadius: 6 }}>
-                          <p style={{ margin: '0 0 4px', fontSize: 11, color: '#2EC4B6', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
-                            Finrate Yorumu
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #E5E9F0' }}>
+                          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#0B3C5D', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            FİNRATE YORUMU
                           </p>
-                          <p style={{ margin: 0, fontSize: 13, color: 'white', lineHeight: 1.65 }}>
+                          <p style={{ margin: 0, fontSize: 14, color: '#0B3C5D', lineHeight: 1.65 }}>
                             {action.bankerPerspective}
                           </p>
                         </div>
