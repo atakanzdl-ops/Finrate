@@ -914,24 +914,11 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   semanticType: 'OPERATIONAL_MARGIN',
   horizons: ['medium'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 500_000)
-    if (amount <= 0) return []
-    // Modeled Margin Improvement Entry.
-    // Gerçekte: satış fiyatı artışı veya hammadde maliyeti düşüşü → 621↓ / 590↑
-    // Bu simplified entry marj iyileşmesinin net dönem kârına etkisini temsil eder.
-    return [
-      makeBalancedTransaction(
-        'A12_MAIN',
-        'Brüt marj iyileşmesi net kâra yansıması — Modeled Margin Improvement Entry (621 / 590)',
-        'OPERATIONAL_MARGIN',
-        [
-          { accountCode: '621', accountName: 'Satılan Ticari Mallar Maliyeti', side: 'DEBIT',  amount, description: 'Maliyet azalışı / marj iyileşmesi (simplified model)' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',                side: 'CREDIT', amount, description: 'Net kâr artışı'                                       },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  // Marj iyileşmesi tek bir muhasebe fişi değil, dönem boyunca yayılan
+  // operasyonel hareket. UI tarafında etkilenen hesaplar + hedef rasyo
+  // gösterilir; gerçek yevmiye üretilmez.
+  buildTransactions: () => [],
 
   preconditions: {
     minSourceAmountTRY: 500_000,
@@ -987,22 +974,8 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
   semanticType: 'OPEX_REDUCTION',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 300_000)
-    if (amount <= 0) return []
-    // Modeled OPEX Reduction Entry: gider azalışının net kâra etkisi
-    return [
-      makeBalancedTransaction(
-        'A13_MAIN',
-        'Faaliyet gideri optimizasyonu — Modeled OPEX Reduction Entry (632 / 590)',
-        'OPEX_REDUCTION',
-        [
-          { accountCode: '632', accountName: 'Genel Yönetim Giderleri', side: 'DEBIT',  amount, description: 'Gider azalışı (simplified model)' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',          side: 'CREDIT', amount, description: 'Net kâr artışı'                   },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  buildTransactions: () => [],
 
   preconditions: {
     minSourceAmountTRY: 300_000,
@@ -1058,21 +1031,8 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   semanticType: 'FINANCE_COST_REDUCTION',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 200_000)
-    if (amount <= 0) return []
-    return [
-      makeBalancedTransaction(
-        'A14_MAIN',
-        'Finansman gideri azaltma — net dönem etkisi (660 / 590)',
-        'FINANCE_COST_REDUCTION',
-        [
-          { accountCode: '660', accountName: 'KV Borçlanma Giderleri', side: 'DEBIT',  amount, description: 'Faiz gideri azalışı (simplified model)' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Net kâr artışı'                         },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  buildTransactions: () => [],
 
   preconditions: {
     requiredAccountCodes: ['660', '661', '780'],
@@ -1190,23 +1150,9 @@ const A16_CASH_BUFFER_BUILD: ActionTemplateV3 = {
   semanticType: 'CASH_INFLOW',
   horizons: ['short', 'medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 500_000)
-    if (amount <= 0) return []
-    // TÜRETİLMİŞ AKSİYON: A05 + A06 + A08 + A10 birikimli nakit etkisini temsil eder.
-    // Bu bağımsız bir muhasebe fişi değildir; diğer aksiyonların sonucudur.
-    return [
-      makeBalancedTransaction(
-        'A16_MAIN',
-        'Nakit tamponu birikiyor — Türetilmiş Aksiyon (A05+A06+A08+A10 birikimli nakit etkisi)',
-        'CASH_INFLOW',
-        [
-          { accountCode: '102', accountName: 'Bankalar',                 side: 'DEBIT',  amount, description: 'Birikimli nakit girişi (diğer aksiyonların sonucu)' },
-          { accountCode: '570', accountName: 'Geçmiş Yıllar Kârları',   side: 'CREDIT', amount, description: 'Nakit tamponu kaydı (simplified)'                   },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A1: Türetilmiş aksiyon — bağımsız fiş üretmez.
+  // A05/A06/A08/A10 birikimli sonucudur, kendi yevmiyesi yoktur.
+  buildTransactions: () => [],
 
   preconditions: {
     minSourceAmountTRY: 500_000,
@@ -1268,23 +1214,8 @@ const A17_KKEG_CLEANUP: ActionTemplateV3 = {
   semanticType: 'KKEG_CLEANUP',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 500_000)
-    if (amount <= 0) return []
-    // Modeled Tax-Quality Normalization Entry.
-    // KKEG'nin azalması efektif vergi yükünü düşürür ve kâr kalitesini artırır.
-    return [
-      makeBalancedTransaction(
-        'A17_MAIN',
-        'KKEG normalizasyonu — Modeled Tax-Quality Normalization Entry (689 / 590)',
-        'KKEG_CLEANUP',
-        [
-          { accountCode: '689', accountName: 'Diğer Olağandışı Gider (KKEG)', side: 'DEBIT',  amount, description: 'KKEG azalışı — vergi kalitesi iyileşmesi (simplified)' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',                side: 'CREDIT', amount, description: 'Vergi kalitesi düzeltme etkisi'                        },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  buildTransactions: () => [],
 
   preconditions: {
     minSourceAmountTRY: 500_000,
@@ -1486,14 +1417,18 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
     if (!isConstructionLike(context.sector)) return []
     const amount = clampAmount(context.amount, 2_000_000)
     if (amount <= 0) return []
+    // Faz 7.3.6A1: Yön düzeltmesi.
+    // Eski: 102 Dr / 350 Cr (350 artıyor ama "çözülme" deniyor — yön ters)
+    // Yeni: 350 Dr / 600 Cr (350 azalır, hasılata alınır)
+    // Not: 358 hakediş hesabı kapanışı sonraki faza (tam YYİ modellemesi).
     return [
       makeBalancedTransaction(
         'A20_MAIN',
-        'YYİ hakediş tahsilatı — inşaat proje nakit akışı (350 → 102)',
+        'YYİ hakediş hasılata alınıyor (350 → 600)',
         'YYI_MONETIZATION',
         [
-          { accountCode: '102', accountName: 'Bankalar',                                   side: 'DEBIT',  amount, description: 'Hakediş tahsilatı nakit girişi' },
-          { accountCode: '350', accountName: 'Yıllara Yaygın İnşaat ve Onarım Maliyeti',  side: 'CREDIT', amount, description: 'YYİ hesabı çözülmesi'           },
+          { accountCode: '350', accountName: 'Yıllara Yaygın İnşaat ve Onarım Hakedişleri', side: 'DEBIT',  amount, description: 'Hakediş yükümlülüğü azalışı' },
+          { accountCode: '600', accountName: 'Yurtiçi Satışlar',                            side: 'CREDIT', amount, description: 'Hasılat artışı'               },
         ]
       ),
     ]
