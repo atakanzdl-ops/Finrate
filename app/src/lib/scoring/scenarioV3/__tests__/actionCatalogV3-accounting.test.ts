@@ -1,8 +1,8 @@
 /**
- * Faz 7.3.6A1 — Muhasebe bacağı doğrulama testleri.
+ * Faz 7.3.6A1/A2 — Muhasebe bacağı doğrulama testleri.
  *
- * Projeksiyon aksiyonları (A12/A13/A14/A16/A17) artık yevmiye üretmez.
- * A20 yön düzeltmesi: 350 Dr / 600 Cr.
+ * Projeksiyon aksiyonları (A12/A13/A14/A16/A17/A18/A19/A20) yevmiye üretmez.
+ * A20 expectedEconomicImpact.createsRealCash → false (hasılata alma; tahsilat ayrı).
  */
 
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
@@ -21,13 +21,16 @@ function makeContext(overrides: Partial<ActionBuildContext> = {}): ActionBuildCo
 
 // ─── Projeksiyon aksiyonları boş array döner ─────────────────────────────────
 
-describe('Faz 7.3.6A1 — Projeksiyon aksiyonları boş array döner', () => {
+describe('Faz 7.3.6A1/A2 — Projeksiyon aksiyonları boş array döner', () => {
   const projectionActionIds = [
     'A12_GROSS_MARGIN_IMPROVEMENT',
     'A13_OPEX_OPTIMIZATION',
     'A14_FINANCE_COST_REDUCTION',
     'A16_CASH_BUFFER_BUILD',
     'A17_KKEG_CLEANUP',
+    'A18_NET_SALES_GROWTH',
+    'A19_ADVANCE_TO_REVENUE',
+    'A20_YYI_MONETIZATION',
   ]
 
   test.each(projectionActionIds)('%s buildTransactions boş array döner', (actionId) => {
@@ -39,48 +42,20 @@ describe('Faz 7.3.6A1 — Projeksiyon aksiyonları boş array döner', () => {
   })
 })
 
-// ─── A20 YYİ Hakediş yön düzeltmesi ─────────────────────────────────────────
+// ─── A20 expectedEconomicImpact düzeltmesi ───────────────────────────────────
 
-describe('Faz 7.3.6A1 — A20 YYİ Hakediş yön düzeltmesi', () => {
+describe('Faz 7.3.6A2 — A20 expectedEconomicImpact düzeltmesi', () => {
   const a20 = ACTION_CATALOG_V3['A20_YYI_MONETIZATION']
 
   test('A20 tanımlı', () => {
     expect(a20).toBeDefined()
   })
 
-  test('A20 inşaat sektöründe 1 transaction üretir', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'CONSTRUCTION', amount: 5_000_000 }))
-    expect(txs.length).toBe(1)
+  test('A20 createsRealCash false (hasılata alma, nakit yaratmaz)', () => {
+    expect(a20.expectedEconomicImpact.createsRealCash).toBe(false)
   })
 
-  test('A20 transactionunda 2 leg var', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'CONSTRUCTION', amount: 5_000_000 }))
-    expect(txs[0].legs.length).toBe(2)
-  })
-
-  test('A20 leg[0]: 350 DEBIT (Hakediş yükümlülüğü azalışı)', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'CONSTRUCTION', amount: 5_000_000 }))
-    const leg = txs[0].legs[0]
-    expect(leg.accountCode).toBe('350')
-    expect(leg.side).toBe('DEBIT')
-  })
-
-  test('A20 leg[1]: 600 CREDIT (Hasılat artışı)', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'CONSTRUCTION', amount: 5_000_000 }))
-    const leg = txs[0].legs[1]
-    expect(leg.accountCode).toBe('600')
-    expect(leg.side).toBe('CREDIT')
-  })
-
-  test('A20 denklik: debit toplamı === credit toplamı', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'CONSTRUCTION', amount: 5_000_000 }))
-    const debitSum  = txs[0].legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
-    const creditSum = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
-    expect(debitSum).toBe(creditSum)
-  })
-
-  test('A20 inşaat dışı sektörde boş döner', () => {
-    const txs = a20.buildTransactions(makeContext({ sector: 'MANUFACTURING', amount: 5_000_000 }))
-    expect(txs.length).toBe(0)
+  test('A20 strengthensOperations hâlâ true (operasyonel etki var)', () => {
+    expect(a20.expectedEconomicImpact.strengthensOperations).toBe(true)
   })
 })

@@ -1271,26 +1271,12 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   semanticType: 'OPERATIONAL_REVENUE',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
-    if (amount <= 0) return []
-    // Hizmet/bilişim: doğrudan nakit tahsilat (102)
-    // İmalat/ticaret/inşaat: alacak üzerinden satış (120)
-    const useCash = isServiceLike(context.sector)
-    const debitCode = useCash ? '102' : '120'
-    const debitName = useCash ? 'Bankalar' : 'Alıcılar'
-    return [
-      makeBalancedTransaction(
-        'A18_MAIN',
-        `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
-        'OPERATIONAL_REVENUE',
-        [
-          { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
-          { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A2: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  // Satış artışı tek yevmiye değil, dönem boyunca yayılan operasyonel
+  // hareket. Maliyet bacağı (621/153) eksik + 600 motorda 590'a otomatik
+  // kapanmıyor → UI'da yanlış denklik. Etkilenen hesaplar + hedef tutar
+  // sonraki fazda projeksiyon kart tasarımıyla gösterilecek.
+  buildTransactions: () => [],
 
   preconditions: {
     minSourceAmountTRY: 1_000_000,
@@ -1346,21 +1332,10 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   semanticType: 'ADVANCE_TO_REVENUE',
   horizons: ['short', 'medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
-    if (amount <= 0) return []
-    return [
-      makeBalancedTransaction(
-        'A19_MAIN',
-        'Alınan avans proje/mal teslimi ile hasılata dönüşüyor (340 → 600)',
-        'ADVANCE_TO_REVENUE',
-        [
-          { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans kapatma — teslim gerçekleşti'  },
-          { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat tanıma'                      },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A2: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  // Avansı temizlemenin 3 yolu var (teslim/UV/159 mahsup). Tek yevmiye
+  // dayatmak yanlış. UI'da alternatif yollar sonraki fazda gösterilecek.
+  buildTransactions: () => [],
 
   preconditions: {
     requiredAccountCodes: ['340'],
@@ -1412,27 +1387,11 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   semanticType: 'YYI_MONETIZATION',
   horizons: ['short', 'medium', 'long'],
 
-  buildTransactions: (context) => {
-    // Savunma katmanı: inşaat dışı sektörde çağrılırsa boş döner
-    if (!isConstructionLike(context.sector)) return []
-    const amount = clampAmount(context.amount, 2_000_000)
-    if (amount <= 0) return []
-    // Faz 7.3.6A1: Yön düzeltmesi.
-    // Eski: 102 Dr / 350 Cr (350 artıyor ama "çözülme" deniyor — yön ters)
-    // Yeni: 350 Dr / 600 Cr (350 azalır, hasılata alınır)
-    // Not: 358 hakediş hesabı kapanışı sonraki faza (tam YYİ modellemesi).
-    return [
-      makeBalancedTransaction(
-        'A20_MAIN',
-        'YYİ hakediş hasılata alınıyor (350 → 600)',
-        'YYI_MONETIZATION',
-        [
-          { accountCode: '350', accountName: 'Yıllara Yaygın İnşaat ve Onarım Hakedişleri', side: 'DEBIT',  amount, description: 'Hakediş yükümlülüğü azalışı' },
-          { accountCode: '600', accountName: 'Yurtiçi Satışlar',                            side: 'CREDIT', amount, description: 'Hasılat artışı'               },
-        ]
-      ),
-    ]
-  },
+  // Faz 7.3.6A2: Projeksiyon aksiyonu — buildTransactions boş array döner.
+  // 350 → 600 hareketi "hasılata alma", "tahsilat" değil; nakit yaratmaz.
+  // 600 motorda 590'a kapanmadığı için UI denkliği bozuluyor.
+  // Sonraki fazda A20 ikiye bölünecek: hasılata alma + tahsilat.
+  buildTransactions: () => [],
 
   preconditions: {
     requiredAccountCodes: ['350', '358'],
@@ -1463,7 +1422,7 @@ const A20_YYI_MONETIZATION: ActionTemplateV3 = {
   },
 
   expectedEconomicImpact: {
-    createsRealCash:        true,
+    createsRealCash:        false,  // Faz 7.3.6A2: hasılata alma; nakit tahsilatı ayrı aksiyon (sonraki faz)
     strengthensOperations:  true,
     realBalanceSheetGrowth: true,
     reducesRisk:            true,
