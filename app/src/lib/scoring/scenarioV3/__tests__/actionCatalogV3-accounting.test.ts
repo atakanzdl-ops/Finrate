@@ -1,8 +1,9 @@
 /**
- * Faz 7.3.6A1 — Muhasebe bacağı doğrulama testleri.
+ * Faz 7.3.6A1/A3 — Muhasebe bacağı doğrulama testleri.
  *
- * Projeksiyon aksiyonları (A12/A13/A14/A16/A17) artık yevmiye üretmez.
+ * Projeksiyon aksiyonları (A12/A13/A14) artık yevmiye üretmez.
  * A20 yön düzeltmesi: 350 Dr / 600 Cr.
+ * A07/A16/A17 katalogdan silindi (Faz 7.3.6A3).
  */
 
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
@@ -26,8 +27,6 @@ describe('Faz 7.3.6A1 — Projeksiyon aksiyonları boş array döner', () => {
     'A12_GROSS_MARGIN_IMPROVEMENT',
     'A13_OPEX_OPTIMIZATION',
     'A14_FINANCE_COST_REDUCTION',
-    'A16_CASH_BUFFER_BUILD',
-    'A17_KKEG_CLEANUP',
   ]
 
   test.each(projectionActionIds)('%s buildTransactions boş array döner', (actionId) => {

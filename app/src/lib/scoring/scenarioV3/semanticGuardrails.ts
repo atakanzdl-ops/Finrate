@@ -170,12 +170,6 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     producesLiquidity: true,
     liquidityImpactRatio: 0.85,  // Stok %85'i nakde dönüşür tipik
   },
-  A07_PREPAID_RELEASE: {
-    sourceAccountRequirements: ['180'],
-    minSourceBalance: 250_000,
-    producesLiquidity: true,
-    liquidityImpactRatio: 0.80,
-  },
   A08_FIXED_ASSET_DISPOSAL: {
     sourceAccountRequirements: ['252', '253', '254'],
     mutuallyExclusiveWith: ['A09_SALE_LEASEBACK'],
@@ -221,14 +215,6 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     sourceAccountRequirements: ['331'],
     minSourceBalance: 1_000_000,
     liquidityImpactRatio: 0,  // Genelde nakit yok, sadece reclass
-  },
-  A16_CASH_BUFFER_BUILD: {
-    preferredAfter: ['A05_RECEIVABLE_COLLECTION', 'A06_INVENTORY_MONETIZATION', 'A08_FIXED_ASSET_DISPOSAL', 'A10_CASH_EQUITY_INJECTION'],
-    requires: ['A10_CASH_EQUITY_INJECTION'],
-    liquidityImpactRatio: 0,  // Türetilmiş — bağımsız nakit etkisi yok
-  },
-  A17_KKEG_CLEANUP: {
-    liquidityImpactRatio: 0.20,  // Vergi tasarrufu dolaylı nakit
   },
   A18_NET_SALES_GROWTH: {
     sourceAccountRequirements: ['600'],
@@ -409,7 +395,7 @@ export function checkEconomicImpossibility(
 }
 
 function isSourceIrrelevant(actionId: string): boolean {
-  return actionId === 'A10_CASH_EQUITY_INJECTION' || actionId === 'A16_CASH_BUFFER_BUILD'
+  return actionId === 'A10_CASH_EQUITY_INJECTION'
 }
 
 // ─── 3. CROSS-ACTION DEPENDENCY CHECK ────────────────────────────────────────
@@ -634,31 +620,6 @@ export const PORTFOLIO_AGGREGATE_RULES: PortfolioAggregateRule[] = [
             `Portföydeki toplam sermaye artışı mevcut özkaynağın 2 katını aşıyor ` +
             `(${(totalEquityIncrease / 1e6).toFixed(1)}M TL vs özkaynak ${(input.firmContext.totalEquity / 1e6).toFixed(1)}M TL)`,
           affectedActionId: equityActions.map(a => a.actionId).join(','),
-          portfolioLevel: true,
-        }
-      }
-      return null
-    },
-  },
-  {
-    ruleCode: 'PORTFOLIO_CASH_INCOHERENCE',
-    description: 'Portföy hem büyük nakit tüketip hem aşırı nakit tamponu oluşturamaz',
-    check: (input) => {
-      const cashConsumers = input.portfolio.filter(p => p.actionId === 'A04_CASH_PAYDOWN_ST')
-      const cashBuffers   = input.portfolio.filter(p => p.actionId === 'A16_CASH_BUFFER_BUILD')
-
-      const totalConsumed = cashConsumers.reduce((sum, a) => sum + a.amountTRY, 0)
-      const totalBuffered = cashBuffers.reduce((sum, a) => sum + a.amountTRY, 0)
-
-      if (totalConsumed > 0 && totalBuffered > 0 && totalBuffered > totalConsumed) {
-        return {
-          pass: false,
-          severity: 'WARNING',
-          ruleCode: 'PORTFOLIO_CASH_INCOHERENCE',
-          message:
-            `Portföy hem nakit tüketiyor (${(totalConsumed / 1e6).toFixed(1)}M TL) ` +
-            `hem nakit tamponu oluşturuyor (${(totalBuffered / 1e6).toFixed(1)}M TL) — mantık çelişkisi`,
-          affectedActionId: 'A04_CASH_PAYDOWN_ST,A16_CASH_BUFFER_BUILD',
           portfolioLevel: true,
         }
       }

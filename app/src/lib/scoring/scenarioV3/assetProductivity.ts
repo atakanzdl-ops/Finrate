@@ -519,13 +519,6 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     affectedComponents: ['workingCapitalLock', 'assetConversion', 'cashSupport'],
     productivityNote: 'Stoğu satışa/nakde çevirir — aktif kilitlenmesini doğrudan azaltır',
   },
-  A07_PREPAID_RELEASE: {
-    repairs: {
-      CASH_GENERATION_GAP: 'WEAK',
-    },
-    affectedComponents: ['cashSupport'],
-    productivityNote: 'Peşin giderleri serbestleştirir — sınırlı etki',
-  },
   A08_FIXED_ASSET_DISPOSAL: {
     repairs: {
       FIXED_ASSET_UNDERUTILIZATION: 'PRIMARY',
@@ -579,16 +572,6 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     repairs: {},
     affectedComponents: [],
     productivityNote: 'Reclass — aktif verimliliğini değiştirmez',
-  },
-  A16_CASH_BUFFER_BUILD: {
-    repairs: {},
-    affectedComponents: ['cashSupport'],
-    productivityNote: 'Nakit tamponu likiditeyi güvence altına alır — aktif verimliliği değiştirmez',
-  },
-  A17_KKEG_CLEANUP: {
-    repairs: {},
-    affectedComponents: [],
-    productivityNote: 'KKEG temizliği gelir kalitesi — productivity etkisi dolaylı',
   },
   A18_NET_SALES_GROWTH: {
     repairs: {

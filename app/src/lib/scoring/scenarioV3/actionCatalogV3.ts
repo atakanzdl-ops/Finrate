@@ -568,72 +568,6 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     'Fazla stoku nakde çevirmek hem işletme sermayesini serbest bırakır hem de stok devir süresi (DIO) üzerinde ölçülebilir iyileşme sağlayabilir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire, eskime riski) aksiyonun gerçek etkisini doğrudan belirler.',
 }
 
-// ── A07 ──────────────────────────────────────────────────────────────────────
-const A07_PREPAID_RELEASE: ActionTemplateV3 = {
-  id: 'A07_PREPAID_RELEASE',
-  name: 'Peşin Ödenmiş Gider Çözülmesi',
-  family: 'WC_COMPOSITION',
-  semanticType: 'PREPAID_RELEASE',
-  horizons: ['short', 'medium'],
-
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 500_000)
-    if (amount <= 0) return []
-    return [
-      makeBalancedTransaction(
-        'A07_MAIN',
-        'Peşin ödenmiş giderlerin dönem içinde gider tanınmasıyla çözülmesi (180 → 102)',
-        'PREPAID_RELEASE',
-        [
-          { accountCode: '102', accountName: 'Bankalar',                          side: 'DEBIT',  amount, description: 'Peşin gider çözülme nakit etkisi' },
-          { accountCode: '180', accountName: 'Gelecek Aylara Ait Giderler (KV)', side: 'CREDIT', amount, description: 'Peşin gider azalışı'              },
-        ]
-      ),
-    ]
-  },
-
-  preconditions: {
-    requiredAccountCodes: ['180', '280'],
-    minSourceAmountTRY: 1_000_000,
-  },
-
-  qualityCoefficient: 0.70,
-  sustainability: 'ONE_OFF',
-
-  repeatDecay: { first: 1.00, second: 0.50, third: 0.25, maxRepeats: 2 },
-
-  suggestedAmount: {
-    basis: 'source_account',
-    minPctOfBasis: 0.20,
-    typicalPctOfBasis: 0.40,
-    maxPctOfBasis: 0.70,
-    absoluteMinTRY: 1_000_000,
-  },
-
-  sectorCompatibility: {
-    CONSTRUCTION:  'applicable',
-    MANUFACTURING: 'applicable',
-    TRADE:         'applicable',
-    RETAIL:        'applicable',
-    SERVICES:      'primary',
-    IT:            'primary',
-  },
-
-  expectedEconomicImpact: {
-    createsRealCash:        true,
-    strengthensOperations:  false,
-    realBalanceSheetGrowth: false,
-    reducesRisk:            false,
-  },
-
-  description:
-    'Gelecek dönemlere ait peşin ödenmiş giderlerin (180/280) hizmet alındıkça gider olarak tanınması ve dönen varlık kalitesinin artırılması.',
-  cfoRationale:
-    'Aşırı peşin ödenmiş giderler çalışma sermayesini bağlar. Optimize edilmiş gider yönetimi nakit akışını iyileştirir.',
-  bankerPerspective:
-    'Bireysel etkisi sınırlı olabilir; ancak gider yönetimi disiplininin göstergesi olarak portföy içindeki değerini korur. Özellikle hizmet ve bilişim sektörlerinde çalışma sermayesi optimizasyonuna anlamlı katkı sağlayabilir.',
-}
-
 // ── A08 ──────────────────────────────────────────────────────────────────────
 const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   id: 'A08_FIXED_ASSET_DISPOSAL',
@@ -1142,127 +1076,6 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
     'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
 }
 
-// ── A16 ──────────────────────────────────────────────────────────────────────
-const A16_CASH_BUFFER_BUILD: ActionTemplateV3 = {
-  id: 'A16_CASH_BUFFER_BUILD',
-  name: 'Nakit Tamponu Oluşturma (Türetilmiş Aksiyon)',
-  family: 'WC_COMPOSITION',
-  semanticType: 'CASH_INFLOW',
-  horizons: ['short', 'medium', 'long'],
-
-  // Faz 7.3.6A1: Türetilmiş aksiyon — bağımsız fiş üretmez.
-  // A05/A06/A08/A10 birikimli sonucudur, kendi yevmiyesi yoktur.
-  buildTransactions: () => [],
-
-  preconditions: {
-    minSourceAmountTRY: 500_000,
-    customCheck: (analysis) => {
-      // Faz 7.3.4F: Net nakit = 100+101+102+108−103 (kontra çıkarılır)
-      const netCash = getNetCashBalance(analysis)
-      if (netCash <= 0) {
-        return {
-          pass: false,
-          reason: 'Nakit tamponu aksiyonu için önce nakit yaratan aksiyonlar (A05/A06/A08/A10) uygulanmalı',
-        }
-      }
-      return { pass: true }
-    },
-  },
-
-  qualityCoefficient: 0.50,
-  sustainability: 'SEMI_RECURRING',
-
-  repeatDecay: { first: 1.00, second: 0.60, third: 0.30, maxRepeats: 3 },
-
-  suggestedAmount: {
-    basis: 'assets',
-    minPctOfBasis: 0.01,
-    typicalPctOfBasis: 0.02,
-    maxPctOfBasis: 0.05,
-    absoluteMinTRY: 500_000,
-  },
-
-  sectorCompatibility: {
-    CONSTRUCTION:  'applicable',
-    MANUFACTURING: 'applicable',
-    TRADE:         'applicable',
-    RETAIL:        'applicable',
-    SERVICES:      'applicable',
-    IT:            'applicable',
-  },
-
-  expectedEconomicImpact: {
-    createsRealCash:        true,
-    strengthensOperations:  false,
-    realBalanceSheetGrowth: false,
-    reducesRisk:            true,
-  },
-
-  description:
-    'TÜRETİLMİŞ AKSİYON: Bu aksiyon bağımsız olarak uygulanamaz. A05 (alacak tahsili), A06 (stok nakde dönüşüm), A08 (varlık satışı) veya A10 (sermaye artırımı) gibi gerçek nakit yaratan aksiyonların birikimli etkisini temsil eder.',
-  cfoRationale:
-    'Tek başına rating driver değildir. Likidite tamponunun yeterliliğini sinyal eder. Diğer aksiyonlar yeterli nakit yarattığında nakit oranı iyileşir.',
-  bankerPerspective:
-    'Bu aksiyon bağımsız uygulanamaz; gerçek nakit üreten aksiyonların birikimli çıktısıdır. Nakit tamponu portföy düzeyinde değerlendirilmelidir: alacak tahsilatı, stok nakde çevirme ve sermaye enjeksiyonu gibi aksiyonlar yeterli nakit yarattığında likidite tamponu doğal biçimde güçlenir.',
-}
-
-// ── A17 ──────────────────────────────────────────────────────────────────────
-const A17_KKEG_CLEANUP: ActionTemplateV3 = {
-  id: 'A17_KKEG_CLEANUP',
-  name: 'KKEG Temizliği (Kanunen Kabul Edilmeyen Gider)',
-  family: 'TAX_QUALITY',
-  semanticType: 'KKEG_CLEANUP',
-  horizons: ['medium', 'long'],
-
-  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
-  buildTransactions: () => [],
-
-  preconditions: {
-    minSourceAmountTRY: 500_000,
-    customCheck: (analysis) => {
-      const kkeg = sumAccountsByPrefix(analysis, ['689', '688'])
-      if (kkeg <= 0) return { pass: false, reason: 'KKEG kalemi (688-689) bulunamadı veya sıfır' }
-      return { pass: true }
-    },
-  },
-
-  qualityCoefficient: 0.50,
-  sustainability: 'RECURRING',
-
-  repeatDecay: { first: 1.00, second: 0.65, third: 0.40, maxRepeats: 3 },
-
-  suggestedAmount: {
-    basis: 'revenue',
-    minPctOfBasis: 0.01,
-    typicalPctOfBasis: 0.03,
-    maxPctOfBasis: 0.10,
-    absoluteMinTRY: 500_000,
-  },
-
-  sectorCompatibility: {
-    CONSTRUCTION:  'primary',
-    MANUFACTURING: 'primary',
-    TRADE:         'applicable',
-    RETAIL:        'applicable',
-    SERVICES:      'applicable',
-    IT:            'applicable',
-  },
-
-  expectedEconomicImpact: {
-    createsRealCash:        false,
-    strengthensOperations:  false,
-    realBalanceSheetGrowth: false,
-    reducesRisk:            true,
-  },
-
-  description:
-    'Kanunen kabul edilmeyen giderlerin (KKEG) azaltılmasıyla vergi kalitesinin iyileştirilmesi. Not: Modeled tax-quality normalization entry — gerçek muhasebe kaydının sadeliştirilmiş temsilidir.',
-  cfoRationale:
-    'Yüksek KKEG oranı vergi planlamasının zayıflığını gösterir. KKEG temizliği efektif vergi yükünü azaltır ve gerçek kâr kalitesini artırır.',
-  bankerPerspective:
-    'KKEG/gelir oranı kâr kalitesinin güvenilir bir göstergesidir. Yüksek KKEG yükü efektif vergi oranını artırır ve gerçek kârı olduğundan düşük gösterebilir. Temizlik çalışması vergi kalitesini ve raporlanan kârın güvenilirliğini güçlendirir; anlık nakit etkisi olmasa da özkaynak kalitesine katkı sağlayabilir.',
-}
-
 // ── A18 ──────────────────────────────────────────────────────────────────────
 const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   id: 'A18_NET_SALES_GROWTH',
@@ -1486,7 +1299,6 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A04_CASH_PAYDOWN_ST,
   A05_RECEIVABLE_COLLECTION,
   A06_INVENTORY_MONETIZATION,
-  A07_PREPAID_RELEASE,
   A08_FIXED_ASSET_DISPOSAL,
   A09_SALE_LEASEBACK,
   A10_CASH_EQUITY_INJECTION,
@@ -1495,8 +1307,6 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A13_OPEX_OPTIMIZATION,
   A14_FINANCE_COST_REDUCTION,
   A15_DEBT_TO_EQUITY_SWAP,
-  A16_CASH_BUFFER_BUILD,
-  A17_KKEG_CLEANUP,
   A18_NET_SALES_GROWTH,
   A19_ADVANCE_TO_REVENUE,
   A20_YYI_MONETIZATION,
