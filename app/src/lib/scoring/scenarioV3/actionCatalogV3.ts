@@ -893,11 +893,16 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   },
 
   description:
-    'Satış fiyatı optimizasyonu veya üretim/hammadde maliyeti düşüşünden kaynaklanan brüt kâr marjı iyileştirmesi. Not: Modeled entry — marj iyileşmesinin net dönem kârına etkisi temsil edilir.',
+    'Tedarikçilerle iskonto/indirim görüşmesi sonucu 320 Satıcılar hesabındaki ticari borç azaltılır. ' +
+    'Bu durumda 621 Satılan Mal Maliyeti de düşer. Sonuç olarak brüt kâr marjı pozitif yönde iyileşir, ' +
+    'FAVÖK marjı (faiz, vergi, amortisman öncesi kâr) da büyür. Mali müşavir tarafında işlem zamanı geldiğinde gerçek yevmiye kayıt ile tamamlanır.',
   cfoRationale:
-    'Fiyatlandırma gücü artırılır veya tedarik maliyetleri düşürülür. Her 1 puan marj artışı net kâr üzerinde doğrudan olumlu etki yaratabilir ve yinelenen (operasyonel) kâr kalitesini güçlendirir.',
+    'Tedarikçi pazarlığı yapıldığında her 1 puanlık brüt kâr marjı artışı, satışın doğrudan kârlılığa yansıyan kısmını büyütür. ' +
+    'FAVÖK marjı da bu hareketten doğrudan etkilenir; finansman kapasitesi ve borç servis gücü artar.',
   bankerPerspective:
-    'En güçlü operasyonel dönüşüm sinyallerinden biridir. Sürdürülebilir marj artışı FAVÖK (faiz, vergi ve amortisman öncesi kâr) büyümesine yansıyabilir ve yinelenen kâr kalitesini güçlendirebilir. Tek seferlik maliyet avantajlarının aksine yapısal iyileşmeler kalıcı etki yaratabilir.',
+    'Brüt kâr marjındaki iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. ' +
+    'FAVÖK marjı yükselişi ile birlikte rating değerlendirmesinde olumlu yansır. ' +
+    'Tek seferlik avantajlardan ayrı, yapısal iyileşme aranır.',
 }
 
 // ── A13 ──────────────────────────────────────────────────────────────────────
