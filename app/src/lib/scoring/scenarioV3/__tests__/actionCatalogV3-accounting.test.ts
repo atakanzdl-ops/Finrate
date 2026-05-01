@@ -1,10 +1,11 @@
 /**
- * Faz 7.3.6A1/A3/A5/A6 — Muhasebe bacağı doğrulama testleri.
+ * Faz 7.3.6A1/A3/A5/A6/B3a — Muhasebe bacağı doğrulama testleri.
  *
- * Projeksiyon aksiyonları (A12/A13/A14) artık yevmiye üretmez.
+ * Projeksiyon aksiyonları (A13/A14) artık yevmiye üretmez.
  * A07/A16/A17 katalogdan silindi (Faz 7.3.6A3).
  * A10B/A15B yeni aksiyonlar eklendi (Faz 7.3.6A5).
  * A20 katalogdan silindi (Faz 7.3.6A6).
+ * A12 gerçek yevmiye üretiyor (Faz 7.3.6B3a).
  */
 
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
@@ -25,7 +26,6 @@ function makeContext(overrides: Partial<ActionBuildContext> = {}): ActionBuildCo
 
 describe('Faz 7.3.6A1 — Projeksiyon aksiyonları boş array döner', () => {
   const projectionActionIds = [
-    'A12_GROSS_MARGIN_IMPROVEMENT',
     'A13_OPEX_OPTIMIZATION',
     'A14_FINANCE_COST_REDUCTION',
   ]
@@ -204,5 +204,137 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     const creditSum = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
 
     expect(debitSum).toBeCloseTo(creditSum, 2)
+  })
+})
+
+// ─── A12 Brüt Kâr Marjı İyileştirme — B3a ────────────────────────────────────
+
+describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması', () => {
+  const a12 = ACTION_CATALOG_V3['A12_GROSS_MARGIN_IMPROVEMENT']
+
+  const makeA12Context = (overrides: Partial<ActionBuildContext> = {}) =>
+    makeContext({
+      amount: 5_000_000,
+      accountBalances: { '320': 50_000_000, '621': 100_000_000 },
+      ...overrides,
+    })
+
+  // ── buildTransactions ──
+
+  test('A12 normal: 2 transaction döner', () => {
+    const txs = a12.buildTransactions(makeA12Context())
+    expect(txs.length).toBe(2)
+  })
+
+  test('A12 tx[0]: 320 DEBIT, 621 CREDIT — denkli', () => {
+    const txs = a12.buildTransactions(makeA12Context())
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '320', side: 'DEBIT',  amount: 5_000_000 })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '621', side: 'CREDIT', amount: 5_000_000 })
+  })
+
+  test('A12 tx[1]: 690 DEBIT, 590 CREDIT — denkli', () => {
+    const txs = a12.buildTransactions(makeA12Context())
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 5_000_000 })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 5_000_000 })
+  })
+
+  test('A12 bakiye sınırı: 320=10M → maxAmount=2M, amount=min(5M,2M)=2M', () => {
+    const txs = a12.buildTransactions(makeA12Context({
+      amount: 5_000_000,
+      accountBalances: { '320': 10_000_000, '621': 100_000_000 },
+    }))
+    // min(10M*0.20, 100M*0.20) = min(2M, 20M) = 2M
+    expect(txs[0].legs[0].amount).toBe(2_000_000)
+  })
+
+  test('A12 320 yok → boş array (maxAmount=0 < 1M min)', () => {
+    const txs = a12.buildTransactions(makeA12Context({
+      accountBalances: { '320': 0, '621': 100_000_000 },
+    }))
+    expect(txs).toEqual([])
+  })
+
+  // ── computeAmount ──
+
+  test('A12 useRatioBasedAmount: true', () => {
+    expect(a12.useRatioBasedAmount).toBe(true)
+  })
+
+  test('A12 computeAmount: %25 margin, IT sektörü hedef %36 → 10M döner', () => {
+    // IT (Bilişim) grossMargin benchmark = 0.36
+    // currentMargin = 25M/100M = 0.25 < 0.36*1.05=0.378 → aktif
+    // requiredImprovement = (0.36 - 0.25) * 100M = 11M
+    // maxFromSupplier = 50M * 0.20 = 10M, maxFromCogs = 100M * 0.20 = 20M
+    // result = min(11M, 10M, 20M) = 10M
+    const result = a12.computeAmount!({
+      sector:           'IT',
+      accountBalances:  { '320': 50_000_000, '621': 100_000_000 },
+      netSales:         100_000_000,
+      grossProfit:       25_000_000,
+      totalAssets:       200_000_000,
+      totalEquity:        50_000_000,
+      totalRevenue:      100_000_000,
+      netIncome:           5_000_000,
+      operatingProfit:     8_000_000,
+      interestExpense:     2_000_000,
+      operatingCashFlow:  null,
+      period:            'ANNUAL',
+    })
+    expect(result).not.toBeNull()
+    expect(result).toBe(10_000_000)
+  })
+
+  test('A12 computeAmount: marj zaten hedefte (IT %40 >= %36*1.05=%37.8) → null', () => {
+    const result = a12.computeAmount!({
+      sector:           'IT',
+      accountBalances:  { '320': 50_000_000, '621': 100_000_000 },
+      netSales:         100_000_000,
+      grossProfit:       40_000_000,   // %40 >= %37.8
+      totalAssets:       200_000_000,
+      totalEquity:        50_000_000,
+      totalRevenue:      100_000_000,
+      netIncome:           5_000_000,
+      operatingProfit:     8_000_000,
+      interestExpense:     2_000_000,
+      operatingCashFlow:  null,
+      period:            'ANNUAL',
+    })
+    expect(result).toBeNull()
+  })
+
+  test('A12 computeAmount: negatif brüt kâr → null', () => {
+    const result = a12.computeAmount!({
+      sector:           'IT',
+      accountBalances:  { '320': 50_000_000, '621': 100_000_000 },
+      netSales:         100_000_000,
+      grossProfit:        -5_000_000,
+      totalAssets:       200_000_000,
+      totalEquity:        50_000_000,
+      totalRevenue:      100_000_000,
+      netIncome:          -5_000_000,
+      operatingProfit:    -5_000_000,
+      interestExpense:     2_000_000,
+      operatingCashFlow:  null,
+      period:            'ANNUAL',
+    })
+    expect(result).toBeNull()
+  })
+
+  test('A12 computeAmount: 320 bakiye yok → null', () => {
+    const result = a12.computeAmount!({
+      sector:           'IT',
+      accountBalances:  { '320': 0, '621': 100_000_000 },
+      netSales:         100_000_000,
+      grossProfit:       25_000_000,
+      totalAssets:       200_000_000,
+      totalEquity:        50_000_000,
+      totalRevenue:      100_000_000,
+      netIncome:           5_000_000,
+      operatingProfit:     8_000_000,
+      interestExpense:     2_000_000,
+      operatingCashFlow:  null,
+      period:            'ANNUAL',
+    })
+    expect(result).toBeNull()
   })
 })

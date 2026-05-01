@@ -786,24 +786,25 @@ function calculateAmountCandidates(
   context:  FirmContext,
   horizon:  HorizonKey,
 ): AmountCandidate[] {
-  // ─── computeAmount override (feature flag korumalı) ───────────────────
-  // ŞART 1: Flag kontrolü computeAmount çağrısından ÖNCE.
-  // Flag kapalıyken action.computeAmount tanımlı OLSA BİLE çağrılmaz.
-  if (process.env.ENABLE_RATIO_BASED_AMOUNTS === 'true') {
-    // ŞART 2: Flag açık ama aksiyonda computeAmount yoksa eski yol devam eder.
-    if (action.computeAmount) {
-      const v = action.computeAmount(context)
-      // ŞART 3: null / 0 / negatif → fallback'e geç.
-      if (v !== null && v > 0) {
-        // Materiality bypass: computeAmount aktif aksiyonlarda
-        // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
-        const transparency = buildRatioTransparency(action, context, v)
-        return [{
-          amountTRY: v,
-          label: 'rasyo-hedef',
-          ratioTransparency: transparency ?? undefined,
-        }]
-      }
+  // ─── computeAmount override ───────────────────────────────────────────
+  // useRatioBasedAmount: true → aksiyon flag'ı (env'den bağımsız)
+  // ENABLE_RATIO_BASED_AMOUNTS env → global flag (A05 gibi eski aksiyonlar)
+  const useRatioBased =
+    action.useRatioBasedAmount === true ||
+    process.env.ENABLE_RATIO_BASED_AMOUNTS === 'true'
+
+  if (useRatioBased && action.computeAmount) {
+    const v = action.computeAmount(context)
+    // null / 0 / negatif → fallback'e geç.
+    if (v !== null && v > 0) {
+      // Materiality bypass: computeAmount aktif aksiyonlarda
+      // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
+      const transparency = buildRatioTransparency(action, context, v)
+      return [{
+        amountTRY: v,
+        label: 'rasyo-hedef',
+        ratioTransparency: transparency ?? undefined,
+      }]
     }
   }
   // ─── eski yüzde mantığı (değiştirilmedi) ──────────────────────────────

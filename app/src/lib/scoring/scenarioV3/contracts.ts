@@ -370,9 +370,15 @@ export interface ActionTemplateV3 {
    * Opsiyonel rasyo-tabanlı tutar override.
    * Tanımlanırsa engine bu fonksiyonu çağırarak aksiyon tutarını üretir.
    * null dönerse engine eski yüzde mantığına fallback yapar.
-   * Henüz hiçbir aksiyonda kullanılmıyor — Faz 4'te A05 pilotunda devreye girer.
    */
   computeAmount?: (ctx: FirmContext) => number | null
+
+  /**
+   * true ise ENABLE_RATIO_BASED_AMOUNTS env flag'ına bakılmaksızın
+   * computeAmount her zaman çalıştırılır.
+   * Default: false (geriye uyum — env flag'a bağımlı kalır).
+   */
+  useRatioBasedAmount?: boolean
 
   /**
    * Opsiyonel TCMB benchmark hedef metadata.

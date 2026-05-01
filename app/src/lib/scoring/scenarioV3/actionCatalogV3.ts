@@ -911,11 +911,70 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   semanticType: 'OPERATIONAL_MARGIN',
   horizons: ['medium'],
 
-  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
-  // Marj iyileşmesi tek bir muhasebe fişi değil, dönem boyunca yayılan
-  // operasyonel hareket. UI tarafında etkilenen hesaplar + hedef rasyo
-  // gösterilir; gerçek yevmiye üretilmez.
-  buildTransactions: () => [],
+  // Faz 7.3.6B3a: computeAmount + gerçek yevmiye (320/621 → 690/590)
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    const netSales    = ctx.netSales    ?? 0
+    const grossProfit = ctx.grossProfit ?? 0
+    if (netSales <= 0 || grossProfit < 0) return null
+
+    const currentMargin = grossProfit / netSales
+
+    // TCMB sektör hedef brüt marjı
+    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
+    const targetMargin = bm?.value ?? 0.30
+
+    // Mevcut marj zaten hedefte (5% tolerans) → aksiyon gereksiz
+    if (currentMargin >= targetMargin * 1.05) return null
+
+    // Hedef marjа ulaşmak için gereken maliyet azaltımı
+    const requiredImprovement = (targetMargin - currentMargin) * netSales
+
+    // Bilanço sınırları
+    const balances        = ctx.accountBalances ?? {}
+    const supplierBalance = balances['320'] ?? 0
+    const cogsBalance     = balances['621'] ?? 0
+
+    // 320 bakiyesinin %20'si (tedarikçi iskonto gerçekçi üst sınır)
+    const maxFromSupplier = supplierBalance * 0.20
+    // 621 bakiyesinin %20'si (maliyet azaltımı gerçekçi üst sınır)
+    const maxFromCogs     = cogsBalance     * 0.20
+
+    const result = Math.min(requiredImprovement, maxFromSupplier, maxFromCogs)
+    return result > 0 ? result : null
+  },
+
+  buildTransactions: (context) => {
+    const balances        = context.accountBalances ?? {}
+    const supplierBalance = balances['320'] ?? 0
+    const cogsBalance     = balances['621'] ?? 0
+
+    const maxAmount = Math.min(supplierBalance * 0.20, cogsBalance * 0.20)
+    const amount    = clampAmount(Math.min(context.amount, maxAmount), 1_000_000)
+    if (amount <= 0) return []
+
+    return [
+      makeBalancedTransaction(
+        'A12_SUPPLIER_DISCOUNT',
+        'Tedarikçi iskonto/indirim — 320 borcu düşer, 621 maliyet azalır',
+        'OPERATIONAL_MARGIN',
+        [
+          { accountCode: '320', accountName: 'Satıcılar',               side: 'DEBIT',  amount, description: 'Ticari borç azalışı' },
+          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',    side: 'CREDIT', amount, description: 'Maliyet azalışı'     },
+        ]
+      ),
+      makeBalancedTransaction(
+        'A12_PROFIT_TRANSFER',
+        'Tasarruf dönem kârına yansır — 690 kapanır, 590 artar',
+        'OPERATIONAL_MARGIN',
+        [
+          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
+        ]
+      ),
+    ]
+  },
 
   preconditions: {
     minSourceAmountTRY: 500_000,
