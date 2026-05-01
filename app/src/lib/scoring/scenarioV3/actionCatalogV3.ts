@@ -769,6 +769,69 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
     'Ortakların şirkete doğrudan nakit koyması taahhüt ve güven açısından güçlü bir sinyal taşır. Tutarın toplam aktife oranı kritik bir değişkendir: görece küçük bir sermaye enjeksiyonu tek başına çok kategorili bir iyileşmeyi desteklemeyebilir; operasyonel aksiyonlarla birlikte uygulandığında çarpan etkisi ortaya çıkabilir.',
 }
 
+// ── A10B ─────────────────────────────────────────────────────────────────────
+const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
+  id: 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION',
+  name: 'Senetli Sermaye Artırımı',
+  family: 'EQUITY_PNL',
+  semanticType: 'NON_CASH_EQUITY',
+  horizons: ['medium', 'long'],
+
+  buildTransactions: (context) => {
+    const amount = clampAmount(context.amount, 2_000_000)
+    if (amount <= 0) return []
+    return [
+      makeBalancedTransaction(
+        'A10B_MAIN',
+        'Senetli sermaye artırımı — ortak senedi ile özkaynak artışı (121 ↑ / 500 ↑)',
+        'NON_CASH_EQUITY',
+        [
+          { accountCode: '121', accountName: 'Alacak Senetleri', side: 'DEBIT',  amount, description: 'Ortak senedi artışı'  },
+          { accountCode: '500', accountName: 'Sermaye',          side: 'CREDIT', amount, description: 'Sermaye artışı'        },
+        ]
+      ),
+    ]
+  },
+
+  preconditions: { minSourceAmountTRY: 2_000_000 },
+
+  qualityCoefficient: 0.55,
+  sustainability: 'SEMI_RECURRING',
+
+  repeatDecay: { first: 1.00, second: 0.50, third: 0.25, maxRepeats: 2 },
+
+  suggestedAmount: {
+    basis: 'assets',
+    minPctOfBasis: 0.03,
+    typicalPctOfBasis: 0.08,
+    maxPctOfBasis: 0.20,
+    absoluteMinTRY: 2_000_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'applicable',
+    MANUFACTURING: 'applicable',
+    TRADE:         'applicable',
+    RETAIL:        'applicable',
+    SERVICES:      'applicable',
+    IT:            'applicable',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        false,
+    strengthensOperations:  false,
+    realBalanceSheetGrowth: true,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Ortakların şirkete senet vererek yapacağı sermaye artırımı. Nakit girişi olmaz; özkaynak artar, alacak senedi (121) likit varlık olarak bilançoya girer. Cari oran iyileşir.',
+  cfoRationale:
+    'Nakit gerektirmeden özkaynak güçlendirilir. Alacak senedi vade sonunda nakde dönüşebilir. Likidite ve sermaye yapısı eş zamanlı iyileşir.',
+  bankerPerspective:
+    'Senet kalitesi ve ortak finansal gücü değerlendirilir. Nakit sermaye artırımına göre daha düşük kaliteli ama yine de sermaye artışı sayılır.',
+}
+
 // ── A11 ──────────────────────────────────────────────────────────────────────
 const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
   id: 'A11_RETAIN_EARNINGS',
@@ -1081,6 +1144,72 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
     'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
 }
 
+// ── A15B ─────────────────────────────────────────────────────────────────────
+const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
+  id: 'A15B_SHAREHOLDER_DEBT_TO_LT',
+  name: 'Ortak Borcunu Uzun Vadeye Aktarma',
+  family: 'DEBT_STRUCTURE',
+  semanticType: 'DEBT_EXTENSION',
+  horizons: ['medium', 'long'],
+
+  buildTransactions: (context) => {
+    const amount = clampAmount(context.amount, 1_000_000)
+    if (amount <= 0) return []
+    return [
+      makeBalancedTransaction(
+        'A15B_MAIN',
+        'Ortak borcu uzun vadeye aktarılıyor (331 ↓ / 431 ↑)',
+        'DEBT_EXTENSION',
+        [
+          { accountCode: '331', accountName: 'Ortaklara Borçlar',      side: 'DEBIT',  amount, description: 'Kısa vadeli ortak borcu azalışı' },
+          { accountCode: '431', accountName: 'Ortaklara Borçlar (UV)', side: 'CREDIT', amount, description: 'Uzun vadeli ortak borcu artışı'  },
+        ]
+      ),
+    ]
+  },
+
+  preconditions: {
+    requiredAccountCodes: ['331'],
+    minSourceAmountTRY: 1_000_000,
+  },
+
+  qualityCoefficient: 0.25,
+  sustainability: 'ACCOUNTING_ONLY',
+
+  repeatDecay: { first: 1.00, second: 0.40, third: 0.20, maxRepeats: 2 },
+
+  suggestedAmount: {
+    basis: 'source_account',
+    minPctOfBasis: 0.20,
+    typicalPctOfBasis: 0.50,
+    maxPctOfBasis: 1.00,
+    absoluteMinTRY: 1_000_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'applicable',
+    MANUFACTURING: 'applicable',
+    TRADE:         'applicable',
+    RETAIL:        'applicable',
+    SERVICES:      'applicable',
+    IT:            'applicable',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        false,
+    strengthensOperations:  false,
+    realBalanceSheetGrowth: false,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Ortakların şirkete vermiş olduğu kısa vadeli borç (331) uzun vadeye (431) aktarılır. Cari oran iyileşir, kısa vadeli ödeme baskısı azalır. Sermaye artışı değildir.',
+  cfoRationale:
+    'Sermaye dönüşümü yapmadan vade yapısı düzeltilir. Kısa vadeli yükümlülük azaldığı için işletme sermayesi rahatlar. Özkaynak değişmez.',
+  bankerPerspective:
+    'Vade uzatımı kabul edilebilir ancak nakit yaratan bir hareket değildir. Cari oran ve likidite değerlendirmesinde olumlu yansır.',
+}
+
 // ── A18 ──────────────────────────────────────────────────────────────────────
 const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   id: 'A18_NET_SALES_GROWTH',
@@ -1307,11 +1436,13 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A08_FIXED_ASSET_DISPOSAL,
   A09_SALE_LEASEBACK,
   A10_CASH_EQUITY_INJECTION,
+  A10B_PROMISSORY_NOTE_EQUITY_INJECTION,
   A11_RETAIN_EARNINGS,
   A12_GROSS_MARGIN_IMPROVEMENT,
   A13_OPEX_OPTIMIZATION,
   A14_FINANCE_COST_REDUCTION,
   A15_DEBT_TO_EQUITY_SWAP,
+  A15B_SHAREHOLDER_DEBT_TO_LT,
   A18_NET_SALES_GROWTH,
   A19_ADVANCE_TO_REVENUE,
   A20_YYI_MONETIZATION,

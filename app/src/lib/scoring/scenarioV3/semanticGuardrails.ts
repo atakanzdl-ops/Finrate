@@ -188,6 +188,9 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     producesLiquidity: true,
     liquidityImpactRatio: 1.0,
   },
+  A10B_PROMISSORY_NOTE_EQUITY_INJECTION: {
+    liquidityImpactRatio: 0,  // Nakit yaratmaz; senet alacak olarak bilançoya girer
+  },
   A11_RETAIN_EARNINGS: {
     sourceAccountRequirements: ['590'],
     requiresPositiveEarnings: true,
@@ -215,6 +218,11 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     sourceAccountRequirements: ['331'],
     minSourceBalance: 1_000_000,
     liquidityImpactRatio: 0,  // Genelde nakit yok, sadece reclass
+  },
+  A15B_SHAREHOLDER_DEBT_TO_LT: {
+    sourceAccountRequirements: ['331'],
+    minSourceBalance: 1_000_000,
+    liquidityImpactRatio: 0,  // Vade uzatımı — nakit etkisi yok
   },
   A18_NET_SALES_GROWTH: {
     sourceAccountRequirements: ['600'],
@@ -396,6 +404,7 @@ export function checkEconomicImpossibility(
 
 function isSourceIrrelevant(actionId: string): boolean {
   return actionId === 'A10_CASH_EQUITY_INJECTION'
+      || actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION'
 }
 
 // ─── 3. CROSS-ACTION DEPENDENCY CHECK ────────────────────────────────────────
@@ -607,7 +616,9 @@ export const PORTFOLIO_AGGREGATE_RULES: PortfolioAggregateRule[] = [
     description: 'Portföydeki sermaye artışı aksiyonlarının toplamı makul sınırda olmalı',
     check: (input) => {
       const equityActions = input.portfolio.filter(p =>
-        p.actionId === 'A10_CASH_EQUITY_INJECTION' || p.actionId === 'A15_DEBT_TO_EQUITY_SWAP'
+        p.actionId === 'A10_CASH_EQUITY_INJECTION'
+        || p.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION'
+        || p.actionId === 'A15_DEBT_TO_EQUITY_SWAP'
       )
       const totalEquityIncrease = equityActions.reduce((sum, a) => sum + a.amountTRY, 0)
 

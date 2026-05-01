@@ -543,6 +543,13 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     affectedComponents: ['cashSupport'],
     productivityNote: 'Sermaye artışı likiditeyi düzeltir AMA aktif verimsizliğini tek başına çözmez',
   },
+  A10B_PROMISSORY_NOTE_EQUITY_INJECTION: {
+    repairs: {
+      CASH_GENERATION_GAP: 'WEAK',
+    },
+    affectedComponents: ['cashSupport'],
+    productivityNote: 'Senetli sermaye artışı nakit yaratmaz; alacak senedi kalitesi onarım etkisini sınırlar',
+  },
   A11_RETAIN_EARNINGS: {
     repairs: {},
     affectedComponents: [],
@@ -572,6 +579,11 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     repairs: {},
     affectedComponents: [],
     productivityNote: 'Reclass — aktif verimliliğini değiştirmez',
+  },
+  A15B_SHAREHOLDER_DEBT_TO_LT: {
+    repairs: {},
+    affectedComponents: [],
+    productivityNote: 'Vade uzatımı — aktif yapısını değiştirmez, sadece pasif vade sınıflaması',
   },
   A18_NET_SALES_GROWTH: {
     repairs: {
