@@ -169,16 +169,19 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs[0].legs[3].amount).toBeCloseTo(7_000_000, 2)
   })
 
-  test('A19 stok hepsi boş: sadece avans hasılata dönüşür (2 leg, Tx2 yok)', () => {
-    // 150-153 hepsinin bakiyesi 0 → totalStock=0 → 2-leg branch, Tx2 eklenmez
+  test('A19 stok hepsi boş: 2 tx (Tx1: 340/600, Tx2: 690/590)', () => {
+    // 150-153 hepsinin bakiyesi 0 → totalStock=0 → stoksuz dal
+    // B3b-1-FIX: stoksuz dalda da Tx2 eklenir; profitAmount = amount
     const txs = a19.buildTransactions(makeA19Context({
       accountBalances: { '340': 50_000_000, '150': 0, '151': 0, '152': 0, '153': 0 },
     }))
 
-    expect(txs.length).toBe(1)
+    expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(2)
-    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT', amount: 20_000_000 })
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT',  amount: 20_000_000 })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT', amount: 20_000_000 })
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 20_000_000 })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 20_000_000 })
   })
 
   test('A19 net satış yoksa boş array döner', () => {
@@ -284,38 +287,45 @@ describe('Faz 7.3.6B3a-FIX3 — A18 Net Satış Artışı muhasebe doğrulaması
       ...overrides,
     })
 
-  // ── 2-leg (stok yok) ──
+  // ── 2-leg + Tx2 (stok yok — B3b-1-FIX) ──
 
-  test('A18 inşaat + stok yok: 2 leg, 120 DEBIT 600 CREDIT', () => {
+  test('A18 inşaat + stok yok: 2 tx (Tx1: 120/600, Tx2: 690/590)', () => {
     const txs = a18.buildTransactions(makeA18Context({
       sector:         'CONSTRUCTION',
       accountBalances: {},
     }))
-    expect(txs.length).toBe(1)
+    expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(2)
-    expect(txs[0].legs[0]).toMatchObject({ accountCode: '120', side: 'DEBIT' })
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '120', side: 'DEBIT'  })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    // stoksuzda profitAmount = amount (costAmount yok)
+    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
   })
 
-  test('A18 hizmet + stok yok: 2 leg, 102 DEBIT 600 CREDIT', () => {
+  test('A18 hizmet + stok yok: 2 tx (Tx1: 102/600, Tx2: 690/590)', () => {
     const txs = a18.buildTransactions(makeA18Context({
       sector:         'SERVICES',
       accountBalances: {},
     }))
-    expect(txs.length).toBe(1)
+    expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(2)
-    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT' })
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT'  })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
   })
 
-  test('A18 IT + stok yok: 2 leg, 102 DEBIT', () => {
+  test('A18 IT + stok yok: 2 tx, Tx1: 102 DEBIT, Tx2: 690/590', () => {
     const txs = a18.buildTransactions(makeA18Context({
       sector:         'IT',
       accountBalances: {},
     }))
-    expect(txs.length).toBe(1)
-    expect(txs[0].legs.length).toBe(2)
-    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT' })
+    expect(txs.length).toBe(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT'  })
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
   })
 
   // ── 4-leg (stok var) ──
@@ -425,14 +435,15 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2.legs[1].amount).toBeCloseTo(3_000_000, 0)
   })
 
-  test('A18 stoksuz: Tx2 eklenmez (1 transaction)', () => {
+  test('A18 stoksuz: 2 tx (Tx2: 690/590, profitAmount=amount)', () => {
+    // B3b-1-FIX: stoksuzda da Tx2 eklenir; maliyet yok → profitAmount = amount
     const txs = a18.buildTransactions(makeA18Ctx({ accountBalances: {} }))
-    expect(txs.length).toBe(1)
+    expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(2)
-    // 690/590 yok
-    const codes = txs[0].legs.map(l => l.accountCode)
-    expect(codes).not.toContain('690')
-    expect(codes).not.toContain('590')
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    // stoksuzda profitAmount = amount (costAmount yok)
+    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
   })
 
   test('A18 Tx2 denklik: 690 DEBIT = 590 CREDIT', () => {
@@ -444,13 +455,15 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2debit).toBeCloseTo(tx2credit, 2)
   })
 
-  test('A18 159 bakiyeli: 159 stok havuzunda değil, totalStock=0 → stoksuz 2-leg', () => {
-    // 159 B3b-1 ile stockAccounts'tan çıkarıldı
+  test('A18 159 bakiyeli: 159 stok havuzunda değil, totalStock=0 → stoksuz dal (2 tx)', () => {
+    // 159 B3b-1 ile stockAccounts'tan çıkarıldı; stoksuz dal tetiklenir
+    // B3b-1-FIX: stoksuz dalda da Tx2 var → 2 transaction
     const txs = a18.buildTransactions(makeA18Ctx({
       accountBalances: { '159': 10_000_000 }, // sadece 159 var
     }))
-    expect(txs.length).toBe(1)
-    expect(txs[0].legs.length).toBe(2) // stoksuz → 2 leg
+    expect(txs.length).toBe(2)        // stoksuz → Tx1 (2 leg) + Tx2 (690/590)
+    expect(txs[0].legs.length).toBe(2)
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT' })
   })
 
   // ── A19 Tx2 ──
@@ -467,15 +480,17 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2.legs[1].amount).toBeCloseTo(6_000_000, 0)
   })
 
-  test('A19 stoksuz: Tx2 eklenmez (1 transaction)', () => {
+  test('A19 stoksuz: 2 tx (Tx1: 340/600, Tx2: 690/590, profitAmount=amount)', () => {
+    // B3b-1-FIX: stoksuzda da Tx2 eklenir; maliyet yok → profitAmount = amount
     const txs = a19.buildTransactions(makeA19Ctx({
       accountBalances: { '340': 50_000_000, '150': 0, '151': 0, '152': 0, '153': 0 },
     }))
-    expect(txs.length).toBe(1)
+    expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(2)
-    const codes = txs[0].legs.map(l => l.accountCode)
-    expect(codes).not.toContain('690')
-    expect(codes).not.toContain('590')
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    // profitAmount = amount (costAmount = 0 çünkü stok yok)
+    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
   })
 
   test('A19 Tx2 denklik: 690 DEBIT = 590 CREDIT', () => {

@@ -1307,7 +1307,8 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: 2 leg (hizmet/bilişim modeli veya stoksuz satış)
+    // Stok yoksa: 2 leg + Tx2 (hizmet/bilişim modeli veya stoksuz satış)
+    // Stoksuzda maliyet yok → profitAmount = amount (tam ciro kâr)
     if (totalStock <= 0) {
       const amount = clampAmount(context.amount, 1_000_000)
       if (amount <= 0) return []
@@ -1319,6 +1320,15 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
           [
             { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
             { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+          ]
+        ),
+        makeBalancedTransaction(
+          'A18_PROFIT_TRANSFER',
+          'Dönem kâr aktarımı',
+          'OPERATIONAL_REVENUE',
+          [
+            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
           ]
         ),
       ]
@@ -1445,7 +1455,8 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: yalnızca 2 leg (340 / 600)
+    // Stok yoksa: 2 leg + Tx2 (340 / 600 + 690 / 590)
+    // Stoksuzda maliyet yok → profitAmount = amount (tam avans tutarı kâr)
     if (totalStock <= 0) {
       const amount = clampAmount(
         Math.min(context.amount, advanceBalance),
@@ -1460,6 +1471,15 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           [
             { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans çözülmesi' },
             { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
+          ]
+        ),
+        makeBalancedTransaction(
+          'A19_PROFIT_TRANSFER',
+          'Dönem kâr aktarımı',
+          'ADVANCE_TO_REVENUE',
+          [
+            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
           ]
         ),
       ]
