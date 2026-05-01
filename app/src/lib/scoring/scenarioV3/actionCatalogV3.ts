@@ -1280,21 +1280,77 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   horizons: ['medium', 'long'],
 
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
-    if (amount <= 0) return []
+    const netSales    = context.netSales    ?? 0
+    const grossProfit = context.grossProfit ?? 0
+    if (netSales <= 0 || grossProfit <= 0) return []
+
+    const grossMargin = grossProfit / netSales
+    if (grossMargin <= 0 || grossMargin >= 1) return []
+
     // Hizmet/bilişim: doğrudan nakit tahsilat (102)
     // İmalat/ticaret/inşaat: alacak üzerinden satış (120)
-    const useCash = isServiceLike(context.sector)
+    const useCash   = isServiceLike(context.sector)
     const debitCode = useCash ? '102' : '120'
     const debitName = useCash ? 'Bankalar' : 'Alıcılar'
+
+    // Stok hesap havuzu (A19 ile aynı)
+    const stockAccounts = [
+      { code: '150', name: 'İlk Madde ve Malzeme'      },
+      { code: '151', name: 'Yarı Mamuller'             },
+      { code: '152', name: 'Mamuller'                  },
+      { code: '153', name: 'Ticari Mallar'             },
+      { code: '159', name: 'Verilen Sipariş Avansları' },
+    ]
+
+    const balances   = context.accountBalances ?? {}
+    const totalStock = stockAccounts.reduce(
+      (sum, acc) => sum + (balances[acc.code] ?? 0),
+      0
+    )
+
+    // Stok yoksa: 2 leg (hizmet/bilişim modeli veya stoksuz satış)
+    if (totalStock <= 0) {
+      const amount = clampAmount(context.amount, 1_000_000)
+      if (amount <= 0) return []
+      return [
+        makeBalancedTransaction(
+          'A18_REVENUE_ONLY',
+          `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+          'OPERATIONAL_REVENUE',
+          [
+            { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+            { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+          ]
+        ),
+      ]
+    }
+
+    // Stok varsa: 4 leg (dominant stok maliyetlendirmesi)
+    const dominantStock = stockAccounts.reduce((max, acc) =>
+      (balances[acc.code] ?? 0) > (balances[max.code] ?? 0) ? acc : max
+    )
+    const dominantBalance = balances[dominantStock.code] ?? 0
+
+    // maxByStock: DOMINANT bakiyeye göre (toplam değil — dominant hesap negatife düşmesin)
+    const maxByStock = dominantBalance / (1 - grossMargin)
+    const amount     = clampAmount(
+      Math.min(context.amount, maxByStock),
+      1_000_000
+    )
+    if (amount <= 0) return []
+
+    const costAmount = amount * (1 - grossMargin)
+
     return [
       makeBalancedTransaction(
-        'A18_MAIN',
-        `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+        'A18_REVENUE_AND_COST',
+        `Net satış artışı + maliyet — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600 / 621 + ${dominantStock.code})`,
         'OPERATIONAL_REVENUE',
         [
-          { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
-          { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+          { accountCode: debitCode,          accountName: debitName,              side: 'DEBIT',  amount,      description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+          { accountCode: '600',              accountName: 'Yurtiçi Satışlar',     side: 'CREDIT', amount,      description: 'Net satış artışı'                                       },
+          { accountCode: '621',              accountName: 'Satılan Mal Maliyeti', side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı'                                },
+          { accountCode: dominantStock.code, accountName: dominantStock.name,     side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'                                  },
         ]
       ),
     ]

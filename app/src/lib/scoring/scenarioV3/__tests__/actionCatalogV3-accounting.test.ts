@@ -269,6 +269,120 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
   })
 })
 
+// ─── A18 Net Satış Artışı — B3a-FIX3 ────────────────────────────────────────
+
+describe('Faz 7.3.6B3a-FIX3 — A18 Net Satış Artışı muhasebe doğrulaması', () => {
+  const a18 = ACTION_CATALOG_V3['A18_NET_SALES_GROWTH']
+
+  const makeA18Context = (overrides: Partial<ActionBuildContext> = {}) =>
+    makeContext({
+      amount:      10_000_000,
+      netSales:   100_000_000,
+      grossProfit: 30_000_000,   // grossMargin = 0.30
+      ...overrides,
+    })
+
+  // ── 2-leg (stok yok) ──
+
+  test('A18 inşaat + stok yok: 2 leg, 120 DEBIT 600 CREDIT', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'CONSTRUCTION',
+      accountBalances: {},
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '120', side: 'DEBIT' })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+  })
+
+  test('A18 hizmet + stok yok: 2 leg, 102 DEBIT 600 CREDIT', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'SERVICES',
+      accountBalances: {},
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT' })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+  })
+
+  test('A18 IT + stok yok: 2 leg, 102 DEBIT', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'IT',
+      accountBalances: {},
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT' })
+  })
+
+  // ── 4-leg (stok var) ──
+
+  test('A18 inşaat + 151=6M: 4 leg, 120 DEBIT, 151 CREDIT', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'CONSTRUCTION',
+      accountBalances: { '151': 6_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '120', side: 'DEBIT'  })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '621', side: 'DEBIT'  })
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '151', side: 'CREDIT' })
+  })
+
+  test('A18 imalat + 152=8M: dominant=152, 152 CREDIT', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'MANUFACTURING',
+      accountBalances: { '152': 8_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '152', side: 'CREDIT' })
+  })
+
+  test('A18 dominant sınırı: 151=4M 153=6M grossMargin=0.30 → dominant=153, costAmount≤6M', () => {
+    // maxByStock = 6M / (1-0.30) = 8.571M
+    // amount = min(10M, 8.571M) = 8.571M
+    // costAmount = 8.571M * 0.70 = 6M (153 bakiyesini aşmaz)
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'MANUFACTURING',
+      accountBalances: { '151': 4_000_000, '153': 6_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    const costLeg = txs[0].legs[3]
+    expect(costLeg.accountCode).toBe('153')
+    expect(costLeg.amount).toBeCloseTo(6_000_000, 0)
+  })
+
+  // ── guard koşulları ──
+
+  test('A18 netSales <= 0 → boş array', () => {
+    expect(a18.buildTransactions(makeA18Context({ netSales: 0 }))).toEqual([])
+  })
+
+  test('A18 grossProfit <= 0 → boş array', () => {
+    expect(a18.buildTransactions(makeA18Context({ grossProfit: 0 }))).toEqual([])
+  })
+
+  test('A18 grossMargin >= 1 → boş array', () => {
+    expect(a18.buildTransactions(makeA18Context({
+      netSales:   100_000_000,
+      grossProfit: 100_000_000,
+    }))).toEqual([])
+  })
+
+  test('A18 denklik: 4-leg DEBIT = CREDIT toplamı', () => {
+    const txs = a18.buildTransactions(makeA18Context({
+      sector:         'MANUFACTURING',
+      accountBalances: { '153': 20_000_000 },
+    }))
+    const debit  = txs[0].legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const credit = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debit).toBeCloseTo(credit, 2)
+  })
+})
+
 // ─── A12 Brüt Kâr Marjı İyileştirme — B3a ────────────────────────────────────
 
 describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması', () => {
