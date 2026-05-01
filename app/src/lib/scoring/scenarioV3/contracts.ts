@@ -20,7 +20,9 @@ export type AttributionSource =
   | 'FINRATE_ESTIMATE'
   | 'FALLBACK'
 
-export interface RatioTransparency {
+// Bakiye-tabanlı oran (A05, A06 vb.) — kind opsiyonel (geriye uyum)
+export interface BalanceRatioTransparency {
+  kind?: 'balance'
   currentBalance: number
   realisticTarget: number      // Math.max(currentBalance - capped, 0)
   sectorMedian: number
@@ -42,6 +44,45 @@ export interface RatioTransparency {
 
   method: 'period-end-balance'
 }
+
+// Kârlılık oranı (A12 brüt marj vb.) — yüzde formatı
+export interface MarginRatioTransparency {
+  kind: 'margin'
+  metricLabel: string
+  current: number
+  realisticTarget: number
+  sectorMedian: number
+  formula: {
+    description: string
+    netSales?: number
+    costToReduce?: number
+    accounts?: Array<{
+      code: string
+      name: string
+      delta: number
+      description: string
+    }>
+  }
+}
+
+// Faaliyet devir oranı (A06 DIO, A18 satış devri vb.) — Xx formatı
+export interface TurnoverRatioTransparency {
+  kind: 'turnover'
+  metricLabel: string
+  current: number
+  realisticTarget: number
+  sectorMedian: number
+  formula: {
+    description: string
+    netSales?: number
+    totalAssets?: number
+  }
+}
+
+export type RatioTransparency =
+  | BalanceRatioTransparency
+  | MarginRatioTransparency
+  | TurnoverRatioTransparency
 
 // ============ TEMEL TANIMLAR ============
 
