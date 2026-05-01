@@ -1355,25 +1355,39 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   horizons: ['short', 'medium', 'long'],
 
   buildTransactions: (context) => {
-    const netSales = context.netSales ?? 0
+    const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
     if (netSales <= 0 || grossProfit <= 0) return []
 
     const grossMargin = grossProfit / netSales
     if (grossMargin <= 0 || grossMargin >= 1) return []
 
-    const balances = context.accountBalances ?? {}
+    const balances       = context.accountBalances ?? {}
     const advanceBalance = balances['340'] ?? 0
-    const stockBalance = balances['153'] ?? 0
     if (advanceBalance <= 0) return []
 
-    if (stockBalance <= 0) {
+    // Stok hesap havuzu (150-153, 159)
+    const stockAccounts = [
+      { code: '150', name: 'İlk Madde ve Malzeme'        },
+      { code: '151', name: 'Yarı Mamuller'               },
+      { code: '152', name: 'Mamuller'                    },
+      { code: '153', name: 'Ticari Mallar'               },
+      { code: '159', name: 'Verilen Sipariş Avansları'   },
+    ]
+
+    // Toplam stok — "stok var mı?" kontrolü
+    const totalStock = stockAccounts.reduce(
+      (sum, acc) => sum + (balances[acc.code] ?? 0),
+      0
+    )
+
+    // Stok yoksa: yalnızca 2 leg (340 / 600)
+    if (totalStock <= 0) {
       const amount = clampAmount(
         Math.min(context.amount, advanceBalance),
         1_000_000
       )
       if (amount <= 0) return []
-
       return [
         makeBalancedTransaction(
           'A19_DELIVERY_REVENUE_ONLY',
@@ -1387,8 +1401,15 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
       ]
     }
 
-    const maxByStock = stockBalance / (1 - grossMargin)
-    const amount = clampAmount(
+    // Dominant stok hesabı (en büyük bakiyeli)
+    const dominantStock = stockAccounts.reduce((max, acc) =>
+      (balances[acc.code] ?? 0) > (balances[max.code] ?? 0) ? acc : max
+    )
+    const dominantBalance = balances[dominantStock.code] ?? 0
+
+    // maxByStock: DOMINANT bakiyeye göre — toplam kullanılırsa dominant negatife düşer
+    const maxByStock = dominantBalance / (1 - grossMargin)
+    const amount     = clampAmount(
       Math.min(context.amount, advanceBalance, maxByStock),
       1_000_000
     )
@@ -1402,10 +1423,10 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
         'Alınan avans teslimatla satışa dönüşür, ilgili stok maliyeti gelir tablosuna alınır',
         'ADVANCE_TO_REVENUE',
         [
-          { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans çözülmesi' },
-          { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
-          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
-          { accountCode: '153', accountName: 'Ticari Mallar',            side: 'CREDIT', amount: costAmount, description: 'Stok azalışı' },
+          { accountCode: '340',              accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount,      description: 'Avans çözülmesi' },
+          { accountCode: '600',              accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,      description: 'Hasılat artışı'  },
+          { accountCode: '621',              accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
+          { accountCode: dominantStock.code, accountName: dominantStock.name,         side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'  },
         ]
       ),
     ]

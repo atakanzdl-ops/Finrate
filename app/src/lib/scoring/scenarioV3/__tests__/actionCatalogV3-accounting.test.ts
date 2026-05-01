@@ -169,9 +169,10 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs[0].legs[3].amount).toBeCloseTo(7_000_000, 2)
   })
 
-  test('A19 stok yoksa sadece avans hasılata dönüşür', () => {
+  test('A19 stok hepsi boş: sadece avans hasılata dönüşür (2 leg)', () => {
+    // 150-153, 159 hepsinin bakiyesi 0 → totalStock=0 → 2-leg branch
     const txs = a19.buildTransactions(makeA19Context({
-      accountBalances: { '340': 50_000_000, '153': 0 },
+      accountBalances: { '340': 50_000_000, '150': 0, '151': 0, '152': 0, '153': 0, '159': 0 },
     }))
 
     expect(txs.length).toBe(1)
@@ -215,6 +216,56 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     const creditSum = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
 
     expect(debitSum).toBeCloseTo(creditSum, 2)
+  })
+
+  // ── Dominant stok seçimi testleri (B3a-FIX2) ──
+
+  test('A19 151 dolu 153 boş: dominant=151, 4 leg 151 CREDIT', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '151': 6_000_000, '153': 0 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '151', side: 'CREDIT' })
+  })
+
+  test('A19 151=4M 153=6M: dominant=153 (daha büyük), 153 CREDIT', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '151': 4_000_000, '153': 6_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '153', side: 'CREDIT' })
+  })
+
+  test('A19 151=8M 153=3M: dominant=151 (daha büyük), 151 CREDIT', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '151': 8_000_000, '153': 3_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '151', side: 'CREDIT' })
+  })
+
+  test('A19 dominant sınırı: 151=6M grossMargin=0.30 → maxByStock=8.57M, costAmount ≤ 6M', () => {
+    // maxByStock = 6M / (1 - 0.30) = 8.571M
+    // amount = min(20M, 50M, 8.571M) = 8.571M
+    // costAmount = 8.571M * 0.70 = 6M (dominant bakiyesini aşmaz)
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '151': 6_000_000 },
+      grossProfit: 30_000_000, // grossMargin = 30M/100M = 0.30
+    }))
+    expect(txs.length).toBe(1)
+    const costLeg = txs[0].legs[3]
+    expect(costLeg.accountCode).toBe('151')
+    expect(costLeg.amount).toBeCloseTo(6_000_000, 0)
+  })
+
+  test('A19 159 dolu: dominant=159, 4 leg 159 CREDIT', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '159': 5_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '159', side: 'CREDIT' })
   })
 })
 
