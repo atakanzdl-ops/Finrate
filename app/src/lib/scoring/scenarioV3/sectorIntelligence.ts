@@ -19,7 +19,7 @@
  *   - SectorWeightInsight — TCMB ağırlıkları narrative bağlamı
  *   - ProductivityHook — V3-8 asset productivity için interface
  *
- * Hard rule SADECE semantik imkânsızlıklarda (A20 YYİ sadece inşaatta).
+ * Hard rule SADECE semantik imkânsızlıklarda (örn. A19 avans → hasılat proje sektörlerine özgü).
  */
 
 import type { SectorCode } from './contracts'
@@ -922,13 +922,6 @@ export function isActionSemanticallyImpossibleForSector(
   actionId: string,
   sector:   SectorCode,
 ): { impossible: boolean; reason?: string } {
-  if (actionId === 'A20_YYI_MONETIZATION' && sector !== 'CONSTRUCTION') {
-    return {
-      impossible: true,
-      reason: 'YYİ (350-358) hesapları sadece inşaat sektöründe bulunur',
-    }
-  }
-
   if (actionId === 'A19_ADVANCE_TO_REVENUE' && sector !== 'CONSTRUCTION' && sector !== 'SERVICES') {
     return {
       impossible: true,

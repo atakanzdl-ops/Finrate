@@ -325,7 +325,6 @@ export const ACTION_CATEGORY_MAP: Record<string, DriverCategory> = {
   A15B_SHAREHOLDER_DEBT_TO_LT:  'COSMETIC',
   A18_NET_SALES_GROWTH:         'STRUCTURAL',
   A19_ADVANCE_TO_REVENUE:       'STRUCTURAL',
-  A20_YYI_MONETIZATION:         'STRUCTURAL',
 }
 
 export interface PortfolioComposition {
@@ -667,7 +666,7 @@ export function buildTwoNotchScenario(
   }
 
   const needsStructural = productivity.productivityScore < 0.40
-  const structuralExamples = ['A18_NET_SALES_GROWTH', 'A06_INVENTORY_MONETIZATION', 'A20_YYI_MONETIZATION']
+  const structuralExamples = ['A18_NET_SALES_GROWTH', 'A06_INVENTORY_MONETIZATION', 'A19_ADVANCE_TO_REVENUE']
     .map(actionIdToLabel).join(', ')
   const blockedBy = needsStructural && composition.isCosmeticHeavy
     ? `Portföy muhasebe ağırlıklı; 2 kategori iyileşme için yapısal aksiyonlar zorunlu (${structuralExamples})`

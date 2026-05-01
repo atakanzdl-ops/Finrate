@@ -1351,79 +1351,6 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
 }
 
-// ── A20 ──────────────────────────────────────────────────────────────────────
-const A20_YYI_MONETIZATION: ActionTemplateV3 = {
-  id: 'A20_YYI_MONETIZATION',
-  name: 'Yıllara Yaygın İnşaat Hakediş Tahsilatı',
-  family: 'INDUSTRY_SPECIFIC',
-  semanticType: 'YYI_MONETIZATION',
-  horizons: ['short', 'medium', 'long'],
-
-  buildTransactions: (context) => {
-    // Savunma katmanı: inşaat dışı sektörde çağrılırsa boş döner
-    if (!isConstructionLike(context.sector)) return []
-    const amount = clampAmount(context.amount, 2_000_000)
-    if (amount <= 0) return []
-    // Faz 7.3.6A1: Yön düzeltmesi.
-    // Eski: 102 Dr / 350 Cr (350 artıyor ama "çözülme" deniyor — yön ters)
-    // Yeni: 350 Dr / 600 Cr (350 azalır, hasılata alınır)
-    // Not: 358 hakediş hesabı kapanışı sonraki faza (tam YYİ modellemesi).
-    return [
-      makeBalancedTransaction(
-        'A20_MAIN',
-        'YYİ hakediş hasılata alınıyor (350 → 600)',
-        'YYI_MONETIZATION',
-        [
-          { accountCode: '350', accountName: 'Yıllara Yaygın İnşaat ve Onarım Hakedişleri', side: 'DEBIT',  amount, description: 'Hakediş yükümlülüğü azalışı' },
-          { accountCode: '600', accountName: 'Yurtiçi Satışlar',                            side: 'CREDIT', amount, description: 'Hasılat artışı'               },
-        ]
-      ),
-    ]
-  },
-
-  preconditions: {
-    requiredAccountCodes: ['350', '358'],
-    minSourceAmountTRY: 2_000_000,
-    sectorMustInclude: ['CONSTRUCTION'],
-  },
-
-  qualityCoefficient: 0.80,
-  sustainability: 'SEMI_RECURRING',
-
-  repeatDecay: { first: 1.00, second: 0.75, third: 0.55, maxRepeats: 3 },
-
-  suggestedAmount: {
-    basis: 'source_account',
-    minPctOfBasis: 0.10,
-    typicalPctOfBasis: 0.25,
-    maxPctOfBasis: 0.50,
-    absoluteMinTRY: 2_000_000,
-  },
-
-  sectorCompatibility: {
-    CONSTRUCTION:  'primary',
-    MANUFACTURING: 'not_applicable',
-    TRADE:         'not_applicable',
-    RETAIL:        'not_applicable',
-    SERVICES:      'not_applicable',
-    IT:            'not_applicable',
-  },
-
-  expectedEconomicImpact: {
-    createsRealCash:        true,
-    strengthensOperations:  true,
-    realBalanceSheetGrowth: true,
-    reducesRisk:            true,
-  },
-
-  description:
-    'İNŞAAT SEKTÖRÜNE ÖZGÜ: Yıllara yaygın inşaat maliyetleri (350-358) kapsamındaki projelerin hakediş kesilip tahsil edilmesiyle nakde dönüştürülmesi. İmalat/ticaret sektörü için uygun değildir.',
-  cfoRationale:
-    'İnşaat şirketlerinde YYİ hesabı birikmiş inşaat maliyetlerini temsil eder. Proje tamamlanma oranına göre hakediş kesilip tahsil edilmesi nakit akışını ve aktif kalitesini anlamlı ölçüde iyileştirebilir.',
-  bankerPerspective:
-    'YYİ hakediş tahsilatı inşaat şirketleri için güçlü nakit dönüşüm araçlarından biridir. "Muhasebe gerçeği" ile "nakit gerçeği" arasındaki mesafenin kapanmasına yardımcı olur: proje ilerlemesi nakde kavuşabilir. Proje riski ve işveren ödeme güvenilirliği aksiyonun kalitesini belirleyen temel unsurlardır.',
-}
-
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────
 
 export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
@@ -1445,7 +1372,6 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A15B_SHAREHOLDER_DEBT_TO_LT,
   A18_NET_SALES_GROWTH,
   A19_ADVANCE_TO_REVENUE,
-  A20_YYI_MONETIZATION,
 }
 
 export const ACTION_IDS_V3 = Object.keys(ACTION_CATALOG_V3)

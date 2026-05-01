@@ -601,15 +601,6 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     affectedComponents: ['salesEfficiency'],
     productivityNote: 'Avansın hasılata dönüşmesi satış/aktif oranını iyileştirir',
   },
-  A20_YYI_MONETIZATION: {
-    repairs: {
-      WIP_LOCK:             'PRIMARY',
-      SALES_ASSET_MISMATCH: 'STRONG',
-      CASH_GENERATION_GAP:  'STRONG',
-    },
-    affectedComponents: ['workingCapitalLock', 'assetConversion', 'salesEfficiency', 'cashSupport'],
-    productivityNote: 'YYİ hakediş tahsilatı inşaat firmasında aktif kilitlenmesini anlamlı ölçüde çözebilir',
-  },
 }
 
 export interface ActionRepairAssessment {
