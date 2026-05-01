@@ -1,21 +1,35 @@
 /**
- * INSIGHT CATALOG (Faz 7.3.7)
+ * INSIGHT CATALOG (Faz 7.3.7 + 7.3.7-FIX)
  *
  * Aksiyon olmayan uyarı kartı üreticileri.
  * ActionTemplateV3'ten bağımsız; engineV3 skoruna dahil değil.
  *
  * Mevcut insight'lar:
  *   - A21_MATURITY_MISMATCH: KV/UV vade uyumsuzluğu
+ *
+ * Severity (Faz 7.3.7-FIX): Cari oran sapması bazlı (sektör verisi varsa)
+ *   sapma < 0.10   → insight üretme
+ *   sapma 0.10-0.30 → low
+ *   sapma 0.30-0.50 → medium
+ *   sapma >= 0.50   → high
+ * Fallback: sektör verisi yoksa eski KV/UV oran mantığı korunur.
  */
 
 import type { DecisionInsight } from './contracts'
+import { getBenchmarkValue } from './ratioHelpers'
+import type { SectorBenchmark } from '../benchmarks'
 
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
 
 /** KV toplamının anlamlı sayılacağı alt sınır */
 const KV_TOTAL_THRESHOLD = 5_000_000
 
-/** KV/UV oran eşikleri */
+/** Cari oran sapması eşikleri (Faz 7.3.7-FIX) */
+const SAPMA_LOW    = 0.10
+const SAPMA_MEDIUM = 0.30
+const SAPMA_HIGH   = 0.50
+
+/** KV/UV oran eşikleri (fallback — sektör verisi yoksa) */
 const RATIO_LOW_THRESHOLD    = 1.5
 const RATIO_MEDIUM_THRESHOLD = 2.0
 const RATIO_HIGH_THRESHOLD   = 3.0
@@ -28,7 +42,7 @@ const ACTION_KV_MIN_SOURCE: Record<string, number> = {
   A15B_SHAREHOLDER_DEBT_TO_LT: 1_000_000,   // 331
 }
 
-// ─── İç yardımcılar ───────────────────────────────────────────────────────────
+// ─── KV/UV ve cari oran yardımcıları ─────────────────────────────────────────
 
 function getKvTotal(balances: Record<string, number>): number {
   return (
@@ -52,12 +66,51 @@ function getUvTotal(balances: Record<string, number>): number {
   )
 }
 
-function determineSeverity(
+/** Dönen varlıklar toplamı — rasyolarla tutarlı hesap listesi */
+function getCurrentAssets(balances: Record<string, number>): number {
+  return (
+    (balances['100'] ?? 0) +
+    (balances['102'] ?? 0) +
+    (balances['103'] ?? 0) +
+    (balances['108'] ?? 0) +
+    (balances['120'] ?? 0) +
+    (balances['121'] ?? 0) +
+    (balances['150'] ?? 0) +
+    (balances['151'] ?? 0) +
+    (balances['152'] ?? 0) +
+    (balances['153'] ?? 0) +
+    (balances['159'] ?? 0)
+  )
+}
+
+/** KV pasif tüm hesaplar — cari oran paydası */
+function getStLiabilities(balances: Record<string, number>): number {
+  return (
+    (balances['300'] ?? 0) +
+    (balances['303'] ?? 0) +
+    (balances['304'] ?? 0) +
+    (balances['320'] ?? 0) +
+    (balances['321'] ?? 0) +
+    (balances['340'] ?? 0) +
+    (balances['331'] ?? 0)
+  )
+}
+
+// ─── Severity belirleyiciler ──────────────────────────────────────────────────
+
+/** Cari oran sapması bazlı severity (yeni mantık) */
+function determineSeverityBySapma(sapma: number): 'low' | 'medium' | 'high' {
+  if (sapma >= SAPMA_HIGH)   return 'high'
+  if (sapma >= SAPMA_MEDIUM) return 'medium'
+  return 'low'
+}
+
+/** KV/UV oran bazlı severity (fallback — sektör verisi yoksa) */
+function determineSeverityByRatio(
   ratio: number | null,
   kvTotal: number,
   uvTotal: number,
 ): 'low' | 'medium' | 'high' {
-  // UV sıfır ve KV anlamlıysa → doğrudan high
   if (uvTotal === 0 && kvTotal >= KV_TOTAL_THRESHOLD) return 'high'
   if (ratio === null) return 'low'
   if (ratio >= RATIO_HIGH_THRESHOLD)   return 'high'
@@ -65,52 +118,33 @@ function determineSeverity(
   return 'low'
 }
 
+// ─── recommendedActions ───────────────────────────────────────────────────────
+
 function buildRecommendedActions(
   balances: Record<string, number>,
 ): Array<{ actionId: string; actionName: string; sourceBalance: number }> {
   const candidates: Array<{ actionId: string; actionName: string; sourceBalance: number }> = []
 
-  // A01 — KV Finansal Borç → UV
   const a01Balance = (balances['300'] ?? 0) + (balances['303'] ?? 0) + (balances['304'] ?? 0)
   if (a01Balance >= ACTION_KV_MIN_SOURCE.A01_ST_FIN_DEBT_TO_LT) {
-    candidates.push({
-      actionId:      'A01_ST_FIN_DEBT_TO_LT',
-      actionName:    'KV Finansal Borç → UV',
-      sourceBalance: a01Balance,
-    })
+    candidates.push({ actionId: 'A01_ST_FIN_DEBT_TO_LT', actionName: 'KV Finansal Borç → UV', sourceBalance: a01Balance })
   }
 
-  // A02 — KV Ticari Borç → UV
   const a02Balance = (balances['320'] ?? 0) + (balances['321'] ?? 0)
   if (a02Balance >= ACTION_KV_MIN_SOURCE.A02_TRADE_PAYABLE_TO_LT) {
-    candidates.push({
-      actionId:      'A02_TRADE_PAYABLE_TO_LT',
-      actionName:    'Ticari Borç → UV',
-      sourceBalance: a02Balance,
-    })
+    candidates.push({ actionId: 'A02_TRADE_PAYABLE_TO_LT', actionName: 'Ticari Borç → UV', sourceBalance: a02Balance })
   }
 
-  // A03 — KV Alınan Avans → UV
   const a03Balance = balances['340'] ?? 0
   if (a03Balance >= ACTION_KV_MIN_SOURCE.A03_ADVANCE_TO_LT) {
-    candidates.push({
-      actionId:      'A03_ADVANCE_TO_LT',
-      actionName:    'Alınan Avans → UV',
-      sourceBalance: a03Balance,
-    })
+    candidates.push({ actionId: 'A03_ADVANCE_TO_LT', actionName: 'Alınan Avans → UV', sourceBalance: a03Balance })
   }
 
-  // A15B — Ortak Borcu UV
   const a15bBalance = balances['331'] ?? 0
   if (a15bBalance >= ACTION_KV_MIN_SOURCE.A15B_SHAREHOLDER_DEBT_TO_LT) {
-    candidates.push({
-      actionId:      'A15B_SHAREHOLDER_DEBT_TO_LT',
-      actionName:    'Ortak Borcu → UV',
-      sourceBalance: a15bBalance,
-    })
+    candidates.push({ actionId: 'A15B_SHAREHOLDER_DEBT_TO_LT', actionName: 'Ortak Borcu → UV', sourceBalance: a15bBalance })
   }
 
-  // Bakiye büyükten küçüğe
   return candidates.sort((a, b) => b.sourceBalance - a.sourceBalance)
 }
 
@@ -119,48 +153,96 @@ function buildRecommendedActions(
 /**
  * Vade uyumsuzluğu insight'ını üretir.
  *
- * Tetiklenme koşulları:
- *   1. kvTotal >= KV_TOTAL_THRESHOLD (5 Mn)
- *   2. uvTotal = 0  VEYA  kvTotal/uvTotal >= 1.5
- *   3. En az bir önerilebilir aksiyon mevcut
+ * Severity (Faz 7.3.7-FIX):
+ *   Sektör benchmark mevcutsa → cari oran sapması bazlı
+ *   Sektör benchmark yoksa  → eski KV/UV oran fallback
  *
  * @param accountBalances - FirmContext.accountBalances
+ * @param sector          - SectorCode (opsiyonel; yoksa fallback)
  */
 export function buildMaturityMismatchInsight(
   accountBalances: Record<string, number>,
+  sector?: string,
 ): DecisionInsight | null {
-  const kvTotal = getKvTotal(accountBalances)
-  const uvTotal = getUvTotal(accountBalances)
+  const balances = accountBalances ?? {}
 
   // KV anlamlı tutarda değilse tetikleme yok
+  const kvTotal = getKvTotal(balances)
+  const uvTotal = getUvTotal(balances)
   if (kvTotal < KV_TOTAL_THRESHOLD) return null
 
-  // Oran hesabı
-  let ratio: number | null = null
-  if (uvTotal > 0) {
-    ratio = kvTotal / uvTotal
-    if (ratio < RATIO_LOW_THRESHOLD) return null
+  let severity: 'low' | 'medium' | 'high'
+  let firmCurrentRatio: number | null = null
+  let sectorCurrentRatio: number | null = null
+  let sapma: number | null = null
+  let usedCurrentRatioLogic = false
+
+  // ── Yeni mantık: cari oran sapması (sektör verisi varsa) ──────────────────
+  if (sector) {
+    const bm = getBenchmarkValue(sector, 'currentRatio' as keyof SectorBenchmark)
+    if (bm) {
+      sectorCurrentRatio = bm.value
+      const stLiabilities = getStLiabilities(balances)
+      if (stLiabilities > 0) {
+        const currentAssets = getCurrentAssets(balances)
+        firmCurrentRatio = currentAssets / stLiabilities
+        sapma = sectorCurrentRatio - firmCurrentRatio
+
+        // Sapma < 0.10 → insight üretme
+        if (sapma < SAPMA_LOW) return null
+
+        severity = determineSeverityBySapma(sapma)
+        usedCurrentRatioLogic = true
+      }
+    }
   }
-  // uvTotal === 0 → null kalır, high severity verilir
 
-  const severity           = determineSeverity(ratio, kvTotal, uvTotal)
-  const recommendedActions = buildRecommendedActions(accountBalances)
+  // ── Fallback: KV/UV oran mantığı (sektör yoksa veya benchmark bulunamadıysa) ─
+  if (!usedCurrentRatioLogic) {
+    let ratio: number | null = null
+    if (uvTotal > 0) {
+      ratio = kvTotal / uvTotal
+      if (ratio < RATIO_LOW_THRESHOLD) return null
+    }
+    // uvTotal === 0 → null kalır, high severity
+    severity = determineSeverityByRatio(ratio, kvTotal, uvTotal)
+  }
 
-  // Hiç önerilebilir aksiyon yoksa insight üretme
+  const recommendedActions = buildRecommendedActions(balances)
   if (recommendedActions.length === 0) return null
 
-  const messages: Record<'low' | 'medium' | 'high', string> = {
-    low:    'Kısa vadeli yükümlülükler uzun vadeli kaynaklara göre yüksek seyrediyor.',
-    medium: 'Vade uyumsuzluğu belirgin: kısa vadeli yükümlülükler uzun vadeli kaynakları aşıyor.',
-    high:   'Vade uyumsuzluğu kritik: kısa vadeli yükümlülükler uzun vadeli kaynaklara göre çok ağır basıyor.',
+  // ── Mesaj ────────────────────────────────────────────────────────────────
+  let message: string
+  if (usedCurrentRatioLogic && firmCurrentRatio !== null && sectorCurrentRatio !== null && sapma !== null) {
+    const firmStr   = firmCurrentRatio.toFixed(2)
+    const sectorStr = sectorCurrentRatio.toFixed(2)
+    const sapmaStr  = sapma.toFixed(2)
+    if (severity! === 'high') {
+      message = `Cari oranınız ${firmStr}, sektör ortalaması ${sectorStr}. Sektörden ${sapmaStr} puan altta; kısa vadeli yükümlülükler sektör normuna göre belirgin baskı yaratıyor.`
+    } else if (severity! === 'medium') {
+      message = `Cari oranınız ${firmStr}, sektör ortalaması ${sectorStr}. Sektörden ${sapmaStr} puan altta; kısa vadeli yükümlülükler ortalamadan ağır.`
+    } else {
+      message = `Cari oranınız ${firmStr}, sektör ortalaması ${sectorStr}. Sektörden ${sapmaStr} puan altta; vade dağılımında hafif sapma var.`
+    }
+  } else {
+    // Fallback mesajları (eski format)
+    const fallbackMessages: Record<'low' | 'medium' | 'high', string> = {
+      low:    'Kısa vadeli yükümlülükler uzun vadeli kaynaklara göre yüksek seyrediyor.',
+      medium: 'Vade uyumsuzluğu belirgin: kısa vadeli yükümlülükler uzun vadeli kaynakları aşıyor.',
+      high:   'Vade uyumsuzluğu kritik: kısa vadeli yükümlülükler uzun vadeli kaynaklara göre çok ağır basıyor.',
+    }
+    message = fallbackMessages[severity!]
   }
+
+  // ratio: bilgi amaçlı (KV/UV oranı korunur)
+  const kvUvRatio = uvTotal > 0 ? kvTotal / uvTotal : null
 
   return {
     insightId: 'A21_MATURITY_MISMATCH',
     title:     'Vade Uyumsuzluğu',
-    message:   messages[severity],
-    severity,
-    ratio,
+    message,
+    severity:  severity!,
+    ratio:     kvUvRatio,
     kvTotal,
     uvTotal,
     recommendedActions,

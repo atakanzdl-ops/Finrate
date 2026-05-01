@@ -1150,9 +1150,9 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
-  // Faz 7.3.7: vade uyumsuzluğu risk insight
+  // Faz 7.3.7: vade uyumsuzluğu risk insight (7.3.7-FIX: sector param eklendi)
   const maturityInsight = accountBalances
-    ? buildMaturityMismatchInsight(accountBalances)
+    ? buildMaturityMismatchInsight(accountBalances, engineResult.sector)
     : null
   const riskInsights: DecisionInsight[] = maturityInsight ? [maturityInsight] : []
 
