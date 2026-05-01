@@ -37,9 +37,10 @@ function makeCtx(overrides: Partial<FirmContext> = {}): FirmContext {
 describe('buildActionRatioTransparency — A06 DIO (kind: balance)', () => {
   const a06 = ACTION_CATALOG_V3['A06_INVENTORY_MONETIZATION']
 
-  test('A06 stok 100M, cogs 200M → BalanceRatioTransparency döner', () => {
+  test('A06 stok 100M, cogs 200M, amount 10M → realisticTarget=90M, sectorMedian=benchmark', () => {
     // MANUFACTURING (imalat): inventoryDays benchmark = 82
-    // realisticTarget = (200M × 82) / 365 ≈ 44.93M
+    // realisticTarget = max(100M - 10M, 0) = 90M  (panel tutarı kadar stok azalışı)
+    // sectorMedian    = (200M × 82) / 365 ≈ 44.93M  (TCMB referansı)
     const ctx = makeCtx({
       sector: 'MANUFACTURING',
       accountBalances: {
@@ -58,15 +59,30 @@ describe('buildActionRatioTransparency — A06 DIO (kind: balance)', () => {
     expect(result!.kind).toBe('balance')
     const r = result as any
     expect(r.currentBalance).toBe(100_000_000)
-    // realisticTarget > 0 (formül çalışıyor)
-    expect(r.realisticTarget).toBeGreaterThan(0)
-    expect(r.realisticTarget).toBeLessThan(r.currentBalance)
+    // realisticTarget = stok - amount
+    expect(r.realisticTarget).toBe(90_000_000)
+    // sectorMedian = TCMB benchmark (cogs × targetDays / 365) — realisticTarget'tan farklı
+    expect(r.sectorMedian).toBeGreaterThan(0)
+    expect(r.sectorMedian).not.toBe(r.realisticTarget)
     expect(r.formula.targetLabel).toBe('Hedef Stok')
     expect(r.formula.basisLabel).toBe('Satılan Mal Maliyeti')
     expect(r.formula.basisValue).toBe(200_000_000)
     expect(r.formula.targetDays).toBeGreaterThan(0) // sektör benchmark
     expect(r.formula.periodDays).toBe(365)
     expect(r.method).toBe('period-end-balance')
+  })
+
+  test('A06 amount > stok → realisticTarget=0 (sıfıra clamp)', () => {
+    const ctx = makeCtx({
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '153':  10_000_000, // stok = 10M
+        '621': 120_000_000, // cogs = 120M
+      },
+    })
+    const result = buildActionRatioTransparency(a06, ctx, 15_000_000) // amount > stok
+    expect(result).not.toBeNull()
+    expect((result as any).realisticTarget).toBe(0)
   })
 
   test('A06 stok 0 → null döner', () => {

@@ -33,10 +33,12 @@ function RatioRows({
   current,
   realisticTarget,
   sectorMedian,
+  currentLabel = 'Bugünkü',
 }: {
   current: string
   realisticTarget: string
   sectorMedian: string
+  currentLabel?: string
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
@@ -44,7 +46,7 @@ function RatioRows({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748B' }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94A3B8', flexShrink: 0 }} />
-          Bugünkü
+          {currentLabel}
         </span>
         <span style={{ color: '#0B3C5D', fontWeight: 500 }}>{current}</span>
       </div>
@@ -140,6 +142,7 @@ function renderTurnoverBlock(data: TurnoverRatioTransparency) {
         current={formatTurnover(data.current)}
         realisticTarget={formatTurnover(data.realisticTarget)}
         sectorMedian={formatTurnover(data.sectorMedian)}
+        currentLabel="Bu aksiyon öncesi"
       />
 
       <p style={formulaRowStyle}>{data.formula.description}</p>

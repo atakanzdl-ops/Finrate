@@ -261,13 +261,14 @@ export function applyFeasibilityCap(
 
 /**
  * A06 — DIO (Stok Çevrimi Günü) transparency.
- * currentBalance: toplam stok (150-153)
- * realisticTarget: benchmark-based hedef stok düzeyi
+ * currentBalance:  toplam stok (150-153)
+ * realisticTarget: aksiyonun panel tutarı kadar stok azalışı → max(stok - amount, 0)
+ * sectorMedian:    TCMB benchmark hedef stok düzeyi (cogs × targetDays / 365)
  */
 function buildDIORatioTransparency(
   action: ActionTemplateV3,
   ctx: FirmContext,
-  _amount: number
+  amount: number
 ): BalanceRatioTransparency | null {
   const stockBalance =
     (ctx.accountBalances['150'] ?? 0) +
@@ -290,8 +291,11 @@ function buildDIORatioTransparency(
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
   const targetDays  = bm?.value ?? action.targetRatio?.fallback ?? 90
   const periodDays  = 365
-  const realisticTarget = (cogs * targetDays) / periodDays
-  const sectorMedian    = realisticTarget
+
+  // realisticTarget: panel aksiyonunun stoka etkisi (sıfıra clamp)
+  const realisticTarget = Math.max(stockBalance - amount, 0)
+  // sectorMedian: TCMB benchmark referansı (DIO formülü)
+  const sectorMedian = (cogs * targetDays) / periodDays
 
   const sourceType: AttributionSource = bm
     ? (bm.reliability as AttributionSource)
