@@ -950,8 +950,10 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     const supplierBalance = balances['320'] ?? 0
     const cogsBalance     = balances['621'] ?? 0
 
-    const maxAmount = Math.min(supplierBalance * 0.20, cogsBalance * 0.20)
-    const amount    = clampAmount(Math.min(context.amount, maxAmount), 1_000_000)
+    if (supplierBalance <= 0 || cogsBalance <= 0) return []
+
+    const requestedAmount = context.amount ?? 0
+    const amount = Math.min(requestedAmount, supplierBalance, cogsBalance)
     if (amount <= 0) return []
 
     return [
@@ -1363,7 +1365,27 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     const balances = context.accountBalances ?? {}
     const advanceBalance = balances['340'] ?? 0
     const stockBalance = balances['153'] ?? 0
-    if (advanceBalance <= 0 || stockBalance <= 0) return []
+    if (advanceBalance <= 0) return []
+
+    if (stockBalance <= 0) {
+      const amount = clampAmount(
+        Math.min(context.amount, advanceBalance),
+        1_000_000
+      )
+      if (amount <= 0) return []
+
+      return [
+        makeBalancedTransaction(
+          'A19_DELIVERY_REVENUE_ONLY',
+          'Alınan avans hizmet/proje teslimatı ile hasılata dönüşür',
+          'ADVANCE_TO_REVENUE',
+          [
+            { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans çözülmesi' },
+            { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
+          ]
+        ),
+      ]
+    }
 
     const maxByStock = stockBalance / (1 - grossMargin)
     const amount = clampAmount(

@@ -169,6 +169,17 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs[0].legs[3].amount).toBeCloseTo(7_000_000, 2)
   })
 
+  test('A19 stok yoksa sadece avans hasılata dönüşür', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '153': 0 },
+    }))
+
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT', amount: 20_000_000 })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT', amount: 20_000_000 })
+  })
+
   test('A19 net satış yoksa boş array döner', () => {
     const txs = a19.buildTransactions(makeA19Context({ netSales: 0 }))
 
@@ -238,18 +249,37 @@ describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması',
     expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 5_000_000 })
   })
 
-  test('A12 bakiye sınırı: 320=10M → maxAmount=2M, amount=min(5M,2M)=2M', () => {
+  test('A12 küçük rasyo-hedef tutarı 1 Mn altında olsa da transaction üretir', () => {
     const txs = a12.buildTransactions(makeA12Context({
-      amount: 5_000_000,
+      amount: 428_000,
       accountBalances: { '320': 10_000_000, '621': 100_000_000 },
     }))
-    // min(10M*0.20, 100M*0.20) = min(2M, 20M) = 2M
-    expect(txs[0].legs[0].amount).toBe(2_000_000)
+
+    expect(txs.length).toBe(2)
+    expect(txs[0].legs[0].amount).toBe(428_000)
+    expect(txs[0].legs[1].amount).toBe(428_000)
   })
 
-  test('A12 320 yok → boş array (maxAmount=0 < 1M min)', () => {
+  test('A12 amount 320 bakiyesini aşarsa 320 bakiyesiyle sınırlar', () => {
+    const txs = a12.buildTransactions(makeA12Context({
+      amount: 15_000_000,
+      accountBalances: { '320': 10_000_000, '621': 100_000_000 },
+    }))
+
+    expect(txs[0].legs[0].amount).toBe(10_000_000)
+    expect(txs[0].legs[1].amount).toBe(10_000_000)
+  })
+
+  test('A12 320 yok → boş array', () => {
     const txs = a12.buildTransactions(makeA12Context({
       accountBalances: { '320': 0, '621': 100_000_000 },
+    }))
+    expect(txs).toEqual([])
+  })
+
+  test('A12 621 yok → boş array', () => {
+    const txs = a12.buildTransactions(makeA12Context({
+      accountBalances: { '320': 10_000_000, '621': 0 },
     }))
     expect(txs).toEqual([])
   })
