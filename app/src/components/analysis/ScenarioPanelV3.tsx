@@ -114,18 +114,42 @@ function toStringArray(value: unknown): string[] {
 
 /**
  * TDHP hesap koduna ve kayıt yönüne göre bilanço hareketinin
- * görünür yönünü belirler. Faz 7.3.5C1.
- * Aktif (1xx/2xx) : Borç=artan(yeşil),  Alacak=azalan(pembe)
- * Pasif (3xx-5xx)  : Alacak=artan(yeşil), Borç=azalan(pembe)
- * Gelir (6xx)      : Alacak=artan(yeşil), Borç=azalan(pembe)
- * Gider (7xx)      : Borç=artan(pembe),   Alacak=azalan(yeşil)
+ * görünür yönünü belirler. Faz 7.3.5C1 + B3b-1.
+ * Aktif (1xx/2xx) : Borç=artan,  Alacak=azalan
+ * Pasif (3xx-5xx)  : Alacak=artan, Borç=azalan
+ * Gelir (6xx, hasılat)  : Alacak=artan, Borç=azalan
+ * Gider/Maliyet (6xx/7xx) : Borç=artan, Alacak=azalan
  */
+
+// Hasılat hesapları — CREDIT artış
+const INCOME_CREDIT_INCREASE = new Set([
+  '600','601','602',
+  '640','641','642','643','644','645','646','647','648','649',
+  '671','679',
+])
+// Gider/maliyet hesapları — DEBIT artış
+const EXPENSE_DEBIT_INCREASE = new Set([
+  '610','611','612',
+  '620','621','622','623',
+  '630','631','632','633',
+  '653','654','655','656','657','658','659',
+  '660','661',
+  '680','681','689',
+  '691',
+])
+
 function classifyLeg(accountCode: string, side: 'DEBIT' | 'CREDIT'): 'increase' | 'decrease' {
   const p = accountCode.charAt(0)
+  // 1xx/2xx: aktif — borç artış
   if (p === '1' || p === '2') return side === 'DEBIT'  ? 'increase' : 'decrease'
+  // 3xx-5xx: pasif — alacak artış
   if (p === '3' || p === '4' || p === '5') return side === 'CREDIT' ? 'increase' : 'decrease'
+  // 6xx: önce açık listeler, sonra fallback (hasılat → alacak artış)
+  if (INCOME_CREDIT_INCREASE.has(accountCode))  return side === 'CREDIT' ? 'increase' : 'decrease'
+  if (EXPENSE_DEBIT_INCREASE.has(accountCode))  return side === 'DEBIT'  ? 'increase' : 'decrease'
   if (p === '6') return side === 'CREDIT' ? 'increase' : 'decrease'
-  if (p === '7') return side === 'DEBIT'  ? 'decrease' : 'increase'
+  // 7xx: tüm gider/maliyet — borç artış
+  if (p === '7') return side === 'DEBIT'  ? 'increase' : 'decrease'
   return side === 'DEBIT' ? 'increase' : 'decrease'
 }
 
@@ -471,7 +495,7 @@ function AksiyonPlaniTab({
                   const allLegs: CL[] = [
                     ...debs.map(l  => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'DEBIT')  })),
                     ...creds.map(l => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'CREDIT') })),
-                  ]
+                  ].filter(leg => leg.code !== '690')  // 690 kapanış hesabı — UI'da gizle, 590 görünür
                   const activeLegs  = allLegs.filter(l => l.code.charAt(0) === '1' || l.code.charAt(0) === '2')
                   const passiveLegs = allLegs.filter(l => ['3','4','5'].includes(l.code.charAt(0)))
                   const incomeLegs  = allLegs.filter(l => l.code.charAt(0) === '6' || l.code.charAt(0) === '7')
