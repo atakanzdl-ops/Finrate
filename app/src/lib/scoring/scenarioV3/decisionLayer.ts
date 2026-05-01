@@ -24,12 +24,13 @@
  *   - Yeni matematik/skor hesabi YAPILMAZ — sadece engineResult verisi formatlanir
  */
 
-import type { AccountingLeg } from './contracts'
+import type { AccountingLeg, DecisionInsight } from './contracts'
 import type {
   EngineResult,
   SelectedAction,
   FeasibilityAssessment,
 } from './engineV3'
+import { buildMaturityMismatchInsight } from './insightCatalog'
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 import type { RatingGrade } from './ratingReasoning'
 import {
@@ -244,6 +245,8 @@ export interface DecisionAnswer {
   comparisonWithV2?: ComparisonWithV2
   /** PATCH 1: Veri kalitesi uyarisi — sparse mizan durumunda dolu */
   dataQualityWarning?: DataQualityWarning
+  /** Faz 7.3.7: Yapısal risk uyarı kartları (aksiyon değil) */
+  riskInsights: DecisionInsight[]
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1147,6 +1150,12 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
+  // Faz 7.3.7: vade uyumsuzluğu risk insight
+  const maturityInsight = accountBalances
+    ? buildMaturityMismatchInsight(accountBalances)
+    : null
+  const riskInsights: DecisionInsight[] = maturityInsight ? [maturityInsight] : []
+
   // PATCH 2: actionId → { debits, credits } gruplu lookup (mutation yok)
   const accountingLegsByAction: Record<string, { debits: AccountingImpactRow[]; credits: AccountingImpactRow[] }> = {}
   for (const row of accountingImpactTable) {
@@ -1179,5 +1188,6 @@ export function buildDecisionAnswer(
     consultantNarrative,
     comparisonWithV2,
     dataQualityWarning,
+    riskInsights,
   }
 }

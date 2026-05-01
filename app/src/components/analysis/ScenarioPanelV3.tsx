@@ -51,6 +51,7 @@ import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
 import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
+import type { DecisionInsight } from '@/lib/scoring/scenarioV3/contracts'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -393,6 +394,43 @@ function OzetTab({ result }: { result: any }) {
 
 // ─── AKSIYON PLANI TAB ────────────────────────────────────────────────────────
 
+// ─── RISK INSIGHT CARD (Faz 7.3.7) ──────────────────────────────────────────
+
+const severityStyles: Record<'low' | 'medium' | 'high', { bg: string; border: string; icon: string }> = {
+  low:    { bg: 'bg-amber-50',  border: 'border-amber-200',  icon: 'text-amber-600'  },
+  medium: { bg: 'bg-orange-50', border: 'border-orange-200', icon: 'text-orange-600' },
+  high:   { bg: 'bg-red-50',    border: 'border-red-200',    icon: 'text-red-600'    },
+}
+
+function RiskInsightCard({ insight }: { insight: DecisionInsight }) {
+  const styles = severityStyles[insight.severity]
+  return (
+    <div className={`${styles.bg} ${styles.border} border rounded-lg p-4 mb-3`}>
+      <div className="flex items-start gap-3">
+        <AlertTriangle className={`${styles.icon} shrink-0 mt-0.5`} size={18} />
+        <div className="flex-1">
+          <h4 className="font-semibold text-[#1E293B] text-sm">{insight.title}</h4>
+          <p className="text-sm text-[#64748B] mt-1">{insight.message}</p>
+          {insight.recommendedActions.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-medium text-[#64748B] mb-1">Öne çıkan çözüm aksiyonları:</p>
+              <ul className="text-sm space-y-1">
+                {insight.recommendedActions.map((action) => (
+                  <li key={action.actionId} className="text-[#1E293B]">
+                    → {action.actionName}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── AKSIYON PLANI TAB ────────────────────────────────────────────────────────
+
 function AksiyonPlaniTab({
   result,
   expanded,
@@ -414,8 +452,26 @@ function AksiyonPlaniTab({
     setExpanded(newSet)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const riskInsights: DecisionInsight[] = da.riskInsights ?? []
+
   return (
     <div className="space-y-6">
+
+      {/* RİSK UYARI KARTLARI (Faz 7.3.7) */}
+      {riskInsights.length > 0 && (
+        <div>
+          <h3
+            className="text-base font-bold text-[#0B3C5D] mb-3"
+            style={{ fontFamily: 'Outfit, sans-serif' }}
+          >
+            Tespit Edilen Riskler
+          </h3>
+          {riskInsights.map((insight) => (
+            <RiskInsightCard key={insight.insightId} insight={insight} />
+          ))}
+        </div>
+      )}
 
       {/* A. ANA AKSIYON TABLOSU */}
       <div

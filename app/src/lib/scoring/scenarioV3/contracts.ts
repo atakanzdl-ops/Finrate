@@ -728,3 +728,25 @@ export interface TargetGap {
   reason?:     string    // isReachable false veya zaten üstündeyse açıklama
   weakestCategories?: ScoreCategory[]  // en düşük 2 kategori (Faz 6a)
 }
+
+// ─── DECISION INSIGHT (Faz 7.3.7) ────────────────────────────────────────────
+
+/**
+ * Aksiyon olmayan uyarı kartı — vade uyumsuzluğu gibi yapısal riskler.
+ * DecisionAnswer.riskInsights[] içinde taşınır.
+ * ActionTemplateV3'ten bağımsız; engineV3 skoruna dahil değil.
+ */
+export interface DecisionInsight {
+  insightId: 'A21_MATURITY_MISMATCH'
+  title: string
+  message: string
+  severity: 'low' | 'medium' | 'high'
+  ratio: number | null
+  kvTotal: number
+  uvTotal: number
+  recommendedActions: Array<{
+    actionId: string
+    actionName: string
+    sourceBalance: number
+  }>
+}
