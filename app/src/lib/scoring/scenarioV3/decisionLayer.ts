@@ -168,7 +168,11 @@ export interface RejectedInsight {
   actionName: string
   reason: string
   /** UI'da gösterilecek kullanıcı dostu açıklama (raw reason yerine) */
-  reasonDisplay?: string
+  reasonDisplay?: string | string[]
+  /** Bu aksiyon kaç farklı değerlendirmede reddedildi (dedupe sonrası) */
+  rejectionCount?: number
+  /** Ham engine gerekçeleri (debug için) */
+  rawReasons?: string[]
   estimatedNotchImpact: number
   category: string
   isFromMissedOpportunities: boolean
@@ -730,50 +734,104 @@ function buildUiReadyRows(engineResult: EngineResult): UiReadyRow[] {
   })
 }
 
+// ─── HELPER: FRIENDLY REJECT REASON ─────────────────────────────────────────
+
+export function toFriendlyRejectReason(rawReason: string): string {
+  if (rawReason.includes('Horizon') && rawReason.includes('desteklenmiyor')) {
+    return 'Bu vade için uygun değil.'
+  }
+  if (rawReason.includes('Kaynak hesap') && rawReason.includes('bakiyesi yok')) {
+    return 'Gerekli kaynak hesap bakiyesi bulunmuyor.'
+  }
+  if (rawReason.includes('Kaynak bakiye yetersiz')) {
+    return 'Kaynak hesap bakiyesi yetersiz.'
+  }
+  if (rawReason.includes('sektoru icin uygulanamaz') || rawReason.toLowerCase().includes('sektör')) {
+    return 'Sektör koşulu sağlanmadı.'
+  }
+  if (rawReason.includes('customCheck basarisiz')) {
+    const match = rawReason.match(/customCheck basarisiz: (.+)/)
+    return match ? match[1] : 'Aksiyon koşulu sağlanmadı.'
+  }
+  if (rawReason.includes('no valid amount candidates')) {
+    return 'Uygulanabilir tutar üretilemedi.'
+  }
+  if (rawReason.includes('Aggregate guardrail')) {
+    return 'Toplu kural nedeniyle uygun değil.'
+  }
+  return 'Bu aksiyon mevcut veriyle uygun görülmedi.'
+}
+
 // ─── BUILDER: REJECTED INSIGHTS ──────────────────────────────────────────────
 
 function buildRejectedInsights(engineResult: EngineResult): RejectedInsight[] {
-  const insights: RejectedInsight[] = []
   const portfolioIds = new Set(engineResult.portfolio.map(a => a.actionId))
 
-  // 1. Engine'in debug.rejectedCandidates listesi
+  // ── 1. Engine rejectedCandidates → dedupe by actionId ────────────────────
+  const grouped = new Map<string, {
+    actionId:       string
+    reasons:        Set<string>   // friendly
+    rawReasons:     Set<string>   // raw
+    rejectionCount: number
+  }>()
+
   const rejectedCandidates = engineResult.debug?.rejectedCandidates ?? []
   for (const rc of rejectedCandidates) {
-    if (portfolioIds.has(rc.actionId)) continue  // portfoydekileri atla
-    const template = ACTION_CATALOG_V3[rc.actionId]
-    const cat      = ACTION_CATEGORY_MAP[rc.actionId] ?? 'HYBRID'
+    if (portfolioIds.has(rc.actionId)) continue
+
+    const existing = grouped.get(rc.actionId) ?? {
+      actionId:       rc.actionId,
+      reasons:        new Set<string>(),
+      rawReasons:     new Set<string>(),
+      rejectionCount: 0,
+    }
+    existing.rejectionCount += 1
+    existing.rawReasons.add(rc.reason)
+    existing.reasons.add(toFriendlyRejectReason(rc.reason))
+    grouped.set(rc.actionId, existing)
+  }
+
+  const insights: RejectedInsight[] = []
+
+  for (const g of grouped.values()) {
+    const template = ACTION_CATALOG_V3[g.actionId]
+    const cat      = ACTION_CATEGORY_MAP[g.actionId] ?? 'HYBRID'
+    const reasonArr = Array.from(g.reasons)
     insights.push({
-      actionId:                 rc.actionId,
-      actionName:               template?.name ?? rc.actionId,
-      reason:                   rc.reason,
-      reasonDisplay:            'Bu aksiyon mevcut veriyle uygun görülmedi.',
-      estimatedNotchImpact:     0,
-      category:                 cat,
+      actionId:                  g.actionId,
+      actionName:                template?.name ?? g.actionId,
+      reason:                    Array.from(g.rawReasons)[0] ?? '',
+      reasonDisplay:             reasonArr.length === 1 ? reasonArr[0] : reasonArr,
+      rejectionCount:            g.rejectionCount,
+      rawReasons:                Array.from(g.rawReasons),
+      estimatedNotchImpact:      0,
+      category:                  cat,
       isFromMissedOpportunities: false,
     })
   }
 
-  // 2. ratingReasoning.missedOpportunities — portfoyden kacan kritik firsatlar
+  // ── 2. missedOpportunities — portföyden kaçan kritik fırsatlar ───────────
   const missed = engineResult.reasoning.missedOpportunities as MissedOpportunity[] | null
   if (missed) {
     for (const m of missed) {
       if (portfolioIds.has(m.actionId)) continue
-      // Duplicate check
       if (insights.some(i => i.actionId === m.actionId)) continue
       const template = ACTION_CATALOG_V3[m.actionId]
       insights.push({
-        actionId:                 m.actionId,
-        actionName:               template?.name ?? m.actionId,
-        reason:                   m.reason,
-        reasonDisplay:            m.reasonDisplay ?? `${template?.name ?? m.actionId} aksiyonu için gerekli koşullar mevcut bilanço yapısında karşılanmıyor.`,
-        estimatedNotchImpact:     m.estimatedNotchImpact,
-        category:                 m.category,
+        actionId:                  m.actionId,
+        actionName:                template?.name ?? m.actionId,
+        reason:                    m.reason,
+        reasonDisplay:             m.reasonDisplay ?? `${template?.name ?? m.actionId} aksiyonu için gerekli koşullar mevcut bilanço yapısında karşılanmıyor.`,
+        rejectionCount:            1,
+        rawReasons:                [m.reason],
+        estimatedNotchImpact:      m.estimatedNotchImpact,
+        category:                  m.category,
         isFromMissedOpportunities: true,
       })
     }
   }
 
-  // Tahmini not etkisine gore sirala (yuksekten dusuge)
+  // Tahmini not etkisine göre sırala (yüksekten düşüğe)
   insights.sort((a, b) => b.estimatedNotchImpact - a.estimatedNotchImpact)
 
   return insights

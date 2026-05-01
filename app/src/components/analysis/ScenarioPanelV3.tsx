@@ -628,7 +628,12 @@ function DetayTab({
                 Neden Bu Aksiyonlar Seçilmedi?
               </h3>
               <p className="text-sm text-[#64748B] mt-1">
-                Yüksek skor alıp reddedilen {rejected.length} aksiyon.
+                {(() => {
+                  const totalEvals = rejected.reduce((s: number, r: any) => s + (r.rejectionCount ?? 1), 0)
+                  return totalEvals > rejected.length
+                    ? `${rejected.length} benzersiz aksiyon, ${totalEvals} değerlendirme reddi`
+                    : `${rejected.length} aksiyon değerlendirme dışı kaldı`
+                })()}
               </p>
             </div>
             <ChevronDown
@@ -643,8 +648,12 @@ function DetayTab({
                 <div key={idx} className="p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div className="font-medium text-[#1E293B]">{r.actionName}</div>
-                    <div className="text-xs text-slate-400 ml-3 flex-shrink-0">
-                      {formatAmount(r.amountTRY)}
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      {r.rejectionCount > 1 && (
+                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {r.rejectionCount} değerlendirme
+                        </span>
+                      )}
                     </div>
                   </div>
 
