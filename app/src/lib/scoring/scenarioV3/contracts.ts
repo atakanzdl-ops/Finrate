@@ -404,6 +404,9 @@ export interface ActionBuildContext {
   analysis: unknown              // Layer 1'de bilanço durumu (V3 analyzer tipi gelince daraltılacak)
   amount: number                 // Aksiyon tutarı (TL)
   previousActions: string[]      // Aynı scenario'da önceki aksiyonların id'leri
+  accountBalances?: Record<string, number>
+  netSales?: number
+  grossProfit?: number
 }
 
 // ============ ENGINE OUTPUT ============

@@ -1038,6 +1038,9 @@ function scoreCandidate(
     analysis:        context.accountBalances as unknown,
     amount:          amountTRY,
     previousActions: previouslySelectedIds,
+    accountBalances: context.accountBalances,
+    netSales:        context.netSales,
+    grossProfit:     context.grossProfit,
   }
   const transactions = action.buildTransactions(buildCtx)
 
@@ -1472,6 +1475,9 @@ function runLocalRepair(
       sector: repairContext.sector, horizon,
       analysis: repairContext.accountBalances as unknown,
       amount: typical.amountTRY, previousActions: allIds,
+      accountBalances: repairContext.accountBalances,
+      netSales: repairContext.netSales,
+      grossProfit: repairContext.grossProfit,
     })
     const repairQuality = calculateQuality({
       template: action, transactions: repairTxs, sector: repairContext.sector,
@@ -1658,6 +1664,9 @@ function buildSustainabilityInput(
       sector: ctx.sector, horizon: sa.horizon,
       analysis: ctx.accountBalances as unknown,
       amount: sa.amountTRY, previousActions: [],
+      accountBalances: ctx.accountBalances,
+      netSales: ctx.netSales,
+      grossProfit: ctx.grossProfit,
     })
 
     const qr: QualityResult = calculateQuality({

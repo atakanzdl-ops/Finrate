@@ -1294,16 +1294,37 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   horizons: ['short', 'medium', 'long'],
 
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
+    const netSales = context.netSales ?? 0
+    const grossProfit = context.grossProfit ?? 0
+    if (netSales <= 0 || grossProfit <= 0) return []
+
+    const grossMargin = grossProfit / netSales
+    if (grossMargin <= 0 || grossMargin >= 1) return []
+
+    const balances = context.accountBalances ?? {}
+    const advanceBalance = balances['340'] ?? 0
+    const stockBalance = balances['153'] ?? 0
+    if (advanceBalance <= 0 || stockBalance <= 0) return []
+
+    const maxByStock = stockBalance / (1 - grossMargin)
+    const amount = clampAmount(
+      Math.min(context.amount, advanceBalance, maxByStock),
+      1_000_000
+    )
     if (amount <= 0) return []
+
+    const costAmount = amount * (1 - grossMargin)
+
     return [
       makeBalancedTransaction(
-        'A19_MAIN',
-        'Alınan avans proje/mal teslimi ile hasılata dönüşüyor (340 → 600)',
+        'A19_DELIVERY_REVENUE_AND_COST',
+        'Alınan avans teslimatla satışa dönüşür, ilgili stok maliyeti gelir tablosuna alınır',
         'ADVANCE_TO_REVENUE',
         [
-          { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans kapatma — teslim gerçekleşti'  },
-          { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat tanıma'                      },
+          { accountCode: '340', accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount, description: 'Avans çözülmesi' },
+          { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
+          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
+          { accountCode: '153', accountName: 'Ticari Mallar',            side: 'CREDIT', amount: costAmount, description: 'Stok azalışı' },
         ]
       ),
     ]

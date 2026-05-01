@@ -129,3 +129,80 @@ describe('Faz 7.3.6A5 — A15B Ortak Borcunu Uzun Vadeye Aktarma muhasebe doğru
     expect(a15b.preconditions.requiredAccountCodes).toContain('331')
   })
 })
+
+// ─── A19 Müşteri Avansını Satışa Dönüştürme ─────────────────────────────────
+
+describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
+  const a19 = ACTION_CATALOG_V3['A19_ADVANCE_TO_REVENUE']
+
+  const makeA19Context = (overrides: Partial<ActionBuildContext> = {}) =>
+    makeContext({
+      amount: 20_000_000,
+      netSales: 100_000_000,
+      grossProfit: 30_000_000,
+      accountBalances: { '340': 50_000_000, '153': 100_000_000 },
+      ...overrides,
+    })
+
+  test('A19 normal senaryoda 4 bacaklı tek transaction üretir', () => {
+    const txs = a19.buildTransactions(makeA19Context())
+
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT', amount: 20_000_000 })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT', amount: 20_000_000 })
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '621', side: 'DEBIT' })
+    expect(txs[0].legs[2].amount).toBeCloseTo(14_000_000, 2)
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '153', side: 'CREDIT' })
+    expect(txs[0].legs[3].amount).toBeCloseTo(14_000_000, 2)
+  })
+
+  test('A19 stok kapasitesiyle tutarı sınırlar', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 50_000_000, '153': 7_000_000 },
+    }))
+
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs[0].amount).toBeCloseTo(10_000_000, 2)
+    expect(txs[0].legs[1].amount).toBeCloseTo(10_000_000, 2)
+    expect(txs[0].legs[2].amount).toBeCloseTo(7_000_000, 2)
+    expect(txs[0].legs[3].amount).toBeCloseTo(7_000_000, 2)
+  })
+
+  test('A19 net satış yoksa boş array döner', () => {
+    const txs = a19.buildTransactions(makeA19Context({ netSales: 0 }))
+
+    expect(txs).toEqual([])
+  })
+
+  test('A19 brüt kâr yoksa boş array döner', () => {
+    const txs = a19.buildTransactions(makeA19Context({ grossProfit: 0 }))
+
+    expect(txs).toEqual([])
+  })
+
+  test('A19 brüt marj yüzde 100 veya üstüyse boş array döner', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      netSales: 100_000_000,
+      grossProfit: 100_000_000,
+    }))
+
+    expect(txs).toEqual([])
+  })
+
+  test('A19 340 avans bakiyesi yoksa boş array döner', () => {
+    const txs = a19.buildTransactions(makeA19Context({
+      accountBalances: { '340': 0, '153': 100_000_000 },
+    }))
+
+    expect(txs).toEqual([])
+  })
+
+  test('A19 denklik: debit toplamı === credit toplamı', () => {
+    const txs = a19.buildTransactions(makeA19Context())
+    const debitSum  = txs[0].legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const creditSum = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+
+    expect(debitSum).toBeCloseTo(creditSum, 2)
+  })
+})
