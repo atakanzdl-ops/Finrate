@@ -582,12 +582,13 @@ describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması',
     expect(a12.useRatioBasedAmount).toBe(true)
   })
 
-  test('A12 computeAmount: %25 margin, IT sektörü hedef %36 → 10M döner', () => {
+  test('A12 computeAmount: %25 margin, IT sektörü hedef %36 → 11M döner (cap %50)', () => {
     // IT (Bilişim) grossMargin benchmark = 0.36
     // currentMargin = 25M/100M = 0.25 < 0.36*1.05=0.378 → aktif
     // requiredImprovement = (0.36 - 0.25) * 100M = 11M
-    // maxFromSupplier = 50M * 0.20 = 10M, maxFromCogs = 100M * 0.20 = 20M
-    // result = min(11M, 10M, 20M) = 10M
+    // cap = 0.50
+    // maxFromSupplier = 50M * 0.50 = 25M, maxFromCogs = 100M * 0.50 = 50M
+    // result = min(11M, 25M, 50M) = 11M  (requiredImprovement kısıtlayıcı)
     const result = a12.computeAmount!({
       sector:           'IT',
       accountBalances:  { '320': 50_000_000, '621': 100_000_000 },
@@ -603,7 +604,31 @@ describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması',
       period:            'ANNUAL',
     })
     expect(result).not.toBeNull()
-    expect(result).toBe(10_000_000)
+    // (0.36 - 0.25) * 100M = float ≈ 11M — toBeCloseTo(0 dp) güvenli
+    expect(result).toBeCloseTo(11_000_000, 0)
+  })
+
+  test('A12 computeAmount: küçük supplier — maxFromSupplier cap kısıtlayıcı', () => {
+    // requiredImprovement = (0.36 - 0.25) * 100M = 11M
+    // maxFromSupplier = 8M * 0.50 = 4M  ← kısıtlayıcı
+    // maxFromCogs     = 100M * 0.50 = 50M
+    // result = min(11M, 4M, 50M) = 4M
+    const result = a12.computeAmount!({
+      sector:           'IT',
+      accountBalances:  { '320': 8_000_000, '621': 100_000_000 },
+      netSales:         100_000_000,
+      grossProfit:       25_000_000,
+      totalAssets:       200_000_000,
+      totalEquity:        50_000_000,
+      totalRevenue:      100_000_000,
+      netIncome:           5_000_000,
+      operatingProfit:     8_000_000,
+      interestExpense:     2_000_000,
+      operatingCashFlow:  null,
+      period:            'ANNUAL',
+    })
+    expect(result).not.toBeNull()
+    expect(result).toBe(4_000_000)
   })
 
   test('A12 computeAmount: marj zaten hedefte (IT %40 >= %36*1.05=%37.8) → null', () => {

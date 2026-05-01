@@ -1261,6 +1261,91 @@ Kullanıcıya görünür PDF içeriği etkileniyor.
 
 ---
 
+---
+
+## ✅ Faz 7.3.6 — V3 Aksiyon Kataloğu + Muhasebe Bacakları + Rasyo Paneli Kapanışı
+
+**Tarih:** 30 Nisan – 1 Mayıs 2026
+**Commit aralığı:** `87b2c9d` → (bu commit)
+**Toplam commit:** 17
+**Test:** 370 → 600 (+230)
+**Snapshot:** 22, drift yok
+**TS hatası:** 0
+**score.ts:** dokunulmadı
+
+### Tamamlananlar
+
+**A grubu — Aksiyon Kataloğu Temizliği:**
+- A07, A16, A17, A20 silindi
+- A10B Senetli Sermaye Artırımı eklendi
+- A15B KV→UV Ortak Borcu Aktarma eklendi
+- A12 Brüt Kâr Marjı metni güncellendi (FAVÖK + sade Türkçe)
+- Reddedilen aksiyonlar listesi tekilleştirildi
+
+**B grubu — Engine ve Muhasebe Bacakları:**
+- Engine gelir tablosu DELTA zinciri (B1)
+- A19 4 bacaklı çoklu yevmiye (B2)
+- A12 yeni model: 320/621 + 690/590, computeAmount (B3a)
+- A18 4 bacaklı yevmiye (B3a-FIX3)
+- A12 cap %20 → %50 hotfix (kapanış)
+
+**B3b grubu — UI Düzeltme ve Rasyo Paneli:**
+- 159 stok listesinden çıkarıldı (B3b-1)
+- A18/A19 stoklu Tx2 (B3b-1)
+- A18/A19 stoksuz Tx2 (B3b-1-FIX)
+- 690 UI'da gizlendi (B3b-1)
+- classifyLeg yön düzeltmeleri (B3b-1)
+- RatioTransparency union tipi (B3b-2)
+- A06/A12/A18/A19 ratioTransparency (B3b-3)
+- A06 hedef formülü düzeltmesi: panel aksiyonu izler (B3b-3-FIX)
+- A18/A19 etiket "Bu aksiyon öncesi" (B3b-3-FIX)
+
+### Aksiyon Kataloğu Final (18 Aksiyon)
+
+A01, A02, A03, A04, A05, A06, A08, A09, A10, A10B, A11, A12,
+A13, A14, A15, A15B, A18, A19
+
+Silinen: A07, A16, A17, A20
+
+### Ratio Transparency Kapsamı
+
+| Aksiyon | Tip | Etiket |
+|---------|-----|--------|
+| A05 Alacak Tahsilat | Balance | DSO |
+| A06 Stok Optimizasyonu | Balance | DIO |
+| A12 Brüt Kâr Marjı | Margin | Brüt Kâr Marjı |
+| A18 Net Satış Artışı | Turnover | Aktif Devir Hızı |
+| A19 Avans Hasılat | Turnover | Aktif Devir Hızı |
+
+### Açık İşler (Sonraki Fazlar)
+
+**Faz 7.3.7 — A21 Vade Uyumsuzluğu Insight (D Alternatifi):**
+- A21 standart aksiyon değil, uyarı kartı
+- decisionLayer + ScenarioPanelV3 dokunulur
+- Mevcut A01/A02/A03/A15B'ye yönlendirir
+- Süre tahmini: 1.5 – 2.5 saat
+
+**Faz 7.3.8 — Subjektif + Gerçek Rating Doğrulaması:**
+- engineV3 → score.ts entegrasyonu
+- Post-action bilanço üzerinden gerçek rating
+- Subjektif faktörlerin V3'e dahil edilmesi
+- Süre tahmini: 4 – 6 saat
+
+**Faz 7.3.9 — Diğer Genişletmeler:**
+- A04 / A10 için ratioTransparency
+- Tarihsel marj altyapısı (son 2 yıl ortalama)
+- Double Count motoru (GPT önerisi)
+- Süre tahmini: 4 – 12 saat
+
+### Notlar
+
+- A12 cap %20 → %50: tedarikçi iskonto sınırı yıllık pazarlık bazında genişletildi. Mali müşavir mantığında savunulabilir.
+- score.ts dokunulmadı; ana rating hesaplama dokunulmaz kaldı.
+- 22 snapshot korundu; jest -u kullanılmadı.
+- Bütün commit'ler tek tek geri alınabilir tasarımda.
+
+---
+
 ## Notlar
 
 - Bu dosya Faz 8 (production hazırlık) tamamlanana kadar canlı tutulacak.

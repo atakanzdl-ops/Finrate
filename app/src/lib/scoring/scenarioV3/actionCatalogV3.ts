@@ -952,10 +952,10 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     const supplierBalance = balances['320'] ?? 0
     const cogsBalance     = balances['621'] ?? 0
 
-    // 320 bakiyesinin %20'si (tedarikçi iskonto gerçekçi üst sınır)
-    const maxFromSupplier = supplierBalance * 0.20
-    // 621 bakiyesinin %20'si (maliyet azaltımı gerçekçi üst sınır)
-    const maxFromCogs     = cogsBalance     * 0.20
+    // Yıllık tedarikçi pazarlık üst sınırı (%50 — B3a-CAP hotfix)
+    const cap             = 0.50
+    const maxFromSupplier = supplierBalance * cap
+    const maxFromCogs     = cogsBalance     * cap
 
     const result = Math.min(requiredImprovement, maxFromSupplier, maxFromCogs)
     return result > 0 ? result : null
