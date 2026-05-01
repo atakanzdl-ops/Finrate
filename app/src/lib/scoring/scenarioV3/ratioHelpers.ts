@@ -4,7 +4,15 @@
  * computeAmount altyapısı için yardımcı fonksiyonlar.
  */
 
-import type { FirmContext, ActionTemplateV3, RatioTransparency, AttributionSource } from './contracts'
+import type {
+  FirmContext,
+  ActionTemplateV3,
+  RatioTransparency,
+  BalanceRatioTransparency,
+  MarginRatioTransparency,
+  TurnoverRatioTransparency,
+  AttributionSource,
+} from './contracts'
 import { getSectorBenchmark } from '../benchmarks'
 import type { SectorBenchmark } from '../benchmarks'
 
@@ -247,6 +255,170 @@ export function applyFeasibilityCap(
   const maxMovement    = currentBalance * capPercent
   const desiredMovement = Math.max(currentBalance - targetBalance, 0)
   return Math.min(desiredMovement, maxMovement)
+}
+
+// ─── Metrik bazlı üreticiler (B3b-3) ─────────────────────────────────────────
+
+/**
+ * A06 — DIO (Stok Çevrimi Günü) transparency.
+ * currentBalance: toplam stok (150-153)
+ * realisticTarget: benchmark-based hedef stok düzeyi
+ */
+function buildDIORatioTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  _amount: number
+): BalanceRatioTransparency | null {
+  const stockBalance =
+    (ctx.accountBalances['150'] ?? 0) +
+    (ctx.accountBalances['151'] ?? 0) +
+    (ctx.accountBalances['152'] ?? 0) +
+    (ctx.accountBalances['153'] ?? 0)
+
+  if (stockBalance <= 0) return null
+
+  // COGS: önce doğrudan hesap bakiyeleri, yoksa netSales - grossProfit
+  const rawCogs =
+    (ctx.accountBalances['620'] ?? 0) +
+    (ctx.accountBalances['621'] ?? 0) +
+    (ctx.accountBalances['622'] ?? 0) +
+    (ctx.accountBalances['623'] ?? 0)
+  const cogs = rawCogs > 0 ? rawCogs : (getCogs(ctx) ?? 0)
+  if (cogs <= 0) return null
+
+  const benchmarkField = (action.targetRatio?.benchmarkField ?? 'inventoryDays') as keyof import('../benchmarks').SectorBenchmark
+  const bm = getBenchmarkValue(ctx.sector, benchmarkField)
+  const targetDays  = bm?.value ?? action.targetRatio?.fallback ?? 90
+  const periodDays  = 365
+  const realisticTarget = (cogs * targetDays) / periodDays
+  const sectorMedian    = realisticTarget
+
+  const sourceType: AttributionSource = bm
+    ? (bm.reliability as AttributionSource)
+    : 'FALLBACK'
+
+  return {
+    kind: 'balance',
+    currentBalance: stockBalance,
+    realisticTarget,
+    sectorMedian,
+    capPercent: 0.25,
+    formula: {
+      targetLabel: 'Hedef Stok',
+      basisLabel:  'Satılan Mal Maliyeti',
+      basisValue:  cogs,
+      targetDays,
+      periodDays,
+    },
+    attribution: {
+      sourceType,
+      sectorLabel: getSectorLabel(ctx.sector),
+      year: new Date().getFullYear(),
+    },
+    method: 'period-end-balance',
+  }
+}
+
+/**
+ * A12 — Brüt Kâr Marjı transparency.
+ * current: mevcut brüt marj
+ * realisticTarget: aksiyon sonrası beklenen marj (sektör medyanı ile sınırlı)
+ */
+function buildMarginRatioTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): MarginRatioTransparency | null {
+  const netSales    = ctx.netSales    ?? 0
+  const grossProfit = ctx.grossProfit ?? 0
+
+  if (netSales <= 0 || grossProfit < 0) return null
+
+  const current = grossProfit / netSales
+
+  const benchmarkField = (action.targetRatio?.benchmarkField ?? 'grossMargin') as keyof import('../benchmarks').SectorBenchmark
+  const bm = getBenchmarkValue(ctx.sector, benchmarkField)
+  const sectorMedian = bm?.value ?? action.targetRatio?.fallback ?? 0.30
+
+  // Aksiyon sonrası gerçekçi marj — sektör medyanını aşmaz
+  const realisticTarget = Math.min(current + amount / netSales, sectorMedian)
+
+  return {
+    kind: 'margin',
+    metricLabel: 'Brüt Kâr Marjı',
+    current,
+    realisticTarget,
+    sectorMedian,
+    formula: {
+      description: 'Brüt Kâr Marjı = (Net Satış − Maliyet) / Net Satış',
+      netSales,
+      costToReduce: amount,
+      accounts: [
+        { code: '320', name: 'Satıcılar',              delta: -amount, description: 'Tedarikçi iskonto'  },
+        { code: '621', name: 'Satılan Mal Maliyeti',   delta: -amount, description: 'Maliyet azalışı'    },
+      ],
+    },
+  }
+}
+
+/**
+ * A18/A19 — Aktif Devir Hızı transparency.
+ * current: mevcut satış/aktif oranı
+ * realisticTarget: ek gelir sonrası beklenen devir hızı
+ */
+function buildTurnoverRatioTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): TurnoverRatioTransparency | null {
+  const netSales    = ctx.netSales    ?? 0
+  const totalAssets = ctx.totalAssets ?? 0
+
+  if (netSales <= 0 || totalAssets <= 0) return null
+
+  const current = netSales / totalAssets
+
+  const benchmarkField = (action.targetRatio?.benchmarkField ?? 'assetTurnover') as keyof import('../benchmarks').SectorBenchmark
+  const bm = getBenchmarkValue(ctx.sector, benchmarkField)
+  const sectorMedian = bm?.value ?? action.targetRatio?.fallback ?? 1.0
+
+  const realisticTarget = (netSales + amount) / totalAssets
+
+  return {
+    kind: 'turnover',
+    metricLabel: 'Aktif Devir Hızı',
+    current,
+    realisticTarget,
+    sectorMedian,
+    formula: {
+      description: 'Aktif Devir Hızı = Net Satış / Toplam Aktif',
+      netSales,
+      totalAssets,
+    },
+  }
+}
+
+/**
+ * Aksiyon metriğine göre doğru transparency üreticisini çalıştırır.
+ * A05 ve targetRatio.metric'siz aksiyonlar → mevcut buildRatioTransparency.
+ * Faz 7.3.6B3b-3.
+ */
+export function buildActionRatioTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): RatioTransparency | null {
+  switch (action.targetRatio?.metric) {
+    case 'DIO':
+      return buildDIORatioTransparency(action, ctx, amount)
+    case 'GROSS_MARGIN':
+      return buildMarginRatioTransparency(action, ctx, amount)
+    case 'ASSET_TURNOVER':
+      return buildTurnoverRatioTransparency(action, ctx, amount)
+    default:
+      // A05 ve diğerleri: mevcut balance/DSO helper
+      return buildRatioTransparency(action, ctx, amount)
+  }
 }
 
 // ─── detectExtremeDeviation ──────────────────────────────────────────────────

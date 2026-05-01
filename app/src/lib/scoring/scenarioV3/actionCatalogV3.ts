@@ -501,6 +501,14 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   semanticType: 'INVENTORY_MONETIZATION',
   horizons: ['short', 'medium', 'long'],
 
+  targetRatio: {
+    metric:         'DIO',
+    benchmarkField: 'inventoryDays',
+    basis:          'cogs',
+    fallback:       90,
+    reliability:    'TCMB_DIRECT',
+  },
+
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 1_000_000)
     if (amount <= 0) return []
@@ -914,6 +922,14 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   // Faz 7.3.6B3a: computeAmount + gerçek yevmiye (320/621 → 690/590)
   useRatioBasedAmount: true,
 
+  targetRatio: {
+    metric:         'GROSS_MARGIN',
+    benchmarkField: 'grossMargin',
+    basis:          'netSales',
+    fallback:       0.30,
+    reliability:    'TCMB_DIRECT',
+  },
+
   computeAmount: (ctx) => {
     const netSales    = ctx.netSales    ?? 0
     const grossProfit = ctx.grossProfit ?? 0
@@ -1279,6 +1295,14 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
   semanticType: 'OPERATIONAL_REVENUE',
   horizons: ['medium', 'long'],
 
+  targetRatio: {
+    metric:         'ASSET_TURNOVER',
+    benchmarkField: 'assetTurnover',
+    basis:          'totalAssets',
+    fallback:       1.0,
+    reliability:    'TCMB_DIRECT',
+  },
+
   buildTransactions: (context) => {
     const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
@@ -1428,6 +1452,14 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   family: 'EQUITY_PNL',
   semanticType: 'ADVANCE_TO_REVENUE',
   horizons: ['short', 'medium', 'long'],
+
+  targetRatio: {
+    metric:         'ASSET_TURNOVER',
+    benchmarkField: 'assetTurnover',
+    basis:          'totalAssets',
+    fallback:       1.0,
+    reliability:    'TCMB_DIRECT',
+  },
 
   buildTransactions: (context) => {
     const netSales    = context.netSales    ?? 0

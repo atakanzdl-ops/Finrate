@@ -63,7 +63,7 @@ import {
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 
-import { buildRatioTransparency } from './ratioHelpers'
+import { buildRatioTransparency, buildActionRatioTransparency } from './ratioHelpers'
 
 import {
   applyTransactions,
@@ -799,7 +799,9 @@ function calculateAmountCandidates(
     if (v !== null && v > 0) {
       // Materiality bypass: computeAmount aktif aksiyonlarda
       // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
-      const transparency = buildRatioTransparency(action, context, v)
+      // B3b-3: wrapper metrik tipine göre doğru üreticiyi seçer
+      // (A12 → GROSS_MARGIN; A05 → DSO fallback; vb.)
+      const transparency = buildActionRatioTransparency(action, context, v)
       return [{
         amountTRY: v,
         label: 'rasyo-hedef',
@@ -1339,7 +1341,16 @@ function runGreedySelection(
       repeatDecayApplied:         selectedCandidate.breakdown.repeatDecay,
       diversityPenaltyApplied:    selectedCandidate.breakdown.diversityPenalty,
       narrative: `${selectedCandidate.action.name}: ${selectedCandidate.breakdown.breakdown}`,
-      ratioTransparency:          selectedCandidate.amountCandidate.ratioTransparency,
+      // B3b-3: computeAmount path dışındaki aksiyonlar (A06/A18/A19) için
+      // wrapper fallback — amountCandidate.ratioTransparency dolu ise öncelikli
+      ratioTransparency:
+        selectedCandidate.amountCandidate.ratioTransparency ??
+        buildActionRatioTransparency(
+          selectedCandidate.action,
+          context,
+          selectedCandidate.amountCandidate.amountTRY
+        ) ??
+        undefined,
     }
 
     selected.push(sa)
