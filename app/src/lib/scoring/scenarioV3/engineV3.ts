@@ -67,6 +67,7 @@ import { buildRatioTransparency } from './ratioHelpers'
 
 import {
   applyTransactions,
+  getAccountDirection,
 } from './ledgerEngine'
 import type { AccountBalance } from './ledgerEngine'
 
@@ -627,6 +628,55 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
   }
 }
 
+export function buildIncomeStatementDeltas(transactions: AccountingTransaction[]): {
+  netSalesDelta: number
+  grossProfitDelta: number
+  operatingProfitDelta: number
+  netIncomeDelta: number
+} {
+  const deltaByCode = new Map<string, number>()
+
+  for (const tx of transactions) {
+    for (const leg of tx.legs) {
+      const direction = getAccountDirection(leg.accountCode)
+      const effect = leg.side === 'DEBIT' ? direction.debitEffect : direction.creditEffect
+      const signed = effect === 'increase' ? leg.amount : -leg.amount
+      deltaByCode.set(leg.accountCode, (deltaByCode.get(leg.accountCode) ?? 0) + signed)
+    }
+  }
+
+  const sum = (codes: string[]) =>
+    codes.reduce((s, c) => s + (deltaByCode.get(c) ?? 0), 0)
+
+  const netSalesDelta =
+    sum(['600', '601', '602']) - sum(['610', '611', '612'])
+
+  const costOfSalesDelta = sum(['620', '621', '622', '623'])
+  const grossProfitDelta = netSalesDelta - costOfSalesDelta
+
+  const operatingExpenseDelta = sum(['630', '631', '632', '633'])
+  const otherIncomeDelta = sum(['640', '641', '642', '643', '644', '645', '646', '647', '648', '649'])
+  const otherExpenseDelta = sum(['653', '654', '655', '656', '657', '658', '659'])
+
+  const operatingProfitDelta =
+    grossProfitDelta - operatingExpenseDelta + otherIncomeDelta - otherExpenseDelta
+
+  const financeExpenseDelta = sum(['660', '661'])
+  const extraordinaryIncomeDelta = sum(['671', '679'])
+  const extraordinaryExpenseDelta = sum(['680', '681', '689'])
+  const taxExpenseDelta = sum(['691'])
+
+  const netIncomeDelta =
+    operatingProfitDelta - financeExpenseDelta + extraordinaryIncomeDelta - extraordinaryExpenseDelta - taxExpenseDelta
+
+  return {
+    netSalesDelta,
+    grossProfitDelta,
+    operatingProfitDelta,
+    netIncomeDelta,
+  }
+}
+
 function updateFirmContextFromTransactions(
   context:      FirmContext,
   transactions: AccountingTransaction[],
@@ -645,12 +695,22 @@ function updateFirmContextFromTransactions(
 
   // buildV3BalanceTotals: kontra hesaplar doğru çıkarılır (Faz 7.3.4B0)
   const { totalAssets, totalEquity } = buildV3BalanceTotals(updatedBalances)
+  const deltas = buildIncomeStatementDeltas(transactions)
+  const netSales = context.netSales + deltas.netSalesDelta
+  const grossProfit = context.grossProfit + deltas.grossProfitDelta
+  const operatingProfit = context.operatingProfit + deltas.operatingProfitDelta
+  const netIncome = context.netIncome + deltas.netIncomeDelta
 
   return {
     ...context,
     accountBalances: updatedBalances,
     totalAssets,
     totalEquity,
+    totalRevenue: netSales,
+    netSales,
+    grossProfit,
+    operatingProfit,
+    netIncome,
   }
 }
 
