@@ -1,22 +1,29 @@
 /**
- * Faz 7.3.8d-FIX — selectTargetPackage tests (minimum-cardinality alt küme araması)
+ * Faz 7.3.8d-FIX2 — selectTargetPackage tests (rasyo grubu çeşitlilik önceliği)
  *
  * Bu suite şu kontratı doğrular:
  *   - Edge case'ler: boş, eşit/altında, geçersiz, ulaşılmaz
- *   - Optimal seçim: en az aksiyon → en düşük tutar → en yakın hedef
+ *   - Sıralama: grup kapsama desc → cardinality asc → tutar asc → hedef yakınlığı
  *   - fullPortfolio sırası alt küme içinde korunur
- *   - DEKAM senaryosu (Codex audit): A10 tek başına CCC, A19+A10 → B, tam paket → BB
+ *   - DEKAM senaryosu (Codex audit): kısa ID → 0 grup → eski tie-break davranışı
  *   - N > 12 koruma: subset search atlanır
+ *   - getCoveredGroups unit testleri
+ *   - coveredGroupCount meta alanı
  *
  * Test stratejisi: postActionRating helper'ı `mockImplementation` ile
  * actionId'lere göre rating üretiyor — her alt küme için doğru rating dönüyor.
- * Bu, alt küme arama mantığının deterministic doğrulamasını sağlar.
+ *
+ * ID konvansiyonu:
+ *   - Mevcut testler (1-9): kısa ID ('A05') → getCoveredGroups=0 → tie-break korunur
+ *   - Yeni diversity testleri (10-11): tam catalog ID ('A05_RECEIVABLE_COLLECTION')
+ *     → getCoveredGroups doğru çalışır → diversity sıralama aktif
  */
 
 import { selectTargetPackage } from '../targetPackage'
 import type { SelectedAction } from '../engineV3'
 import * as postActionRatingModule from '../postActionRating'
 import type { ActualRatingValidation } from '../postActionRating'
+import { getCoveredGroups } from '../actionRatioGroupProfile'
 
 // ─── YARDIMCILAR ──────────────────────────────────────────────────────────────
 
@@ -483,6 +490,196 @@ describe('selectTargetPackage — meta tutarlılığı', () => {
       requestedTarget: 'B',
     })
     expect(r.meta.warnings).toEqual([])
+    expect(r.meta.reachedTarget).toBe(true)
+    expect(r.meta.fallback).toBe(false)
+  })
+})
+
+// ─── 10. getCoveredGroups UNIT TESTLERİ ──────────────────────────────────────
+
+describe('getCoveredGroups — unit', () => {
+  test('tek aksiyon primary only → 1 grup', () => {
+    // A11_RETAIN_EARNINGS: primary=LEVERAGE, secondary yok
+    const groups = getCoveredGroups(['A11_RETAIN_EARNINGS'])
+    expect(groups.size).toBe(1)
+    expect(groups.has('LEVERAGE')).toBe(true)
+  })
+
+  test('tek aksiyon primary+secondary → 2 grup', () => {
+    // A10_CASH_EQUITY_INJECTION: primary=LEVERAGE, secondary=LIQUIDITY
+    const groups = getCoveredGroups(['A10_CASH_EQUITY_INJECTION'])
+    expect(groups.size).toBe(2)
+    expect(groups.has('LEVERAGE')).toBe(true)
+    expect(groups.has('LIQUIDITY')).toBe(true)
+  })
+
+  test('iki aksiyon tüm 4 grubu kapsıyor', () => {
+    // A10: LEVERAGE+LIQUIDITY  |  A18: PROFITABILITY+ACTIVITY  → 4 grup
+    const groups = getCoveredGroups(['A10_CASH_EQUITY_INJECTION', 'A18_NET_SALES_GROWTH'])
+    expect(groups.size).toBe(4)
+    expect(groups.has('LEVERAGE')).toBe(true)
+    expect(groups.has('LIQUIDITY')).toBe(true)
+    expect(groups.has('PROFITABILITY')).toBe(true)
+    expect(groups.has('ACTIVITY')).toBe(true)
+  })
+
+  test('aksiyonlar örtüşen gruplara sahip → dedupe', () => {
+    // A10: LEVERAGE+LIQUIDITY  |  A01: LEVERAGE+LIQUIDITY  → hâlâ 2 grup
+    const groups = getCoveredGroups(['A10_CASH_EQUITY_INJECTION', 'A01_ST_FIN_DEBT_TO_LT'])
+    expect(groups.size).toBe(2)
+  })
+
+  test('profile dışı ID → katkı sıfır (sessiz fallback)', () => {
+    const groups = getCoveredGroups(['UNKNOWN_ACTION', 'A99_FAKE'])
+    expect(groups.size).toBe(0)
+  })
+
+  test('kısa ID (A10 değil A10_CASH_EQUITY_INJECTION) → profile bulunamaz → 0 grup', () => {
+    // Kısa ID yanlış format — production'da tam ID gelir
+    const groups = getCoveredGroups(['A10'])
+    expect(groups.size).toBe(0)
+  })
+
+  test('boş dizi → 0 grup', () => {
+    expect(getCoveredGroups([]).size).toBe(0)
+  })
+
+  test('projeksiyon aksiyonu (A13_OPEX_OPTIMIZATION) da profilde var', () => {
+    // Projeksiyon olsa da diversity hesabına dahil
+    const groups = getCoveredGroups(['A13_OPEX_OPTIMIZATION'])
+    expect(groups.size).toBe(1)
+    expect(groups.has('PROFITABILITY')).toBe(true)
+  })
+})
+
+// ─── 11. DİVERSİTY ÖNCELİĞİ (tam catalog ID ile) ─────────────────────────────
+//
+// Bu testlerde makeAction'a TAM catalog ID'si verilir.
+// getCoveredGroups doğru grubu bulur → diversity sıralama aktif olur.
+
+describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => {
+  test('1-grup vs 2-grup (aynı cardinality) → 2-grup seçilir', () => {
+    // A11_RETAIN_EARNINGS: LEVERAGE (1 grup), 10M
+    // A10_CASH_EQUITY_INJECTION: LEVERAGE+LIQUIDITY (2 grup), 15M
+    // Her ikisi de tek başına hedefi tutuyor. Cardinality eşit (k=1).
+    // Diversity: 2 grup > 1 grup → A10 seçilir (daha pahalı ama dengeli)
+    setupRatingMock((ids) => {
+      if (ids.has('A11_RETAIN_EARNINGS') || ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A11_RETAIN_EARNINGS', 10_000_000),       // 1 grup — ucuz
+        makeAction('A10_CASH_EQUITY_INJECTION', 15_000_000), // 2 grup — pahalı
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.selectedActions).toHaveLength(1)
+    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
+    expect(r.meta.coveredGroupCount).toBe(2)
+    expect(r.meta.reachedTarget).toBe(true)
+  })
+
+  test('3-grup 2-aksiyon vs 2-grup 1-aksiyon → 3-grup seçilir (diversity > cardinality)', () => {
+    // A10 tek: LEVERAGE+LIQUIDITY (2 grup), k=1, 38.5M
+    // A05+A18: LIQUIDITY+ACTIVITY+PROFITABILITY (3 grup), k=2, 15M
+    // Diversity (3>2) önce gelir → A05+A18 seçilir
+    // NOT: ids.size kontrolü ile sadece belirtilen kombinasyonlar B döner;
+    //      A18+A10 gibi diğer çiftler C kalır (mock'u basit tutar)
+    setupRatingMock((ids) => {
+      if (ids.size === 1 && ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
+      if (ids.size === 2 && ids.has('A05_RECEIVABLE_COLLECTION') && ids.has('A18_NET_SALES_GROWTH')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A05_RECEIVABLE_COLLECTION', 5_000_000),   // LIQUIDITY+ACTIVITY
+        makeAction('A18_NET_SALES_GROWTH', 10_000_000),       // PROFITABILITY+ACTIVITY
+        makeAction('A10_CASH_EQUITY_INJECTION', 38_500_000),  // LEVERAGE+LIQUIDITY
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.selectedActions.map(a => a.actionId)).toEqual([
+      'A05_RECEIVABLE_COLLECTION',
+      'A18_NET_SALES_GROWTH',
+    ])
+    expect(r.meta.coveredGroupCount).toBe(3)
+  })
+
+  test('eşit grup, farklı cardinality → az aksiyon seçilir', () => {
+    // A10 tek: LEVERAGE+LIQUIDITY (2 grup), k=1
+    // A01+A04: LEVERAGE+LIQUIDITY (2 grup), k=2  — aynı gruplar, daha fazla aksiyon
+    // Diversity tie → cardinality: k=1 kazanır → A10
+    setupRatingMock((ids) => {
+      if (ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
+      if (ids.has('A01_ST_FIN_DEBT_TO_LT') && ids.has('A04_CASH_PAYDOWN_ST')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A01_ST_FIN_DEBT_TO_LT', 20_000_000),    // LEVERAGE+LIQUIDITY
+        makeAction('A04_CASH_PAYDOWN_ST', 15_000_000),      // LEVERAGE+LIQUIDITY
+        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000), // LEVERAGE+LIQUIDITY
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.selectedActions).toHaveLength(1)
+    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
+    expect(r.meta.coveredGroupCount).toBe(2)
+  })
+
+  test('eşit grup, eşit cardinality → daha düşük tutar seçilir', () => {
+    // A01: LEVERAGE+LIQUIDITY (2 grup), 50M
+    // A10: LEVERAGE+LIQUIDITY (2 grup), 30M
+    // Her ikisi de tek başına yeterli (k=1). Tie: 2 grup eşit, k eşit → tutar → 30M kazanır
+    setupRatingMock((ids) => {
+      if (ids.has('A01_ST_FIN_DEBT_TO_LT') || ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A01_ST_FIN_DEBT_TO_LT', 50_000_000),    // LEVERAGE+LIQUIDITY, pahalı
+        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000), // LEVERAGE+LIQUIDITY, ucuz
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.selectedActions).toHaveLength(1)
+    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
+    expect(r.meta.totalAmountTRY).toBe(30_000_000)
+    expect(r.meta.coveredGroupCount).toBe(2)
+  })
+
+  test('4 grup kapsayan paket → coveredGroupCount=4', () => {
+    // A10: LEVERAGE+LIQUIDITY  |  A18: PROFITABILITY+ACTIVITY  → 4 grup birlikte
+    setupRatingMock((ids) => {
+      if (ids.has('A10_CASH_EQUITY_INJECTION') && ids.has('A18_NET_SALES_GROWTH')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A10_CASH_EQUITY_INJECTION', 10_000_000),
+        makeAction('A18_NET_SALES_GROWTH', 10_000_000),
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.coveredGroupCount).toBe(4)
+    expect(r.meta.reachedTarget).toBe(true)
+  })
+
+  test('profile dışı ID → coveredGroupCount=0, işlev bozulmaz', () => {
+    // Profile'da olmayan aksiyon: diversity=0, fallback sessiz
+    setupRatingMock(() => 'B')
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [makeAction('LEGACY_ACTION_XYZ', 5_000_000)],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.coveredGroupCount).toBe(0)
     expect(r.meta.reachedTarget).toBe(true)
     expect(r.meta.fallback).toBe(false)
   })

@@ -1,30 +1,32 @@
 /**
- * TARGET PACKAGE SELECTOR (Faz 7.3.8d-FIX)
+ * TARGET PACKAGE SELECTOR (Faz 7.3.8d-FIX2)
  *
  * Mevcut V3 portföyünden, kullanıcının istediği hedef rating'e
  * ulaşmak için OPTİMAL aksiyon paketini seçer.
  *
- * Algoritma — minimum-cardinality alt küme araması:
+ * Algoritma — rasyo grubu çeşitlilik öncelikli alt küme araması:
  *   1. requestedTarget parse edilir; geçersizse → tüm liste fallback
  *   2. currentIdx >= targetIdx → boş paket, reachedTarget=true
  *   3. Boş portföy → reachedTarget=false, boş paket
- *   4. Cardinality k = 1..N için tüm C(N,k) alt kümesi denenir;
- *      her biri calculateActualPostActionRating ile gerçek post-rating'e çevrilir.
- *      İlk feasible cardinality'de durulur (minimum aksiyon sayısı garantili).
- *   5. Aynı k için tie-break sırası:
- *        a) En düşük totalAmountTRY
- *        b) En yakın hedef (achievedIdx asc — hedefi en az aşan)
+ *   4. Tüm C(N,k) alt kümeleri (k=1..N) calculateActualPostActionRating ile
+ *      gerçek post-rating'e çevrilir; hedefe ulaşan tüm adaylar toplanır.
+ *   5. Adaylar şu öncelik sırasıyla karşılaştırılır (bankacı kredi komitesi mantığı):
+ *        a) Rasyo grubu kapsama desc (LIQUIDITY/PROFITABILITY/LEVERAGE/ACTIVITY)
+ *           → çok grubu kapsayan "dengeli paket" tercih edilir
+ *        b) Cardinality asc (daha az aksiyon)
+ *        c) En düşük totalAmountTRY
+ *        d) En yakın hedef (achievedIdx asc — hedefi en az aşan)
  *   6. Hiçbir alt küme yeterli değilse → tüm liste fallback,
  *      reachedTarget=false, achievedRating=fullPortfolio post-rating
  *
  * KORUMA: N > SUBSET_SEARCH_LIMIT (12) ise 2^N patlamasını engellemek
  *   için subset search atlanır, fullPortfolio + uyarı dönülür.
  *
- * ÇIKTI ŞEKLİ DEĞİŞMEDİ (sözleşme):
+ * ÇIKTI ŞEKLİ:
  *   { selectedActions, meta: TargetPackageMeta, validation }
+ *   YENİ meta alanı: coveredGroupCount (0..4) — UI "4/4 grup kapsanmış" için
  *
- * selectedActions sırası: alt küme bulunduktan sonra fullPortfolio
- *   orijinal sırası korunur (vade ve impact düzeni bozulmaz).
+ * selectedActions sırası: fullPortfolio orijinal sırası korunur.
  *
  * KRİTİK:
  *   score.ts / ratios.ts / subjective.ts DOKUNULMAZ — sadece
@@ -40,6 +42,7 @@ import {
   ratingToIndex,
   type RatingGrade,
 } from './ratingReasoning'
+import { getCoveredGroups }                from './actionRatioGroupProfile'
 
 // ─── ÇIKTI TİPLERİ (sözleşme: değişmedi) ──────────────────────────────────────
 
@@ -58,6 +61,12 @@ export interface TargetPackageMeta {
   fallback:                 boolean
   /** Edge case açıklamaları (UI'da gösterim opsiyoneldir) */
   warnings:                 string[]
+  /**
+   * Seçilen pakette kapsanan farklı rasyo grubu sayısı (0..4).
+   * Gruplar: LIQUIDITY, PROFITABILITY, LEVERAGE, ACTIVITY.
+   * UI'da "4/4 grup kapsanmış" gösterimi için kullanılabilir.
+   */
+  coveredGroupCount:        number
 }
 
 export interface TargetPackageResult {
@@ -168,6 +177,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fullPortfolioActionCount: fullCount,
         fallback:                 true,
         warnings,
+        coveredGroupCount:        0,
       },
     }
   }
@@ -187,6 +197,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fullPortfolioActionCount: fullCount,
         fallback:                 false,
         warnings,
+        coveredGroupCount:        0,
       },
     }
   }
@@ -205,6 +216,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fullPortfolioActionCount: 0,
         fallback:                 false,
         warnings,
+        coveredGroupCount:        0,
       },
     }
   }
@@ -226,9 +238,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       currentCombinedScore:   params.currentCombinedScore,
       currentActualRating:    params.currentActualRating,
     })
-    const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
-    const achievedIdx    = ratingToIndex(achievedRating)
-    const totalAmount    = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+    const achievedRating     = tryParseRating(validation.postActualRating) ?? fallbackCurrent
+    const achievedIdx        = ratingToIndex(achievedRating)
+    const totalAmount        = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+    const coveredGroupCount  = getCoveredGroups(fullPortfolio.map(a => a.actionId)).size
     return {
       selectedActions: fullPortfolio,
       validation,
@@ -240,27 +253,44 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fullPortfolioActionCount: fullCount,
         fallback:                 true,
         warnings,
+        coveredGroupCount,
       },
     }
   }
 
-  // ── ALT KÜME ARAMASI: cardinality ascending, ilk feasible'da dur ────────────
+  // ── ALT KÜME ARAMASI: tüm feasible adayları topla, çeşitlilik-öncelikli sırala ──
   type Candidate = {
     indices:        number[]
+    actionIds:      string[]            // getCoveredGroups için (tam catalog ID'leri)
     validation:     ActualRatingValidation
     achievedRating: RatingGrade
     achievedIdx:    number
     totalAmount:    number
   }
 
+  /**
+   * Aday karşılaştırıcı — bankacı kredi komitesi mantığı:
+   *   1. Grup kapsama desc  (çok grup = dengeli paket)
+   *   2. Cardinality asc    (daha az aksiyon)
+   *   3. Tutar asc          (daha düşük maliyet)
+   *   4. achievedIdx asc    (hedefi en az aşan)
+   */
+  function compareCandidate(a: Candidate, b: Candidate): number {
+    const aGroups = getCoveredGroups(a.actionIds).size
+    const bGroups = getCoveredGroups(b.actionIds).size
+    if (aGroups !== bGroups) return bGroups - aGroups          // desc: fazla grup önce
+    if (a.indices.length !== b.indices.length) return a.indices.length - b.indices.length
+    if (a.totalAmount !== b.totalAmount) return a.totalAmount - b.totalAmount
+    return a.achievedIdx - b.achievedIdx
+  }
+
+  const allFeasible: Candidate[] = []
   let lastValidation: ActualRatingValidation | null = null
 
   for (let k = 1; k <= fullCount; k++) {
-    let bestAtK: Candidate | null = null
-
     for (const indices of combinationsOfSize(fullCount, k)) {
-      const subset = indices.map(i => fullPortfolio[i])
-      const totalAmount = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+      const subset       = indices.map(i => fullPortfolio[i])
+      const totalAmount  = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
       const transactions = flattenTransactions(subset)
 
       const validation = calculateActualPostActionRating({
@@ -278,37 +308,39 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
       const achievedIdx    = ratingToIndex(achievedRating)
 
-      // Hedefe ulaşmıyorsa atla
-      if (achievedIdx < targetIdx) continue
-
-      // Bu k için en iyi mi? Tie-break: tutar asc → achievedIdx asc
-      if (
-        !bestAtK ||
-        totalAmount < bestAtK.totalAmount ||
-        (totalAmount === bestAtK.totalAmount && achievedIdx < bestAtK.achievedIdx)
-      ) {
-        bestAtK = { indices: [...indices], validation, achievedRating, achievedIdx, totalAmount }
+      if (achievedIdx >= targetIdx) {
+        allFeasible.push({
+          indices:      [...indices],
+          actionIds:    subset.map(a => a.actionId),
+          validation,
+          achievedRating,
+          achievedIdx,
+          totalAmount,
+        })
       }
     }
+  }
 
-    if (bestAtK) {
-      // Minimum cardinality bulundu — erken çık.
-      // bestAtK.indices zaten sıralı (combinationsOfSize lex-order üretir),
-      // bu yüzden fullPortfolio orijinal sırası korunur.
-      const selectedActions = bestAtK.indices.map(i => fullPortfolio[i])
-      return {
-        selectedActions,
-        validation: bestAtK.validation,
-        meta: {
-          reachedTarget:            true,
-          achievedRating:           bestAtK.achievedRating,
-          totalAmountTRY:           bestAtK.totalAmount,
-          selectedActionCount:      selectedActions.length,
-          fullPortfolioActionCount: fullCount,
-          fallback:                 false,
-          warnings,
-        },
-      }
+  // ── EN İYİ ADAY: çeşitlilik → cardinality → tutar → yakınlık ────────────────
+  if (allFeasible.length > 0) {
+    allFeasible.sort(compareCandidate)
+    const best = allFeasible[0]
+    // indices sıralı geldiğinden (combinationsOfSize lex-order) fullPortfolio sırası korunur
+    const selectedActions   = best.indices.map(i => fullPortfolio[i])
+    const coveredGroupCount = getCoveredGroups(best.actionIds).size
+    return {
+      selectedActions,
+      validation: best.validation,
+      meta: {
+        reachedTarget:            true,
+        achievedRating:           best.achievedRating,
+        totalAmountTRY:           best.totalAmount,
+        selectedActionCount:      selectedActions.length,
+        fullPortfolioActionCount: fullCount,
+        fallback:                 false,
+        warnings,
+        coveredGroupCount,
+      },
     }
   }
 
@@ -333,6 +365,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       fullPortfolioActionCount: fullCount,
       fallback:                 true,
       warnings,
+      coveredGroupCount:        0,
     },
   }
 }
