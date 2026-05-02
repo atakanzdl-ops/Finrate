@@ -366,6 +366,54 @@ function buildMarginRatioTransparency(
 }
 
 /**
+ * A10 — Özkaynak / Aktif (Equity Ratio) transparency.
+ *
+ * Hem pay hem payda aynı anda artar: ortak nakit koyduğunda 102 Bankalar
+ * (aktif) ve 500 Sermaye (özkaynak) eş miktarda artar.
+ *   current          = totalEquity / totalAssets
+ *   realisticTarget  = (totalEquity + amount) / (totalAssets + amount)
+ *   sectorMedian     = 1 − benchmark.debtToAssets    (TCMB kaynağı)
+ *
+ * MarginRatioTransparency yeniden kullanılır (kind: 'margin') — format
+ * zaten yüzde, UI renderMarginBlock + formatPercent ile gösterir.
+ * contracts.ts ve RatioTransparencyBlock.tsx değişmez.
+ */
+function buildEquityRatioTransparency(
+  _action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): MarginRatioTransparency | null {
+  if (amount <= 0) return null
+
+  const totalAssets = ctx.totalAssets ?? 0
+  // runtime guard: FirmContext.totalEquity: number ama JS'de undefined gelebilir
+  const totalEquity = (ctx as any).totalEquity as number | undefined | null
+  if (totalAssets <= 0) return null
+  if (totalEquity === undefined || totalEquity === null || isNaN(totalEquity)) return null
+
+  const current         = totalEquity / totalAssets
+  const realisticTarget = (totalEquity + amount) / (totalAssets + amount)
+
+  // TCMB sektör kıyası: 1 − debtToAssets
+  const bm              = getBenchmarkValue(ctx.sector, 'debtToAssets')
+  const sectorDebtToAssets = bm?.value ?? 0.66
+  const sectorMedian    = 1 - sectorDebtToAssets
+
+  return {
+    kind: 'margin',
+    metricLabel: 'Özkaynak / Aktif',
+    current,
+    realisticTarget,
+    sectorMedian,
+    formula: {
+      description:
+        'Özkaynak / Aktif = Özkaynaklar / Toplam Aktif ' +
+        '→ A10 sonrası: (Özkaynak + Tutar) / (Aktif + Tutar)',
+    },
+  }
+}
+
+/**
  * A18/A19 — Aktif Devir Hızı transparency.
  * current: mevcut satış/aktif oranı
  * realisticTarget: ek gelir sonrası beklenen devir hızı
@@ -405,13 +453,18 @@ function buildTurnoverRatioTransparency(
 /**
  * Aksiyon metriğine göre doğru transparency üreticisini çalıştırır.
  * A05 ve targetRatio.metric'siz aksiyonlar → mevcut buildRatioTransparency.
- * Faz 7.3.6B3b-3.
+ * Faz 7.3.6B3b-3 / Faz 7.3.11.
  */
 export function buildActionRatioTransparency(
   action: ActionTemplateV3,
   ctx: FirmContext,
   amount: number
 ): RatioTransparency | null {
+  // ── Faz 7.3.11: A10 — Özkaynak/Aktif (ID-tabanlı; katalogda targetRatio yok) ──
+  if (action.id === 'A10_CASH_EQUITY_INJECTION') {
+    return buildEquityRatioTransparency(action, ctx, amount)
+  }
+
   switch (action.targetRatio?.metric) {
     case 'DIO':
       return buildDIORatioTransparency(action, ctx, amount)

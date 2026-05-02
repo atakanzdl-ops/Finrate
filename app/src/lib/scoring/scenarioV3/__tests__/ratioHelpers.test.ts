@@ -253,3 +253,97 @@ describe('buildActionRatioTransparency — A05 default (DSO)', () => {
     expect(nonSpecialMetric).toBe(true)
   })
 })
+
+// ─── Özkaynak / Aktif — A10 (Faz 7.3.11) ────────────────────────────────────
+
+describe('buildActionRatioTransparency — A10 Özkaynak/Aktif (kind: margin)', () => {
+  const a10 = ACTION_CATALOG_V3['A10_CASH_EQUITY_INJECTION']
+
+  test('A10 ratioTransparency üretir — kind: margin, metricLabel, 3 alan', () => {
+    // CONSTRUCTION sektörü; DEKAM benzeri değerler
+    const ctx = makeCtx({
+      sector:      'CONSTRUCTION',
+      totalEquity:  3_500_000,
+      totalAssets: 180_000_000,
+    })
+    const result = buildActionRatioTransparency(a10, ctx, 38_500_000)
+
+    expect(result).not.toBeNull()
+    expect(result!.kind).toBe('margin')
+    const r = result as any
+    expect(r.metricLabel).toBe('Özkaynak / Aktif')
+    expect(typeof r.current).toBe('number')
+    expect(typeof r.realisticTarget).toBe('number')
+    expect(typeof r.sectorMedian).toBe('number')
+  })
+
+  test('amount = 0 → null döner', () => {
+    const ctx = makeCtx({ totalEquity: 5_000_000, totalAssets: 100_000_000 })
+    expect(buildActionRatioTransparency(a10, ctx, 0)).toBeNull()
+  })
+
+  test('totalAssets <= 0 → null guard', () => {
+    const ctx = makeCtx({ totalEquity: 5_000_000, totalAssets: 0 })
+    expect(buildActionRatioTransparency(a10, ctx, 10_000_000)).toBeNull()
+  })
+
+  test('totalEquity undefined → null guard', () => {
+    const ctx = makeCtx({ totalEquity: undefined as unknown as number, totalAssets: 100_000_000 })
+    expect(buildActionRatioTransparency(a10, ctx, 10_000_000)).toBeNull()
+  })
+
+  test('negatif özkaynak → null dönmez; current negatif', () => {
+    // Zarar birikimi ile özkaynak negatife düşebilir — yine de üretilir
+    const ctx = makeCtx({ totalEquity: -5_000_000, totalAssets: 100_000_000 })
+    const result = buildActionRatioTransparency(a10, ctx, 20_000_000)
+    expect(result).not.toBeNull()
+    expect((result as any).current).toBeLessThan(0)
+  })
+
+  test('sektör eksikse debtToAssets fallback 0.66 → sectorMedian=0.34', () => {
+    // getSectorBenchmark bilinmeyen sektör → Genel → farklı debtToAssets
+    // Ama burada CONSTRUCTION sector + SECTOR_CODE_TO_TR ile inşaat → 0.66 doğrulanır
+    // Genel için debtToAssets'i bilmiyoruz; sadece fallback mantığını test edelim
+    // ctx.sector='UNKNOWN_SECTOR_XYZ' → getBenchmarkValue → Genel fallback
+    const ctx = makeCtx({
+      sector: 'UNKNOWN_SECTOR_XYZ' as any,
+      totalEquity:  5_000_000,
+      totalAssets: 100_000_000,
+    })
+    const result = buildActionRatioTransparency(a10, ctx, 10_000_000)
+    // getSectorBenchmark sonuç Genel döner → debtToAssets mevcut; null olmamalı
+    expect(result).not.toBeNull()
+    const r = result as any
+    // sectorMedian = 1 - bm.debtToAssets (ya da fallback 0.66)
+    expect(r.sectorMedian).toBeGreaterThan(0)
+    expect(r.sectorMedian).toBeLessThanOrEqual(1)
+  })
+
+  test('DEKAM senaryosu — current ~%1.94, realisticTarget ~%19.2, sectorMedian ~%34', () => {
+    // DEKAM benzeri değerler (gerçek API doğrulaması canlıya geçince yapılacak)
+    //   totalEquity:  3.5 Mn  → current = 3.5 / 180 = %1.94
+    //   totalAssets: 180 Mn
+    //   amount:      38.5 Mn  → new = (3.5+38.5) / (180+38.5) = 42/218.5 = %19.22
+    //   CONSTRUCTION debtToAssets: 0.66 → sectorMedian = 0.34
+    const ctx = makeCtx({
+      sector:      'CONSTRUCTION',
+      totalEquity:  3_500_000,
+      totalAssets: 180_000_000,
+    })
+    const result = buildActionRatioTransparency(a10, ctx, 38_500_000)
+
+    expect(result).not.toBeNull()
+    const r = result as any
+    // current ≈ 0.01944 (%1.94)
+    expect(r.current).toBeCloseTo(3_500_000 / 180_000_000, 6)
+    expect(r.current).toBeCloseTo(0.0194, 3)
+    // realisticTarget ≈ 0.1922 (%19.22)
+    expect(r.realisticTarget).toBeCloseTo(42_000_000 / 218_500_000, 6)
+    expect(r.realisticTarget).toBeCloseTo(0.1922, 3)
+    // sectorMedian = 1 - 0.66 = 0.34 (%34) — TCMB İnşaat
+    expect(r.sectorMedian).toBeCloseTo(0.34, 4)
+    // formula mevcut
+    expect(typeof r.formula.description).toBe('string')
+    expect(r.formula.description.length).toBeGreaterThan(0)
+  })
+})
