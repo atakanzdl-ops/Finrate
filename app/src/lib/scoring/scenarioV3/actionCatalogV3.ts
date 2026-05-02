@@ -510,24 +510,41 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   },
 
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
+    // Dominant stok seçimi (A18/A19 ile aynı pattern) — 159 hariç (avans niteliği)
+    const stockAccounts = [
+      { code: '150', name: 'İlk Madde ve Malzeme' },
+      { code: '151', name: 'Yarı Mamuller'        },
+      { code: '152', name: 'Mamuller'             },
+      { code: '153', name: 'Ticari Mallar'        },
+    ]
+
+    const balances = context.accountBalances ?? {}
+    const dominantStock = stockAccounts.reduce((max, acc) =>
+      (balances[acc.code] ?? 0) > (balances[max.code] ?? 0) ? acc : max
+    )
+    const dominantBalance = balances[dominantStock.code] ?? 0
+
+    // Stok sıfır veya negatif → uygulama yok
+    if (dominantBalance <= 0) return []
+
+    // %95 güvenlik tamponu: dominant hesabın negatife düşmesini engeller
+    const amount = clampAmount(
+      Math.min(context.amount, dominantBalance * 0.95),
+      1_000_000
+    )
     if (amount <= 0) return []
-    // Ticaret sektöründe ticari mal (153), imalatta hammadde/mamul (150)
-    const inventoryCode = isTradeLike(context.sector) ? '153' : '150'
-    const inventoryName = isTradeLike(context.sector)
-      ? 'Ticari Mallar'
-      : 'İlk Madde ve Malzeme'
+
     // Not: Bu simplified monetization modelidir. Gerçek satışta 600 Satışlar ve
     // 620/621 Satış Maliyeti de etkilenir; V3 katalog aşamasında net stok→nakit
     // etkisi temsil edilmektedir.
     return [
       makeBalancedTransaction(
         'A06_MAIN',
-        `Fazla stok nakde dönüşüyor — basitleştirilmiş nakde dönüşüm modeli (${inventoryCode} → 102)`,
+        `Fazla stok nakde dönüşüyor — basitleştirilmiş nakde dönüşüm modeli (${dominantStock.code} → 102)`,
         'INVENTORY_MONETIZATION',
         [
-          { accountCode: '102',          accountName: 'Bankalar',     side: 'DEBIT',  amount, description: 'Stok satışından nakit girişi'        },
-          { accountCode: inventoryCode,  accountName: inventoryName,  side: 'CREDIT', amount, description: 'Stok azalışı (simplified model)'     },
+          { accountCode: '102',                accountName: 'Bankalar',            side: 'DEBIT',  amount, description: 'Stok satışından nakit girişi'    },
+          { accountCode: dominantStock.code,   accountName: dominantStock.name,    side: 'CREDIT', amount, description: 'Stok azalışı (simplified model)' },
         ]
       ),
     ]

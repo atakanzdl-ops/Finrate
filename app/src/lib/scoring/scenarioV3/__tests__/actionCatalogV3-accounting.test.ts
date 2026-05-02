@@ -685,3 +685,116 @@ describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması',
     expect(result).toBeNull()
   })
 })
+
+// ─── A06 Dominant Stok Seçimi (Faz 7.3.8b-PRE) ──────────────────────────────
+
+describe('Faz 7.3.8b-PRE — A06 dominant stok buildTransactions', () => {
+  const a06 = ACTION_CATALOG_V3['A06_INVENTORY_MONETIZATION']!
+
+  // 1. DEKAM benzeri: 150=0, 151=47M → dominant=151
+  test('A06 150=0, 151=47M: dominant=151, 151 CREDIT', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          4_700_000,
+      sector:          'CONSTRUCTION',
+      accountBalances: { '150': 0, '151': 47_000_000, '152': 0, '153': 0 },
+    }))
+    expect(txs).toHaveLength(1)
+    const legs = txs[0].legs
+    expect(legs).toHaveLength(2)
+    expect(legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT',  amount: 4_700_000 })
+    expect(legs[1]).toMatchObject({ accountCode: '151', side: 'CREDIT', amount: 4_700_000 })
+  })
+
+  // 2. TRADE sektörü: 153=10M dominant
+  test('A06 TRADE: 153=10M, dominantStock=153', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          3_000_000,
+      sector:          'TRADE',
+      accountBalances: { '150': 0, '151': 0, '152': 0, '153': 10_000_000 },
+    }))
+    expect(txs).toHaveLength(1)
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '153', side: 'CREDIT' })
+  })
+
+  // 3. Manufacturing: 150=15M, 151=10M, 152=5M
+  test('A06 manufacturing: 150=15M dominant, 150 CREDIT', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          5_000_000,
+      sector:          'MANUFACTURING',
+      accountBalances: { '150': 15_000_000, '151': 10_000_000, '152': 5_000_000, '153': 0 },
+    }))
+    expect(txs).toHaveLength(1)
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '150', side: 'CREDIT' })
+  })
+
+  // 4. Dusuk dominant: amount > dominant * 0.95 → sınırlanır
+  test('A06 amount 5M > dominant 151=2M*0.95=1.9M → amount sınırlanır', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          5_000_000,
+      sector:          'CONSTRUCTION',
+      accountBalances: { '150': 0, '151': 2_000_000, '152': 0, '153': 0 },
+    }))
+    expect(txs).toHaveLength(1)
+    const creditLeg = txs[0].legs[1]
+    expect(creditLeg.accountCode).toBe('151')
+    // amount = min(5M, 2M * 0.95) = 1.9M — clampAmount(1.9M, 1M) = 1.9M
+    expect(creditLeg.amount).toBeCloseTo(1_900_000, 0)
+    // 102 DEBIT = 151 CREDIT (denklik)
+    expect(txs[0].legs[0].amount).toBe(txs[0].legs[1].amount)
+  })
+
+  // 5. Tum stok sifir → bos array
+  test('A06 150=151=152=153=0 → bos array dondurmeli', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          5_000_000,
+      sector:          'MANUFACTURING',
+      accountBalances: { '150': 0, '151': 0, '152': 0, '153': 0 },
+    }))
+    expect(txs).toHaveLength(0)
+  })
+
+  // 6. Sadece 159 dolu → 159 kullanilmaz, tum stok 0 → bos array
+  test('A06 sadece 159=10M (avans) → 159 kullanilmaz → bos array', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          5_000_000,
+      sector:          'MANUFACTURING',
+      accountBalances: { '150': 0, '151': 0, '152': 0, '153': 0, '159': 10_000_000 },
+    }))
+    expect(txs).toHaveLength(0)
+  })
+
+  // 7. Transaction denkligi: 102 DEBIT = dominant CREDIT
+  test('A06 transaction dengeli: 102 DEBIT = dominant CREDIT', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          3_000_000,
+      sector:          'MANUFACTURING',
+      accountBalances: { '150': 20_000_000, '151': 0, '152': 0, '153': 0 },
+    }))
+    expect(txs).toHaveLength(1)
+    const debitTotal  = txs[0].legs.filter(l => l.side === 'DEBIT').reduce((s, l) => s + l.amount, 0)
+    const creditTotal = txs[0].legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debitTotal).toBe(creditTotal)
+  })
+
+  // 8. Description dinamik hesap kodu icerir
+  test('A06 description dinamik: dominant kod iceriyor', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          3_000_000,
+      sector:          'CONSTRUCTION',
+      accountBalances: { '150': 0, '151': 8_000_000, '152': 0, '153': 0 },
+    }))
+    expect(txs[0].description).toContain('151')
+    expect(txs[0].description).toContain('102')
+  })
+
+  // 9. %95 tampon: dominant 151=5M, amount 5M → 5M * 0.95 = 4.75M
+  test('A06 dominant=5M, amount=5M → amount clamp 4.75M', () => {
+    const txs = a06.buildTransactions(makeContext({
+      amount:          5_000_000,
+      sector:          'MANUFACTURING',
+      accountBalances: { '150': 0, '151': 5_000_000, '152': 0, '153': 0 },
+    }))
+    expect(txs).toHaveLength(1)
+    expect(txs[0].legs[0].amount).toBeCloseTo(4_750_000, 0)
+  })
+})
