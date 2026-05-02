@@ -52,7 +52,6 @@ import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
 import type { DecisionInsight } from '@/lib/scoring/scenarioV3/contracts'
-import { RatingValidationCard } from './RatingValidationCard'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -208,6 +207,15 @@ function OzetTab({ result }: { result: any }) {
     ?? null
   const transition  = result.engineResult?.reasoning?.transition
 
+  // Faz 7.3.8c: Üst başlık gerçek hesaba (postActualRating) bağlanır,
+  // V3 tahmini yalnız fallback olarak kalır.
+  const displayCurrentRating =
+    da?.actualRatingValidation?.currentActualRating ?? exec.currentRating
+  const displayTargetRating =
+    da?.actualRatingValidation?.postActualRating
+      ?? exec.achievableTarget
+      ?? exec.achievableRating
+
   return (
     <div className="space-y-6">
 
@@ -222,11 +230,11 @@ function OzetTab({ result }: { result: any }) {
               Gerçekçi Üst Sınır
             </div>
             <div className="text-4xl font-bold">
-              {exec.achievableTarget ?? exec.achievableRating}
+              {displayTargetRating}
             </div>
             <div className="text-sm text-white/70 mt-1">
-              Mevcut: {exec.currentRating}
-              {exec.requestedTarget && exec.requestedTarget !== (exec.achievableTarget ?? exec.achievableRating) && (
+              Mevcut: {displayCurrentRating}
+              {exec.requestedTarget && exec.requestedTarget !== displayTargetRating && (
                 <> &bull; İstenen: {exec.requestedTarget}</>
               )}
             </div>
@@ -281,7 +289,7 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-sm text-amber-800">
                 Teorik rating tavanı mevcut olsa da seçilen aksiyon portföyü bu seviyeyi taşımıyor.
                 Mevcut portföyle ulaşılabilir en yüksek seviye:{' '}
-                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
+                <strong>{displayTargetRating}</strong>.
               </div>
             </div>
           </div>
@@ -458,11 +466,6 @@ function AksiyonPlaniTab({
 
   return (
     <div className="space-y-6">
-
-      {/* RATING DOĞRULAMA KARTI (Faz 7.3.8b) */}
-      {da?.actualRatingValidation && (
-        <RatingValidationCard validation={da.actualRatingValidation} />
-      )}
 
       {/* RİSK UYARI KARTLARI (Faz 7.3.7) */}
       {riskInsights.length > 0 && (
