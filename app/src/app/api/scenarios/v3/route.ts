@@ -3,15 +3,17 @@ import { prisma }                    from '@/lib/db'
 import { getUserIdFromRequest }      from '@/lib/auth'
 import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioEngine'
 import { formatScenariosForResponse }        from '@/lib/scoring/scenarioV3/responseMapper'
-import { buildDecisionAnswer }       from '@/lib/scoring/scenarioV3/decisionLayer'
-import { calculateRatiosFromAccounts } from '@/lib/scoring/ratios'
+import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
+import { calculateRatiosFromAccounts }        from '@/lib/scoring/ratios'
+import { calculateScore, scoreToRating }      from '@/lib/scoring/score'
+import { combineScores }                      from '@/lib/scoring/subjective'
+import { calculateActualPostActionRating }    from '@/lib/scoring/scenarioV3/postActionRating'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
 import {
   RATING_ORDER,
   normalizeLegacyRating,
 }                                    from '@/lib/scoring/scenarioV3/ratingReasoning'
-import { scoreToRating }             from '@/lib/scoring/score'
 
 // ─── SECTOR STRING → SECTORCODE MAPPING ──────────────────────────────────────
 
@@ -214,14 +216,61 @@ export async function POST(req: NextRequest) {
     })
 
     // ── 9. DECISION LAYER ─────────────────────────────────────────────────────
-    // Faz 7.3.7-FIX2: A21 severity icin currentRatio hesapla (kendi iç hesabı yok artık)
+    // Faz 7.3.7-FIX2: A21 severity icin currentRatio hesapla
     const ratios = calculateRatiosFromAccounts(analysis.financialAccounts)
+
+    // Faz 7.3.8a: Mevcut objektif skor — ratios + orijinal sektör string'i
+    const rawSector = analysis.entity.sector ?? ''
+    const currentScoreResult    = calculateScore(ratios, rawSector)
+    const currentObjectiveScore = currentScoreResult.finalScore
+
+    // subjectiveTotal — ratios JSON'dan al, yoksa 0
+    let subjectiveTotal = 0
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawRatiosJson = (analysis as any).ratios as string | null | undefined
+      if (rawRatiosJson) {
+        const parsed = JSON.parse(rawRatiosJson) as Record<string, unknown>
+        if (typeof parsed.__subjectiveTotal === 'number') {
+          subjectiveTotal = parsed.__subjectiveTotal
+        }
+      }
+    } catch { /* fallback 0 */ }
+
+    const currentCombinedScore  = combineScores(currentObjectiveScore, subjectiveTotal)
+    const currentActualRating   = scoreToRating(currentCombinedScore)
+
+    // Faz 7.3.8a: Tüm aksiyonların transaction'larını topla
+    // Aynı actionId+amount kombinasyonu birden fazla gelirse ilkini al (set ile dedupe)
+    const seenActions = new Set<string>()
+    const allTransactions = (engineResult.portfolio ?? [])
+      .filter(a => {
+        const key = `${a.actionId}::${a.amountTRY}`
+        if (seenActions.has(key)) return false
+        seenActions.add(key)
+        return true
+      })
+      .flatMap(a => a.transactions ?? [])
+
+    // Faz 7.3.8a: Post-action rating doğrulaması
+    const actualRatingValidation = calculateActualPostActionRating({
+      initialBalances:       balances,
+      transactions:          allTransactions,
+      sector:                rawSector,
+      subjectiveTotal,
+      v3EstimatedRating:     engineResult.finalTargetRating,
+      currentObjectiveScore,
+      currentCombinedScore,
+      currentActualRating,
+    })
+
     const decisionAnswer = buildDecisionAnswer(
       engineResult,
       targetRating,
-      null,       // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
-      balances,   // PATCH 1: dataQualityWarning icin hesap sayisi
-      ratios,     // Faz 7.3.7-FIX2: A21 cari oran sapması
+      null,                    // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
+      balances,                // PATCH 1: dataQualityWarning icin hesap sayisi
+      ratios,                  // Faz 7.3.7-FIX2: A21 cari oran sapması
+      actualRatingValidation,  // Faz 7.3.8a: post-action rating doğrulama
     )
 
     // ── 10. RESPONSE ──────────────────────────────────────────────────────────

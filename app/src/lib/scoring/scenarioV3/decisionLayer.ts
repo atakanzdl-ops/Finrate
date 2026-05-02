@@ -25,6 +25,7 @@
  */
 
 import type { AccountingLeg, DecisionInsight } from './contracts'
+import type { ActualRatingValidation } from './postActionRating'
 import type {
   EngineResult,
   SelectedAction,
@@ -247,6 +248,8 @@ export interface DecisionAnswer {
   dataQualityWarning?: DataQualityWarning
   /** Faz 7.3.7: Yapısal risk uyarı kartları (aksiyon değil) */
   riskInsights: DecisionInsight[]
+  /** Faz 7.3.8a: Gerçek post-action rating doğrulaması (opsiyonel) */
+  actualRatingValidation?: ActualRatingValidation | null
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1124,11 +1127,12 @@ function buildDataQualityWarning(
 /**
  * engineV3.ts ciktisini banker UI cevabina donusturur.
  *
- * @param engineResult    - runEngineV3 ciktisi
- * @param requestedTarget - kullanicinin istedigi hedef rating
- * @param v2Result        - opsiyonel V2 karsilastirma (null = atla)
- * @param accountBalances - PATCH 1: dataQualityWarning icin hesap sayisi
- * @param ratios          - Faz 7.3.7-FIX2: calculateRatiosFromAccounts ciktisi (A21 severity icin)
+ * @param engineResult           - runEngineV3 ciktisi
+ * @param requestedTarget        - kullanicinin istedigi hedef rating
+ * @param v2Result               - opsiyonel V2 karsilastirma (null = atla)
+ * @param accountBalances        - PATCH 1: dataQualityWarning icin hesap sayisi
+ * @param ratios                 - Faz 7.3.7-FIX2: calculateRatiosFromAccounts ciktisi (A21 severity icin)
+ * @param actualRatingValidation - Faz 7.3.8a: post-action rating dogrulama sonucu (route'tan iletilir)
  */
 export function buildDecisionAnswer(
   engineResult:    EngineResult,
@@ -1137,6 +1141,7 @@ export function buildDecisionAnswer(
   v2Result:         any | null = null,
   accountBalances?: Record<string, number>,
   ratios?: { currentRatio?: number | null },
+  actualRatingValidation?: ActualRatingValidation | null,
 ): DecisionAnswer {
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
   const whatCompanyShouldDo          = buildActionPlan(engineResult)
@@ -1191,5 +1196,6 @@ export function buildDecisionAnswer(
     comparisonWithV2,
     dataQualityWarning,
     riskInsights,
+    actualRatingValidation: actualRatingValidation ?? null,
   }
 }
