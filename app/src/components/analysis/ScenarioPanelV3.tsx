@@ -52,6 +52,7 @@ import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
 import type { DecisionInsight } from '@/lib/scoring/scenarioV3/contracts'
+import { RatingValidationCard } from './RatingValidationCard'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -457,6 +458,11 @@ function AksiyonPlaniTab({
 
   return (
     <div className="space-y-6">
+
+      {/* RATING DOĞRULAMA KARTI (Faz 7.3.8b) */}
+      {da?.actualRatingValidation && (
+        <RatingValidationCard validation={da.actualRatingValidation} />
+      )}
 
       {/* RİSK UYARI KARTLARI (Faz 7.3.7) */}
       {riskInsights.length > 0 && (
