@@ -51,9 +51,9 @@ export interface TargetPackageMeta {
   reachedTarget:            boolean
   /** Seçilen paket uygulandığında elde edilen gerçek rating */
   achievedRating:           RatingGrade
-  /** Seçilen aksiyonların toplam tutarı */
+  /** Seçilen aksiyonların toplam tutarı (geriye uyum — selectedPackageAmountTRY ile eşdeğer) */
   totalAmountTRY:           number
-  /** Seçilen paketteki aksiyon sayısı */
+  /** Seçilen paketteki raw satır sayısı (geriye uyum — rawSelectedActionCount ile eşdeğer) */
   selectedActionCount:      number
   /** Tam V3 portföyündeki aksiyon sayısı */
   fullPortfolioActionCount: number
@@ -67,6 +67,29 @@ export interface TargetPackageMeta {
    * UI'da "4/4 grup kapsanmış" gösterimi için kullanılabilir.
    */
   coveredGroupCount:        number
+
+  // ── Faz 7.3.8d-FIX3: Sayım uyumu (debug / UI) ────────────────────────────
+  /**
+   * Raw satır sayısı — aynı actionId'nin birden fazla parçası (short/medium/long)
+   * ayrı satır olarak sayılır. selectedActionCount ile eşdeğerdir (geriye uyum alias'ı).
+   */
+  rawSelectedActionCount:   number
+  /**
+   * Müşteri görünümü için consolidated aksiyon sayısı.
+   * Aynı actionId'nin tüm parçaları tek satır sayılır
+   * (= UI kart sayısı, dedupeActions + consolidateByActionId sonrası).
+   */
+  displayActionCount:       number
+  /**
+   * Tam motor portföyünün toplam tutarı (input fullPortfolio.reduce).
+   * Hedef paket seçildiğinde totalAmountTRY'den farklı olabilir.
+   */
+  fullPortfolioAmountTRY:   number
+  /**
+   * Seçilen paketin toplam tutarı.
+   * totalAmountTRY ile eşdeğerdir (geriye uyum alias'ı).
+   */
+  selectedPackageAmountTRY: number
 }
 
 export interface TargetPackageResult {
@@ -86,6 +109,21 @@ export interface TargetPackageResult {
 const SUBSET_SEARCH_LIMIT = 12
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+/**
+ * actionId'nin "kısa prefix"ini döndürür (YOL B: split('_')[0]).
+ * Aynı aksiyonun birden fazla horizon parçasını (short/medium/long) tek satırda
+ * saymak için kullanılır.
+ *
+ * @example
+ *   getShortActionId('A10_CASH_EQUITY_INJECTION')         // → 'A10'
+ *   getShortActionId('A10B_PROMISSORY_NOTE_EQUITY_...')   // → 'A10B'
+ *   getShortActionId('A15B_SHAREHOLDER_DEBT_TO_LT')       // → 'A15B'
+ *   getShortActionId('LEGACY_ID')                         // → 'LEGACY' (sessiz fallback)
+ */
+function getShortActionId(actionId: string): string {
+  return actionId.split('_')[0]
+}
 
 /** Geçerli bir RatingGrade ise normalize edip döner; değilse null. */
 function tryParseRating(rating: string | undefined | null): RatingGrade | null {
@@ -158,6 +196,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   const currentIdx           = ratingToIndex(params.currentActualRating)
   const fallbackCurrent      = tryParseRating(params.currentActualRating) ?? 'C'
 
+  // ── FIX3: Tam portföy türetilmiş sabitler (tüm return'lerde kullanılır) ──────
+  const fullPortfolioAmountTRY = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+  const fullDisplayCount       = new Set(fullPortfolio.map(a => getShortActionId(a.actionId))).size
+
   const targetGrade = tryParseRating(String(params.requestedTarget))
 
   // ── EDGE: Geçersiz hedef → tüm liste fallback ───────────────────────────────
@@ -165,19 +207,22 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     warnings.push(
       `Geçersiz hedef rating: '${params.requestedTarget}' — tüm aksiyon listesi gösteriliyor.`,
     )
-    const totalAmount = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
     return {
       selectedActions: fullPortfolio,
       validation: null,
       meta: {
         reachedTarget:            false,
         achievedRating:           fallbackCurrent,
-        totalAmountTRY:           totalAmount,
+        totalAmountTRY:           fullPortfolioAmountTRY,
         selectedActionCount:      fullCount,
         fullPortfolioActionCount: fullCount,
         fallback:                 true,
         warnings,
         coveredGroupCount:        0,
+        rawSelectedActionCount:   fullCount,
+        displayActionCount:       fullDisplayCount,
+        fullPortfolioAmountTRY,
+        selectedPackageAmountTRY: fullPortfolioAmountTRY,
       },
     }
   }
@@ -198,6 +243,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fallback:                 false,
         warnings,
         coveredGroupCount:        0,
+        rawSelectedActionCount:   0,
+        displayActionCount:       0,
+        fullPortfolioAmountTRY,
+        selectedPackageAmountTRY: 0,
       },
     }
   }
@@ -217,6 +266,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fallback:                 false,
         warnings,
         coveredGroupCount:        0,
+        rawSelectedActionCount:   0,
+        displayActionCount:       0,
+        fullPortfolioAmountTRY:   0,
+        selectedPackageAmountTRY: 0,
       },
     }
   }
@@ -240,7 +293,6 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     })
     const achievedRating     = tryParseRating(validation.postActualRating) ?? fallbackCurrent
     const achievedIdx        = ratingToIndex(achievedRating)
-    const totalAmount        = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
     const coveredGroupCount  = getCoveredGroups(fullPortfolio.map(a => a.actionId)).size
     return {
       selectedActions: fullPortfolio,
@@ -248,12 +300,16 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       meta: {
         reachedTarget:            achievedIdx >= targetIdx,
         achievedRating,
-        totalAmountTRY:           totalAmount,
+        totalAmountTRY:           fullPortfolioAmountTRY,
         selectedActionCount:      fullCount,
         fullPortfolioActionCount: fullCount,
         fallback:                 true,
         warnings,
         coveredGroupCount,
+        rawSelectedActionCount:   fullCount,
+        displayActionCount:       fullDisplayCount,
+        fullPortfolioAmountTRY,
+        selectedPackageAmountTRY: fullPortfolioAmountTRY,
       },
     }
   }
@@ -326,8 +382,9 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     allFeasible.sort(compareCandidate)
     const best = allFeasible[0]
     // indices sıralı geldiğinden (combinationsOfSize lex-order) fullPortfolio sırası korunur
-    const selectedActions   = best.indices.map(i => fullPortfolio[i])
-    const coveredGroupCount = getCoveredGroups(best.actionIds).size
+    const selectedActions    = best.indices.map(i => fullPortfolio[i])
+    const coveredGroupCount  = getCoveredGroups(best.actionIds).size
+    const displayActionCount = new Set(best.actionIds.map(getShortActionId)).size
     return {
       selectedActions,
       validation: best.validation,
@@ -340,6 +397,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         fallback:                 false,
         warnings,
         coveredGroupCount,
+        rawSelectedActionCount:   selectedActions.length,
+        displayActionCount,
+        fullPortfolioAmountTRY,
+        selectedPackageAmountTRY: best.totalAmount,
       },
     }
   }
@@ -349,7 +410,6 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   warnings.push(
     'Mevcut aksiyonlarla hedef rating elde edilemiyor — tüm portföy gösteriliyor.',
   )
-  const totalAmount = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
   const finalAchieved = lastValidation
     ? (tryParseRating(lastValidation.postActualRating) ?? fallbackCurrent)
     : fallbackCurrent
@@ -360,12 +420,16 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     meta: {
       reachedTarget:            false,
       achievedRating:           finalAchieved,
-      totalAmountTRY:           totalAmount,
+      totalAmountTRY:           fullPortfolioAmountTRY,
       selectedActionCount:      fullCount,
       fullPortfolioActionCount: fullCount,
       fallback:                 true,
       warnings,
       coveredGroupCount:        0,
+      rawSelectedActionCount:   fullCount,
+      displayActionCount:       fullDisplayCount,
+      fullPortfolioAmountTRY,
+      selectedPackageAmountTRY: fullPortfolioAmountTRY,
     },
   }
 }

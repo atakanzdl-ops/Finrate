@@ -684,3 +684,121 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     expect(r.meta.fallback).toBe(false)
   })
 })
+
+// ─── 12. FIX3: SAYIM UYUMU (rawSelectedActionCount / displayActionCount / tutar alanları) ──
+
+describe('selectTargetPackage — FIX3 sayım uyumu', () => {
+  /**
+   * Horizon parçalı aksiyon fabrikası: aynı actionId'ye farklı transactionId atar.
+   * Böylece mock her parçayı ayrı tanıyabilir.
+   */
+  function makeHorizonPart(
+    actionId: string,
+    amount:   number,
+    part:     'short' | 'medium' | 'long',
+  ): SelectedAction {
+    return {
+      ...makeAction(actionId, amount),
+      transactions: [{
+        transactionId: `${actionId}::${part}`,
+        description:   `${actionId} ${part} horizon`,
+        semanticType:  'CASH_INFLOW' as const,
+        legs:          [],
+      }],
+    }
+  }
+
+  test('aynı actionId üç horizon parçası → rawSelectedActionCount=3, displayActionCount=1', () => {
+    // Tüm 3 parça bir arada gerekli: mock sadece hepsini görünce B döner
+    setupRatingMock((ids) => {
+      const hasAll =
+        ids.has('A10_CASH_EQUITY_INJECTION::short')   &&
+        ids.has('A10_CASH_EQUITY_INJECTION::medium')  &&
+        ids.has('A10_CASH_EQUITY_INJECTION::long')
+      return hasAll ? 'B' : 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeHorizonPart('A10_CASH_EQUITY_INJECTION', 10_000_000, 'short'),
+        makeHorizonPart('A10_CASH_EQUITY_INJECTION', 20_000_000, 'medium'),
+        makeHorizonPart('A10_CASH_EQUITY_INJECTION', 30_000_000, 'long'),
+      ],
+      requestedTarget: 'B',
+    })
+    // 3 raw satır seçildi, ama display'de tek kart
+    expect(r.meta.rawSelectedActionCount).toBe(3)
+    expect(r.meta.displayActionCount).toBe(1)
+    // geriye uyum alias'ı da tutarlı
+    expect(r.meta.selectedActionCount).toBe(r.meta.rawSelectedActionCount)
+  })
+
+  test('subset seçildiğinde fullPortfolioAmountTRY ≠ selectedPackageAmountTRY', () => {
+    // Portföyde 3 aksiyon, sadece ilki yeterli
+    setupRatingMock((ids) => (ids.has('A1') ? 'B' : 'C'))
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A1',  5_000_000),   // tek başına yeterli
+        makeAction('A2', 10_000_000),
+        makeAction('A3', 15_000_000),
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.fullPortfolioAmountTRY).toBe(30_000_000)   // 5+10+15 tüm portföy
+    expect(r.meta.selectedPackageAmountTRY).toBe(5_000_000)  // sadece A1
+    expect(r.meta.fullPortfolioAmountTRY).not.toBe(r.meta.selectedPackageAmountTRY)
+    // totalAmountTRY geriye uyum alias'ı: seçilen paketle eşit
+    expect(r.meta.totalAmountTRY).toBe(r.meta.selectedPackageAmountTRY)
+  })
+
+  test('A10 ve A10B ayrı prefix → displayActionCount=2', () => {
+    // 'A10_CASH_EQUITY_INJECTION'         → split → 'A10'
+    // 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION' → split → 'A10B'
+    // Farklı prefix → 2 UI kartı
+    setupRatingMock((ids) => {
+      if (ids.has('A10_CASH_EQUITY_INJECTION') && ids.has('A10B_PROMISSORY_NOTE_EQUITY_INJECTION')) return 'B'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A10_CASH_EQUITY_INJECTION', 10_000_000),
+        makeAction('A10B_PROMISSORY_NOTE_EQUITY_INJECTION', 15_000_000),
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.rawSelectedActionCount).toBe(2)
+    expect(r.meta.displayActionCount).toBe(2)  // 'A10' ≠ 'A10B'
+  })
+
+  test('boş portföy → dört yeni alan tümü sıfır', () => {
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio:       [],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.rawSelectedActionCount).toBe(0)
+    expect(r.meta.displayActionCount).toBe(0)
+    expect(r.meta.fullPortfolioAmountTRY).toBe(0)
+    expect(r.meta.selectedPackageAmountTRY).toBe(0)
+  })
+
+  test('hedef ulaşılamaz fallback → fullPortfolioAmountTRY === selectedPackageAmountTRY', () => {
+    setupRatingMock(() => 'C')   // hiçbir zaman hedefe ulaşmıyor
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio: [
+        makeAction('A1',  5_000_000),
+        makeAction('A2', 10_000_000),
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.fallback).toBe(true)
+    expect(r.meta.rawSelectedActionCount).toBe(2)
+    expect(r.meta.displayActionCount).toBe(2)
+    expect(r.meta.fullPortfolioAmountTRY).toBe(15_000_000)
+    expect(r.meta.selectedPackageAmountTRY).toBe(15_000_000)
+    expect(r.meta.fullPortfolioAmountTRY).toBe(r.meta.selectedPackageAmountTRY)
+  })
+})
