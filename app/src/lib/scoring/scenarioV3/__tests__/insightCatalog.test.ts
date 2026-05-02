@@ -101,83 +101,68 @@ describe('buildMaturityMismatchInsight — severity fallback (KV/UV)', () => {
   })
 })
 
-// ─── Severity — cari oran sapması (yeni mod, sector ile) ─────────────────────
+// ─── Severity — cari oran sapması (yeni mod, sector + ratios ile) ─────────────
 
 describe('buildMaturityMismatchInsight — severity cari oran (sector)', () => {
-  // Ortak fixture helper: CONSTRUCTION → sectorCurrentRatio = 1.50
-  // '320' (KV ticari borç) + '102' (dönen varlık) ile ratio manipüle edilir
-  // stLiabilities = getStLiabilities(balances) — KV pasif hesaplar
+  // Ortak fixture: CONSTRUCTION → sectorCurrentRatio = 1.50
+  // Faz 7.3.7-FIX2: firmCR artık ratios.currentRatio mock'u ile geçilir
 
   test('Sapma 0.05 (< 0.10) → null döner (insight yok)', () => {
-    // stLiabilities = 10M, currentAssets = 14.5M → firmCR = 1.45, sapma = 0.05
-    const balances = makeBalances({
-      '320': 10_000_000,  // KV (stLiabilities)
-      '102': 14_500_000,  // dönen varlık
-    })
-    expect(buildMaturityMismatchInsight(balances, 'CONSTRUCTION')).toBeNull()
+    // firmCR = 1.45, sapma = 0.05 < 0.10 → null
+    const balances = makeBalances({ '320': 10_000_000 })
+    expect(
+      buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 1.45 })
+    ).toBeNull()
   })
 
   test('Sapma 0.20 → low severity', () => {
-    // stLiabilities = 10M, currentAssets = 13M → firmCR = 1.30, sapma = 0.20
-    const balances = makeBalances({
-      '320': 10_000_000,  // KV
-      '102': 13_000_000,  // dönen varlık
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    // firmCR = 1.30, sapma = 0.20
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 1.30 })
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('low')
   })
 
   test('Sapma 0.40 → medium severity', () => {
-    // stLiabilities = 10M, currentAssets = 11M → firmCR = 1.10, sapma = 0.40
-    const balances = makeBalances({
-      '320': 10_000_000,  // KV
-      '102': 11_000_000,  // dönen varlık
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    // firmCR = 1.10, sapma = 0.40
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 1.10 })
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('medium')
   })
 
   test('Sapma 0.53 (DEKAM) → high severity', () => {
-    // stLiabilities = 41.6M, currentAssets = 40.352M → firmCR ≈ 0.97, sapma ≈ 0.53
+    // firmCR = 0.97, sapma = 1.50 - 0.97 = 0.53 → high
     const balances = makeBalances({
-      '300':  5_400_000,   // KV banka
-      '320':  6_500_000,   // KV satıcılar
-      '340': 29_700_000,   // KV avans (stLiabilities = 41.6M)
-      '102': 40_352_000,   // dönen varlık → firmCR ≈ 0.97
+      '300':  5_400_000,
+      '320':  6_500_000,
+      '340': 29_700_000,
     })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 0.97 })
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('high')
   })
 
   test('Sapma 1.00 → high severity', () => {
-    // stLiabilities = 10M, currentAssets = 5M → firmCR = 0.50, sapma = 1.00
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102':  5_000_000,
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    // firmCR = 0.50, sapma = 1.00
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 0.50 })
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('high')
   })
 
   test('Cari oran sektör üzerinde (negatif sapma) → null döner', () => {
-    // stLiabilities = 10M, currentAssets = 20M → firmCR = 2.00 > 1.50
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102': 20_000_000,
-    })
-    expect(buildMaturityMismatchInsight(balances, 'CONSTRUCTION')).toBeNull()
+    // firmCR = 2.00 > 1.50 → sapma negatif → null
+    const balances = makeBalances({ '320': 10_000_000 })
+    expect(
+      buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 2.00 })
+    ).toBeNull()
   })
 
   test('Sector parametresi yok → fallback KV/UV mantığı', () => {
-    // UV=0 → fallback devreye girer → high
-    const balances = makeBalances({
-      '320': 10_000_000,  // KV = 10M, UV = 0
-    })
-    const result = buildMaturityMismatchInsight(balances)   // sector yok
+    // UV = 0, KV = 10M → fallback → high
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances)   // sector + ratios yok
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('high')
   })
@@ -189,38 +174,26 @@ describe('buildMaturityMismatchInsight — mesaj formatı (sector)', () => {
   // CONSTRUCTION → sectorCurrentRatio = 1.50
 
   test('high severity mesajı "belirgin baskı yaratıyor" içerir', () => {
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102':  5_000_000,  // firmCR = 0.50, sapma = 1.00 → high
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 0.50 })
     expect(result!.message).toContain('belirgin baskı yaratıyor')
   })
 
   test('medium severity mesajı "ortalamadan ağır" içerir', () => {
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102': 11_000_000,  // firmCR = 1.10, sapma = 0.40 → medium
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 1.10 })
     expect(result!.message).toContain('ortalamadan ağır')
   })
 
   test('low severity mesajı "hafif sapma" içerir', () => {
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102': 13_000_000,  // firmCR = 1.30, sapma = 0.20 → low
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 1.30 })
     expect(result!.message).toContain('hafif sapma')
   })
 
   test('Mesaj cari oran değerini "0.50" formatında içerir (high, 2 ondalık)', () => {
-    const balances = makeBalances({
-      '320': 10_000_000,
-      '102':  5_000_000,  // firmCR = 0.50
-    })
-    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION')
+    const balances = makeBalances({ '320': 10_000_000 })
+    const result = buildMaturityMismatchInsight(balances, 'CONSTRUCTION', { currentRatio: 0.50 })
     expect(result!.message).toContain('0.50')
     expect(result!.message).toContain('1.50')  // sektör oranı
   })
@@ -335,11 +308,10 @@ describe('buildMaturityMismatchInsight — DEKAM fixture (fallback)', () => {
 // ─── DEKAM cari oran modu ────────────────────────────────────────────────────
 
 describe('buildMaturityMismatchInsight — DEKAM cari oran modu (CONSTRUCTION)', () => {
-  // stLiabilities = 41.6M (KV pasif)
-  // currentAssets = 40.352M → firmCR ≈ 0.97
+  // Faz 7.3.7-FIX2: firmCR ratios mock ile geçilir
   // sectorCurrentRatio (CONSTRUCTION/inşaat) = 1.50
-  // sapma = 1.50 - 0.97 = 0.53 → high
-  const DEKAM_WITH_ASSETS = {
+  // firmCR = 0.97 → sapma = 0.53 → high
+  const DEKAM_BALANCES_CR = {
     '300':  5_400_000,
     '320':  6_500_000,
     '340': 29_700_000,
@@ -348,29 +320,28 @@ describe('buildMaturityMismatchInsight — DEKAM cari oran modu (CONSTRUCTION)',
     '420':          0,
     '440':          0,
     '431':          0,
-    '102': 40_352_000,   // dönen varlık → firmCR ≈ 0.97
   }
+  const DEKAM_RATIOS = { currentRatio: 0.97 }
 
-  test('DEKAM cari oran: firmCR ≈ 0.97, sektör 1.50, sapma 0.53 → high', () => {
-    const result = buildMaturityMismatchInsight(DEKAM_WITH_ASSETS, 'CONSTRUCTION')
+  test('DEKAM cari oran: firmCR 0.97, sektör 1.50, sapma 0.53 → high', () => {
+    const result = buildMaturityMismatchInsight(DEKAM_BALANCES_CR, 'CONSTRUCTION', DEKAM_RATIOS)
     expect(result).not.toBeNull()
     expect(result!.severity).toBe('high')
   })
 
   test('DEKAM cari oran: mesaj "1.50" ve "0.97" içerir', () => {
-    const result = buildMaturityMismatchInsight(DEKAM_WITH_ASSETS, 'CONSTRUCTION')
+    const result = buildMaturityMismatchInsight(DEKAM_BALANCES_CR, 'CONSTRUCTION', DEKAM_RATIOS)
     expect(result!.message).toContain('1.50')
-    // firmCR = 40352000 / 41600000 ≈ 0.97
-    expect(result!.message).toMatch(/0\.9[0-9]/)  // 0.97 ± floating
+    expect(result!.message).toContain('0.97')
   })
 
   test('DEKAM cari oran: mesaj "belirgin baskı yaratıyor" içerir', () => {
-    const result = buildMaturityMismatchInsight(DEKAM_WITH_ASSETS, 'CONSTRUCTION')
+    const result = buildMaturityMismatchInsight(DEKAM_BALANCES_CR, 'CONSTRUCTION', DEKAM_RATIOS)
     expect(result!.message).toContain('belirgin baskı yaratıyor')
   })
 
   test('DEKAM cari oran: recommendedActions korunuyor (A03 > A02 > A01)', () => {
-    const result = buildMaturityMismatchInsight(DEKAM_WITH_ASSETS, 'CONSTRUCTION')
+    const result = buildMaturityMismatchInsight(DEKAM_BALANCES_CR, 'CONSTRUCTION', DEKAM_RATIOS)
     const ids = result!.recommendedActions.map(a => a.actionId)
     expect(ids[0]).toBe('A03_ADVANCE_TO_LT')
     expect(ids[1]).toBe('A02_TRADE_PAYABLE_TO_LT')

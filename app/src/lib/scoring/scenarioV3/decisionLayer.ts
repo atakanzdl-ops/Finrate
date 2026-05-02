@@ -1128,6 +1128,7 @@ function buildDataQualityWarning(
  * @param requestedTarget - kullanicinin istedigi hedef rating
  * @param v2Result        - opsiyonel V2 karsilastirma (null = atla)
  * @param accountBalances - PATCH 1: dataQualityWarning icin hesap sayisi
+ * @param ratios          - Faz 7.3.7-FIX2: calculateRatiosFromAccounts ciktisi (A21 severity icin)
  */
 export function buildDecisionAnswer(
   engineResult:    EngineResult,
@@ -1135,6 +1136,7 @@ export function buildDecisionAnswer(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   v2Result:         any | null = null,
   accountBalances?: Record<string, number>,
+  ratios?: { currentRatio?: number | null },
 ): DecisionAnswer {
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
   const whatCompanyShouldDo          = buildActionPlan(engineResult)
@@ -1150,9 +1152,9 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
-  // Faz 7.3.7: vade uyumsuzluğu risk insight (7.3.7-FIX: sector param eklendi)
+  // Faz 7.3.7: vade uyumsuzluğu risk insight (7.3.7-FIX2: ratios.currentRatio direkt)
   const maturityInsight = accountBalances
-    ? buildMaturityMismatchInsight(accountBalances, engineResult.sector)
+    ? buildMaturityMismatchInsight(accountBalances, engineResult.sector, ratios)
     : null
   const riskInsights: DecisionInsight[] = maturityInsight ? [maturityInsight] : []
 

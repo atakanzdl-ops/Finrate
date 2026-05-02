@@ -4,6 +4,7 @@ import { getUserIdFromRequest }      from '@/lib/auth'
 import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioEngine'
 import { formatScenariosForResponse }        from '@/lib/scoring/scenarioV3/responseMapper'
 import { buildDecisionAnswer }       from '@/lib/scoring/scenarioV3/decisionLayer'
+import { calculateRatiosFromAccounts } from '@/lib/scoring/ratios'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
 import {
@@ -213,11 +214,14 @@ export async function POST(req: NextRequest) {
     })
 
     // ── 9. DECISION LAYER ─────────────────────────────────────────────────────
+    // Faz 7.3.7-FIX2: A21 severity icin currentRatio hesapla (kendi iç hesabı yok artık)
+    const ratios = calculateRatiosFromAccounts(analysis.financialAccounts)
     const decisionAnswer = buildDecisionAnswer(
       engineResult,
       targetRating,
       null,       // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
       balances,   // PATCH 1: dataQualityWarning icin hesap sayisi
+      ratios,     // Faz 7.3.7-FIX2: A21 cari oran sapması
     )
 
     // ── 10. RESPONSE ──────────────────────────────────────────────────────────

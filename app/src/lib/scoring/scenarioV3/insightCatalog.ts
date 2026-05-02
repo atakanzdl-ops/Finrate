@@ -66,36 +66,6 @@ function getUvTotal(balances: Record<string, number>): number {
   )
 }
 
-/** Dönen varlıklar toplamı — rasyolarla tutarlı hesap listesi */
-function getCurrentAssets(balances: Record<string, number>): number {
-  return (
-    (balances['100'] ?? 0) +
-    (balances['102'] ?? 0) +
-    (balances['103'] ?? 0) +
-    (balances['108'] ?? 0) +
-    (balances['120'] ?? 0) +
-    (balances['121'] ?? 0) +
-    (balances['150'] ?? 0) +
-    (balances['151'] ?? 0) +
-    (balances['152'] ?? 0) +
-    (balances['153'] ?? 0) +
-    (balances['159'] ?? 0)
-  )
-}
-
-/** KV pasif tüm hesaplar — cari oran paydası */
-function getStLiabilities(balances: Record<string, number>): number {
-  return (
-    (balances['300'] ?? 0) +
-    (balances['303'] ?? 0) +
-    (balances['304'] ?? 0) +
-    (balances['320'] ?? 0) +
-    (balances['321'] ?? 0) +
-    (balances['340'] ?? 0) +
-    (balances['331'] ?? 0)
-  )
-}
-
 // ─── Severity belirleyiciler ──────────────────────────────────────────────────
 
 /** Cari oran sapması bazlı severity (yeni mantık) */
@@ -153,16 +123,18 @@ function buildRecommendedActions(
 /**
  * Vade uyumsuzluğu insight'ını üretir.
  *
- * Severity (Faz 7.3.7-FIX):
- *   Sektör benchmark mevcutsa → cari oran sapması bazlı
- *   Sektör benchmark yoksa  → eski KV/UV oran fallback
+ * Severity (Faz 7.3.7-FIX2):
+ *   Sektör benchmark mevcutsa VE ratios.currentRatio sağlandıysa → sapma bazlı
+ *   Sektör benchmark yoksa veya ratios.currentRatio null ise → KV/UV oran fallback
  *
  * @param accountBalances - FirmContext.accountBalances
  * @param sector          - SectorCode (opsiyonel; yoksa fallback)
+ * @param ratios          - calculateRatiosFromAccounts çıktısı (opsiyonel; yoksa fallback)
  */
 export function buildMaturityMismatchInsight(
   accountBalances: Record<string, number>,
   sector?: string,
+  ratios?: { currentRatio?: number | null },
 ): DecisionInsight | null {
   const balances = accountBalances ?? {}
 
@@ -177,15 +149,14 @@ export function buildMaturityMismatchInsight(
   let sapma: number | null = null
   let usedCurrentRatioLogic = false
 
-  // ── Yeni mantık: cari oran sapması (sektör verisi varsa) ──────────────────
+  // ── Yeni mantık: cari oran sapması (sektör + ratios.currentRatio varsa) ───
   if (sector) {
     const bm = getBenchmarkValue(sector, 'currentRatio' as keyof SectorBenchmark)
     if (bm) {
       sectorCurrentRatio = bm.value
-      const stLiabilities = getStLiabilities(balances)
-      if (stLiabilities > 0) {
-        const currentAssets = getCurrentAssets(balances)
-        firmCurrentRatio = currentAssets / stLiabilities
+      const cr = ratios?.currentRatio
+      if (cr != null) {
+        firmCurrentRatio = cr
         sapma = sectorCurrentRatio - firmCurrentRatio
 
         // Sapma < 0.10 → insight üretme
