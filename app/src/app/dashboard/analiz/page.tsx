@@ -463,16 +463,17 @@ function CircularScore({ score, rating }: { score: number; rating: string }) {
   )
 }
 
-/* ─── Feature flag: ?v2=1 → ScenarioPanelV2 ────────── */
+/* ─── Feature flag: ?v2=1 → ScenarioPanelV2 (yedek) ──────── */
 function useV2Scenario(): boolean {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('v2') === '1'
 }
 
-/* ─── Feature flag: ?v=v3 → ScenarioPanelV3 ───────── */
-function useV3Scenario(): boolean {
+/* ─── Feature flag: ?legacy=1 → ScenarioPanel (iç destek) ── */
+// Faz 7.3.10: Default artık V3. Legacy'ye erişim için ?legacy=1 gerekli.
+function useLegacyScenario(): boolean {
   if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).get('v') === 'v3'
+  return new URLSearchParams(window.location.search).get('legacy') === '1'
 }
 
 /* ─── Main Page ──────────────────────────────────── */
@@ -1271,12 +1272,13 @@ function AnalizPageContent() {
                 )}
 
                 {/* ── SENARYO ─────────────────── */}
+                {/* Faz 7.3.10: Default V3. ?v2=1 → V2 yedek. ?legacy=1 → iç destek. */}
                 {activeTab === 'scenario' && (
-                  useV3Scenario() ? (
-                    <ScenarioPanelV3
+                  useLegacyScenario() ? (
+                    <ScenarioPanel
                       analysisId={selected.id}
-                      currentScore={cs}
                       currentGrade={cr}
+                      currentScore={cs}
                     />
                   ) : useV2Scenario() ? (
                     <ScenarioPanelV2
@@ -1285,10 +1287,10 @@ function AnalizPageContent() {
                       currentGrade={cr}
                     />
                   ) : (
-                    <ScenarioPanel
+                    <ScenarioPanelV3
                       analysisId={selected.id}
-                      currentGrade={cr}
                       currentScore={cs}
+                      currentGrade={cr}
                     />
                   )
                 )}
