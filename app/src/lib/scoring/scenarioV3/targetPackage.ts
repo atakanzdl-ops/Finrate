@@ -1,22 +1,30 @@
 /**
- * TARGET PACKAGE SELECTOR (Faz 7.3.8d)
+ * TARGET PACKAGE SELECTOR (Faz 7.3.8d-FIX)
  *
  * Mevcut V3 portföyünden, kullanıcının istediği hedef rating'e
- * ulaşmak için MİNİMAL aksiyon paketini seçer.
+ * ulaşmak için OPTİMAL aksiyon paketini seçer.
  *
- * Algoritma — greedy prefix:
- *   1. Aksiyonları engine sırasıyla (priority/notch katkısı) gez
- *   2. Her adımda kümülatif transaction setini calculateActualPostActionRating
- *      ile gerçek post-rating'e çevir
- *   3. achievedIdx >= targetIdx olur olmaz dur → reachedTarget = true
- *   4. Liste biter ve hedef yoksa → tüm liste fallback, reachedTarget = false
+ * Algoritma — minimum-cardinality alt küme araması:
+ *   1. requestedTarget parse edilir; geçersizse → tüm liste fallback
+ *   2. currentIdx >= targetIdx → boş paket, reachedTarget=true
+ *   3. Boş portföy → reachedTarget=false, boş paket
+ *   4. Cardinality k = 1..N için tüm C(N,k) alt kümesi denenir;
+ *      her biri calculateActualPostActionRating ile gerçek post-rating'e çevrilir.
+ *      İlk feasible cardinality'de durulur (minimum aksiyon sayısı garantili).
+ *   5. Aynı k için tie-break sırası:
+ *        a) En düşük totalAmountTRY
+ *        b) En yakın hedef (achievedIdx asc — hedefi en az aşan)
+ *   6. Hiçbir alt küme yeterli değilse → tüm liste fallback,
+ *      reachedTarget=false, achievedRating=fullPortfolio post-rating
  *
- * Edge case'ler:
- *   - Boş portfolio              → boş paket, reachedTarget = false
- *   - Hedef = mevcut rating (eşit/altında) → boş paket, reachedTarget = true
- *   - İlk aksiyon hedefi tutuyor → 1 aksiyonluk paket
- *   - Hedef ulaşılmıyor          → tüm liste fallback, reachedTarget = false
- *   - Geçersiz hedef rating      → tüm liste fallback (warning ile)
+ * KORUMA: N > SUBSET_SEARCH_LIMIT (12) ise 2^N patlamasını engellemek
+ *   için subset search atlanır, fullPortfolio + uyarı dönülür.
+ *
+ * ÇIKTI ŞEKLİ DEĞİŞMEDİ (sözleşme):
+ *   { selectedActions, meta: TargetPackageMeta, validation }
+ *
+ * selectedActions sırası: alt küme bulunduktan sonra fullPortfolio
+ *   orijinal sırası korunur (vade ve impact düzeni bozulmaz).
  *
  * KRİTİK:
  *   score.ts / ratios.ts / subjective.ts DOKUNULMAZ — sadece
@@ -33,7 +41,7 @@ import {
   type RatingGrade,
 } from './ratingReasoning'
 
-// ─── ÇIKTI TİPLERİ ────────────────────────────────────────────────────────────
+// ─── ÇIKTI TİPLERİ (sözleşme: değişmedi) ──────────────────────────────────────
 
 export interface TargetPackageMeta {
   /** Hedef rating tutuldu mu? (achievedIdx >= targetIdx) */
@@ -46,7 +54,7 @@ export interface TargetPackageMeta {
   selectedActionCount:      number
   /** Tam V3 portföyündeki aksiyon sayısı */
   fullPortfolioActionCount: number
-  /** true → minimal subset bulunamadı, tüm liste fallback olarak gösterildi */
+  /** true → minimal subset bulunamadı veya search atlandı; tüm liste fallback */
   fallback:                 boolean
   /** Edge case açıklamaları (UI'da gösterim opsiyoneldir) */
   warnings:                 string[]
@@ -60,6 +68,13 @@ export interface TargetPackageResult {
   /** Son ölçülen post-action validation (debug/audit için) */
   validation:      ActualRatingValidation | null
 }
+
+/**
+ * Alt küme araması için üst sınır.
+ * 12 → 2^12-1 = 4095 alt küme (kabul edilebilir).
+ * Üstünde patlama riski; greedy fallback uygulanır.
+ */
+const SUBSET_SEARCH_LIMIT = 12
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +97,26 @@ function flattenTransactions(actions: SelectedAction[]): AccountingTransaction[]
     for (const t of (a.transactions ?? [])) out.push(t)
   }
   return out
+}
+
+/**
+ * Lex-order combinations of indices [0..n-1] of size k.
+ * yielded array sıralıdır → fullPortfolio sırası alt küme içinde korunur.
+ */
+function* combinationsOfSize(n: number, k: number): Generator<number[]> {
+  if (k <= 0 || k > n) return
+  const indices = Array.from({ length: k }, (_, i) => i)
+  yield [...indices]
+  while (true) {
+    let i = k - 1
+    while (i >= 0 && indices[i] === n - k + i) i--
+    if (i < 0) return
+    indices[i]++
+    for (let j = i + 1; j < k; j++) {
+      indices[j] = indices[j - 1] + 1
+    }
+    yield [...indices]
+  }
 }
 
 // ─── ANA API ──────────────────────────────────────────────────────────────────
@@ -116,7 +151,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
 
   const targetGrade = tryParseRating(String(params.requestedTarget))
 
-  // ── EDGE 5: Geçersiz hedef → tüm liste fallback ─────────────────────────────
+  // ── EDGE: Geçersiz hedef → tüm liste fallback ───────────────────────────────
   if (!targetGrade) {
     warnings.push(
       `Geçersiz hedef rating: '${params.requestedTarget}' — tüm aksiyon listesi gösteriliyor.`,
@@ -139,7 +174,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
 
   const targetIdx = ratingToIndex(targetGrade)
 
-  // ── EDGE 2: Mevcut rating zaten hedefte/üstünde → boş paket, hedef tutuldu ──
+  // ── EDGE: Mevcut rating zaten hedefte/üstünde → boş paket ───────────────────
   if (currentIdx >= targetIdx) {
     return {
       selectedActions: [],
@@ -156,7 +191,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     }
   }
 
-  // ── EDGE 1: Boş portföy → hedef ulaşılamıyor ────────────────────────────────
+  // ── EDGE: Boş portföy ───────────────────────────────────────────────────────
   if (fullCount === 0) {
     warnings.push('Portföy boş — hedef rating elde edilemiyor.')
     return {
@@ -174,13 +209,13 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     }
   }
 
-  // ── ANA DÖNGÜ: Greedy prefix — ilk hedefi tutan k'da dur ────────────────────
-  let lastValidation: ActualRatingValidation | null = null
-
-  for (let k = 1; k <= fullCount; k++) {
-    const prefix = fullPortfolio.slice(0, k)
-    const transactions = flattenTransactions(prefix)
-
+  // ── KORUMA: N büyükse 2^N patlamasını engelle ───────────────────────────────
+  if (fullCount > SUBSET_SEARCH_LIMIT) {
+    warnings.push(
+      `Aksiyon sayısı (${fullCount}) alt küme arama eşiğini (${SUBSET_SEARCH_LIMIT}) aşıyor — ` +
+      'optimal paket araması atlandı, tüm portföy gösteriliyor.',
+    )
+    const transactions = flattenTransactions(fullPortfolio)
     const validation = calculateActualPostActionRating({
       initialBalances:        params.initialBalances,
       transactions,
@@ -191,22 +226,84 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       currentCombinedScore:   params.currentCombinedScore,
       currentActualRating:    params.currentActualRating,
     })
-    lastValidation = validation
-
     const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
     const achievedIdx    = ratingToIndex(achievedRating)
+    const totalAmount    = fullPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+    return {
+      selectedActions: fullPortfolio,
+      validation,
+      meta: {
+        reachedTarget:            achievedIdx >= targetIdx,
+        achievedRating,
+        totalAmountTRY:           totalAmount,
+        selectedActionCount:      fullCount,
+        fullPortfolioActionCount: fullCount,
+        fallback:                 true,
+        warnings,
+      },
+    }
+  }
 
-    // Hedefe ulaşıldı mı? (eşit veya üstü)
-    if (achievedIdx >= targetIdx) {
-      const totalAmount = prefix.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+  // ── ALT KÜME ARAMASI: cardinality ascending, ilk feasible'da dur ────────────
+  type Candidate = {
+    indices:        number[]
+    validation:     ActualRatingValidation
+    achievedRating: RatingGrade
+    achievedIdx:    number
+    totalAmount:    number
+  }
+
+  let lastValidation: ActualRatingValidation | null = null
+
+  for (let k = 1; k <= fullCount; k++) {
+    let bestAtK: Candidate | null = null
+
+    for (const indices of combinationsOfSize(fullCount, k)) {
+      const subset = indices.map(i => fullPortfolio[i])
+      const totalAmount = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+      const transactions = flattenTransactions(subset)
+
+      const validation = calculateActualPostActionRating({
+        initialBalances:        params.initialBalances,
+        transactions,
+        sector:                 params.sector,
+        subjectiveTotal:        params.subjectiveTotal,
+        v3EstimatedRating:      params.v3EstimatedRating,
+        currentObjectiveScore:  params.currentObjectiveScore,
+        currentCombinedScore:   params.currentCombinedScore,
+        currentActualRating:    params.currentActualRating,
+      })
+      lastValidation = validation
+
+      const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
+      const achievedIdx    = ratingToIndex(achievedRating)
+
+      // Hedefe ulaşmıyorsa atla
+      if (achievedIdx < targetIdx) continue
+
+      // Bu k için en iyi mi? Tie-break: tutar asc → achievedIdx asc
+      if (
+        !bestAtK ||
+        totalAmount < bestAtK.totalAmount ||
+        (totalAmount === bestAtK.totalAmount && achievedIdx < bestAtK.achievedIdx)
+      ) {
+        bestAtK = { indices: [...indices], validation, achievedRating, achievedIdx, totalAmount }
+      }
+    }
+
+    if (bestAtK) {
+      // Minimum cardinality bulundu — erken çık.
+      // bestAtK.indices zaten sıralı (combinationsOfSize lex-order üretir),
+      // bu yüzden fullPortfolio orijinal sırası korunur.
+      const selectedActions = bestAtK.indices.map(i => fullPortfolio[i])
       return {
-        selectedActions: prefix,
-        validation,
+        selectedActions,
+        validation: bestAtK.validation,
         meta: {
           reachedTarget:            true,
-          achievedRating,
-          totalAmountTRY:           totalAmount,
-          selectedActionCount:      prefix.length,
+          achievedRating:           bestAtK.achievedRating,
+          totalAmountTRY:           bestAtK.totalAmount,
+          selectedActionCount:      selectedActions.length,
           fullPortfolioActionCount: fullCount,
           fallback:                 false,
           warnings,
@@ -215,7 +312,8 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     }
   }
 
-  // ── EDGE 4: Liste tükendi, hedef tutmadı → tüm liste fallback ───────────────
+  // ── EDGE: Hiçbir alt küme yeterli değil → tüm liste fallback ────────────────
+  // Not: arama k=N'a kadar gittiğinden lastValidation tüm portföye aittir.
   warnings.push(
     'Mevcut aksiyonlarla hedef rating elde edilemiyor — tüm portföy gösteriliyor.',
   )
