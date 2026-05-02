@@ -142,7 +142,6 @@ function renderTurnoverBlock(data: TurnoverRatioTransparency) {
         current={formatTurnover(data.current)}
         realisticTarget={formatTurnover(data.realisticTarget)}
         sectorMedian={formatTurnover(data.sectorMedian)}
-        currentLabel="Bu aksiyon öncesi"
       />
 
       <p style={formulaRowStyle}>{data.formula.description}</p>

@@ -1752,6 +1752,14 @@ export function runEngineV3(input: EngineInput): EngineResult {
   // ── FAZ 1: HAZIRLIK ───────────────────────────────────────────────────────
   let workingContext = buildInitialFirmContext(input)
 
+  // Faz 7.3.12-PRE: Baseline — aksiyonlar uygulanmadan önceki gerçek firma durumu.
+  // ratioTransparency.current değerleri buradan üretilir (UI "Bugünkü" etiketi).
+  // Greedy seçim mantığı ve workingContext ileri taşıma KORUNUR.
+  const baselineContext: FirmContext = {
+    ...workingContext,
+    accountBalances: { ...workingContext.accountBalances },
+  }
+
   // ── FAZ 2: HORIZON GREEDY SELECTION ──────────────────────────────────────
   const shortMax  = input.options?.maxActionsPerHorizon ?? HORIZON_LIMITS.short.maxActions
   const mediumMax = HORIZON_LIMITS.medium.maxActions
@@ -1782,6 +1790,17 @@ export function runEngineV3(input: EngineInput): EngineResult {
   }
 
   let fullPortfolio = [...shortActions, ...mediumActions, ...longActions]
+
+  // Faz 7.3.12-PRE: ratioTransparency.current = baseline değeri
+  // Her aksiyonun "Bugünkü" değeri paket içi konumdan bağımsız, gerçek başlangıç.
+  // realisticTarget hesaplaması greedy context'te yapıldığından doğru hedefi gösterir.
+  // Sadece current için baseline kullanılır; aksiyon seçimi ve miktarı değişmez.
+  for (const sa of fullPortfolio) {
+    const actionTemplate = ACTION_CATALOG_V3[sa.actionId]
+    if (!actionTemplate) continue
+    const refreshed = buildActionRatioTransparency(actionTemplate, baselineContext, sa.amountTRY)
+    if (refreshed !== null) sa.ratioTransparency = refreshed
+  }
 
   // ── FAZ 3: ILK KATMAN ANALIZI ─────────────────────────────────────────────
   const productivityInputV1  = buildProductivityInput(workingContext, fullPortfolio)
