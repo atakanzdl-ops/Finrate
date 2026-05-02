@@ -26,6 +26,10 @@
 
 import type { AccountingLeg, DecisionInsight } from './contracts'
 import type { ActualRatingValidation } from './postActionRating'
+import {
+  selectTargetPackage,
+  type TargetPackageMeta,
+} from './targetPackage'
 import type {
   EngineResult,
   SelectedAction,
@@ -250,6 +254,27 @@ export interface DecisionAnswer {
   riskInsights: DecisionInsight[]
   /** Faz 7.3.8a: Gerçek post-action rating doğrulaması (opsiyonel) */
   actualRatingValidation?: ActualRatingValidation | null
+  /** Faz 7.3.8d: Hedef rating'e göre filtreleme meta verisi (opsiyonel) */
+  targetPackageMeta?: TargetPackageMeta
+}
+
+// ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
+
+/**
+ * Faz 7.3.8d: selectTargetPackage'i çalıştırmak için route.ts'in
+ * sağladığı bağlam. Yokluğunda filtreleme uygulanmaz, davranış geriye uyumlu.
+ */
+export interface TargetPackageContext {
+  /** Firma sektörü — ham string (score.ts'e iletilir) */
+  sector:                string
+  /** Subjektif puan — sabit tutulur */
+  subjectiveTotal:       number
+  /** Mevcut objektif skor */
+  currentObjectiveScore: number
+  /** Mevcut kombine skor */
+  currentCombinedScore:  number
+  /** Mevcut gerçek rating (legacy notch'lu kabul edilir) */
+  currentActualRating:   string
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1133,6 +1158,8 @@ function buildDataQualityWarning(
  * @param accountBalances        - PATCH 1: dataQualityWarning icin hesap sayisi
  * @param ratios                 - Faz 7.3.7-FIX2: calculateRatiosFromAccounts ciktisi (A21 severity icin)
  * @param actualRatingValidation - Faz 7.3.8a: post-action rating dogrulama sonucu (route'tan iletilir)
+ * @param targetPackageContext   - Faz 7.3.8d: hedef rating'e gore minimal paket secimi icin baglam
+ *                                 (yoksa filtreleme uygulanmaz, davranis geriye uyumlu kalir)
  */
 export function buildDecisionAnswer(
   engineResult:    EngineResult,
@@ -1142,16 +1169,43 @@ export function buildDecisionAnswer(
   accountBalances?: Record<string, number>,
   ratios?: { currentRatio?: number | null },
   actualRatingValidation?: ActualRatingValidation | null,
+  targetPackageContext?: TargetPackageContext,
 ): DecisionAnswer {
+  // ── Faz 7.3.8d: Hedef pakete gore filtreleme ─────────────────────────────
+  // Bagam yoksa (eski cagrilar veya test mock'lari) filtreleme calistirilmaz —
+  // engineResult.portfolio aynen kullanilir, davranis 7.3.8c oncesi gibi.
+  let portfolioForUI: SelectedAction[] = engineResult.portfolio
+  let targetPackageMeta: TargetPackageMeta | undefined
+
+  if (targetPackageContext && accountBalances) {
+    const pkg = selectTargetPackage({
+      portfolio:             engineResult.portfolio,
+      initialBalances:       accountBalances,
+      sector:                targetPackageContext.sector,
+      subjectiveTotal:       targetPackageContext.subjectiveTotal,
+      currentObjectiveScore: targetPackageContext.currentObjectiveScore,
+      currentCombinedScore:  targetPackageContext.currentCombinedScore,
+      currentActualRating:   targetPackageContext.currentActualRating,
+      v3EstimatedRating:     engineResult.finalTargetRating,
+      requestedTarget,
+    })
+    portfolioForUI    = pkg.selectedActions
+    targetPackageMeta = pkg.meta
+  }
+
+  // Filtered view: yalniz portfolio swap edilir, diger alanlar korunur.
+  // Bu sayede notch plans, missed opps, executive answer vb. tum engineResult'tan okur.
+  const filteredEngineResult: EngineResult = { ...engineResult, portfolio: portfolioForUI }
+
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
-  const whatCompanyShouldDo          = buildActionPlan(engineResult)
+  const whatCompanyShouldDo          = buildActionPlan(filteredEngineResult)
   const oneNotchPlan                 = buildOneNotchPlan(engineResult)
   const twoNotchPlan                 = buildTwoNotchPlan(engineResult)
-  const accountingImpactTable        = buildAccountingImpactTable(engineResult)
+  const accountingImpactTable        = buildAccountingImpactTable(filteredEngineResult)
   const whyCapitalAloneIsNotEnough   = buildWhyCapitalAloneNotEnough(engineResult)
   const targetFeasibilityExplanation = buildTargetFeasibilityExplanation(engineResult, requestedTarget)
   const ifNotDoneRisk                = buildIfNotDoneRisk(engineResult)
-  const uiReadyRows                  = buildUiReadyRows(engineResult)
+  const uiReadyRows                  = buildUiReadyRows(filteredEngineResult)
   const rejectedInsights             = buildRejectedInsights(engineResult)
   // PATCH 1: requestedTarget'ı geç — portfolio capacity mesajı için
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
@@ -1197,5 +1251,6 @@ export function buildDecisionAnswer(
     dataQualityWarning,
     riskInsights,
     actualRatingValidation: actualRatingValidation ?? null,
+    targetPackageMeta,
   }
 }

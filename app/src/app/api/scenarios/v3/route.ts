@@ -271,6 +271,13 @@ export async function POST(req: NextRequest) {
       balances,                // PATCH 1: dataQualityWarning icin hesap sayisi
       ratios,                  // Faz 7.3.7-FIX2: A21 cari oran sapması
       actualRatingValidation,  // Faz 7.3.8a: post-action rating doğrulama
+      {                        // Faz 7.3.8d: hedef pakete göre minimal subset için bağlam
+        sector:                rawSector,
+        subjectiveTotal,
+        currentObjectiveScore,
+        currentCombinedScore:  currentCombinedScore,
+        currentActualRating:   currentActualRating,
+      },
     )
 
     // ── 10. RESPONSE ──────────────────────────────────────────────────────────

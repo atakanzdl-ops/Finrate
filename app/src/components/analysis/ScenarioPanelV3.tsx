@@ -482,6 +482,17 @@ function AksiyonPlaniTab({
         </div>
       )}
 
+      {/* HEDEF PAKETİ NOTU (Faz 7.3.8d) — yalnız ulaşılamadığında gösterilir */}
+      {da?.targetPackageMeta?.reachedTarget === false && (
+        <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
+          <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+          <div className="text-sm text-amber-900">
+            Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. En yakın gerçekçi seviye:{' '}
+            <strong>{da.targetPackageMeta.achievedRating}</strong>.
+          </div>
+        </div>
+      )}
+
       {/* A. ANA AKSIYON TABLOSU */}
       <div
         className="bg-white border border-[#E5E9F0] rounded-[12px] overflow-hidden"
