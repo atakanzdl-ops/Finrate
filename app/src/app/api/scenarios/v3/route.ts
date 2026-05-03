@@ -6,7 +6,7 @@ import { formatScenariosForResponse }        from '@/lib/scoring/scenarioV3/resp
 import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
 import { calculateRatiosFromAccounts }        from '@/lib/scoring/ratios'
 import { calculateScore, scoreToRating }      from '@/lib/scoring/score'
-import { combineScores }                      from '@/lib/scoring/subjective'
+import { combineScores, calcSubjectiveScore }  from '@/lib/scoring/subjective'
 import { calculateActualPostActionRating }    from '@/lib/scoring/scenarioV3/postActionRating'
 import type { SectorCode }           from '@/lib/scoring/scenarioV3/contracts'
 import type { RatingGrade }          from '@/lib/scoring/scenarioV3/ratingReasoning'
@@ -224,18 +224,25 @@ export async function POST(req: NextRequest) {
     const currentScoreResult    = calculateScore(ratios, rawSector)
     const currentObjectiveScore = currentScoreResult.finalScore
 
-    // subjectiveTotal — ratios JSON'dan al, yoksa 0
+    // subjectiveTotal — 1. Katman: SubjectiveInput tablosu; 2. Katman: ratios JSON; 3. Fallback 0
     let subjectiveTotal = 0
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rawRatiosJson = (analysis as any).ratios as string | null | undefined
-      if (rawRatiosJson) {
-        const parsed = JSON.parse(rawRatiosJson) as Record<string, unknown>
-        if (typeof parsed.__subjectiveTotal === 'number') {
-          subjectiveTotal = parsed.__subjectiveTotal
+    const subjectiveRow = await prisma.subjectiveInput.findUnique({
+      where: { entityId: analysis.entity.id },
+    })
+    if (subjectiveRow) {
+      subjectiveTotal = calcSubjectiveScore(subjectiveRow).total
+    } else {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawRatiosJson = (analysis as any).ratios as string | null | undefined
+        if (rawRatiosJson) {
+          const parsed = JSON.parse(rawRatiosJson) as Record<string, unknown>
+          if (typeof parsed.__subjectiveTotal === 'number') {
+            subjectiveTotal = parsed.__subjectiveTotal
+          }
         }
-      }
-    } catch { /* fallback 0 */ }
+      } catch { /* fallback 0 */ }
+    }
 
     const currentCombinedScore  = combineScores(currentObjectiveScore, subjectiveTotal)
     const currentActualRating   = scoreToRating(currentCombinedScore)

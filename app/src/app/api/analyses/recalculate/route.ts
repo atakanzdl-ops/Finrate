@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
     const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, fd.entity.sector)
 
     if (fd.analysis) {
+      // Mevcut ratios JSON'daki meta alanları koru (__subjectiveTotal, __financialScore)
+      let existingMeta: Record<string, unknown> = {}
+      try {
+        if (fd.analysis.ratios) existingMeta = JSON.parse(fd.analysis.ratios as string)
+      } catch { /* ignore — bozuk JSON ise meta kaybolmasın diye silent */ }
+
       await prisma.analysis.update({
         where: { id: fd.analysis.id },
         data: {
@@ -64,7 +70,13 @@ export async function POST(req: NextRequest) {
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
           activityScore:      score.activityScore,
-          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null, __insufficientCategories: score.insufficientCategories }),
+          ratios: JSON.stringify({
+            ...ratios,
+            __overallCoverage:        score.overallCoverage ?? null,
+            __insufficientCategories: score.insufficientCategories,
+            ...(existingMeta.__subjectiveTotal !== undefined && { __subjectiveTotal: existingMeta.__subjectiveTotal }),
+            ...(existingMeta.__financialScore  !== undefined && { __financialScore:  existingMeta.__financialScore  }),
+          }),
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),
         },

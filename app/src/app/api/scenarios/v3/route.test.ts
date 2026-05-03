@@ -38,6 +38,7 @@ const MOCK_DECISION       = { decision: 'mock' }
 function setupMocks(opts: {
   userId:                     string | null
   analysis?:                  object | null
+  subjectiveInput?:           object | null   // SubjectiveInput tablosu mock verisi
   runEngineV3Behavior?:       'success' | 'throw'
   generateScenariosBehavior?: 'success' | 'throw'
   generatedScenarios?:        object[]
@@ -62,7 +63,17 @@ function setupMocks(opts: {
       analysis: {
         findFirst: jest.fn(() => Promise.resolve(opts.analysis ?? null)),
       },
+      subjectiveInput: {
+        findUnique: jest.fn(() => Promise.resolve(
+          opts.subjectiveInput !== undefined ? opts.subjectiveInput : null
+        )),
+      },
     },
+  }))
+
+  jest.doMock('@/lib/scoring/subjective', () => ({
+    combineScores:       jest.fn((financial: number, subjective: number) => financial + subjective),
+    calcSubjectiveScore: jest.fn(() => ({ total: 0 })),
   }))
 
   jest.doMock('@/lib/scoring/scenarioV3/engineV3', () => ({
@@ -249,5 +260,73 @@ describe('POST /api/scenarios/v3', () => {
     expect(body.engine).toBe('v3')
     expect(body.scenarios).toEqual([])
     expect(body.v2Comparison).toBeDefined()
+  })
+
+  // ── Test H: SubjectiveInput tablosunda kayıt var → calcSubjectiveScore kullanılır ──
+
+  test('H — SubjectiveInput kaydı var → calcSubjectiveScore çağrılır, 200', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    const subjectiveRow = { id: 'sub-1', entityId: 'e1', kkbCategory: 'iyi' }
+    setupMocks({
+      userId:               'user-1',
+      analysis:             VALID_ANALYSIS,
+      subjectiveInput:      subjectiveRow,
+      runEngineV3Behavior:  'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+
+    expect(res.status).toBe(200)
+
+    const subjMod = await import('@/lib/scoring/subjective') as any
+    expect(subjMod.calcSubjectiveScore).toHaveBeenCalledWith(subjectiveRow)
+  })
+
+  // ── Test I: SubjectiveInput yok → ratios JSON'dan __subjectiveTotal okunur ──
+
+  test('I — SubjectiveInput yok, ratios JSON var → __subjectiveTotal ratios\'tan okunur, 200', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    const analysisWithRatios = {
+      ...VALID_ANALYSIS,
+      ratios: JSON.stringify({ __subjectiveTotal: 30 }),
+    }
+    setupMocks({
+      userId:              'user-1',
+      analysis:            analysisWithRatios,
+      subjectiveInput:     null,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+
+    expect(res.status).toBe(200)
+
+    const subjMod = await import('@/lib/scoring/subjective') as any
+    // calcSubjectiveScore çağrılmamış — SubjectiveInput yok
+    expect(subjMod.calcSubjectiveScore).not.toHaveBeenCalled()
+  })
+
+  // ── Test J: SubjectiveInput yok + ratios JSON yok → subjectiveTotal = 0, 200 ──
+
+  test('J — SubjectiveInput yok, ratios JSON yok → subjectiveTotal 0 ile devam, 200', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,   // ratios field yok
+      subjectiveInput:     null,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+
+    expect(res.status).toBe(200)
+
+    const subjMod = await import('@/lib/scoring/subjective') as any
+    expect(subjMod.calcSubjectiveScore).not.toHaveBeenCalled()
+    // combineScores(objectiveScore, 0) çağrılmış — 0 ikinci argüman
+    expect(subjMod.combineScores).toHaveBeenCalledWith(expect.any(Number), 0)
   })
 })

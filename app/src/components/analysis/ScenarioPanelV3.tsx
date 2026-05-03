@@ -837,7 +837,7 @@ function DetayTab({
             className="text-lg font-bold text-[#0B3C5D] mb-3"
             style={{ fontFamily: 'Outfit, sans-serif' }}
           >
-            Hedef Degerlendirmesi
+            Hedef Değerlendirmesi
           </h3>
           <div className="text-[#1E293B] leading-relaxed whitespace-pre-line">
             {da.targetFeasibilityExplanation}
