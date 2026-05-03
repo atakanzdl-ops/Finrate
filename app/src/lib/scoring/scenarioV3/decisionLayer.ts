@@ -320,7 +320,7 @@ export function buildProblemInefficiencyBlock(
     .filter((l): l is string => l !== null)
     .join('\n\n')
 
-  return ` Tespit edilen yapısal sorunlar:\n\n${lines}`
+  return `\n\nTespit edilen yapısal sorunlar:\n\n${lines}`
 }
 
 /**
@@ -851,7 +851,7 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
     parts.push('Önerilen aksiyonlar uygulanmazsa mevcut rating seviyesi korunur, iyileşme gerçekleşmez.')
   }
 
-  return parts.join(' ')
+  return parts.join('\n\n')
 }
 
 // ─── BUILDER: UI READY ROWS ──────────────────────────────────────────────────

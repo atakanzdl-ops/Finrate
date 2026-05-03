@@ -325,7 +325,7 @@ function OzetTab({ result }: { result: any }) {
           {consultant.problem && (
             <div>
               <div className="text-xs uppercase tracking-wider text-[#64748B] mb-1">Temel Problem</div>
-              <div className="text-sm text-slate-800 leading-relaxed">{consultant.problem}</div>
+              <div className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">{consultant.problem}</div>
             </div>
           )}
 
@@ -355,7 +355,7 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-xs uppercase tracking-wider text-[#0B3C5D] font-semibold mb-1">
                 Finrate Yorumu
               </div>
-              <div className="text-[#1E293B] leading-relaxed font-medium">{consultant.bankerView}</div>
+              <div className="text-sm text-slate-800 leading-relaxed">{consultant.bankerView}</div>
             </div>
           )}
         </div>
@@ -393,7 +393,7 @@ function OzetTab({ result }: { result: any }) {
             <TrendingDown size={16} className="text-red-500" />
             Aksiyon Alınmazsa
           </div>
-          <div className="text-sm text-[#1E293B] leading-relaxed">{da.ifNotDoneRisk}</div>
+          <div className="text-sm text-[#1E293B] leading-relaxed whitespace-pre-line">{da.ifNotDoneRisk}</div>
         </div>
       )}
 
