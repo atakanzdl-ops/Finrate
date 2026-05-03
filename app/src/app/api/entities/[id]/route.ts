@@ -12,10 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const entity = await prisma.entity.findFirst({
     where: { id, userId },
     include: {
-      financialData: {
-        orderBy: [{ year: 'desc' }, { period: 'asc' }],
-        include: { manualAdjustments: { select: { fieldName: true } } },
-      },
+      financialData: { orderBy: [{ year: 'desc' }, { period: 'asc' }] },
       group: { select: { id: true, name: true } },
     },
   })

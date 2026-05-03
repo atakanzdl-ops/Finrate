@@ -37,30 +37,6 @@ export async function PATCH(
       data: { ...updateData, updatedAt: new Date() },
     })
 
-    // ManualAdjustment kaydı — her güncellenen alan için upsert
-    for (const [key, val] of Object.entries(updateData)) {
-      if (val != null) {
-        await prisma.manualAdjustment.upsert({
-          where: {
-            financialDataId_fieldName_scenarioName: {
-              financialDataId: fdId,
-              fieldName:       key,
-              scenarioName:    'manual',
-            },
-          },
-          create: {
-            financialDataId: fdId,
-            fieldName:       key,
-            adjustedValue:   val,
-            scenarioName:    'manual',
-          },
-          update: {
-            adjustedValue: val,
-          },
-        })
-      }
-    }
-
     // Skor yeniden hesapla
     const numericKeys = [
       'revenue','cogs','grossProfit','operatingExpenses','ebit','depreciation',

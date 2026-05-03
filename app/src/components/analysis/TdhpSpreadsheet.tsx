@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Info } from 'lucide-react'
 import clsx from 'clsx'
 
 // ─── Types ─────────────────────────────────────────────────
@@ -19,8 +18,7 @@ interface FinData {
   id: string
   year: number
   period: string
-  manualAdjustments?: Array<{ fieldName: string }>
-  [key: string]: number | null | string | Array<{ fieldName: string }> | undefined
+  [key: string]: number | null | string
 }
 
 interface Props {
@@ -143,16 +141,6 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
 
   const [inputStrings, setInputStrings] = useState<Record<string, Record<string, string>>>({})
   const [saving, setSaving]             = useState<Record<string, boolean>>({})
-  // editEnabled[fdId] = true ise o sütun düzenlenebilir; varsayılan kapalı
-  const [editEnabled, setEditEnabled]   = useState<Record<string, boolean>>({})
-
-  // fdId:fieldName çiftleri — manuel düzenlenmiş alanları hızlı lookup için
-  const manualSet = new Set<string>()
-  for (const col of cols) {
-    for (const ma of (col.manualAdjustments ?? []) as Array<{ fieldName: string }>) {
-      manualSet.add(`${col.id}:${ma.fieldName}`)
-    }
-  }
 
   function getStoredVal(fdId: string, field: string): number | null {
     const fd = cols.find(c => c.id === fdId)
@@ -527,9 +515,6 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             )
           }
 
-          const isColEnabled = editEnabled[col.id] ?? false
-          const isManualField = manualSet.has(`${col.id}:${row.field!}`)
-
           if (isCalc) {
             const v = getEffectiveVal(col.id, row.field!)
             return (
@@ -540,12 +525,10 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                   onFocus={(e) => handleFocus(col.id, row.field!, e)}
                   onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
                   onBlur={() => handleBlur(col.id, row.field!)}
-                  disabled={!isColEnabled}
                   className={clsx(
                     'w-full bg-transparent text-right tabular-nums focus:outline-none focus:bg-slate-100 focus:rounded px-1',
                     isTotal ? 'font-black text-[10px]' : 'font-bold text-[10px]',
                     v != null && v < 0 ? 'text-red-600' : 'text-[#0B3C5D]',
-                    !isColEnabled && 'opacity-60 cursor-not-allowed',
                   )}
                   placeholder="0,00"
                 />
@@ -567,30 +550,19 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
 
           return (
             <td key={col.id} className="px-2 py-1">
-              <div className="flex items-center gap-0.5">
-                <input
-                  type="text"
-                  value={displayVal}
-                  onFocus={(e) => handleFocus(col.id, row.field!, e)}
-                  onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
-                  onBlur={() => handleBlur(col.id, row.field!)}
-                  disabled={!isColEnabled}
-                  className={clsx(
-                    'flex-1 min-w-0 bg-white border border-slate-200 rounded px-1.5 py-0.5',
-                    'text-right tabular-nums text-[10px] focus:outline-none focus:border-[#1FA4A9]/50',
-                    isNeg ? 'text-red-600' : 'text-[#1E293B]',
-                    !isColEnabled && 'opacity-60 cursor-not-allowed bg-slate-50',
-                  )}
-                  placeholder="0,00"
-                />
-                {isManualField && (
-                  <Info
-                    size={12}
-                    className="flex-shrink-0 text-red-500"
-                    title="Manuel düzenlenmiştir"
-                  />
+              <input
+                type="text"
+                value={displayVal}
+                onFocus={(e) => handleFocus(col.id, row.field!, e)}
+                onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
+                onBlur={() => handleBlur(col.id, row.field!)}
+                className={clsx(
+                  'w-full bg-white border border-slate-200 rounded px-1.5 py-0.5',
+                  'text-right tabular-nums text-[10px] focus:outline-none focus:border-[#1FA4A9]/50',
+                  isNeg ? 'text-red-600' : 'text-[#1E293B]',
                 )}
-              </div>
+                placeholder="0,00"
+              />
             </td>
           )
         })}
@@ -643,18 +615,6 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
                       {PERIOD_LABEL[col.period] ?? col.period}
                     </span>
                   </div>
-                  {/* Manuel düzenleme kilidi */}
-                  <label className="mt-1.5 flex items-center justify-end gap-1 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={editEnabled[col.id] ?? false}
-                      onChange={e =>
-                        setEditEnabled(prev => ({ ...prev, [col.id]: e.target.checked }))
-                      }
-                      className="w-3 h-3 accent-[#1FA4A9]"
-                    />
-                    <span className="text-[8px] text-slate-400 font-medium">Manuel</span>
-                  </label>
                   {saving[col.id] && (
                     <div className="text-[8px] text-[#1FA4A9] mt-0.5 animate-pulse">kaydediliyor</div>
                   )}
