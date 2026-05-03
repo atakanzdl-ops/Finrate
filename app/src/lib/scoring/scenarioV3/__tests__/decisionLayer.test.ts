@@ -9,7 +9,11 @@
  *   hesaplar. Tek parçalı aksiyonlar etkilenmez.
  */
 
-import { consolidateByActionId } from '../decisionLayer'
+import {
+  consolidateByActionId,
+  buildProblemInefficiencyBlock,
+  buildIfNotDoneInefficiencyBlock,
+} from '../decisionLayer'
 import type { SelectedAction } from '../engineV3'
 import type {
   MarginRatioTransparency,
@@ -259,6 +263,134 @@ describe('Faz 7.3.12-PRE-FIX — consolidateByActionId transparency rebuild', ()
     expect(a18.amountTRY).toBe(5_000_000)
     const a18rt = a18.ratioTransparency as TurnoverRatioTransparency
     expect(a18rt.realisticTarget).toBeCloseTo(0.23, 6)
+  })
+
+})
+
+// ─── Faz 7.3.13 — inefficiency enrichment helpers ────────────────────────────
+
+describe('Faz 7.3.13 — buildProblemInefficiencyBlock', () => {
+
+  const severeFlag = {
+    type:        'ADVANCES_LOCK',
+    severity:    'SEVERE',
+    description: "Verilen avanslar aktifin 45.6%'ini oluşturuyor, tedarikçi riski",
+  }
+
+  const moderateFlag = {
+    type:        'INVENTORY_LOCK',
+    severity:    'MODERATE',
+    description: "Stok aktifin 28.0%'ini bağlıyor (sektör eşiği: 20%)",
+  }
+
+  const mildFlag = {
+    type:        'RECEIVABLE_SLOWDOWN',
+    severity:    'MILD',
+    description: "Alacaklar satışın 45%'i kadar — tahsilat süresi uzun",
+  }
+
+  const criticalFlag = {
+    type:        'CASH_GENERATION_GAP',
+    severity:    'CRITICAL',
+    description: 'Operasyonel nakit üretimi negatif',
+  }
+
+  test('SEVERE flag → profesyonel başlık ve açıklama içerir', () => {
+    const result = buildProblemInefficiencyBlock([severeFlag])
+    expect(result).not.toBeNull()
+    expect(result).toContain('Sipariş Avanslarında Yoğunlaşma')
+    expect(result).toContain('CİDDİ')
+    expect(result).toContain('Kanıt: Verilen avanslar aktifin 45.6%')
+  })
+
+  test('MILD flag → null döner (gizli)', () => {
+    const result = buildProblemInefficiencyBlock([mildFlag])
+    expect(result).toBeNull()
+  })
+
+  test('Hiç flag yok → null döner', () => {
+    const result = buildProblemInefficiencyBlock([])
+    expect(result).toBeNull()
+  })
+
+  test('Yalnız MILD flag listesi → null döner', () => {
+    const result = buildProblemInefficiencyBlock([
+      mildFlag,
+      { ...mildFlag, type: 'WIP_LOCK' },
+    ])
+    expect(result).toBeNull()
+  })
+
+  test('CRITICAL + SEVERE → CRITICAL önce sıralanır', () => {
+    const result = buildProblemInefficiencyBlock([severeFlag, criticalFlag])
+    expect(result).not.toBeNull()
+    const critIdx = result!.indexOf('Nakit Üretim Yetersizliği')
+    const sevIdx  = result!.indexOf('Sipariş Avanslarında Yoğunlaşma')
+    expect(critIdx).toBeLessThan(sevIdx)
+  })
+
+  test('MODERATE flag → görünür, ORTA etiketi çıkar', () => {
+    const result = buildProblemInefficiencyBlock([moderateFlag])
+    expect(result).not.toBeNull()
+    expect(result).toContain('Stok Yoğunluğu')
+    expect(result).toContain('ORTA')
+    expect(result).toContain('Kanıt: Stok aktifin 28.0%')
+  })
+
+  test('"Tespit edilen yapısal sorunlar" prefix dahil', () => {
+    const result = buildProblemInefficiencyBlock([severeFlag])
+    expect(result).toContain('Tespit edilen yapısal sorunlar')
+  })
+
+})
+
+describe('Faz 7.3.13 — buildIfNotDoneInefficiencyBlock', () => {
+
+  const severeFlag = {
+    type:        'ADVANCES_LOCK',
+    severity:    'SEVERE',
+    description: "Verilen avanslar aktifin 45.6%'ini oluşturuyor, tedarikçi riski",
+  }
+
+  const mildFlag = {
+    type:        'INVENTORY_LOCK',
+    severity:    'MILD',
+    description: "Stok aktifin 10.0%'ini bağlıyor",
+  }
+
+  const criticalFlag = {
+    type:        'CASH_GENERATION_GAP',
+    severity:    'CRITICAL',
+    description: 'Operasyonel nakit üretimi negatif',
+  }
+
+  test('SEVERE flag → ifNotAddressed cümlesi içerir', () => {
+    const result = buildIfNotDoneInefficiencyBlock([severeFlag])
+    expect(result).not.toBeNull()
+    expect(result).toContain('Sipariş Avanslarında Yoğunlaşma')
+    expect(result).toContain('Tedarikçi tarafındaki bağımlılık derinleşir')
+  })
+
+  test('MILD flag → null döner (gizli)', () => {
+    const result = buildIfNotDoneInefficiencyBlock([mildFlag])
+    expect(result).toBeNull()
+  })
+
+  test('Hiç flag yok → null döner', () => {
+    const result = buildIfNotDoneInefficiencyBlock([])
+    expect(result).toBeNull()
+  })
+
+  test('Birden fazla visible flag → hepsi satır satır listelenir', () => {
+    const result = buildIfNotDoneInefficiencyBlock([severeFlag, criticalFlag])
+    expect(result).not.toBeNull()
+    expect(result).toContain('Sipariş Avanslarında Yoğunlaşma')
+    expect(result).toContain('Nakit Üretim Yetersizliği')
+  })
+
+  test('"Bu yapısal sorunlar çözülmezse" prefix dahil', () => {
+    const result = buildIfNotDoneInefficiencyBlock([severeFlag])
+    expect(result).toContain('Bu yapısal sorunlar çözülmezse')
   })
 
 })

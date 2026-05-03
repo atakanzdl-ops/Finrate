@@ -50,6 +50,12 @@ import type {
   MissedOpportunity,
   NotchScenario,
 } from './ratingReasoning'
+import {
+  INEFFICIENCY_NARRATIVES,
+  SEVERITY_LABELS,
+  SEVERITY_ORDER,
+  VISIBLE_SEVERITIES,
+} from './inefficiencyNarratives'
 
 // Unused import guard
 void 0 as unknown as AccountingLeg
@@ -278,6 +284,70 @@ export interface TargetPackageContext {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+// ─── FAZ 7.3.13: INEFFICIENCY ENRICHMENT HELPERS ─────────────────────────────
+
+type InefficiencyFlagLite = { type: string; severity: string; description: string }
+
+/** Severity sıralama yardımcısı — bilinmeyen seviyeler sona gider */
+function severityRank(sev: string): number {
+  const idx = (SEVERITY_ORDER as readonly string[]).indexOf(sev)
+  return idx === -1 ? 99 : idx
+}
+
+/**
+ * "Temel Problem" için görünür (MODERATE+) verimsizlik bloğu üretir.
+ * Sonuç string, `problem` prefix'ine eklenir.
+ * Hiç visible flag yoksa null döner → çağıran fallback uygular.
+ * @public — decisionLayer.test.ts tarafından doğrudan test edilir
+ */
+export function buildProblemInefficiencyBlock(
+  flags: ReadonlyArray<InefficiencyFlagLite>,
+): string | null {
+  const visible = [...flags]
+    .filter(f => (VISIBLE_SEVERITIES as ReadonlyArray<string>).includes(f.severity))
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+
+  if (visible.length === 0) return null
+
+  const lines = visible
+    .map(f => {
+      const narr = INEFFICIENCY_NARRATIVES[f.type as keyof typeof INEFFICIENCY_NARRATIVES]
+      if (!narr) return null
+      const lbl = SEVERITY_LABELS[f.severity as keyof typeof SEVERITY_LABELS] ?? f.severity
+      return `• ${narr.title} (${lbl})\n  ${narr.description}\n  Kanıt: ${f.description}`
+    })
+    .filter((l): l is string => l !== null)
+    .join('\n\n')
+
+  return ` Tespit edilen yapısal sorunlar:\n\n${lines}`
+}
+
+/**
+ * "Aksiyon Alınmazsa" için görünür verimsizlik bloğu üretir.
+ * Hiç visible flag yoksa null döner → çağıran drivers.negative fallback uygular.
+ * @public — decisionLayer.test.ts tarafından doğrudan test edilir
+ */
+export function buildIfNotDoneInefficiencyBlock(
+  flags: ReadonlyArray<InefficiencyFlagLite>,
+): string | null {
+  const visible = [...flags]
+    .filter(f => (VISIBLE_SEVERITIES as ReadonlyArray<string>).includes(f.severity))
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+
+  if (visible.length === 0) return null
+
+  const lines = visible
+    .map(f => {
+      const narr = INEFFICIENCY_NARRATIVES[f.type as keyof typeof INEFFICIENCY_NARRATIVES]
+      if (!narr) return null
+      return `• ${narr.title}: ${narr.ifNotAddressed}`
+    })
+    .filter((l): l is string => l !== null)
+    .join('\n')
+
+  return `Bu yapısal sorunlar çözülmezse:\n\n${lines}`
+}
 
 // ─── TDHP GRUP ADLARI ─────────────────────────────────────────────────────────
 
@@ -741,6 +811,9 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
   const drivers         = engineResult.reasoning.drivers as DriverGroup | null
   const missed          = engineResult.reasoning.missedOpportunities as MissedOpportunity[] | null
   const bindingCeiling  = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
+  const productivity    = engineResult.layerSummaries.productivity as {
+    inefficiencyFlags: Array<{ type: string; severity: string; description: string }>
+  } | null
 
   const parts: string[] = []
 
@@ -751,7 +824,13 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
     )
   }
 
-  if (drivers && drivers.negative.length > 0) {
+  // Faz 7.3.13: inefficiencyFlags-based enrichment (replaces drivers.negative when present)
+  const ifNotDoneBlock = buildIfNotDoneInefficiencyBlock(
+    productivity?.inefficiencyFlags ?? []
+  )
+  if (ifNotDoneBlock) {
+    parts.push(ifNotDoneBlock)
+  } else if (drivers && drivers.negative.length > 0) {
     parts.push(
       `Temel riskler çözülmezse: ${drivers.negative.slice(0, 2).join('; ')}.`
     )
@@ -919,7 +998,7 @@ function buildConsultantNarrative(
   const productivity   = engineResult.layerSummaries.productivity as {
     productivityScore: number
     metrics: { trappedAssetsShare: number }
-    inefficiencyFlags: Array<{ type: string; severity: string }>
+    inefficiencyFlags: Array<{ type: string; severity: string; description: string }>
   } | null
 
   const sustainability = engineResult.layerSummaries.sustainability as {
@@ -932,9 +1011,13 @@ function buildConsultantNarrative(
   void composition  // kullanilmayacak, dogrudan drivers kullanilacak
 
   // ── problem ──────────────────────────────────────────────────────────────
+  // Faz 7.3.13: visible inefficiency flags varsa profesyonel dil; yoksa mevcut fallback.
   let problem = `Şirket ${engineResult.currentRating} rating seviyesinde.`
 
-  if (drivers && drivers.negative.length > 0) {
+  const problemBlock = buildProblemInefficiencyBlock(productivity?.inefficiencyFlags ?? [])
+  if (problemBlock) {
+    problem += problemBlock
+  } else if (drivers && drivers.negative.length > 0) {
     problem += ` Temel sorunlar: ${drivers.negative.slice(0, 2).join('; ')}.`
   } else if (productivity && productivity.productivityScore < 0.40) {
     problem += ` Varlık verimliliği düşük (%${(productivity.productivityScore * 100).toFixed(0)}).`
