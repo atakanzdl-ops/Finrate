@@ -426,7 +426,7 @@ const MIZAN_MAP: Record<string, string> = {
   '686': 'extraordinaryExpense',  '687': 'extraordinaryExpense',  '688': 'extraordinaryExpense',
   '689': 'extraordinaryExpense',
   // Pasif – bakAlacak (_A)
-  '103': 'tradePayables_A',
+  '103': 'cash_CA',
   '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',
   '321': 'tradePayables_A',          '326': 'tradePayables_A',
   '335': 'otherShortTermPayables_A', '336': 'otherShortTermPayables_A',
@@ -461,6 +461,17 @@ const MIZAN_MAP: Record<string, string> = {
   '437': 'otherNonCurrentLiabilities_CB',      // UV Borç Senetleri Reeskontu (kontra)
 }
 
+// Ana hesap → kanonik alt hesap eşlemesi (2 haneli → 3 haneli)
+// parseMizanRows'da 2 haneli kod gelirse ve grubun alt kodu yoksa,
+// bu tablo üzerinden kanonik 3 haneli koda dönüştürülür.
+const MAIN_ACCOUNT_CANONICAL: Record<string, string> = {
+  '10': '100', '12': '121', '13': '136', '15': '153', '18': '180', '19': '190',
+  '25': '252', '26': '260', '28': '280',
+  '30': '300', '32': '321', '33': '336', '34': '340', '36': '360', '38': '381',
+  '40': '400', '42': '429', '43': '436',
+  '50': '500', '52': '529', '54': '549', '57': '570', '58': '580',
+}
+
 export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
   const header = findMizanHeader(rows)
   if (!header) return []
@@ -472,6 +483,18 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
 
   const rawAccounts: Array<{ code: string; amount: number }> = []
 
+  // Geçiş 1: 3 haneli alt kodu olan grup prefixlerini tespit et
+  // (örn. satırda "431" varsa "43" grubu alt kod içeriyor demektir)
+  const groupHasSubcode = new Set<string>()
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i] as (string | number | null)[]
+    const rawCode = row[cols['code'] ?? 0]
+    if (!rawCode) continue
+    const nc = String(rawCode).replace(/\./g, '').trim().replace(/\D/g, '')
+    if (nc.length === 3) groupHasSubcode.add(nc.substring(0, 2))
+  }
+
+  // Geçiş 2: asıl eşleme
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as (string | number | null)[]
     const rawCode = row[cols['code'] ?? 0]
@@ -479,8 +502,18 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
 
     // Noktalı gösterim kaldır: "100.01" → "10001"; sadece 2-3 haneli kodları al
     const code = String(rawCode).replace(/\./g, '').trim()
-    const nc   = code.replace(/\D/g, '')
+    let nc   = code.replace(/\D/g, '')
     if (!nc || nc.length > 3 || nc.length < 2) continue
+
+    // 2 haneli ana hesap kodu:
+    //   - grubun alt kodu varsa atla (alt kodlar zaten işleyecek)
+    //   - yoksa kanonik 3 haneli koda dönüştür
+    if (nc.length === 2) {
+      if (groupHasSubcode.has(nc)) continue
+      const canonical = MAIN_ACCOUNT_CANONICAL[nc]
+      if (!canonical) continue
+      nc = canonical
+    }
 
     const getNum = (key: string, fallback?: string): number => {
       const idx =

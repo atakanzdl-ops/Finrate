@@ -7,6 +7,32 @@ import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 
+// ─── Alan grupları: hangi docType hangi alanları yazabilir (Faz 7.3.16) ────────
+const BALANCE_SHEET_FIELDS = new Set([
+  'cash', 'shortTermInvestments', 'tradeReceivables', 'otherReceivables',
+  'inventory', 'constructionCosts', 'prepaidSuppliers', 'prepaidExpenses',
+  'otherCurrentAssets', 'totalCurrentAssets',
+  'longTermTradeReceivables', 'longTermOtherReceivables', 'longTermInvestments',
+  'tangibleAssets', 'intangibleAssets', 'depletableAssets',
+  'longTermPrepaidExpenses', 'otherNonCurrentAssets', 'totalNonCurrentAssets',
+  'totalAssets',
+  'shortTermFinancialDebt', 'tradePayables', 'otherShortTermPayables',
+  'advancesReceived', 'constructionProgress', 'taxPayables', 'shortTermProvisions',
+  'deferredRevenue', 'otherCurrentLiabilities', 'totalCurrentLiabilities',
+  'longTermFinancialDebt', 'longTermTradePayables', 'longTermOtherPayables',
+  'longTermAdvancesReceived', 'longTermProvisions', 'otherNonCurrentLiabilities',
+  'totalNonCurrentLiabilities',
+  'paidInCapital', 'capitalReserves', 'profitReserves', 'retainedEarnings',
+  'retainedLosses', 'netProfitCurrentYear', 'totalEquity', 'totalLiabilitiesAndEquity',
+])
+
+const INCOME_STATEMENT_FIELDS = new Set([
+  'grossSales', 'salesDiscounts', 'revenue', 'cogs', 'grossProfit',
+  'operatingExpenses', 'ebit', 'ebitda', 'otherIncome', 'otherExpense',
+  'interestExpense', 'extraordinaryIncome', 'extraordinaryExpense',
+  'ebt', 'taxExpense', 'netProfit', 'netProfitCurrentYear', 'depreciation', 'purchases',
+])
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
@@ -124,11 +150,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const source = isExcel ? 'EXCEL' : isCsv ? 'CSV' : 'PDF'
       const period = (row.period as string) ?? 'ANNUAL'
+      const docType = (row.docType ?? 'UNKNOWN') as string
 
       // Eksik toplamları otomatik hesapla
       const f = row.fields
-      // Parser'ın bizzat sağladığı alanları sakla — merge sırasında sadece bunlar DB'yi ezebilir
-      const parserProvidedKeys = new Set(Object.keys(f).filter(k => f[k] != null))
+      // Parser'ın bizzat sağladığı alanları sakla — merge sırasında sadece bunlar DB'yi ezebilir.
+      // docType bazlı filtre: MIZAN → sadece bilanço alanları; BEYANNAME → sadece gelir tablosu;
+      // ANNUAL+BEYANNAME → tüm alanlar; UNKNOWN → hiçbiri.
+      const allParserProvidedKeys = new Set(Object.keys(f).filter(k => f[k] != null))
+      const parserProvidedKeys: Set<string> =
+        (period === 'ANNUAL' && docType === 'BEYANNAME')
+          ? allParserProvidedKeys
+          : docType === 'MIZAN'
+            ? new Set([...allParserProvidedKeys].filter(k => BALANCE_SHEET_FIELDS.has(k)))
+            : docType === 'BEYANNAME'
+              ? new Set([...allParserProvidedKeys].filter(k => INCOME_STATEMENT_FIELDS.has(k)))
+              : new Set<string>()
       const n = (v: unknown) => (v != null && !isNaN(Number(v)) ? Number(v) : null)
 
       // Dönen sub-item çift sayım koruması:
@@ -290,6 +327,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         f.netProfitCurrentYear = n(f.netProfit)
       }
 
+      // docType bazlı alan temizliği — hem yeni kayıt oluşturma hem de merge için geçerli:
+      // MIZAN → sadece bilanço alanları; Q+BEYANNAME → sadece gelir tablosu alanları.
+      // Auto-calc türetilmiş alanlar bu temizlik SONRASINDA gerçek katkı sağlıyorsa korunur.
+      if (docType === 'MIZAN') {
+        for (const k of Object.keys(f)) {
+          if (!BALANCE_SHEET_FIELDS.has(k)) (f as Record<string, unknown>)[k] = null
+        }
+      } else if (docType === 'BEYANNAME' && period !== 'ANNUAL') {
+        for (const k of Object.keys(f)) {
+          if (!INCOME_STATEMENT_FIELDS.has(k)) (f as Record<string, unknown>)[k] = null
+        }
+      }
+
       // Mevcut kaydı bul: varsa yeni verilerle merge et (null olan alanları koru)
       const existing = await prisma.financialData.findUnique({
         where: { entityId_year_period: { entityId, year: row.year, period } },
@@ -299,6 +349,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Sadece yeterince geniş alan seti gelirse full-replace uygula.
       const parsedFieldCount = Object.keys(row.fields ?? {}).length
       const shouldReplace = isPdf && parsedFieldCount >= 25
+        && !(docType === 'BEYANNAME' && period !== 'ANNUAL')
       const mergedFields = existing
         ? shouldReplace
           ? Object.fromEntries(
@@ -436,8 +487,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             console.log(`  ${r.originalCode} → ${r.reclassifiedCode} (${r.amount.toLocaleString('tr-TR')} TL)`)
           }
         }
-
-        const docType = row.docType ?? 'UNKNOWN'
 
         if (period === 'ANNUAL' && docType === 'BEYANNAME') {
           // Yıllık beyanname: tek kaynak olduğu için tüm hesaplar yazılır

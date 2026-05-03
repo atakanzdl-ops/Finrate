@@ -28,16 +28,18 @@ import { parseMizanRows } from './excel'
  * Header: "Hesap Kodu" | "Hesap Adı" | "Bakiye Borç" | "Bakiye Alacak"
  *
  * parseMizanRows → Object.keys(fields).length < 3 ise [] döner.
- * Bu yüzden her test için 2 nötr baz satır (100 ve 150) eklenir;
- * testler yalnızca ilgili alanı kontrol eder, baz satırlar sonucu etkilemez.
+ * Bu yüzden her test için 3 nötr baz satır eklenir (121, 136, 153 — 10x/15x/5x gruplarıyla
+ * çakışmaz, dolayısıyla 103 contra ve 2 haneli kod testleri güvenlidir).
+ * Testler yalnızca ilgili alanı kontrol eder, baz satırlar sonucu etkilemez.
  */
 function makeMizanRows(
   entries: Array<{ code: string; bakBorc?: number; bakAlacak?: number }>
 ): unknown[][] {
   const header = ['Hesap Kodu', 'Hesap Adı', 'Bakiye Borç', 'Bakiye Alacak']
   const baseRows: unknown[][] = [
-    ['100', 'Kasa',    1, 0],   // cash
-    ['150', 'Stoklar', 1, 0],   // inventory
+    ['121', 'Alıcılar',        1, 0],   // tradeReceivables (12x grubunu işaretler)
+    ['136', 'Diğer Alacaklar', 1, 0],   // otherReceivables (13x grubunu işaretler)
+    ['153', 'Ticari Mal',      1, 0],   // inventory        (15x grubunu işaretler)
   ]
   const dataRows: unknown[][] = entries.map(e =>
     [e.code, `Hesap ${e.code}`, e.bakBorc ?? 0, e.bakAlacak ?? 0]
@@ -225,5 +227,80 @@ describe('parseMizanRows — docType', () => {
     const result = await parseMizanRows(rows)
     expect(result.length).toBeGreaterThan(0)
     expect(result[0]?.docType).toBe('MIZAN')
+  })
+})
+
+// ─── Faz 7.3.16 — BUG 1: 103 Verilen Çekler contra ──────────────────────────
+
+describe('parseMizanRows — 103 Verilen Çekler (cash contra)', () => {
+
+  test('103 bakAlacak → cash azaltır (cash_CA)', async () => {
+    const rows = makeMizanRows([
+      { code: '100', bakBorc: 5_000_000 },
+      { code: '103', bakAlacak: 500_000 },  // contra: 5M - 0.5M = 4.5M
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(4_500_000)
+  })
+
+  test('103 bakBorç → cash etkilemez (contra sadece bakAlacak ile çalışır)', async () => {
+    const rows = makeMizanRows([
+      { code: '100', bakBorc: 3_000_000 },
+      { code: '103', bakBorc: 300_000 },  // bakBorç — _CA suffix'de add(-ba) → ba=0 → etki yok
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(3_000_000)
+  })
+})
+
+// ─── Faz 7.3.16 — BUG 2: 2 haneli ana hesap kodu (ENES senaryosu) ────────────
+
+describe('parseMizanRows — 2 haneli ana hesap kodu (MAIN_ACCOUNT_CANONICAL)', () => {
+
+  test('"43" 2 haneli kod → otherNonCurrentLiabilities (436 kanonik)', async () => {
+    // ENES senaryosu: mizan dosyasında "43" kodu var, 43x alt kodu yok
+    const rows = makeMizanRows([{ code: '43', bakAlacak: 8_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.otherNonCurrentLiabilities).toBe(8_000_000)
+  })
+
+  test('"42" 2 haneli kod → longTermTradePayables (429 kanonik)', async () => {
+    const rows = makeMizanRows([{ code: '42', bakAlacak: 3_500_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.longTermTradePayables).toBe(3_500_000)
+  })
+
+  test('"10" 2 haneli kod → cash (100 kanonik)', async () => {
+    const rows = makeMizanRows([{ code: '10', bakBorc: 2_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(2_000_000)
+  })
+
+  test('"43" 2 haneli + "431" alt kod → 2 haneli atlanır, 431 işlenir', async () => {
+    // Geçiş 1 "431" görür → groupHasSubcode "43" ekler → "43" satırı atlanır
+    const rows = makeMizanRows([
+      { code: '43',  bakAlacak: 99_999_000 }, // atlanmalı (alt kod var)
+      { code: '431', bakAlacak:  5_000_000 }, // işlenmeli
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.otherNonCurrentLiabilities).toBe(5_000_000)
+  })
+
+  test('"50" 2 haneli kod → paidInCapital (500 kanonik)', async () => {
+    const rows = makeMizanRows([{ code: '50', bakAlacak: 10_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.paidInCapital).toBe(10_000_000)
+  })
+
+  test('ENES sentez: 43+431+437 karışık → net otherNonCurrentLiabilities', async () => {
+    // Gerçek senaryo: "43" (8M bakAlacak) var ama "431" de var → "43" atlanır
+    // Ek olarak "437" kontra (500K bakBorç) → net 5M - 500K = 4.5M
+    const rows = makeMizanRows([
+      { code: '43',  bakAlacak: 99_000_000 }, // atlanmalı
+      { code: '431', bakAlacak:  5_000_000 }, // işlenmeli
+      { code: '437', bakBorc:      500_000 }, // kontra _CB
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.otherNonCurrentLiabilities).toBe(4_500_000)
   })
 })

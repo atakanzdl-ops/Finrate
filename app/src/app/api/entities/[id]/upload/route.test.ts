@@ -317,3 +317,93 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
     expect(createMock).not.toHaveBeenCalled()
   })
 })
+
+// ─── Faz 7.3.16 — BUG 3: parserProvidedKeys docType filtresi ─────────────────
+
+/**
+ * financialData.upsert merge mantığı: hangi docType hangi alanları ezebilir?
+ * Mock: findUnique → null (yeni kayıt) — sadece parserProvidedKeys filtresi test edilir.
+ * upsert.create çağrısının ikinci argümanını kontrol ediyoruz.
+ */
+
+describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi (Faz 7.3.16)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // ── Senaryo A: MIZAN → sadece bilanço alanları finansal veriye yazılır ──────
+
+  test('Senaryo A — MIZAN: upsert.create bilanço alanı (cash) içerir, gelir tablosu alanı (revenue) içermez', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'Q3',
+        fields: { cash: 5_000_000, revenue: 10_000_000 },
+        unmapped: [],
+        docType: 'MIZAN',
+        rawAccounts: [{ code: '100', amount: 5_000_000 }],
+      }],
+      isExcel: true,
+    })
+    // upsert mock'u override et
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:     jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3' })
+    await callPost(req)
+
+    expect(upsertMock).toHaveBeenCalled()
+    const createArg = upsertMock.mock.calls[0][0].create as Record<string, unknown>
+    // cash (bilanço) yazılmış olmalı
+    expect(createArg.cash).toBe(5_000_000)
+    // revenue (gelir tablosu) MIZAN'da yazılmamalı — parserProvidedKeys filtresi dışında
+    // Not: auto-calc olmadığından null veya undefined gelir
+    expect(createArg.revenue == null).toBe(true)
+  })
+
+  // ── Senaryo B: Q+BEYANNAME → sadece gelir tablosu alanları yazılır ──────────
+
+  test('Senaryo B — Q+BEYANNAME: upsert.create gelir tablosu alanı (revenue) içerir, bilanço alanı (cash) içermez', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'Q3',
+        fields: { revenue: 10_000_000, cash: 5_000_000 },
+        unmapped: [],
+        docType: 'BEYANNAME',
+        rawAccounts: [{ code: '600', amount: 10_000_000 }],
+      }],
+      isExcel: false,
+    })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:     jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'Q3' })
+    await callPost(req)
+
+    expect(upsertMock).toHaveBeenCalled()
+    const createArg = upsertMock.mock.calls[0][0].create as Record<string, unknown>
+    // revenue (gelir tablosu) yazılmış olmalı
+    expect(createArg.revenue).toBe(10_000_000)
+    // cash (bilanço) Q+BEYANNAME'de yazılmamalı
+    expect(createArg.cash == null).toBe(true)
+  })
+})

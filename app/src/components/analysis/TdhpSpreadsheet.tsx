@@ -11,6 +11,7 @@ interface RowDef {
   code?: string
   label: string
   field?: string
+  additionalField?: string   // ikincil toplam alanı (görsel birleşim; edit sadece field'ı değiştirir)
 }
 
 interface FinData {
@@ -34,7 +35,7 @@ const TDHP_ROWS: RowDef[] = [
   { type: 'account', code: '11', label: 'Menkul Kıymetler',                           field: 'shortTermInvestments' },
   { type: 'account', code: '12', label: 'Ticari Alacaklar',                           field: 'tradeReceivables' },
   { type: 'account', code: '13', label: 'Diğer Alacaklar',                            field: 'otherReceivables' },
-  { type: 'account', code: '15+159', label: 'Stoklar (Verilen Sipariş Avansları dahil)', field: 'inventory' },
+  { type: 'account', code: '15+159', label: 'Stoklar (Verilen Sipariş Avansları dahil)', field: 'inventory', additionalField: 'prepaidSuppliers' },
   { type: 'account', code: '17', label: 'Yıllara Yaygın İnş. ve Onarım Maliyetleri', field: 'constructionCosts' },
   { type: 'account', code: '18', label: 'Gelecek Aylara Ait Giderler',                field: 'prepaidExpenses' },
   { type: 'account', code: '19', label: 'Diğer Dönen Varlıklar',                      field: 'otherCurrentAssets' },
@@ -535,14 +536,23 @@ export function TdhpSpreadsheet({ entityId, data, onRefresh }: Props) {
             )
           }
 
-          const storedVal = getEffectiveVal(col.id, row.field!)
+          const baseVal   = getEffectiveVal(col.id, row.field!)
+          const addVal    = row.additionalField ? getEffectiveVal(col.id, row.additionalField) : null
+          const storedVal = (baseVal != null || addVal != null)
+            ? (baseVal ?? 0) + (addVal ?? 0)
+            : null
           const isNeg     = storedVal != null && storedVal < 0
+          // combined display when additionalField is set and user is not currently editing
+          const isEditing  = inputStrings[col.id]?.[row.field!] !== undefined
+          const displayVal = (!isEditing && row.additionalField && storedVal != null)
+            ? fmtTR(storedVal)
+            : getDisplayStr(col.id, row.field!)
 
           return (
             <td key={col.id} className="px-2 py-1">
               <input
                 type="text"
-                value={getDisplayStr(col.id, row.field!)}
+                value={displayVal}
                 onFocus={(e) => handleFocus(col.id, row.field!, e)}
                 onChange={(e) => handleChange(col.id, row.field!, e.target.value)}
                 onBlur={() => handleBlur(col.id, row.field!)}
