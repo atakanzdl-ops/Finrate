@@ -407,3 +407,115 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
     expect(createArg.cash == null).toBe(true)
   })
 })
+
+// ─── Faz 7.3.17 — Manuel alan koruması (upload) ──────────────────────────────
+
+describe('POST /api/entities/[id]/upload — manuel alan koruması (Faz 7.3.17)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // ── Senaryo C: Manuel alan var → upload üzerine yazmaz ────────────────────
+
+  test('Senaryo C — manuel alan koruması: manuel field mergedFields\'tan silinir, upsert update\'e girmez', async () => {
+    const upsertMock    = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    const findManyMock  = jest.fn(() => Promise.resolve([{ fieldName: 'cash' }]))
+
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'Q3',
+        fields: { cash: 9_999_000, inventory: 2_000_000 },
+        unmapped: [],
+        docType: 'MIZAN',
+        rawAccounts: [
+          { code: '100', amount: 9_999_000 },
+          { code: '150', amount: 2_000_000 },
+        ],
+      }],
+      isExcel: true,
+    })
+
+    // existing kayıt var (merge branch)
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:   {
+          findUnique: jest.fn(() => Promise.resolve({
+            id: FINANCIAL_DATA_ID,
+            cash: 5_000_000,  // mevcut manuel değer — korunmalı
+            inventory: 1_000_000,
+          })),
+          upsert: upsertMock,
+          findFirst: jest.fn(() => Promise.resolve(null)),
+        },
+        analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        manualAdjustment:{ findMany: findManyMock },
+        $executeRaw:     jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3' })
+    await callPost(req)
+
+    // manualAdjustment.findMany çağrıldı mı?
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { financialDataId: FINANCIAL_DATA_ID } })
+    )
+
+    // upsert.update'de cash YOK (mergedFields'tan silindi)
+    expect(upsertMock).toHaveBeenCalledTimes(1)
+    const updateArg = upsertMock.mock.calls[0][0].update as Record<string, unknown>
+    expect(updateArg.cash == null || !('cash' in updateArg)).toBe(true)
+
+    // inventory ise mevcutta (manuel değil) — DB'ye yazılabilir
+    // (MIZAN + BALANCE_SHEET_FIELDS korumasıyla inventory hâlâ geçerli)
+    // Burada sadece cash'in silindiğini doğruluyoruz
+  })
+
+  // ── Senaryo D: Manuel alan yok → upload normal çalışır ────────────────────
+
+  test('Senaryo D — manuel alan yok → findMany boş döner, mergedFields değişmez', async () => {
+    const upsertMock   = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    const findManyMock = jest.fn(() => Promise.resolve([]))  // boş
+
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'Q3',
+        fields: { cash: 5_000_000 },
+        unmapped: [],
+        docType: 'MIZAN',
+        rawAccounts: [{ code: '100', amount: 5_000_000 }],
+      }],
+      isExcel: true,
+    })
+
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:   {
+          findUnique: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID, cash: 3_000_000 })),
+          upsert: upsertMock,
+          findFirst: jest.fn(() => Promise.resolve(null)),
+        },
+        analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        manualAdjustment:{ findMany: findManyMock },
+        $executeRaw:     jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3' })
+    await callPost(req)
+
+    expect(findManyMock).toHaveBeenCalled()
+    // cash serbest — update'de yer alıyor (MIZAN BALANCE_SHEET koruması ile izin verilmiş)
+    expect(upsertMock).toHaveBeenCalledTimes(1)
+    const updateArg = upsertMock.mock.calls[0][0].update as Record<string, unknown>
+    expect(updateArg.cash).toBe(5_000_000)
+  })
+})

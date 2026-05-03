@@ -408,6 +408,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
+      // Manuel düzenlenmiş alanları koru — Excel/PDF yüklemesi bu alanların üzerine yazmasın
+      if (existing) {
+        const manualAdj = await prisma.manualAdjustment.findMany({
+          where:  { financialDataId: existing.id },
+          select: { fieldName: true },
+        })
+        for (const { fieldName } of manualAdj) {
+          delete (mergedFields as Record<string, unknown>)[fieldName]
+        }
+      }
+
       const financialData = await prisma.financialData.upsert({
         where: { entityId_year_period: { entityId, year: row.year, period } },
         update: { ...mergedFields, source: nextSource, fileName: file.name, updatedAt: new Date() },
