@@ -24,7 +24,7 @@
  *   - Yeni matematik/skor hesabi YAPILMAZ — sadece engineResult verisi formatlanir
  */
 
-import type { AccountingLeg, DecisionInsight } from './contracts'
+import type { AccountingLeg, DecisionInsight, BalanceRatioTransparency } from './contracts'
 import type { ActualRatingValidation } from './postActionRating'
 import {
   selectTargetPackage,
@@ -357,13 +357,15 @@ export function dedupeActions(actions: SelectedAction[]): SelectedAction[] {
  *   - amountTRY: toplanir
  *   - transactions: birlestir (tüm muhasebe bacaklari korunur)
  *   - estimatedNotchContribution: toplanir, max 2.0 ile sinirlanir
+ *   - ratioTransparency: toplam tutarla yeniden hesaplanir (Faz 7.3.12-PRE-FIX)
  *   - Diger alanlar (horizon, narrative vb.) ilk kaydın degerini korur
  *
  * NOT: dedupeActions SONRASI cagirilir — onceden exact-duplicate'lar
  * zaten temizlenmis olur, sadece farkli-tutar parçalar kalir.
  */
-function consolidateByActionId(actions: SelectedAction[]): SelectedAction[] {
-  const map = new Map<string, SelectedAction>()
+export function consolidateByActionId(actions: SelectedAction[]): SelectedAction[] {
+  const map          = new Map<string, SelectedAction>()
+  const firstAmounts = new Map<string, number>()  // Faz 7.3.12-PRE-FIX: ilk parça tutarı
 
   for (const action of actions) {
     const existing = map.get(action.actionId)
@@ -376,7 +378,45 @@ function consolidateByActionId(actions: SelectedAction[]): SelectedAction[] {
       )
     } else {
       // Shallow copy + transactions deep-copy (mutation koruması)
+      firstAmounts.set(action.actionId, action.amountTRY ?? 0)  // ilk parça tutarı kaydet
       map.set(action.actionId, { ...action, transactions: [...action.transactions] })
+    }
+  }
+
+  // Faz 7.3.12-PRE-FIX: Çoklu parça aksiyonlarda realisticTarget'ı toplam tutarla yeniden hesapla.
+  // İlk parçanın transparency'si tek parça tutarını yansıtır; consolidated kart toplam etkiyi göstermeli.
+  // Tek parçalı aksiyonlar (a1 >= total) dokunulmaz — regresyon yok.
+  for (const action of map.values()) {
+    const a1    = firstAmounts.get(action.actionId) ?? action.amountTRY ?? 0
+    const total = action.amountTRY ?? 0
+    if (a1 >= total) continue  // tek parça veya degenerate
+
+    const rt = action.ratioTransparency
+    if (!rt) continue
+
+    if (rt.kind === 'turnover') {
+      // A18/A19: formula'da netSales ve totalAssets hazır
+      const { netSales, totalAssets } = rt.formula
+      if (netSales != null && totalAssets != null && totalAssets > 0) {
+        action.ratioTransparency = { ...rt, realisticTarget: (netSales + total) / totalAssets }
+      }
+    } else if (rt.kind === 'margin') {
+      // A10 özkaynak/aktif: current = E/A, rt1 = (E+a1)/(A+a1) → A ve E reverse-engineer
+      const c   = rt.current
+      const rt1 = rt.realisticTarget  // ilk parçanın rt'si
+      if (rt1 > c && a1 > 0) {
+        const A = a1 * (1 - rt1) / (rt1 - c)  // A = a1×(1-rt1)/(rt1-c)
+        if (A > 0) {
+          const E = c * A
+          action.ratioTransparency = { ...rt, realisticTarget: (E + total) / (A + total) }
+        }
+      }
+      // rt1 <= c veya A <= 0 → degenerate, ilk parçanın rt'si korunur
+    } else {
+      // balance kind — kural: Math.max(currentBalance - total, 0)
+      // A05 normalde tek parça; bu branch multi-piece balance aksiyonlar için guard.
+      const brt = rt as BalanceRatioTransparency
+      action.ratioTransparency = { ...brt, realisticTarget: Math.max(brt.currentBalance - total, 0) }
     }
   }
 
