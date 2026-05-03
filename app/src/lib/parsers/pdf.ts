@@ -443,6 +443,18 @@ function detectPdfMizan(text: string): boolean {
   return n.includes('mizan') && (n.includes('hesap kod') || /aciklama.*bor.*alacak/.test(n))
 }
 
+/**
+ * PDF'nin 'BEYANNAME' mi, 'MIZAN' mı yoksa 'UNKNOWN' mu olduğunu döner.
+ * Kontrol sırası önemli: mizan PDF'leri beyanname kelimesi içerebilir,
+ * bu yüzden mizan önce kontrol edilir.
+ */
+export function detectPdfType(text: string): 'BEYANNAME' | 'MIZAN' | 'UNKNOWN' {
+  if (detectPdfMizan(text)) return 'MIZAN'
+  const t = detectType(text)
+  if (t !== 'unknown') return 'BEYANNAME'
+  return 'UNKNOWN'
+}
+
 function parsePdfMizan(text: string): ParsedRow[] {
   const dateMatch = text.match(
     /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-\u2013\u2014]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/
@@ -483,7 +495,7 @@ function parsePdfMizan(text: string): ParsedRow[] {
   }
 
   if (Object.keys(fields).length < 3) return []
-  return [{ year, period, fields, unmapped: [] }]
+  return [{ year, period, fields, unmapped: [], docType: 'MIZAN' }]
 }
 
 // ─── Fallback parser ──────────────────────────────────────────────────────────
@@ -1206,7 +1218,7 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     const fromRight = { ...bilFields.cari,   ...gelFields.cari   }  // sağ sütun
     const fields1001A = Object.keys(fromLeft).length > 0 ? fromLeft : fromRight
     const rawAcc1001A = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
-    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [], rawAccounts: rawAcc1001A }]
+    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [], rawAccounts: rawAcc1001A, docType: 'BEYANNAME' }]
     return []
   }
 
@@ -1216,11 +1228,11 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     const gelIdx = findNormIdx(text, 'gelir tablosu')
     if (gelIdx !== -1) {
       const { cari } = parseEkSection(text.slice(gelIdx, gelIdx + 4000))
-      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [], rawAccounts: rawAccGV }]
+      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
     }
     const full = parseEkSection(text)
-    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [], rawAccounts: rawAccGV }]
-    return [{ year, period, fields: parseTaxForm(text), unmapped: [], rawAccounts: rawAccGV }]
+    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
+    return [{ year, period, fields: parseTaxForm(text), unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
   }
 
   // 4) Kurumlar Vergisi Yıllık (1010)
@@ -1238,9 +1250,9 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
       console.log('[pdf] raw.cari=', JSON.stringify(raw.cari))
       console.log('[pdf] raw.onceki keys=', Object.keys(raw.onceki))
       // raw.cari = her satırın SON sayısı = cari dönem (2 sütunluda sağ, tek sütunluda tek)
-      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV }]
+      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME' }]
     }
-    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [], rawAccounts: rawAccKV }]
+    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME' }]
   }
 
   // 5) Kurumlar Geçici Vergi (1032-KV)
@@ -1252,7 +1264,7 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
       const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
       // Geçici vergide taxExpense gelir tablosu kalemi değil
       const { taxExpense: _t, ...taxNoTax } = taxFields
-      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG }]
+      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
     }
     const rawFull = parseEkSection(text)
     const { taxExpense: _t2, ...taxNoTax2 } = taxFields
@@ -1262,13 +1274,13 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
         hasRevenue: rawFull.cari.revenue != null,
         hasCogs: rawFull.cari.cogs != null,
       })
-      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG }]
+      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
     }
-    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG }]
+    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
   }
 
   // 6) Bilinmeyen: satır bazlı fallback
   const fallbackRows = parseFallback(text, year, period)
   const rawAccFallback = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
-  return fallbackRows.map(r => ({ ...r, rawAccounts: rawAccFallback }))
+  return fallbackRows.map(r => ({ ...r, rawAccounts: rawAccFallback, docType: 'BEYANNAME' }))
 }

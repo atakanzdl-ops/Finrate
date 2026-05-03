@@ -398,7 +398,8 @@ const MIZAN_MAP: Record<string, string> = {
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
   '159': 'prepaidSuppliers',
   '180': 'prepaidExpenses',
-  '190': 'otherCurrentAssets', '193': 'otherCurrentAssets',
+  '190': 'otherCurrentAssets', '191': 'otherCurrentAssets', '193': 'otherCurrentAssets',
+  '195': 'otherCurrentAssets', '196': 'otherCurrentAssets', '197': 'otherCurrentAssets', '198': 'otherCurrentAssets',
   '250': 'tangibleAssets',   '252': 'tangibleAssets',   '253': 'tangibleAssets',   '254': 'tangibleAssets', '255': 'tangibleAssets',
   '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets',
   '280': 'longTermPrepaidExpenses',
@@ -434,9 +435,20 @@ const MIZAN_MAP: Record<string, string> = {
   '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
   '381': 'deferredRevenue_A',
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
+  // 42x — UV Ticari Borçlar → longTermTradePayables_A
+  '420': 'longTermTradePayables_A',  '421': 'longTermTradePayables_A',
+  '426': 'longTermTradePayables_A',  '429': 'longTermTradePayables_A',
+  // 43x — UV Diğer Borçlar → otherNonCurrentLiabilities_A
+  '431': 'otherNonCurrentLiabilities_A', '432': 'otherNonCurrentLiabilities_A',
+  '433': 'otherNonCurrentLiabilities_A', '436': 'otherNonCurrentLiabilities_A',
   '500': 'paidInCapital_A',
   '502': 'capitalReserves_A',        // Sermaye Düzeltmesi → capitalReserves (NOT paidInCapital)
-  '529': 'capitalReserves_A',
+  // 52x — Sermaye Yedekleri alt kodlar → capitalReserves_A
+  '520': 'capitalReserves_A', '521': 'capitalReserves_A', '522': 'capitalReserves_A',
+  '523': 'capitalReserves_A', '524': 'capitalReserves_A', '529': 'capitalReserves_A',
+  // 54x — Kâr Yedekleri → profitReserves_A
+  '540': 'profitReserves_A', '541': 'profitReserves_A', '542': 'profitReserves_A',
+  '548': 'profitReserves_A', '549': 'profitReserves_A',
   '570': 'retainedEarnings_A',
   '590': 'netProfitCurrentYear_A',   // Dönem Net Karı (bakAlacak = pozitif)
   '591': 'netProfitCurrentYear_CB',  // Dönem Net Zararı (bakBorç = zarar → negatif)
@@ -445,6 +457,8 @@ const MIZAN_MAP: Record<string, string> = {
   '268': 'intangibleAssets_CA',
   '302': 'shortTermFinancialDebt_CB',
   '402': 'longTermFinancialDebt_CB',
+  '422': 'longTermTradePayables_CB',           // UV Alacak Senetleri Reeskontu (kontra)
+  '437': 'otherNonCurrentLiabilities_CB',      // UV Borç Senetleri Reeskontu (kontra)
 }
 
 export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
@@ -551,6 +565,7 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     period,
     fields: fields as Record<string, number | null>,
     unmapped: [],
+    docType: 'MIZAN',
     meta: { ...metaBase, confidence: calcConfidence(metaBase) },
     rawAccounts: finalRawAccounts.length > 0 ? finalRawAccounts : undefined,
     reversals: reversals.length > 0 ? reversals : undefined,

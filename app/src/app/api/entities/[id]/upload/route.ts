@@ -426,7 +426,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-      // Ham hesap kodu verisi varsa (mizan yüklemelerinde) FinancialAccount tablosuna kaydet
+      // Ham hesap kodu verisi varsa FinancialAccount tablosuna kaydet
+      // period + docType bazlı merge: BEYANNAME ve mizan birbirini EZMESİN
       if (row.rawAccounts && row.rawAccounts.length > 0) {
         // Audit trail — ters bakiye reklasifikasyonları logla
         if (row.reversals && row.reversals.length > 0) {
@@ -435,20 +436,84 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             console.log(`  ${r.originalCode} → ${r.reclassifiedCode} (${r.amount.toLocaleString('tr-TR')} TL)`)
           }
         }
-        await prisma.financialAccount.deleteMany({ where: { analysisId: analysis.id } })
-        await prisma.financialAccount.createMany({
-          data: row.rawAccounts.map(a => ({
-            analysisId:  analysis.id,
-            accountCode: a.code,
-            accountName: '',
-            amount:      a.amount,
-          })),
-          skipDuplicates: true,
-        })
+
+        const docType = row.docType ?? 'UNKNOWN'
+
+        if (period === 'ANNUAL' && docType === 'BEYANNAME') {
+          // Yıllık beyanname: tek kaynak olduğu için tüm hesaplar yazılır
+          await prisma.financialAccount.deleteMany({ where: { analysisId: analysis.id } })
+          await prisma.financialAccount.createMany({
+            data: row.rawAccounts.map(a => ({
+              analysisId:  analysis.id,
+              accountCode: a.code,
+              accountName: '',
+              amount:      a.amount,
+            })),
+            skipDuplicates: true,
+          })
+        } else if (docType === 'MIZAN') {
+          // Mizan (Excel veya PDF): sadece bilanço hesapları (1xx-5xx)
+          // 6xx gelir tablosu hesapları korunur (beyanname tarafından yazılmış olabilir)
+          await prisma.financialAccount.deleteMany({
+            where: {
+              analysisId: analysis.id,
+              OR: [
+                { accountCode: { startsWith: '1' } },
+                { accountCode: { startsWith: '2' } },
+                { accountCode: { startsWith: '3' } },
+                { accountCode: { startsWith: '4' } },
+                { accountCode: { startsWith: '5' } },
+              ],
+            },
+          })
+          const balanceAccounts = row.rawAccounts.filter(a =>
+            ['1', '2', '3', '4', '5'].some(p => a.code.startsWith(p))
+          )
+          if (balanceAccounts.length > 0) {
+            await prisma.financialAccount.createMany({
+              data: balanceAccounts.map(a => ({
+                analysisId:  analysis.id,
+                accountCode: a.code,
+                accountName: '',
+                amount:      a.amount,
+              })),
+              skipDuplicates: true,
+            })
+          }
+        } else if (docType === 'BEYANNAME') {
+          // Geçici beyanname (Q dönemi): sadece gelir tablosu hesapları (6xx)
+          // 1xx-5xx bilanço hesapları korunur (mizan tarafından yazılmış olabilir)
+          await prisma.financialAccount.deleteMany({
+            where: {
+              analysisId:  analysis.id,
+              accountCode: { startsWith: '6' },
+            },
+          })
+          const incomeAccounts = row.rawAccounts.filter(a => a.code.startsWith('6'))
+          if (incomeAccounts.length > 0) {
+            await prisma.financialAccount.createMany({
+              data: incomeAccounts.map(a => ({
+                analysisId:  analysis.id,
+                accountCode: a.code,
+                accountName: '',
+                amount:      a.amount,
+              })),
+              skipDuplicates: true,
+            })
+          }
+        } else {
+          // UNKNOWN docType — defansif: mevcut kayıtlara dokunma
+          console.warn('[upload] unknown docType, skipping rawAccounts write', {
+            analysisId: analysis.id,
+            rawAccountsCount: row.rawAccounts.length,
+          })
+        }
+
         console.info('[upload] financialAccounts saved', {
           analysisId: analysis.id,
           year: row.year,
           period,
+          docType,
           count: row.rawAccounts.length,
         })
       }
