@@ -1,14 +1,14 @@
 'use client'
 
 /**
- * EntityRatingCard (Faz 7.3.27)
+ * EntityRatingCard (Faz 7.3.27, bug fix Faz 7.3.28)
  *
  * Mali müşavir kontrol panelinde her firma için mini kart.
  * Firma adı + sektör badge + skor + rating + trend oku + mini bar grafik.
  *
  * Dışa aktarılan saf fonksiyonlar (test edilebilir):
- *   miniPeriodLabel, groupAnalysesByEntity, latestUpdatedAt,
- *   sortEntitiesByLatest, computeTrend
+ *   miniPeriodLabel, computeTrendX, groupAnalysesByEntity, latestUpdatedAt,
+ *   sortEntitiesByLatest, computeTrend, latestAnalysisPeriodLabel
  */
 
 import { useState } from 'react'
@@ -63,6 +63,15 @@ export function miniPeriodLabel(year: number, period: string): string {
   return period === 'ANNUAL' ? String(year).slice(-2) : period
 }
 
+/**
+ * SVG trend çizgisi için i. çubuğun x koordinatı (Faz 7.3.28 fix).
+ * viewBox 0-400, n çubuk eşit genişlikte → merkez (i + 0.5) / n * 400.
+ * Eski formül (50 + i * 300/(n-1)) bar merkezini ±16px kaçırıyordu.
+ */
+export function computeTrendX(i: number, n: number): number {
+  return (i + 0.5) / n * 400
+}
+
 /** Analizleri entity.id'ye göre gruplar. entity alanı olmayan analizler atlanır. */
 export function groupAnalysesByEntity(analyses: CardAnalysisItem[]): EntityGroup[] {
   const map = new Map<string, EntityGroup>()
@@ -77,12 +86,16 @@ export function groupAnalysesByEntity(analyses: CardAnalysisItem[]): EntityGroup
   return Array.from(map.values())
 }
 
-/** Bir analizler listesinden en yeni updatedAt değerini döner. */
+/**
+ * Bir analizler listesinden en yeni updatedAt değerini döner.
+ * NOT (Faz 7.3.28): jsonUtf8.normalizeStrings Prisma Date'leri {} yapıyor.
+ * Bu fonksiyon yedekte kalmaktadır; sortEntitiesByLatest artık kullanmıyor.
+ */
 export function latestUpdatedAt(analyses: CardAnalysisItem[]): string | null {
   if (!analyses.length) return null
   let latest: string | null = null
   for (const a of analyses) {
-    if (!a.updatedAt) continue
+    if (!a.updatedAt || typeof a.updatedAt !== 'string') continue
     if (!latest || new Date(a.updatedAt) > new Date(latest)) {
       latest = a.updatedAt
     }
@@ -90,16 +103,32 @@ export function latestUpdatedAt(analyses: CardAnalysisItem[]): string | null {
   return latest
 }
 
-/** EntityGroup listesini son güncellenen analize göre DESC sıralar. */
+/**
+ * EntityGroup listesini en son analiz yılı + dönemi'ne göre DESC sıralar (Faz 7.3.28).
+ * updatedAt API serialization hatası (Date→{}) nedeniyle year×10 + PERIOD_ORDER skoru kullanılır.
+ */
 export function sortEntitiesByLatest(groups: EntityGroup[]): EntityGroup[] {
-  return [...groups].sort((a, b) => {
-    const aMax = latestUpdatedAt(a.analyses)
-    const bMax = latestUpdatedAt(b.analyses)
-    if (!aMax && !bMax) return 0
-    if (!aMax) return 1
-    if (!bMax) return -1
-    return new Date(bMax).getTime() - new Date(aMax).getTime()
-  })
+  function maxChronScore(g: EntityGroup): number {
+    let max = -Infinity
+    for (const a of g.analyses) {
+      const s = a.year * 10 + (PERIOD_ORDER[a.period] ?? 5)
+      if (s > max) max = s
+    }
+    return max === -Infinity ? 0 : max
+  }
+  return [...groups].sort((a, b) => maxChronScore(b) - maxChronScore(a))
+}
+
+/**
+ * Bir analizler listesinden kronolojik olarak en son dönem etiketini döner.
+ * Subtitle'da tarih yerine kullanılır (Faz 7.3.28).
+ */
+export function latestAnalysisPeriodLabel(analyses: CardAnalysisItem[]): string | null {
+  if (!analyses.length) return null
+  const sorted = sortByPeriod(analyses)
+  const last = sorted[sorted.length - 1]
+  if (!last) return null
+  return periodLabel(last.year, last.period)
 }
 
 /**
@@ -136,9 +165,9 @@ export default function EntityRatingCard({ entity, analyses }: Props) {
   const last   = sorted[sorted.length - 1] ?? null
   const trend  = computeTrend(analyses)
 
-  // Trend line koordinatları — aynı SVG viewBox(0 0 400 200)
+  // Trend line koordinatları — Faz 7.3.28: computeTrendX ile bar merkezine hizalı
   const trendPoints = sorted.map((a, i) => {
-    const x = n === 1 ? 200 : 50 + i * (300 / Math.max(n - 1, 1))
+    const x = computeTrendX(i, n)
     const y = 200 - (a.finalScore / 100) * 200
     return [x, y] as [number, number]
   })

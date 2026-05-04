@@ -1,25 +1,29 @@
 /**
- * EntityRatingCard — Saf fonksiyon testleri (Faz 7.3.27)
+ * EntityRatingCard — Saf fonksiyon testleri (Faz 7.3.27 + Faz 7.3.28 bug fix)
  *
  * testEnvironment: 'node' → jsdom/rendering yok.
  * Dışa aktarılan saf fonksiyonlar test edilir:
- *   miniPeriodLabel, groupAnalysesByEntity, latestUpdatedAt,
- *   sortEntitiesByLatest, computeTrend
+ *   miniPeriodLabel, computeTrendX, groupAnalysesByEntity, latestUpdatedAt,
+ *   sortEntitiesByLatest, computeTrend, latestAnalysisPeriodLabel
  *
  * T_ERC1: groupAnalysesByEntity — aynı entity.id → tek grup
  * T_ERC2: groupAnalysesByEntity — farklı entity'ler → ayrı gruplar
- * T_ERC3: sortEntitiesByLatest — son güncellenen üste
+ * T_ERC3: sortEntitiesByLatest — year+period bazlı sıralama (Faz 7.3.28)
  * T_ERC4: computeTrend — 2+ analiz: skor farkı döner
  * T_ERC5: computeTrend — tek analiz: null
  * T_ERC6: latestUpdatedAt — boş → null; dolu → en yeni tarih
+ * T_ERC7: computeTrendX — son x koordinatı viewBox içinde (Faz 7.3.28)
+ * T_ERC8: latestAnalysisPeriodLabel — en son dönem etiketi (Faz 7.3.28)
  */
 
 import {
   miniPeriodLabel,
+  computeTrendX,
   groupAnalysesByEntity,
   latestUpdatedAt,
   sortEntitiesByLatest,
   computeTrend,
+  latestAnalysisPeriodLabel,
   type CardAnalysisItem,
   type EntityGroup,
 } from '../EntityRatingCard'
@@ -125,8 +129,10 @@ describe('T_ERC2 — groupAnalysesByEntity: farklı entity\'ler → ayrı grupla
 })
 
 // ─── T_ERC3: sortEntitiesByLatest ────────────────────────────────────────────
+// Faz 7.3.28: updatedAt API Date→{} hatası nedeniyle year+period bazlı sıralamaya geçildi.
+// Fixture'daki yıl sıralaması (e2=2025 > e1=2024 > e3=2023) tarih sıralamasıyla aynı → testler geçer.
 
-describe('T_ERC3 — sortEntitiesByLatest: son güncellenen üste', () => {
+describe('T_ERC3 — sortEntitiesByLatest: year+period bazlı kronolojik sıralama (Faz 7.3.28)', () => {
   const groups: EntityGroup[] = [
     {
       entity: { id: 'e1', name: 'Firma A' },
@@ -251,5 +257,81 @@ describe('T_ERC6 — latestUpdatedAt', () => {
       makeItem('a2', 2025, 'Q1',    70),
     ]
     expect(latestUpdatedAt(analyses)).toBeNull()
+  })
+})
+
+// ─── T_ERC7: computeTrendX ────────────────────────────────────────────────────
+// Faz 7.3.28: x koordinatı bar merkezi = (i + 0.5) / n * 400
+
+describe('T_ERC7 — computeTrendX: x koordinatı viewBox 0-400 içinde, bar merkezinde', () => {
+  test('n=1: tek çubuk merkezi = 200', () => {
+    expect(computeTrendX(0, 1)).toBeCloseTo(200, 1)
+  })
+
+  test('n=3, i=0: ilk çubuk merkezi ≈ 66.7', () => {
+    expect(computeTrendX(0, 3)).toBeCloseTo(66.7, 0)
+    expect(computeTrendX(0, 3)).toBeGreaterThan(0)
+  })
+
+  test('n=3, i=2: son çubuk merkezi ≈ 333.3 (eski formül 350 veriyordu)', () => {
+    expect(computeTrendX(2, 3)).toBeCloseTo(333.3, 0)
+    expect(computeTrendX(2, 3)).toBeLessThan(400)
+  })
+
+  test('n=3, i=1: orta çubuk = 200 (simetrik)', () => {
+    expect(computeTrendX(1, 3)).toBeCloseTo(200, 1)
+  })
+
+  test('her i için 0 < x < 400 (n=5, ipos benzeri kart)', () => {
+    for (let i = 0; i < 5; i++) {
+      const x = computeTrendX(i, 5)
+      expect(x).toBeGreaterThan(0)
+      expect(x).toBeLessThan(400)
+    }
+  })
+
+  test('son çubuk her zaman viewBox sağ kenarı içinde (n=1..6)', () => {
+    for (let n = 1; n <= 6; n++) {
+      const x = computeTrendX(n - 1, n)
+      expect(x).toBeLessThan(400)
+      expect(x).toBeGreaterThan(0)
+    }
+  })
+})
+
+// ─── T_ERC8: latestAnalysisPeriodLabel ───────────────────────────────────────
+// Faz 7.3.28: updatedAt yerine year+period bazlı dönem etiketi
+
+describe('T_ERC8 — latestAnalysisPeriodLabel: en son dönem etiketi', () => {
+  test('boş liste → null', () => {
+    expect(latestAnalysisPeriodLabel([])).toBeNull()
+  })
+
+  test('tek analiz ANNUAL → sadece yıl ("2024")', () => {
+    const analyses = [makeItem('a1', 2024, 'ANNUAL', 60)]
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024')
+  })
+
+  test('tek analiz Q4 → "2024/Q4"', () => {
+    const analyses = [makeItem('a1', 2024, 'Q4', 60)]
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/Q4')
+  })
+
+  test('3 karışık analiz → en son dönem (2025/Q4)', () => {
+    const analyses = [
+      makeItem('a1', 2024, 'Q1',    60),
+      makeItem('a2', 2025, 'Q4',    70),
+      makeItem('a3', 2023, 'ANNUAL', 55),
+    ]
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2025/Q4')
+  })
+
+  test('aynı yılda ANNUAL < Q1 < Q4 → Q4 döner', () => {
+    const analyses = [
+      makeItem('a1', 2024, 'ANNUAL', 60),
+      makeItem('a2', 2024, 'Q4',    70),
+      makeItem('a3', 2024, 'Q1',    65),
+    ]
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/Q4')
   })
 })

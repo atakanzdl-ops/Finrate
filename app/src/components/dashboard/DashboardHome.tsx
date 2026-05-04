@@ -7,7 +7,7 @@ import FinrateShell from '@/components/layout/FinrateShell'
 import EntityRatingCard, {
   groupAnalysesByEntity,
   sortEntitiesByLatest,
-  latestUpdatedAt,
+  latestAnalysisPeriodLabel,
   type CardAnalysisItem,
 } from '@/components/dashboard/EntityRatingCard'
 
@@ -87,8 +87,9 @@ export default function DashboardHome() {
 
   const subtitle = useMemo(() => {
     if (!analyses.length) return 'Henüz analiz bulunmuyor.'
-    const overallLatest = latestUpdatedAt(analyses as CardAnalysisItem[])
-    return `${entityGroups.length} firma • Son güncelleme: ${formatDate(overallLatest)}`
+    // updatedAt API'den {} geliyor (jsonUtf8 Date→{} hatası); year+period güvenilir
+    const lastPeriod = latestAnalysisPeriodLabel(analyses as CardAnalysisItem[]) ?? '—'
+    return `${entityGroups.length} firma • Son dönem: ${lastPeriod}`
   }, [analyses, entityGroups.length])
 
   async function handleCreateAnalysis(e: React.FormEvent) {
