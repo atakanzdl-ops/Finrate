@@ -284,6 +284,8 @@ export async function POST(req: NextRequest) {
         currentObjectiveScore,
         currentCombinedScore:  currentCombinedScore,
         currentActualRating:   currentActualRating,
+        // Faz 7.3.19: erken çıkış için engine rating kaynağı (currentActualRating'den farklı olabilir)
+        decisionCurrentRating: engineResult.currentRating,
       },
     )
 

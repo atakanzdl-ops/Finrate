@@ -262,6 +262,16 @@ export interface DecisionAnswer {
   actualRatingValidation?: ActualRatingValidation | null
   /** Faz 7.3.8d: Hedef rating'e göre filtreleme meta verisi (opsiyonel) */
   targetPackageMeta?: TargetPackageMeta
+  /**
+   * Faz 7.3.19: Engine'in seçtiği tam portföy aksiyon sayısı (targetPackage filtresi öncesi).
+   * UI'da "X seçilen, Y seçilmeyen" ayrımı için kullanılır.
+   */
+  enginePortfolioCount: number
+  /**
+   * Faz 7.3.19: Engine tarafından reddedilen (portföye alınmayan) benzersiz aksiyon sayısı.
+   * rejectedInsights.length ile eşdeğerdir; UI'da kolaylık için açık alan.
+   */
+  rejectedInsightCount: number
 }
 
 // ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
@@ -281,6 +291,12 @@ export interface TargetPackageContext {
   currentCombinedScore:  number
   /** Mevcut gerçek rating (legacy notch'lu kabul edilir) */
   currentActualRating:   string
+  /**
+   * Faz 7.3.19: Erken çıkış kararı için kullanılan rating kaynağı (opsiyonel).
+   * route.ts'den engineResult.currentRating olarak geçirilmeli.
+   * selectTargetPackage'e doğrudan iletilir.
+   */
+  decisionCurrentRating?: string
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1302,14 +1318,16 @@ export function buildDecisionAnswer(
 
   if (targetPackageContext && accountBalances) {
     const pkg = selectTargetPackage({
-      portfolio:             engineResult.portfolio,
-      initialBalances:       accountBalances,
-      sector:                targetPackageContext.sector,
-      subjectiveTotal:       targetPackageContext.subjectiveTotal,
-      currentObjectiveScore: targetPackageContext.currentObjectiveScore,
-      currentCombinedScore:  targetPackageContext.currentCombinedScore,
-      currentActualRating:   targetPackageContext.currentActualRating,
-      v3EstimatedRating:     engineResult.finalTargetRating,
+      portfolio:              engineResult.portfolio,
+      initialBalances:        accountBalances,
+      sector:                 targetPackageContext.sector,
+      subjectiveTotal:        targetPackageContext.subjectiveTotal,
+      currentObjectiveScore:  targetPackageContext.currentObjectiveScore,
+      currentCombinedScore:   targetPackageContext.currentCombinedScore,
+      currentActualRating:    targetPackageContext.currentActualRating,
+      // Faz 7.3.19: erken çıkış kararı için ayrı kaynak — inconsistentSources tespiti
+      decisionCurrentRating:  targetPackageContext.decisionCurrentRating,
+      v3EstimatedRating:      engineResult.finalTargetRating,
       requestedTarget,
     })
     portfolioForUI    = pkg.selectedActions
@@ -1357,6 +1375,11 @@ export function buildDecisionAnswer(
     ? buildComparisonWithV2(engineResult, v2Result)
     : undefined
 
+  // Faz 7.3.19: UI ayrımı için meta sayımlar
+  // enginePortfolioCount: targetPackage öncesi tam engine portföyü (deduped aksiyon sayısı)
+  const enginePortfolioCount = dedupeActions(engineResult.portfolio).length
+  const rejectedInsightCount = rejectedInsights.length
+
   return {
     executiveAnswer,
     whatCompanyShouldDo,
@@ -1375,5 +1398,7 @@ export function buildDecisionAnswer(
     riskInsights,
     actualRatingValidation: actualRatingValidation ?? null,
     targetPackageMeta,
+    enginePortfolioCount,
+    rejectedInsightCount,
   }
 }

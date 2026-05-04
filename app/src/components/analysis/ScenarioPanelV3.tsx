@@ -493,6 +493,16 @@ function AksiyonPlaniTab({
         </div>
       )}
 
+      {/* TUTARSIZ KAYNAK UYARISI (Faz 7.3.19) — engine rating ile görünen rating çeliştiğinde */}
+      {da?.targetPackageMeta?.inconsistentSources && (
+        <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
+          <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+          <div className="text-sm text-amber-900">
+            Rating kaynakları arasında tutarsızlık tespit edildi. Önerilen aksiyonlar engine analizine göre listelenmiştir.
+          </div>
+        </div>
+      )}
+
       {/* A. ANA AKSIYON TABLOSU */}
       <div
         className="bg-white border border-[#E5E9F0] rounded-[12px] overflow-hidden"
@@ -729,6 +739,10 @@ function DetayTab({
               </h3>
               <p className="text-sm text-[#64748B] mt-1">
                 {(() => {
+                  // Faz 7.3.19: enginePortfolioCount varsa kesin rakamları kullan
+                  if (da.enginePortfolioCount !== undefined) {
+                    return `${da.enginePortfolioCount} seçilen, ${da.rejectedInsightCount ?? rejected.length} seçilmeyen aksiyon`
+                  }
                   const totalEvals = rejected.reduce((s: number, r: any) => s + (r.rejectionCount ?? 1), 0)
                   return totalEvals > rejected.length
                     ? `${rejected.length} benzersiz aksiyon, ${totalEvals} değerlendirme reddi`

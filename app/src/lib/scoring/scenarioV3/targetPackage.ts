@@ -67,6 +67,11 @@ export interface TargetPackageMeta {
    * UI'da "4/4 grup kapsanmış" gösterimi için kullanılabilir.
    */
   coveredGroupCount:        number
+  /**
+   * true → currentActualRating >= target ama decisionCurrentRating < target.
+   * İki rating kaynağı çelişiyor; engine portföyü gösteriliyor, UI'da uyarı üretilmeli.
+   */
+  inconsistentSources?:     boolean
 
   // ── Faz 7.3.8d-FIX3: Sayım uyumu (debug / UI) ────────────────────────────
   /**
@@ -183,6 +188,14 @@ export interface SelectTargetPackageParams {
   currentCombinedScore:   number
   /** Mevcut gerçek rating (legacy notch'lu kabul edilir, normalize edilir) */
   currentActualRating:    string
+  /**
+   * Erken çıkış kararı için kullanılan rating kaynağı (opsiyonel).
+   * Sağlanmazsa currentActualRating kullanılır (geriye uyumlu davranış).
+   * route.ts'den engineResult.currentRating olarak geçirilmeli.
+   * İki kaynak çelişirse (decisionCurrentRating < target ≤ currentActualRating)
+   * boş portföy döndürülmez; engine portföyü + inconsistentSources uyarısı üretilir.
+   */
+  decisionCurrentRating?: string
   /** V3 engine'in tahmin ettiği post-rating */
   v3EstimatedRating:      string
   /** Kullanıcının istediği hedef rating */
@@ -229,8 +242,45 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
 
   const targetIdx = ratingToIndex(targetGrade)
 
-  // ── EDGE: Mevcut rating zaten hedefte/üstünde → boş paket ───────────────────
+  // ── EDGE: Mevcut rating zaten hedefte/üstünde → boş paket (veya tutarsızlık) ─
   if (currentIdx >= targetIdx) {
+    // decisionCurrentRating sağlandıysa kaynak tutarlılığını kontrol et.
+    // Faz 7.3.19: currentActualRating >= target ama decisionCurrentRating < target
+    // → engine farklı rating kaynağından analiz yaptı → boş dönme, portföyü göster.
+    const decisionIdx = params.decisionCurrentRating !== undefined
+      ? ratingToIndex(params.decisionCurrentRating)
+      : currentIdx
+
+    if (decisionIdx < targetIdx) {
+      // Tutarsızlık: görünen rating hedefin üstünde ama engine hedefin altından çalıştı
+      warnings.push(
+        'Rating kaynakları arasında tutarsızlık tespit edildi. ' +
+        'Görünen rating hedefin üstünde olsa da engine analizi aksiyonlar öneriyor. ' +
+        'Engine portföyü gösteriliyor.',
+      )
+      const coveredGroupCount = getCoveredGroups(fullPortfolio.map(a => a.actionId)).size
+      return {
+        selectedActions: fullPortfolio,
+        validation:      null,
+        meta: {
+          reachedTarget:            false,
+          achievedRating:           fallbackCurrent,
+          totalAmountTRY:           fullPortfolioAmountTRY,
+          selectedActionCount:      fullCount,
+          fullPortfolioActionCount: fullCount,
+          fallback:                 true,
+          warnings,
+          coveredGroupCount,
+          rawSelectedActionCount:   fullCount,
+          displayActionCount:       fullDisplayCount,
+          fullPortfolioAmountTRY,
+          selectedPackageAmountTRY: fullPortfolioAmountTRY,
+          inconsistentSources:      true,
+        },
+      }
+    }
+
+    // Normal: her iki kaynak da hedefin üstünde → hedef gerçekten aşıldı
     return {
       selectedActions: [],
       validation: null,
@@ -247,6 +297,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         displayActionCount:       0,
         fullPortfolioAmountTRY,
         selectedPackageAmountTRY: 0,
+        inconsistentSources:      false,
       },
     }
   }

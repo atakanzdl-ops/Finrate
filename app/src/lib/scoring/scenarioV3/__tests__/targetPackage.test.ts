@@ -802,3 +802,63 @@ describe('selectTargetPackage — FIX3 sayım uyumu', () => {
     expect(r.meta.fullPortfolioAmountTRY).toBe(r.meta.selectedPackageAmountTRY)
   })
 })
+
+// ─── 13. TUTARSIZ KAYNAK (Faz 7.3.19) ────────────────────────────────────────
+//
+// decisionCurrentRating parametresi: iki rating kaynağı arasındaki çelişki tespiti.
+// currentActualRating >= target ama decisionCurrentRating < target → inconsistentSources=true.
+
+describe('selectTargetPackage — decisionCurrentRating tutarsız kaynak tespiti (Faz 7.3.19)', () => {
+
+  // T13: Tutarsızlık — currentActualRating hedefte, decisionCurrentRating altında
+  test('T13 — currentActualRating≥target ama decisionCurrentRating<target → inconsistentSources:true, tam portföy döner', () => {
+    // Hiçbir mock gerekmez — erken çıkış calculateActualPostActionRating çağırmaz
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      currentActualRating:    'BB',   // >= 'B' → normal erken çıkış tetikler
+      decisionCurrentRating:  'CCC',  // < 'B' → tutarsızlık tespiti
+      portfolio: [
+        makeAction('A1', 1_000_000),
+        makeAction('A2', 2_000_000),
+      ],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.inconsistentSources).toBe(true)
+    expect(r.meta.fallback).toBe(true)
+    expect(r.meta.reachedTarget).toBe(false)
+    expect(r.selectedActions).toHaveLength(2)         // tam portföy — boş değil
+    expect(r.meta.warnings.length).toBeGreaterThan(0)
+    expect(r.meta.warnings[0]).toMatch(/tutarsızlık/i)
+  })
+
+  // T14: Tutarlı — her iki kaynak da hedefin üstünde → normal boş paket
+  test('T14 — her iki kaynak da hedefte → inconsistentSources:false, boş paket', () => {
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      currentActualRating:    'BB',   // >= 'B'
+      decisionCurrentRating:  'A',    // >= 'B' → tutarlı
+      portfolio: [makeAction('A1', 1_000_000)],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.inconsistentSources).toBe(false)
+    expect(r.meta.reachedTarget).toBe(true)
+    expect(r.selectedActions).toHaveLength(0)
+    expect(r.meta.selectedActionCount).toBe(0)
+  })
+
+  // T15: decisionCurrentRating sağlanmadı → geriye uyumlu davranış (boş paket, reachedTarget true)
+  test('T15 — decisionCurrentRating yok → geriye uyumlu: boş paket, inconsistentSources undefined/false', () => {
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      currentActualRating: 'BB',   // >= 'B'
+      // decisionCurrentRating: undefined (sağlanmıyor)
+      portfolio: [makeAction('A1', 1_000_000)],
+      requestedTarget: 'B',
+    })
+    // Geriye uyumlu: erken çıkış, boş paket
+    expect(r.meta.reachedTarget).toBe(true)
+    expect(r.selectedActions).toHaveLength(0)
+    // inconsistentSources ya false ya da undefined — her ikisi de kabul edilir
+    expect(r.meta.inconsistentSources).toBeFalsy()
+  })
+})
