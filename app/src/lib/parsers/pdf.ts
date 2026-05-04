@@ -683,8 +683,12 @@ function parseTdhpNum(s: string): number | null {
  * Virgülsüz sayılar (satır numaraları "1.", "2.") yakalanmaz.
  */
 function cariDonemNum(line: string): number | null {
-  // Sadece virgüllü TR formatı: 1.234.567,89 veya 0,00 — satır numarası "1." atlanır
-  const m = line.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
+  // Önce: virgüllü TR formatı (katı) — 1.234.567,89 veya 0,00
+  // Satır numarası "1." atlanır (nokta grubu + virgül zorunlu)
+  let m = line.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
+  // Faz 7.3.23 fallback: ondalıksız tamsayı — "51.184.000" (en az 1 nokta grubu zorunlu)
+  // parseTdhpNum dots-stripped → doğru parse; sadece katı format null döndürdüğünde devreye girer
+  if (!m || m.length === 0) m = line.match(/\d{1,3}(?:\.\d{3})+/g)
   if (!m || m.length === 0) return null
   const val = m.length >= 2 ? m[1] : m[0]   // index 1 = cari dönem
   return parseTdhpNum(val)
@@ -892,11 +896,13 @@ const TDHP_ROW_MAP: Array<{ sub: TdhpSubSection; entries: TdhpRowEntry[] }> = [
     entries: [
       { code: '501', patterns: ['odenmemis sermaye'] },           // daha spesifik önce
       { code: '502', patterns: ['sermaye duzeltmesi olumlu'] },   // daha spesifik önce
+      // Faz 7.3.23: 'B. Sermaye Yedekleri' satırı '500-sermaye' ile çakışıyor;
+      // '529' öne alındı + 'sermaye yedeg' pattern eklendi → dedup hatası giderildi
+      { code: '529', patterns: ['diger sermaye yedekleri', 'sermaye yedek'] },
       { code: '500', patterns: ['sermaye'] },                     // en geniş en son
       { code: '520', patterns: ['hisse senedi ihrac primleri'] },
       { code: '522', patterns: ['m.d.v. yeniden degerleme', 'mdv yeniden degerleme'] },
       { code: '523', patterns: ['istirakler yeniden degerleme'] },
-      { code: '529', patterns: ['diger sermaye yedekleri'] },
       { code: '540', patterns: ['yasal yedekler'] },
       { code: '541', patterns: ['statu yedekleri'] },
       { code: '542', patterns: ['olaganustu yedekler'] },
