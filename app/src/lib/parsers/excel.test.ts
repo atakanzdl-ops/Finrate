@@ -492,3 +492,90 @@ describe('parseMizanRows — İPOS ACCLIST format (Faz 7.3.22)', () => {
     expect(result[0]?.fields?.cash).toBe(50_000_000)
   })
 })
+
+// ─── Faz 7.3.25 — MIZAN_MAP eksik hesaplar (128, 192, 267) ──────────────────
+//
+// İPOS 2025/Q4 Excel mizan parse'ında ~20 Mn TL aktif/pasif farkı:
+//   128 Şüpheli Ticari Alacaklar:  4.85 Mn
+//   192 Diğer KDV:                14.51 Mn
+//   267 Diğer Maddi Olmayan:       0.66 Mn
+//
+// 264 Özel Maliyetler zaten MIZAN_MAP'te mevcut (ekstra işlem gerekmez).
+
+describe('parseMizanRows — Faz 7.3.25 MIZAN_MAP (128, 192, 267)', () => {
+
+  // Minimal satır seti — parseMizanRows "≥3 field" eşiğini geçmek için
+  // iki pasif dummy satır (400, 500) eklenir; test fieldlarını etkilemez.
+  function makeMinimalRows(
+    entries: Array<{ code: string; bakBorc?: number; bakAlacak?: number }>,
+  ): unknown[][] {
+    const header = ['Hesap Kodu', 'Hesap Adı', 'Bakiye Borç', 'Bakiye Alacak']
+    return [
+      header,
+      ['400', 'UV Banka Kredisi', 0, 1],  // longTermFinancialDebt_A — dummy, aktif fieldlara dokunmaz
+      ['500', 'Sermaye',          0, 1],  // paidInCapital_A         — dummy, aktif fieldlara dokunmaz
+      ...entries.map(e => [e.code, `Hesap ${e.code}`, e.bakBorc ?? 0, e.bakAlacak ?? 0]),
+    ]
+  }
+
+  // T_İP25_1: 128 bakBorç → tradeReceivables
+  test('T_İP25_1 — 128 Şüpheli Ticari Alacaklar bakBorç → tradeReceivables', async () => {
+    const rows = makeMinimalRows([{ code: '128', bakBorc: 4_850_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.tradeReceivables).toBe(4_850_000)
+  })
+
+  // T_İP25_2: 192 bakBorç → otherCurrentAssets
+  test('T_İP25_2 — 192 Diğer KDV bakBorç → otherCurrentAssets', async () => {
+    const rows = makeMinimalRows([{ code: '192', bakBorc: 14_510_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.otherCurrentAssets).toBe(14_510_000)
+  })
+
+  // T_İP25_3: 267 bakBorç → intangibleAssets
+  test('T_İP25_3 — 267 Diğer Maddi Olmayan bakBorç → intangibleAssets', async () => {
+    const rows = makeMinimalRows([{ code: '267', bakBorc: 660_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.intangibleAssets).toBe(660_000)
+  })
+
+  // T_İP25_4: Birleşik — 128+192+267 aynı mizanda → her field doğru ayrışır
+  test('T_İP25_4 — 128+192+267 birlikte parse edilir; fieldlar dogru ayrisir', async () => {
+    const rows = makeMinimalRows([
+      { code: '128', bakBorc:  4_850_000 },
+      { code: '192', bakBorc: 14_510_000 },
+      { code: '267', bakBorc:    660_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.tradeReceivables).toBe(4_850_000)
+    expect(result[0]?.fields?.otherCurrentAssets).toBe(14_510_000)
+    expect(result[0]?.fields?.intangibleAssets).toBe(660_000)
+  })
+
+  // T_İP25_5: İPOS sentetik — 128+192+267 dahil aktif ~20Mn artar (İPOS ACCLIST formatında)
+  test('T_İP25_5 — İPOS ACCLIST formatında 128+192+267 → aktif ~20Mn artıyor', async () => {
+    const rows = makeIposRows([
+      { tamHesap: '128', bakBorc:  4_850_000 }, // Şüpheli Ticari Alacaklar
+      { tamHesap: '192', bakBorc: 14_510_000 }, // Diğer KDV
+      { tamHesap: '267', bakBorc:    660_000 }, // Diğer Maddi Olmayan
+    ])
+    const result = await parseMizanRows(rows)
+    // 3 ayrı field'a düşer
+    expect(result[0]?.fields?.tradeReceivables).toBeGreaterThanOrEqual(4_850_000)
+    expect(result[0]?.fields?.otherCurrentAssets).toBeGreaterThanOrEqual(14_510_000)
+    expect(result[0]?.fields?.intangibleAssets).toBeGreaterThanOrEqual(660_000)
+    // Toplam artış ≥ 20 Mn
+    const gain =
+      (result[0]?.fields?.tradeReceivables  ?? 0) +
+      (result[0]?.fields?.otherCurrentAssets ?? 0) +
+      (result[0]?.fields?.intangibleAssets   ?? 0)
+    expect(gain).toBeGreaterThanOrEqual(20_000_000)
+  })
+
+  // T_İP25_6: Regresyon — 264 zaten MIZAN_MAP'te; mevcut eşleme bozulmadı
+  test('T_İP25_6 — 264 Özel Maliyetler zaten çalışıyor (regresyon guard)', async () => {
+    const rows = makeMinimalRows([{ code: '264', bakBorc: 5_740_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.intangibleAssets).toBe(5_740_000)
+  })
+})

@@ -398,17 +398,17 @@ const MIZAN_SPLIT: Record<string, { bb: string; ba: string }> = {
 const MIZAN_MAP: Record<string, string> = {
   // Aktif – bakBorç
   '100': 'cash',             '101': 'cash',             '102': 'cash',             '108': 'cash',
-  '121': 'tradeReceivables', '126': 'tradeReceivables',
+  '121': 'tradeReceivables', '126': 'tradeReceivables', '128': 'tradeReceivables', // Faz 7.3.25: 128 Şüpheli Ticari Alacaklar
   '136': 'otherReceivables',
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
   '159': 'prepaidSuppliers',
   '170': 'constructionCosts', '178': 'constructionCosts',  // Faz 7.3.21: YİYY İnşaat Maliyeti
   '180': 'prepaidExpenses',
-  '190': 'otherCurrentAssets', '191': 'otherCurrentAssets', '193': 'otherCurrentAssets',
+  '190': 'otherCurrentAssets', '191': 'otherCurrentAssets', '192': 'otherCurrentAssets', '193': 'otherCurrentAssets', // Faz 7.3.25: 192 Diğer KDV
   '195': 'otherCurrentAssets', '196': 'otherCurrentAssets', '197': 'otherCurrentAssets', '198': 'otherCurrentAssets',
   '250': 'tangibleAssets',   '252': 'tangibleAssets',   '253': 'tangibleAssets',   '254': 'tangibleAssets', '255': 'tangibleAssets',
   '258': 'tangibleAssets',   // Faz 7.3.21: Yapılmakta Olan Yatırımlar
-  '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets',
+  '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets', '267': 'intangibleAssets', // Faz 7.3.25: 267 Diğer Maddi Olmayan
   '280': 'longTermPrepaidExpenses',
   '580': 'retainedLosses',
   // Gelir tablosu – 64x/65x/67x/68x (mizan'da görünebilir)
