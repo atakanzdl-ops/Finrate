@@ -13,9 +13,12 @@
  *
  * Faz 7.3.23 — Sermaye Yedekleri parse testleri (T_SY1-T_SY4):
  *   extractTdhpRawAccountsFromText: OZKAYNAKLAR '529' eşleme + ondalıksız fallback
+ *
+ * Faz 7.3.24 — matchBilField parseEkSection pattern fix (T_PE1-T_PE5):
+ *   'sermaye yedeg' → 'sermaye yedek', 'kar yedeg' → 'kar yedek'
  */
 
-import { detectPdfType, extractTdhpRawAccountsFromText } from './pdf'
+import { detectPdfType, extractTdhpRawAccountsFromText, parseEkSection } from './pdf'
 
 // ─── detectPdfType ────────────────────────────────────────────────────────────
 
@@ -154,5 +157,77 @@ describe('extractTdhpRawAccountsFromText — Faz 7.3.23 Sermaye Yedekleri', () =
     const codes = result.map(r => r.code)
     expect(codes.filter(c => c === '500').length).toBe(1)
     expect(codes.filter(c => c === '529').length).toBe(1)
+  })
+})
+
+// ─── Faz 7.3.24 — parseEkSection matchBilField pattern fix ───────────────────
+//
+// Düzeltilen bug: matchBilField 'sermaye yedeg' / 'kar yedeg' pattern'leri
+// "Yedekleri" (çoğul, 'k') ile eşleşmiyordu. 'yedek' → doğru substring.
+//
+// parseEkSection: "V. Özkaynaklar" → sec='oz'
+// Tüm satırlar "section" string içinde gelir (parsePdfBuffer slice eder).
+// Satır formatı: ". B. Sermaye Yedekleri 0,00 51.184.000,00"
+//   - label: ". B. Sermaye Yedekleri"  (TR_NUM sil → trim)
+//   - n: "b. sermaye yedekleri"         (norm → leading dots stripped)
+//   - matchBilField → 'capitalReserves' ✓
+
+describe('parseEkSection — Faz 7.3.24 matchBilField pattern fix', () => {
+
+  // Yardımcı: Özkaynaklar bölümü sentetik metin üretir
+  // "V. Özkaynaklar" → detectEkSection → sec='oz'
+  function makeOzSection(lines: string[]): string {
+    return ['V. Özkaynaklar', ...lines].join('\n')
+  }
+
+  // T_PE1: "B. Sermaye Yedekleri 0,00 51.184.000,00" → capitalReserves = 51184000
+  test('T_PE1 — ". B. Sermaye Yedekleri" cari dönem capitalReserves olarak parse edilir', () => {
+    const text = makeOzSection([
+      '. B. Sermaye Yedekleri 0,00 51.184.000,00',
+    ])
+    const { cari } = parseEkSection(text)
+    expect(cari.capitalReserves).toBeCloseTo(51_184_000, 0)
+  })
+
+  // T_PE2: 2 dönem — cari dönem = son sayı (51184000), önceki = ilk sayı (0)
+  test('T_PE2 — 2 dönem satırında cari=son sayı, önceki=ilk sayı', () => {
+    const text = makeOzSection([
+      '. B. Sermaye Yedekleri 0,00 51.184.000,00',
+    ])
+    const { cari, onceki } = parseEkSection(text)
+    expect(cari.capitalReserves).toBeCloseTo(51_184_000, 0)
+    expect(onceki.capitalReserves).toBeCloseTo(0, 0)
+  })
+
+  // T_PE3: Regresyon — "A. Ödenmiş Sermaye" → paidInCapital (etkilenmedi)
+  test('T_PE3 — "A. Ödenmiş Sermaye" → paidInCapital regresyon temiz', () => {
+    const text = makeOzSection([
+      '. A. Ödenmiş Sermaye 5.000.000,00 5.000.000,00',
+    ])
+    const { cari } = parseEkSection(text)
+    expect(cari.paidInCapital).toBeCloseTo(5_000_000, 0)
+    expect(cari.capitalReserves).toBeUndefined()
+  })
+
+  // T_PE4: "C. Kâr Yedekleri" → profitReserves ('kar yedeg' → 'kar yedek' fix)
+  test('T_PE4 — "C. Kâr Yedekleri" → profitReserves doğru parse edilir', () => {
+    const text = makeOzSection([
+      '. C. Kâr Yedekleri 2.000.000,00 3.000.000,00',
+    ])
+    const { cari } = parseEkSection(text)
+    expect(cari.profitReserves).toBeCloseTo(3_000_000, 0)
+  })
+
+  // T_PE5: Birleşik — paidInCapital + capitalReserves + profitReserves hepsi doğru
+  test('T_PE5 — paidInCapital + capitalReserves + profitReserves birlikte parse edilir', () => {
+    const text = makeOzSection([
+      '. A. Ödenmiş Sermaye 5.000.000,00 5.000.000,00',
+      '. B. Sermaye Yedekleri 0,00 51.184.000,00',
+      '. C. Kâr Yedekleri 1.000.000,00 2.000.000,00',
+    ])
+    const { cari } = parseEkSection(text)
+    expect(cari.paidInCapital).toBeCloseTo(5_000_000, 0)
+    expect(cari.capitalReserves).toBeCloseTo(51_184_000, 0)
+    expect(cari.profitReserves).toBeCloseTo(2_000_000, 0)
   })
 })

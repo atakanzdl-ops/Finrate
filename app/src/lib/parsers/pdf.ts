@@ -21,6 +21,7 @@ function norm(s: unknown): string {
     .replace(/[üÜ]/g, 'u')
     .replace(/[öÖ]/g, 'o')
     .replace(/[çÇ]/g, 'c')
+    .replace(/[âÂ]/g, 'a')  // Faz 7.3.24: "Kâr" (U+00E2) → 'a' — TDHP PDF'lerde kar/kâr tutarsız
 }
 
 // ─── Sayı ayrıştırma ──────────────────────────────────────────────────────────
@@ -255,14 +256,15 @@ function matchBilField(label: string, sec: EkSection): string | null {
 
   if (sec === 'oz') {
     if (/^a[\s.\-]\s*odenmis\s*sermaye/.test(n))      return 'paidInCapital'
-    if (/^b[\s.\-]\s*sermaye\s*yedeg/.test(n))        return 'capitalReserves'
-    if (/^c[\s.\-]\s*kar\s*yedeg/.test(n))            return 'profitReserves'
+    // Faz 7.3.24: 'yedeg' → 'yedek' — norm("Yedekleri") = "yedekleri" ('k' kalır, ğ yok)
+    if (/^b[\s.\-]\s*sermaye\s*yedek/.test(n))        return 'capitalReserves'
+    if (/^c[\s.\-]\s*kar\s*yedek/.test(n))            return 'profitReserves'
     if (/^d[\s.\-]\s*gecmis\s*yil.*kar/.test(n))      return 'retainedEarnings'
     if (/^e[\s.\-]\s*gecmis\s*yil.*zarar/.test(n))    return 'retainedLosses'
     if (/^f[\s.\-]\s*donem\s*net\s*kar/.test(n))      return 'netProfitCurrentYear'
     if (n.includes('odenmis sermaye'))   return 'paidInCapital'
-    if (n.includes('sermaye yedeg'))     return 'capitalReserves'
-    if (n.includes('kar yedeg'))         return 'profitReserves'
+    if (n.includes('sermaye yedek'))     return 'capitalReserves'
+    if (n.includes('kar yedek'))         return 'profitReserves'
     if (n.includes('gecmis yil') && n.includes('kar'))   return 'retainedEarnings'
     if (n.includes('gecmis yil') && n.includes('zarar')) return 'retainedLosses'
     if (n.includes('donem net kar'))     return 'netProfitCurrentYear'
@@ -318,7 +320,7 @@ const TOTAL_FIELDS = new Set([
   'totalEquity', 'totalLiabilitiesAndEquity',
 ])
 
-function parseEkSection(section: string): { cari: Record<string, number>; onceki: Record<string, number> } {
+export function parseEkSection(section: string): { cari: Record<string, number>; onceki: Record<string, number> } {
   const cari:   Record<string, number> = {}  // cari dönem (son sütun)
   const onceki: Record<string, number> = {}  // önceki dönem (ilk sütun, varsa)
   let sec: EkSection = null
