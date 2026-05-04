@@ -304,3 +304,86 @@ describe('parseMizanRows — 2 haneli ana hesap kodu (MAIN_ACCOUNT_CANONICAL)', 
     expect(result[0]?.fields?.otherNonCurrentLiabilities).toBe(4_500_000)
   })
 })
+
+// ─── Faz 7.3.21 — İSRA İnşaat: MIZAN_MAP genişleme + hiyerarşi fix ───────────
+
+describe('parseMizanRows — 258 Yapılmakta Olan Yatırımlar (T_İ1)', () => {
+  test('T_İ1 — 258 bakBorç → tangibleAssets (Yapılmakta Olan Yatırımlar)', async () => {
+    const rows = makeMizanRows([{ code: '258', bakBorc: 10_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.tangibleAssets).toBe(10_000_000)
+  })
+})
+
+describe('parseMizanRows — 170/178 YİYY İnşaat Maliyeti (T_İ2, T_İ3)', () => {
+  test('T_İ2 — 170 bakBorç → constructionCosts', async () => {
+    const rows = makeMizanRows([{ code: '170', bakBorc: 25_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.constructionCosts).toBe(25_000_000)
+  })
+
+  test('T_İ3 — 170 + 178 bakBorç → constructionCosts birikir', async () => {
+    const rows = makeMizanRows([
+      { code: '170', bakBorc: 15_000_000 },
+      { code: '178', bakBorc: 10_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.constructionCosts).toBe(25_000_000)
+  })
+})
+
+describe('parseMizanRows — 350 Hakediş KV yükümlülük (T_İ4)', () => {
+  test('T_İ4 — 350 bakAlacak → constructionProgress (yeni MIZAN_MAP girişi)', async () => {
+    const rows = makeMizanRows([{ code: '350', bakAlacak: 30_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.constructionProgress).toBe(30_000_000)
+  })
+})
+
+describe('parseMizanRows — 440/449 UV Alınan Avanslar (T_İ5, T_İ6)', () => {
+  test('T_İ5 — 440 bakAlacak → longTermAdvancesReceived', async () => {
+    const rows = makeMizanRows([{ code: '440', bakAlacak: 50_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.longTermAdvancesReceived).toBe(50_000_000)
+  })
+
+  test('T_İ6 — 440 + 449 bakAlacak → longTermAdvancesReceived birikir', async () => {
+    const rows = makeMizanRows([
+      { code: '440', bakAlacak: 30_000_000 },
+      { code: '449', bakAlacak: 20_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.longTermAdvancesReceived).toBe(50_000_000)
+  })
+})
+
+describe('parseMizanRows — noktalı hiyerarşi fix: çift sayım önleme (T_İ7, T_İ8, T_İ9)', () => {
+  test('T_İ7 — "340" + "340.ANT" → çift sayım yok; advancesReceived = 340 tutarı', async () => {
+    // Hiyerarşi fix öncesi: "340.ANT" → "340ANT".replace(/\D/g,'') → "340" → double-count
+    // Hiyerarşi fix sonrası: "340.ANT" includes('.') → continue → atlanır
+    const rows = makeMizanRows([
+      { code: '340',     bakAlacak: 5_000_000 },
+      { code: '340.ANT', bakAlacak: 3_000_000 }, // noktalı → atlanmalı
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.advancesReceived).toBe(5_000_000)
+  })
+
+  test('T_İ8 — sadece "340.ANT" → atlanır; advancesReceived undefined/0', async () => {
+    const rows = makeMizanRows([
+      { code: '340.ANT', bakAlacak: 3_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    // Temel satırlar (121/136/153) 3 alan sağlar → parseMizanRows [] dönmez
+    // Ancak advancesReceived hiç eklenmemiş olmalı
+    expect(result[0]?.fields?.advancesReceived).toBeFalsy()
+  })
+
+  test('T_İ9 — "340.01" rakam içerse bile noktalı kod atlanır', async () => {
+    const rows = makeMizanRows([
+      { code: '340.01', bakAlacak: 2_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.advancesReceived).toBeFalsy()
+  })
+})

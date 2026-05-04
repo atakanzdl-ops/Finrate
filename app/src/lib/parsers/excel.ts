@@ -397,10 +397,12 @@ const MIZAN_MAP: Record<string, string> = {
   '136': 'otherReceivables',
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
   '159': 'prepaidSuppliers',
+  '170': 'constructionCosts', '178': 'constructionCosts',  // Faz 7.3.21: YİYY İnşaat Maliyeti
   '180': 'prepaidExpenses',
   '190': 'otherCurrentAssets', '191': 'otherCurrentAssets', '193': 'otherCurrentAssets',
   '195': 'otherCurrentAssets', '196': 'otherCurrentAssets', '197': 'otherCurrentAssets', '198': 'otherCurrentAssets',
   '250': 'tangibleAssets',   '252': 'tangibleAssets',   '253': 'tangibleAssets',   '254': 'tangibleAssets', '255': 'tangibleAssets',
+  '258': 'tangibleAssets',   // Faz 7.3.21: Yapılmakta Olan Yatırımlar
   '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets',
   '280': 'longTermPrepaidExpenses',
   '580': 'retainedLosses',
@@ -431,7 +433,9 @@ const MIZAN_MAP: Record<string, string> = {
   '321': 'tradePayables_A',          '326': 'tradePayables_A',
   '335': 'otherShortTermPayables_A', '336': 'otherShortTermPayables_A',
   '340': 'advancesReceived_A',
-  '358': 'constructionProgress_A',
+  '350': 'constructionProgress_A', '358': 'constructionProgress_A',  // Faz 7.3.21: 350 eklendi
+  // 44x — UV Alınan Avanslar → longTermAdvancesReceived_A (Faz 7.3.21)
+  '440': 'longTermAdvancesReceived_A', '449': 'longTermAdvancesReceived_A',
   '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
   '381': 'deferredRevenue_A',
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
@@ -485,13 +489,16 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
 
   // Geçiş 1: 3 haneli alt kodu olan grup prefixlerini tespit et
   // (örn. satırda "431" varsa "43" grubu alt kod içeriyor demektir)
+  // Faz 7.3.21: noktalı kod → hiyerarşi child satırı → atla
   const groupHasSubcode = new Set<string>()
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as (string | number | null)[]
     const rawCode = row[cols['code'] ?? 0]
     if (!rawCode) continue
-    const nc = String(rawCode).replace(/\./g, '').trim().replace(/\D/g, '')
-    if (nc.length === 3) groupHasSubcode.add(nc.substring(0, 2))
+    const codeStr1 = String(rawCode).trim()
+    if (codeStr1.includes('.')) continue   // Faz 7.3.21: noktalı detay → child, atla
+    const nc1 = codeStr1.replace(/\D/g, '')
+    if (nc1.length === 3) groupHasSubcode.add(nc1.substring(0, 2))
   }
 
   // Geçiş 2: asıl eşleme
@@ -500,9 +507,11 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     const rawCode = row[cols['code'] ?? 0]
     if (!rawCode) continue
 
-    // Noktalı gösterim kaldır: "100.01" → "10001"; sadece 2-3 haneli kodları al
-    const code = String(rawCode).replace(/\./g, '').trim()
-    let nc   = code.replace(/\D/g, '')
+    // Faz 7.3.21: noktalı kod → hiyerarşik child satır (340.ANT, 340.ABD002 vb.) → atla
+    // Sadece pure numeric 2-3 haneli ana hesap kodları işlenir.
+    const codeStr = String(rawCode).trim()
+    if (codeStr.includes('.')) continue
+    let nc = codeStr.replace(/\D/g, '')
     if (!nc || nc.length > 3 || nc.length < 2) continue
 
     // 2 haneli ana hesap kodu:

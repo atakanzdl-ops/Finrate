@@ -104,3 +104,39 @@ describe('checkBalance — 350/358 KV yükümlülük tarafında sayılır', () =
       .toBeCloseTo(10_000, 2)
   })
 })
+
+// ─── Faz 7.3.21 — 440/449 longTermAdvancesReceived ───────────────────────────
+
+describe('rebuildAggregateFromAccounts — 440/449 longTermAdvancesReceived (Faz 7.3.21)', () => {
+  // T_AM1: 440 → longTermAdvancesReceived alanı doldurur
+  it('T_AM1 — 440 bakiyesi longTermAdvancesReceived alanına yansır', () => {
+    const accounts = [{ accountCode: '440', amount: 50_000_000 }]
+    const result = rebuildAggregateFromAccounts(accounts)
+    expect(result).toHaveProperty('longTermAdvancesReceived')
+    expect(result.longTermAdvancesReceived).toBe(50_000_000)
+  })
+
+  // T_AM2: 449 + 440 birikir
+  it('T_AM2 — 440 + 449 longTermAdvancesReceived\'a birikir', () => {
+    const accounts = [
+      { accountCode: '440', amount: 30_000_000 },
+      { accountCode: '449', amount: 20_000_000 },
+    ]
+    const result = rebuildAggregateFromAccounts(accounts)
+    expect(result.longTermAdvancesReceived).toBe(50_000_000)
+  })
+
+  // T_AM3: 440 totalNonCurrentLiabilities'a dahil edilir
+  it('T_AM3 — 440 totalNonCurrentLiabilities\'a dahil edilir (tncl hesabı)', () => {
+    const without440 = [{ accountCode: '400', amount: 10_000_000 }]
+    const with440 = [
+      { accountCode: '400', amount: 10_000_000 },
+      { accountCode: '440', amount: 50_000_000 },
+    ]
+    const rWithout = rebuildAggregateFromAccounts(without440)
+    const rWith    = rebuildAggregateFromAccounts(with440)
+    expect(rWith.totalNonCurrentLiabilities).toBeCloseTo(60_000_000, 2)
+    expect(rWith.totalNonCurrentLiabilities - rWithout.totalNonCurrentLiabilities)
+      .toBeCloseTo(50_000_000, 2)
+  })
+})
