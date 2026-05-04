@@ -47,7 +47,16 @@ import { getCoveredGroups }                from './actionRatioGroupProfile'
 // ─── ÇIKTI TİPLERİ (sözleşme: değişmedi) ──────────────────────────────────────
 
 export interface TargetPackageMeta {
-  /** Hedef rating tutuldu mu? (achievedIdx >= targetIdx) */
+  /**
+   * Faz 7.3.20: Paketin genel durumu — UI banner seçimi için birincil alan.
+   *
+   *   REACHED         → hedef rating elde edildi (optimal subset bulundu)
+   *   NOT_REACHED     → tüm kombinasyonlar denendi, hedef ulaşılamadı
+   *   SOURCE_MISMATCH → rating kaynakları çelişiyor (bkz. inconsistentSources)
+   *   FALLBACK        → arama atlandı (N>12, geçersiz hedef vb.)
+   */
+  status:                   'REACHED' | 'NOT_REACHED' | 'SOURCE_MISMATCH' | 'FALLBACK'
+  /** Hedef rating tutuldu mu? (achievedIdx >= targetIdx) — geriye uyum, korunur */
   reachedTarget:            boolean
   /** Seçilen paket uygulandığında elde edilen gerçek rating */
   achievedRating:           RatingGrade
@@ -70,6 +79,7 @@ export interface TargetPackageMeta {
   /**
    * true → currentActualRating >= target ama decisionCurrentRating < target.
    * İki rating kaynağı çelişiyor; engine portföyü gösteriliyor, UI'da uyarı üretilmeli.
+   * Geriye uyum için korunur — status === 'SOURCE_MISMATCH' ile eşdeğerdir.
    */
   inconsistentSources?:     boolean
 
@@ -224,6 +234,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       selectedActions: fullPortfolio,
       validation: null,
       meta: {
+        status:                   'FALLBACK',
         reachedTarget:            false,
         achievedRating:           fallbackCurrent,
         totalAmountTRY:           fullPortfolioAmountTRY,
@@ -263,6 +274,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         selectedActions: fullPortfolio,
         validation:      null,
         meta: {
+          status:                   'SOURCE_MISMATCH',
           reachedTarget:            false,
           achievedRating:           fallbackCurrent,
           totalAmountTRY:           fullPortfolioAmountTRY,
@@ -285,6 +297,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       selectedActions: [],
       validation: null,
       meta: {
+        status:                   'REACHED',
         reachedTarget:            true,
         achievedRating:           fallbackCurrent,
         totalAmountTRY:           0,
@@ -309,6 +322,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       selectedActions: [],
       validation: null,
       meta: {
+        status:                   'NOT_REACHED',
         reachedTarget:            false,
         achievedRating:           fallbackCurrent,
         totalAmountTRY:           0,
@@ -349,6 +363,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       selectedActions: fullPortfolio,
       validation,
       meta: {
+        status:                   'FALLBACK',
         reachedTarget:            achievedIdx >= targetIdx,
         achievedRating,
         totalAmountTRY:           fullPortfolioAmountTRY,
@@ -440,6 +455,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       selectedActions,
       validation: best.validation,
       meta: {
+        status:                   'REACHED',
         reachedTarget:            true,
         achievedRating:           best.achievedRating,
         totalAmountTRY:           best.totalAmount,
@@ -469,6 +485,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     selectedActions: fullPortfolio,
     validation: lastValidation,
     meta: {
+      status:                   'NOT_REACHED',
       reachedTarget:            false,
       achievedRating:           finalAchieved,
       totalAmountTRY:           fullPortfolioAmountTRY,

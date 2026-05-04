@@ -862,3 +862,71 @@ describe('selectTargetPackage — decisionCurrentRating tutarsız kaynak tespiti
     expect(r.meta.inconsistentSources).toBeFalsy()
   })
 })
+
+// ─── 14. STATUS ENUM (Faz 7.3.20) ────────────────────────────────────────────
+//
+// Her return noktasının doğru status ürettiğini doğrular.
+// reachedTarget / inconsistentSources alanları geriye uyum için korunur.
+
+describe('selectTargetPackage — status enum (Faz 7.3.20)', () => {
+
+  // T16: Optimal subset bulundu → REACHED
+  test('T16 — subset bulundu → status: REACHED, reachedTarget: true', () => {
+    setupRatingMock((ids) => (ids.has('A1') ? 'B' : 'C'))
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio:       [makeAction('A1', 1_000_000), makeAction('A2', 2_000_000)],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.status).toBe('REACHED')
+    expect(r.meta.reachedTarget).toBe(true)    // geriye uyum
+    expect(r.meta.fallback).toBe(false)
+  })
+
+  // T17: Hiçbir subset hedefi tutamadı → NOT_REACHED
+  test('T17 — subset yok → status: NOT_REACHED, reachedTarget: false', () => {
+    setupRatingMock(() => 'C')  // hiçbir kombinasyon B'ye ulaşamıyor
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio:       [makeAction('A1', 1_000_000), makeAction('A2', 2_000_000)],
+      requestedTarget: 'B',
+    })
+    expect(r.meta.status).toBe('NOT_REACHED')
+    expect(r.meta.reachedTarget).toBe(false)   // geriye uyum
+    expect(r.meta.fallback).toBe(true)
+    // Gerçek ulaşılamama: achievedRating hedefin altında
+    expect(r.meta.achievedRating).toBeDefined()
+  })
+
+  // T18: SOURCE_MISMATCH — currentActualRating hedefte, decisionCurrentRating altında
+  test('T18 — SOURCE_MISMATCH → status: SOURCE_MISMATCH, inconsistentSources: true', () => {
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      currentActualRating:   'BB',   // >= 'B' → normal erken çıkış tetikler
+      decisionCurrentRating: 'CCC',  // < 'B' → tutarsızlık
+      portfolio:             [makeAction('A1', 1_000_000)],
+      requestedTarget:       'B',
+    })
+    expect(r.meta.status).toBe('SOURCE_MISMATCH')
+    expect(r.meta.inconsistentSources).toBe(true)  // geriye uyum
+    expect(r.meta.reachedTarget).toBe(false)        // geriye uyum
+    expect(r.selectedActions).toHaveLength(1)       // tam portföy döner
+  })
+
+  // T19: N > SUBSET_SEARCH_LIMIT → FALLBACK (arama atlandı)
+  test('T19 — N>12 → status: FALLBACK', () => {
+    jest
+      .spyOn(postActionRatingModule, 'calculateActualPostActionRating')
+      .mockReturnValue(fakeValidation('B'))
+    const portfolio = Array.from({ length: 13 }, (_, i) =>
+      makeAction(`A${i}`, 1_000_000),
+    )
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      portfolio,
+      requestedTarget: 'B',
+    })
+    expect(r.meta.status).toBe('FALLBACK')
+    expect(r.meta.fallback).toBe(true)  // geriye uyum
+  })
+})

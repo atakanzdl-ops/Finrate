@@ -482,8 +482,8 @@ function AksiyonPlaniTab({
         </div>
       )}
 
-      {/* HEDEF PAKETİ NOTU (Faz 7.3.8d) — yalnız ulaşılamadığında gösterilir */}
-      {da?.targetPackageMeta?.reachedTarget === false && (
+      {/* NOT_REACHED BANNER (Faz 7.3.20) — gerçek ulaşılamama: hiçbir subset hedefe ulaşamadı */}
+      {da?.targetPackageMeta?.status === 'NOT_REACHED' && (
         <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
           <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
           <div className="text-sm text-amber-900">
@@ -493,8 +493,8 @@ function AksiyonPlaniTab({
         </div>
       )}
 
-      {/* TUTARSIZ KAYNAK UYARISI (Faz 7.3.19) — engine rating ile görünen rating çeliştiğinde */}
-      {da?.targetPackageMeta?.inconsistentSources && (
+      {/* SOURCE_MISMATCH BANNER (Faz 7.3.20) — rating kaynakları çelişiyor, aksiyonlar engine'den */}
+      {da?.targetPackageMeta?.status === 'SOURCE_MISMATCH' && (
         <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
           <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
           <div className="text-sm text-amber-900">

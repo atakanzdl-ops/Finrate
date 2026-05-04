@@ -766,7 +766,9 @@ function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
 
   const criticalFlags = productivity.inefficiencyFlags.filter(f => f.severity === 'CRITICAL').slice(0, 2)
   for (const flag of criticalFlags) {
-    parts.push(`${flag.type}: ${flag.description}`)
+    // Faz 7.3.20: INEFFICIENCY_NARRATIVES'den profesyonel metin; ham flag.type basılmaz
+    const narr = INEFFICIENCY_NARRATIVES[flag.type as keyof typeof INEFFICIENCY_NARRATIVES]
+    parts.push(narr?.description ?? flag.description)
   }
 
   return parts.join(' ')

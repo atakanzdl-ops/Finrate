@@ -175,3 +175,38 @@ describe('buildDecisionAnswer — enginePortfolioCount / rejectedInsightCount (F
     expect(da.rejectedInsightCount).toBe(da.rejectedInsights.length)
   })
 })
+
+// ─── Faz 7.3.20: buildWhyCapitalAloneNotEnough — ham flag.type sızıntısı ─────
+
+describe('buildDecisionAnswer — whyCapitalAloneIsNotEnough INEFFICIENCY_NARRATIVES (Faz 7.3.20)', () => {
+
+  // T_F1: CRITICAL flag var → whyCapitalAloneIsNotEnough ham flag.type içermez
+  test('T_F1 — CRITICAL flag.type UI\'ye sızmaz; INEFFICIENCY_NARRATIVES description kullanılır', () => {
+    const engineResult = makeStubEngineResult({
+      portfolio: [],
+    })
+    // layerSummaries.productivity stub: OPERATING_YIELD_GAP CRITICAL flag
+    engineResult.layerSummaries.productivity = {
+      productivityScore: 0.20,            // < 0.30 → ilk parts.push tetiklenir
+      metrics:           { trappedAssetsShare: 0.30 },
+      inefficiencyFlags: [
+        {
+          type:        'OPERATING_YIELD_GAP',
+          severity:    'CRITICAL',
+          description: 'Faaliyet kârı / aktif oranı sektör ortalamasının altında',
+        },
+      ],
+    }
+
+    const da = buildDecisionAnswer(engineResult as any, 'B')
+    const text = da.whyCapitalAloneIsNotEnough
+
+    // Ham flag.type kesinlikle olmamalı
+    expect(text).not.toContain('OPERATING_YIELD_GAP')
+    // "type: description" pattern olmamalı
+    expect(text).not.toMatch(/OPERATING_YIELD_GAP\s*:/)
+    // INEFFICIENCY_NARRATIVES description'ından bir parça olmalı
+    // OPERATING_YIELD_GAP.description başlangıcı: "Operasyonel kârın aktif büyüklüğüne..."
+    expect(text).toContain('Operasyonel kârın')
+  })
+})
