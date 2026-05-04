@@ -157,7 +157,10 @@ function parseYearHeaderCell(raw: unknown): { year: number; period: string } | n
 
 function isCodeHeaderCell(raw: unknown): boolean {
   const n = norm(raw)
-  return n.includes('hesap kod') || n === 'kod' || n.includes('hesap kodu')
+  return n.includes('hesap kod')
+      || n === 'kod'
+      || n.includes('hesap kodu')
+      || n.replace(/[^a-z0-9]/g, '').includes('tamhesap') // Faz 7.3.22: "(Tam) Hesap" — İPOS format
 }
 
 function findVerticalYearHeader(
@@ -342,10 +345,12 @@ function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<s
       if (isCodeHeaderCell(cell)) { cols['code'] = idx; return }
       // bakBorc: hücre hem "bak" hem "bor" içeriyorsa
       if (n.includes('bak') && n.includes('bor'))     { cols['bakBorc'] = idx;   return }
-      if (n.includes('bak') && n.includes('alacak'))  { cols['bakAlacak'] = idx; return }
+      // bakAlacak: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Bakiye Alac." eşleşir
+      if (n.includes('bak') && (n.includes('alacak') || n.includes('alac'))) { cols['bakAlacak'] = idx; return }
       // sadece bor veya alacak (bakiyesiz sütunlar)
       if (n.includes('bor') && cols['borc'] === undefined)         { cols['borc'] = idx }
-      if (n.includes('alacak') && cols['alacak'] === undefined)    { cols['alacak'] = idx }
+      // alacak fallback: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Toplam Alac." eşleşir
+      if ((n.includes('alacak') || n.includes('alac')) && cols['alacak'] === undefined) { cols['alacak'] = idx }
     })
 
     console.log('[HEADER] row', i, JSON.stringify(cols))
@@ -622,6 +627,9 @@ function selectMizanSheet(wb: ReturnType<typeof XLSX.read>): { sheetName: string
   if (exact)   return { sheetName: exact,   ws: wb.Sheets[exact] }
   const partial = names.find(n => norm(n).includes('mizan'))
   if (partial) return { sheetName: partial, ws: wb.Sheets[partial] }
+  // Faz 7.3.22: ACCLIST — İPOS / Logo tarzı muhasebe yazılımı çıktısı
+  const acclist = names.find(n => norm(n) === 'acclist' || norm(n).includes('acclist'))
+  if (acclist) return { sheetName: acclist, ws: wb.Sheets[acclist] }
   return { sheetName: names[0], ws: wb.Sheets[names[0]] }
 }
 

@@ -387,3 +387,108 @@ describe('parseMizanRows — noktalı hiyerarşi fix: çift sayım önleme (T_İ
     expect(result[0]?.fields?.advancesReceived).toBeFalsy()
   })
 })
+
+// ─── Faz 7.3.22 — İPOS ACCLIST format desteği ───────────────────────────────
+
+/**
+ * İPOS / Logo tarzı muhasebe yazılımı ACCLIST sheet formatı:
+ *
+ *   Sütun: (Tam) Hesap | Hesap Adı | T.D. Hesap No | Türü | Kategori |
+ *          Toplam Borç | Toplam Alac. | Bakiye Borç | Bakiye Alac. | F. P. Br.
+ *
+ * Ana Hes. satırları → (Tam) Hesap = saf 3 haneli kod ("100")
+ * Üst / Doğr.Günc.   → (Tam) Hesap = noktalı kod  ("100.01", "100.01.01.001")
+ *
+ * Faz 7.3.21 noktalı atlama kuralı noktalı kodları otomatik atlar.
+ * Faz 7.3.22:
+ *   - "(Tam) Hesap"  → isCodeHeaderCell: tamhesap pattern
+ *   - "Bakiye Alac." → findMizanHeader: alac kısa biçimi
+ *   - "ACCLIST"      → selectMizanSheet: acclist pattern
+ *
+ * Bakiye Borç = col 7  (parser okur — aktif hesaplar)
+ * Bakiye Alac.= col 8  (parser okur — pasif hesaplar, _A suffix)
+ */
+function makeIposRows(
+  entries: Array<{ tamHesap: string; bakBorc?: number; bakAlacak?: number }>
+): unknown[][] {
+  const header: unknown[] = [
+    '(Tam) Hesap', 'Hesap Adı', 'T.D. Hesap No', 'Türü', 'Kategori',
+    'Toplam Borç', 'Toplam Alac.', 'Bakiye Borç', 'Bakiye Alac.', 'F. P. Br.',
+  ]
+  // Baz satırlar: min 3 alan için (121/136/153 Ana Hes., bakBorc col 7)
+  const baseRows: unknown[][] = [
+    ['121', 'Alıcılar',        '121', 'Ana Hes.', 'AKTF', 1, 0, 1, 0, ''],
+    ['136', 'Diğer Alacaklar', '136', 'Ana Hes.', 'AKTF', 1, 0, 1, 0, ''],
+    ['153', 'Ticari Mal',      '153', 'Ana Hes.', 'AKTF', 1, 0, 1, 0, ''],
+  ]
+  const dataRows: unknown[][] = entries.map(e => [
+    e.tamHesap,                             // col 0: (Tam) Hesap (code sütunu)
+    `Hesap ${e.tamHesap.replace(/\./g, '-')}`, // col 1: Hesap Adı
+    e.tamHesap.replace(/\..*/u, ''),        // col 2: T.D. Hesap No (kök)
+    'Ana Hes.',                             // col 3: Türü
+    'AKTF',                                 // col 4: Kategori
+    e.bakBorc   ?? 0,                       // col 5: Toplam Borç
+    e.bakAlacak ?? 0,                       // col 6: Toplam Alac.
+    e.bakBorc   ?? 0,                       // col 7: Bakiye Borç  ← parser okur (aktif)
+    e.bakAlacak ?? 0,                       // col 8: Bakiye Alac. ← parser okur (pasif)
+    '',                                     // col 9: F. P. Br.
+  ])
+  return [header, ...baseRows, ...dataRows]
+}
+
+describe('parseMizanRows — İPOS ACCLIST format (Faz 7.3.22)', () => {
+
+  // T_İP1: İSRA standart başlık — regresyon
+  test('T_İP1 — İSRA "Hesap Kodu" başlığı değişiklikten etkilenmedi (regresyon)', async () => {
+    const rows = makeMizanRows([{ code: '100', bakBorc: 3_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0]?.fields?.cash).toBe(3_000_000)
+  })
+
+  // T_İP2: "(Tam) Hesap" başlığı tanınır → parseMizanRows non-empty döner
+  test('T_İP2 — "(Tam) Hesap" başlığı format tespitini geçer (docType: MIZAN)', async () => {
+    const rows = makeIposRows([{ tamHesap: '100', bakBorc: 5_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0]?.docType).toBe('MIZAN')
+  })
+
+  // T_İP3: "Bakiye Borç" (col 7) → aktif hesap doğru okunur
+  test('T_İP3 — İPOS "100" Ana Hes. → cash = Bakiye Borç değeri', async () => {
+    const rows = makeIposRows([{ tamHesap: '100', bakBorc: 5_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(5_000_000)
+  })
+
+  // T_İP4: "Bakiye Alac." (col 8) → pasif hesap (_A suffix) doğru okunur
+  // "321" → MIZAN_MAP['321'] = 'tradePayables_A' → add('tradePayables', ba)
+  test('T_İP4 — İPOS "321" Ana Hes. → tradePayables = Bakiye Alac. değeri', async () => {
+    const rows = makeIposRows([{ tamHesap: '321', bakAlacak: 8_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.tradePayables).toBe(8_000_000)
+  })
+
+  // T_İP5: Faz 7.3.21 noktalı kural İPOS'ta çalışır — çift sayım yok
+  test('T_İP5 — "100" Ana Hes. + "100.01.01.001" Doğr. → cash çift sayılmaz', async () => {
+    const rows = makeIposRows([
+      { tamHesap: '100',           bakBorc: 5_000_000 }, // Ana Hes. → işlenir
+      { tamHesap: '100.01.01.001', bakBorc: 5_000_000 }, // noktalı  → atlanır
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(5_000_000) // 10M değil
+  })
+
+  // T_İP6: 3 seviye hiyerarşi — yalnızca Ana Hes. (noktalı olmayanlar) işlenir
+  test('T_İP6 — tam hiyerarşi; 5 satır → yalnızca "100" Ana Hes. tutarı (cash = 50M)', async () => {
+    const rows = makeIposRows([
+      { tamHesap: '100',           bakBorc: 50_000_000 }, // Ana Hes.   → işlenir
+      { tamHesap: '100.01',        bakBorc: 30_000_000 }, // Üst Hesap  → noktalı → atlanır
+      { tamHesap: '100.01.01.001', bakBorc: 30_000_000 }, // Doğr.Günc. → noktalı → atlanır
+      { tamHesap: '100.02',        bakBorc: 20_000_000 }, // Üst Hesap  → noktalı → atlanır
+      { tamHesap: '100.02.01.001', bakBorc: 20_000_000 }, // Doğr.Günc. → noktalı → atlanır
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.cash).toBe(50_000_000)
+  })
+})
