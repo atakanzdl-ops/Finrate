@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Plus, Search, ChevronRight, Loader2, Trash2, X } from 'lucide-react'
+import { Building2, Plus, Search, ChevronRight, Loader2, Trash2, X, Pencil } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
 
 interface Entity {
@@ -43,6 +43,13 @@ export default function SirketlerPage() {
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
 
+  // Edit modal state
+  const [editEntity, setEditEntity]           = useState<Entity | null>(null)
+  const [showEditModal, setShowEditModal]     = useState(false)
+  const [editFormLoading, setEditFormLoading] = useState(false)
+  const [editFormError, setEditFormError]     = useState('')
+  const [editForm, setEditForm] = useState({ name: '', taxNumber: '', sector: '', entityType: 'STANDALONE' })
+
   // Yeni şirket modal
   const [showModal, setShowModal] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
@@ -56,6 +63,44 @@ export default function SirketlerPage() {
     setForm({ name: '', taxNumber: '', sector: '', entityType: 'STANDALONE' })
     setFormError('')
     setShowModal(true)
+  }
+
+  function openEditModal(entity: Entity) {
+    setEditEntity(entity)
+    setEditForm({
+      name:       entity.name,
+      taxNumber:  entity.taxNumber ?? '',
+      sector:     entity.sector   ?? '',
+      entityType: entity.entityType,
+    })
+    setEditFormError('')
+    setShowEditModal(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editEntity) return
+    setEditFormError('')
+    if (editForm.name.trim().length < 2) {
+      setEditFormError('Şirket adı en az 2 karakter olmalıdır.')
+      return
+    }
+    setEditFormLoading(true)
+    try {
+      const res = await fetch(`/api/entities/${editEntity.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(editForm),
+      })
+      const data = await res.json()
+      if (!res.ok) { setEditFormError(data.error ?? 'Güncelleme başarısız.'); return }
+      setEntities(prev => prev.map(e =>
+        e.id === editEntity.id ? { ...e, ...data.entity } : e
+      ))
+      setShowEditModal(false)
+    } finally {
+      setEditFormLoading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -158,7 +203,7 @@ export default function SirketlerPage() {
               <div key={entity.id} className="relative group">
                 <Link
                   href={`/dashboard/sirketler/${entity.id}`}
-                  className="glass-card flex items-center gap-4 p-5 pr-20 hover:shadow-md transition-all block"
+                  className="glass-card flex items-center gap-4 p-5 pr-28 hover:shadow-md transition-all block"
                   style={{ textDecoration: 'none' }}
                 >
                   {/* İkon */}
@@ -197,6 +242,18 @@ export default function SirketlerPage() {
                   </div>
                 </Link>
 
+                {/* Kalem (düzenle) butonu — sadece confirm yokken */}
+                {confirmId !== entity.id && (
+                  <div className="absolute right-20 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); openEditModal(entity) }}
+                      className="p-1.5 rounded-lg hover:bg-cyan-50 text-slate-300 hover:text-[#0B3C5D] transition-all"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Sil butonu */}
                 <div className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {confirmId === entity.id ? (
@@ -229,6 +286,117 @@ export default function SirketlerPage() {
           </div>
         )}
       </div>
+
+      {/* Şirket Düzenle Modal */}
+      {showEditModal && editEntity && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(11,60,93,0.35)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false) }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {/* Başlık */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: '#0B3C5D' }}>Şirketi Düzenle</h2>
+                <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">{editEntity.name}</p>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Sektör değişikliği uyarısı */}
+            {(editForm.sector || null) !== (editEntity.sector ?? null) && (
+              <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 leading-relaxed">
+                ⚠️ Sektör değişikliği mevcut rating ve benchmark sonuçlarını etkileyecek. Kaydetme sonrası otomatik yeniden hesaplanır.
+              </div>
+            )}
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {/* Ad */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Şirket Adı <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Örn: ABC Tekstil A.Ş."
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {/* VKN */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Vergi Kimlik No</label>
+                <input
+                  type="text"
+                  value={editForm.taxNumber}
+                  onChange={(e) => setEditForm(p => ({ ...p, taxNumber: e.target.value }))}
+                  placeholder="10 haneli VKN"
+                  maxLength={11}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {/* Sektör */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Sektör</label>
+                <select
+                  value={editForm.sector}
+                  onChange={(e) => setEditForm(p => ({ ...p, sector: e.target.value }))}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">— Seçiniz —</option>
+                  {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Şirket Tipi */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Şirket Tipi</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ENTITY_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditForm(p => ({ ...p, entityType: value }))}
+                      className="px-3 py-2.5 rounded-lg text-xs font-medium text-left transition-all border"
+                      style={editForm.entityType === value
+                        ? { borderColor: 'rgba(46,196,182,0.4)', background: '#EFF9F8', color: '#0B3C5D' }
+                        : { borderColor: '#e5e7eb', background: '#ffffff', color: '#5A7A96' }
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {editFormError && (
+                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-500">
+                  {editFormError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={editFormLoading}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 hover:opacity-90 transition-opacity"
+                style={{ background: '#0B3C5D' }}
+              >
+                {editFormLoading && <Loader2 size={16} className="animate-spin" />}
+                Kaydet
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Yeni Şirket Modal */}
       {showModal && (
