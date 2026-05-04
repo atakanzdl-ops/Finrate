@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import FinrateShell from '@/components/layout/FinrateShell'
+import RatingHistoryChart from '@/components/dashboard/RatingHistoryChart'
 
 interface Analysis {
   id: string
@@ -197,38 +198,7 @@ export default function DashboardHome() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="card-head">
-                <h2 className="card-title">Analiz Geçmişi</h2>
-              </div>
-              <div className="card-body">
-                {analyses.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500">
-                    İlk analiz için <strong>Yeni Analiz Başlat</strong> butonunu kullanın.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {analyses.slice(0, 9).map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => router.push(`/dashboard/analiz?entityId=${item.entity?.id ?? ''}`)}
-                        className="text-left p-4 rounded-xl border border-[#E5E9F0] hover:border-[#0B3C5D]/25 hover:bg-[#F8FAFC] transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-[#1E293B]">{item.entity?.name ?? 'Şirket'}</span>
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(item.finalRating)}`}>
-                            {item.finalRating}
-                          </span>
-                        </div>
-                        <div className="mt-3 text-2xl font-black text-[#0B3C5D]">{Math.round(item.finalScore)}</div>
-                        <div className="mt-1 text-xs text-slate-500">{formatDate(item.updatedAt)} • {item.year}/{item.period}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <RatingHistoryChart analyses={analyses} />
 
             <div className="flex justify-end">
               <button
