@@ -2,16 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowRight,
-  CalendarClock,
-  Loader2,
-  Plus,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react'
+import { ArrowRight, Loader2, Plus } from 'lucide-react'
 import FinrateShell from '@/components/layout/FinrateShell'
-import RatingHistoryChart from '@/components/dashboard/RatingHistoryChart'
+import EntityRatingCard, {
+  groupAnalysesByEntity,
+  sortEntitiesByLatest,
+  latestUpdatedAt,
+  type CardAnalysisItem,
+} from '@/components/dashboard/EntityRatingCard'
 
 interface Analysis {
   id: string
@@ -54,11 +52,6 @@ function formatDate(value?: string | null) {
   }).format(date)
 }
 
-function ratingTone(rating: string) {
-  if (['AAA', 'AA', 'A'].includes(rating)) return 'text-emerald-600 bg-emerald-50 border-emerald-100'
-  if (rating === 'BBB') return 'text-amber-700 bg-amber-50 border-amber-100'
-  return 'text-red-600 bg-red-50 border-red-100'
-}
 
 export default function DashboardHome() {
   const router = useRouter()
@@ -87,14 +80,16 @@ export default function DashboardHome() {
       .finally(() => setLoading(false))
   }, [])
 
-  const latest = analyses[0] ?? null
-  const previous = analyses[1] ?? null
-  const change = latest && previous ? latest.finalScore - previous.finalScore : null
+  const entityGroups = useMemo(
+    () => sortEntitiesByLatest(groupAnalysesByEntity(analyses as CardAnalysisItem[])),
+    [analyses],
+  )
 
   const subtitle = useMemo(() => {
-    if (!latest) return 'Henüz analiz bulunmuyor.'
-    return `${latest.entity?.name ?? 'Şirket'} • Son analiz: ${formatDate(latest.updatedAt)}`
-  }, [latest])
+    if (!analyses.length) return 'Henüz analiz bulunmuyor.'
+    const overallLatest = latestUpdatedAt(analyses as CardAnalysisItem[])
+    return `${entityGroups.length} firma • Son güncelleme: ${formatDate(overallLatest)}`
+  }, [analyses, entityGroups.length])
 
   async function handleCreateAnalysis(e: React.FormEvent) {
     e.preventDefault()
@@ -159,56 +154,21 @@ export default function DashboardHome() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="card p-6 md:col-span-2">
-                <p className="text-xs text-slate-500 tracking-widest font-bold">SKOR / RATING</p>
-                <div className="mt-3 flex items-end gap-3">
-                  <span className="text-5xl font-black text-[#0B3C5D]">{latest ? Math.round(latest.finalScore) : '-'}</span>
-                  <span className={`text-sm font-bold px-3 py-1 rounded-full border ${latest ? ratingTone(latest.finalRating) : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
-                    {latest?.finalRating ?? '—'}
-                  </span>
-                </div>
+            {entityGroups.length === 0 ? (
+              <div className="card p-16 text-center text-slate-500">
+                İlk analiz için <strong>Yeni Analiz Başlat</strong> butonunu kullanın.
               </div>
-
-              <div className="card p-6">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Son Analiz Tarihi</p>
-                <div className="mt-3 flex items-center gap-2 text-[#0B3C5D]">
-                  <CalendarClock size={18} />
-                  <span className="font-bold text-lg">{latest ? formatDate(latest.updatedAt) : '—'}</span>
-                </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {entityGroups.map((g) => (
+                  <EntityRatingCard
+                    key={g.entity.id}
+                    entity={g.entity}
+                    analyses={g.analyses}
+                  />
+                ))}
               </div>
-
-              <div className="card p-6">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Son Değişim</p>
-                <div className="mt-3 flex items-center gap-2">
-                  {change == null ? (
-                    <span className="text-slate-500 font-bold text-lg">—</span>
-                  ) : change >= 0 ? (
-                    <>
-                      <TrendingUp size={18} className="text-emerald-600" />
-                      <span className="text-emerald-600 font-bold text-lg">+{change.toFixed(1)} puan</span>
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown size={18} className="text-red-600" />
-                      <span className="text-red-600 font-bold text-lg">{change.toFixed(1)} puan</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <RatingHistoryChart analyses={analyses} />
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => router.push('/dashboard/analiz')}
-              >
-                Tüm Analizleri Gör <ArrowRight size={16} />
-              </button>
-            </div>
+            )}
           </>
         )}
       </div>
