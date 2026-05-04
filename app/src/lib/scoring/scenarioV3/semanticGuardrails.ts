@@ -477,7 +477,8 @@ export function checkTemporalRealism(
 
   // Short ufuk + büyük A10 → soft block
   if (horizon === 'short' && action.id === 'A10_CASH_EQUITY_INJECTION') {
-    const isLarge = proposedAmountTRY > firmContext.totalEquity * 0.5
+    const absEq = Math.abs(firmContext.totalEquity)
+    const isLarge = absEq > 0 && proposedAmountTRY > absEq * 0.5
     if (isLarge) {
       return {
         pass: false,
@@ -519,7 +520,8 @@ export function checkTemporalRealism(
 
   // Medium ufuk + çok büyük A10 → warning
   if (horizon === 'medium' && action.id === 'A10_CASH_EQUITY_INJECTION') {
-    const isVeryLarge = proposedAmountTRY > firmContext.totalEquity * 1.5
+    const absEq = Math.abs(firmContext.totalEquity)
+    const isVeryLarge = absEq > 0 && proposedAmountTRY > absEq * 1.5
     if (isVeryLarge) {
       return {
         pass: true,
@@ -554,7 +556,8 @@ export function checkLegalRegulatorySanity(
   }
 
   if (action.id === 'A10_CASH_EQUITY_INJECTION') {
-    const isSignificant = proposedAmountTRY > firmContext.totalEquity * 0.3
+    const absEq = Math.abs(firmContext.totalEquity)
+    const isSignificant = absEq > 0 && proposedAmountTRY > absEq * 0.3
     if (isSignificant) {
       return {
         pass: true,
@@ -616,7 +619,8 @@ export const PORTFOLIO_AGGREGATE_RULES: PortfolioAggregateRule[] = [
       )
       const totalEquityIncrease = equityActions.reduce((sum, a) => sum + a.amountTRY, 0)
 
-      if (totalEquityIncrease > input.firmContext.totalEquity * 2) {
+      const absEquity = Math.abs(input.firmContext.totalEquity)
+      if (absEquity > 0 && totalEquityIncrease > absEquity * 2) {
         return {
           pass: false,
           severity: 'SOFT_BLOCK',
