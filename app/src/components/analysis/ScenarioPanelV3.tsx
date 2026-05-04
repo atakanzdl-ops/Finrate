@@ -227,7 +227,7 @@ function OzetTab({ result }: { result: any }) {
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="text-xs uppercase tracking-wider text-[#2EC4B6] font-semibold mb-2">
-              Gerçekçi Üst Sınır
+              {displayTargetRating === exec.requestedTarget ? 'Hedef Rating' : 'Ulaşılabilir Seviye'}
             </div>
             <div className="text-4xl font-bold">
               {displayTargetRating}

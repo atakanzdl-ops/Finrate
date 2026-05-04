@@ -511,7 +511,7 @@ export function consolidateByActionId(actions: SelectedAction[]): SelectedAction
 
 // ─── BUILDER: EXECUTIVE ANSWER ───────────────────────────────────────────────
 
-function buildExecutiveAnswer(
+export function buildExecutiveAnswer(
   engineResult: EngineResult,
   requestedTarget: RatingGrade,
 ): ExecutiveAnswer {
@@ -523,8 +523,9 @@ function buildExecutiveAnswer(
     confidenceModifier,
   } = engineResult
 
-  const targetMatchesRequest = finalTargetRating === requestedTarget
-  const achievedRequested    = ratingToIndex(finalTargetRating) >= ratingToIndex(requestedTarget)
+  // Faz 7.3.31: >= karşılaştırması — hedef aşıldığında da yeşil badge
+  const targetMatchesRequest = ratingToIndex(finalTargetRating) >= ratingToIndex(requestedTarget)
+  const achievedRequested    = targetMatchesRequest
 
   // Binding ceiling kontrolu
   const bindingCeiling = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
@@ -545,6 +546,28 @@ function buildExecutiveAnswer(
   }
 
   let executiveSummary = engineResult.reasoning.bankerSummary as string
+  // Faz 7.3.31: Teknik sızıntı veya bozuk Türkçe karakter tespiti → fallback
+  if (
+    !executiveSummary ||
+    executiveSummary.includes('guardrail') ||
+    executiveSummary.includes('HARD_REJECT') ||
+    executiveSummary.includes('REJECT') ||
+    executiveSummary.includes('iyilesmesi') ||
+    executiveSummary.includes('gecersiz') ||
+    executiveSummary.includes('guclenme')
+  ) {
+    if (notchesGained === 0) {
+      if (hasCeiling) {
+        executiveSummary = 'Mevcut yapısal limitler nedeniyle hedeflenen not artışı şu an desteklenmemektedir.'
+      } else {
+        executiveSummary = 'Mevcut finansal ve operasyonel yapı, hedeflenen not artışını desteklemek için yeterli değildir. Temel alanlarda yapısal iyileşme gerekiyor.'
+      }
+    } else if (targetMatchesRequest) {
+      executiveSummary = 'Önerilen aksiyon planının tutarlı şekilde uygulanmasıyla hedeflenen seviyeye ulaşılması mümkün görünmektedir.'
+    } else {
+      executiveSummary = `Hedef seviye mevcut portföyle tam olarak desteklenmese de, finansal dayanıklılıkta ${notchesGained} kademe iyileşme sağlanabilir.`
+    }
+  }
 
   const ceilingNote = hasCeiling
     ? `${ceilingTypeToDisplay(bindingCeiling!.source)} tavanı aktif: ${bindingCeiling!.reason} (max ${bindingCeiling!.maxRating})`
@@ -1151,9 +1174,10 @@ function buildConsultantNarrative(
       `Daha yüksek bir hedefe ulaşmak için portföyün yapısal aksiyonlarla genişletilmesi gerekiyor. ` +
       `Likidite iyileşmesi tek başına yeterli değildir; aktif verimlilik ve gelir kalitesinin de güçlenmesi gerekir.`
   } else if (notchesGained === 0) {
+    // Faz 7.3.31: bankerSummary referansı kaldırıldı (teknik sızıntı riski)
     bankerView =
       `Mevcut yapıda anlamlı rating iyileşmesi sağlanamıyor. ` +
-      `${engineResult.reasoning.bankerSummary as string || 'Köklü operasyonel değişim gerekiyor.'}`
+      `Köklü operasyonel değişim ve finansal yeniden yapılandırma gerekiyor.`
   } else {
     bankerView =
       `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
@@ -1332,8 +1356,8 @@ export function buildDecisionAnswer(
       v3EstimatedRating:      engineResult.finalTargetRating,
       requestedTarget,
     })
-    portfolioForUI    = pkg.selectedActions
-    targetPackageMeta = pkg.meta
+    portfolioForUI    = engineResult.portfolio  // Faz 7.3.31: tam portföy — subset paradoksunu önler
+    targetPackageMeta = pkg.meta               // meta korunur (badge/banner state için)
   }
 
   // Filtered view: yalniz portfolio swap edilir, diger alanlar korunur.

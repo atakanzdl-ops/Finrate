@@ -7,13 +7,18 @@
  *
  * Çözüm: consolidateByActionId merge sonrası realisticTarget'ı toplam tutarla yeniden
  *   hesaplar. Tek parçalı aksiyonlar etkilenmez.
+ *
+ * Faz 7.3.31 — buildExecutiveAnswer testleri (T_DL1-T_DL5):
+ *   UI metin sızıntısı, badge mantık düzeltmesi, boş portföy güvenliği.
  */
 
 import {
   consolidateByActionId,
   buildProblemInefficiencyBlock,
   buildIfNotDoneInefficiencyBlock,
+  buildExecutiveAnswer,
 } from '../decisionLayer'
+import type { EngineResult } from '../engineV3'
 import type { SelectedAction } from '../engineV3'
 import type {
   MarginRatioTransparency,
@@ -21,6 +26,7 @@ import type {
   BalanceRatioTransparency,
   HorizonKey,
 } from '../contracts'
+import type { RatingGrade } from '../ratingReasoning'
 
 // ─── Test yardımcıları ────────────────────────────────────────────────────────
 
@@ -391,6 +397,223 @@ describe('Faz 7.3.13 — buildIfNotDoneInefficiencyBlock', () => {
   test('"Bu yapısal sorunlar çözülmezse" prefix dahil', () => {
     const result = buildIfNotDoneInefficiencyBlock([severeFlag])
     expect(result).toContain('Bu yapısal sorunlar çözülmezse')
+  })
+
+})
+
+// ─── Faz 7.3.31 — buildExecutiveAnswer (T_DL1-T_DL5) ────────────────────────
+
+function makeMinimalEngineResult(opts: {
+  currentRating?:    RatingGrade
+  finalTargetRating?: RatingGrade
+  notchesGained?:    number
+  confidence?:       'HIGH' | 'MEDIUM' | 'LOW'
+  bankerSummary?:    string
+  bindingCeiling?:   unknown
+}): EngineResult {
+  return {
+    version:            'v3',
+    sector:             'İMALAT',
+    currentRating:      opts.currentRating      ?? 'B',
+    rawTargetRating:    opts.finalTargetRating   ?? 'BB',
+    finalTargetRating:  opts.finalTargetRating   ?? 'BB',
+    notchesGained:      opts.notchesGained       ?? 1,
+    confidence:         opts.confidence          ?? 'MEDIUM',
+    confidenceModifier: 1,
+    horizons:           { short: { actions: [], totalImpact: 0 }, medium: { actions: [], totalImpact: 0 }, long: { actions: [], totalImpact: 0 } },
+    portfolio:          [],
+    reasoning: {
+      bindingCeiling:      opts.bindingCeiling   ?? null,
+      supportingCeilings:  [],
+      drivers:             null,
+      missedOpportunities: [],
+      oneNotchScenario:    null,
+      twoNotchScenario:    null,
+      sensitivityAnalysis: null,
+      bankerSummary:       opts.bankerSummary    ?? '',
+      transition:          null,
+    },
+    layerSummaries: {
+      productivity:   null,
+      sustainability: null,
+      sector:         null,
+      guardrails:     [],
+    },
+    decisionTrace: [],
+  } as unknown as EngineResult
+}
+
+// ─── T_DL1: Teknik sızıntı pattern tespiti ───────────────────────────────────
+
+describe('T_DL1 — buildExecutiveAnswer: teknik sızıntı pattern tespiti (Faz 7.3.31)', () => {
+
+  test('bankerSummary "HARD_REJECT" içeriyorsa executiveSummary teknik terim içermez', () => {
+    const er = makeMinimalEngineResult({
+      bankerSummary: 'Portfoy semantic guardrail HARD_REJECT nedeniyle gecersiz',
+      notchesGained: 1,
+      finalTargetRating: 'BB',
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.executiveSummary).not.toContain('HARD_REJECT')
+    expect(ans.executiveSummary).not.toContain('guardrail')
+    expect(ans.executiveSummary).not.toContain('REJECT')
+    expect(ans.executiveSummary).not.toContain('gecersiz')
+    expect(ans.executiveSummary.length).toBeGreaterThan(10)
+  })
+
+  test('bankerSummary "iyilesmesi" içeriyorsa executiveSummary ASCII Türkçe içermez', () => {
+    const er = makeMinimalEngineResult({
+      bankerSummary: 'Likidite guclenme ve iyilesmesi bekleniyor',
+      notchesGained: 2,
+      finalTargetRating: 'BBB',
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.executiveSummary).not.toContain('iyilesmesi')
+    expect(ans.executiveSummary).not.toContain('guclenme')
+  })
+
+  test('temiz bankerSummary olduğunda doğrudan kullanılır (sızıntı yok, fallback tetiklenmez)', () => {
+    const cleanSummary = 'Önerilen aksiyon planı orta vadede BB hedefini destekliyor.'
+    const er = makeMinimalEngineResult({
+      bankerSummary: cleanSummary,
+      notchesGained: 1,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.executiveSummary).toBe(cleanSummary)
+  })
+
+})
+
+// ─── T_DL2: Badge >= mantığı ─────────────────────────────────────────────────
+
+describe('T_DL2 — buildExecutiveAnswer: targetMatchesRequest >= düzeltmesi (Faz 7.3.31)', () => {
+
+  test('finalTarget BB, requestedTarget B → targetMatchesRequest = true (AA>BB senaryosu)', () => {
+    // BB >= B → hedef karşılandı
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'BB',
+      notchesGained:    1,
+    })
+    const ans = buildExecutiveAnswer(er, 'B')
+    expect(ans.targetMatchesRequest).toBe(true)
+  })
+
+  test('finalTarget AA, requestedTarget BB → targetMatchesRequest = true (üst sınır aşma)', () => {
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'AA',
+      notchesGained:    4,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.targetMatchesRequest).toBe(true)
+  })
+
+  test('finalTarget BB, requestedTarget AA → targetMatchesRequest = false (gerçekten kısıtlı)', () => {
+    // BB < AA → hedef karşılanmadı → kırmızı badge doğru
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'BB',
+      notchesGained:    1,
+    })
+    const ans = buildExecutiveAnswer(er, 'AA')
+    expect(ans.targetMatchesRequest).toBe(false)
+  })
+
+  test('finalTarget === requestedTarget → targetMatchesRequest = true (strict eşitlik de çalışır)', () => {
+    const er = makeMinimalEngineResult({
+      currentRating:    'BB',
+      finalTargetRating: 'BBB',
+      notchesGained:    1,
+    })
+    const ans = buildExecutiveAnswer(er, 'BBB')
+    expect(ans.targetMatchesRequest).toBe(true)
+  })
+
+})
+
+// ─── T_DL3: notchesGained=0, ceiling=null → fallback metin A ─────────────────
+
+describe('T_DL3 — buildExecutiveAnswer: notchesGained=0, ceiling=null → fallback metin A (Faz 7.3.31)', () => {
+
+  test('bankerSummary boş + notchesGained=0 + ceiling=null → "yapısal iyileşme" fallback', () => {
+    const er = makeMinimalEngineResult({
+      bankerSummary:  '',
+      notchesGained:  0,
+      bindingCeiling: null,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.executiveSummary).toContain('yapısal')
+    expect(ans.executiveSummary).not.toContain('guardrail')
+    expect(ans.executiveSummary).not.toContain('REJECT')
+  })
+
+  test('sızıntılı bankerSummary + notchesGained=0 + ceiling=null → operasyonel fallback', () => {
+    const er = makeMinimalEngineResult({
+      bankerSummary:  'HARD_REJECT yapısı gecersiz',
+      notchesGained:  0,
+      bindingCeiling: null,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.executiveSummary).not.toContain('HARD_REJECT')
+    expect(ans.executiveSummary.length).toBeGreaterThan(20)
+  })
+
+})
+
+// ─── T_DL4: notchesGained=0, ceiling=SEMANTIC_GUARDRAIL → fallback metin B ───
+
+describe('T_DL4 — buildExecutiveAnswer: notchesGained=0, ceiling aktif → fallback metin B (Faz 7.3.31)', () => {
+
+  test('bankerSummary sızıntılı + notchesGained=0 + ceiling=SEMANTIC_GUARDRAIL → yapısal limit fallback', () => {
+    const er = makeMinimalEngineResult({
+      bankerSummary:  'Portfoy SEMANTIC_GUARDRAIL HARD_REJECT',
+      notchesGained:  0,
+      bindingCeiling: {
+        source:    'SEMANTIC_GUARDRAIL',
+        maxRating: 'B',
+        reason:    'Özkaynak yetersizliği',
+        evidence:  [],
+      },
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    // hasCeiling = true → "yapısal limitler" mesajı
+    expect(ans.executiveSummary).not.toContain('SEMANTIC_GUARDRAIL')
+    expect(ans.executiveSummary).not.toContain('HARD_REJECT')
+    expect(ans.hasCeiling).toBe(true)
+    expect(ans.executiveSummary.length).toBeGreaterThan(20)
+  })
+
+})
+
+// ─── T_DL5: Boş portföy durumunda exception yok ──────────────────────────────
+
+describe('T_DL5 — buildExecutiveAnswer: boş portföy → exception yok (Faz 7.3.31)', () => {
+
+  test('portfolio=[], notchesGained=0 → executiveSummary dolu, throw yok', () => {
+    const er = makeMinimalEngineResult({
+      notchesGained:  0,
+      bankerSummary:  '',
+      bindingCeiling: null,
+    })
+    expect(() => {
+      const ans = buildExecutiveAnswer(er, 'BB')
+      expect(ans.executiveSummary).toBeTruthy()
+      expect(typeof ans.executiveSummary).toBe('string')
+    }).not.toThrow()
+  })
+
+  test('portfolio=[], notchesGained=2 → temiz executiveSummary', () => {
+    const er = makeMinimalEngineResult({
+      notchesGained:    2,
+      finalTargetRating: 'BBB',
+      bankerSummary:    '',
+    })
+    expect(() => {
+      const ans = buildExecutiveAnswer(er, 'BBB')
+      expect(ans.notchesGained).toBe(2)
+      expect(typeof ans.executiveSummary).toBe('string')
+    }).not.toThrow()
   })
 
 })
