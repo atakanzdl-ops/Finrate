@@ -290,6 +290,11 @@ export async function POST(req: NextRequest) {
     )
 
     // ── 10. RESPONSE ──────────────────────────────────────────────────────────
+    // Faz 7.3.38: ?diagnostics=1 flag — üretimde varsayılan kapalı
+    // try-catch: test ortamında req.url undefined olabilir → false fallback
+    let diagnosticsMode = false
+    try { diagnosticsMode = new URL(req.url).searchParams.get('diagnostics') === '1' } catch { /* noop */ }
+
     return NextResponse.json({
       engine:         'v3',
       analysisId,
@@ -301,6 +306,9 @@ export async function POST(req: NextRequest) {
 
       // Ana karar cevabi — UI bu objeyi kullanir
       decisionAnswer,
+
+      // Opsiyonel observability payload — ?diagnostics=1 ile açılır
+      ...(diagnosticsMode ? { diagnostics: decisionAnswer.diagnostics } : {}),
 
       // Raw engine result — debug ve advanced kullanim icin
       engineResult: {

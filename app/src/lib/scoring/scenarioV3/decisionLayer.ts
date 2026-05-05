@@ -26,6 +26,7 @@
 
 import type { AccountingLeg, DecisionInsight, BalanceRatioTransparency } from './contracts'
 import type { ActualRatingValidation } from './postActionRating'
+import { buildDiagnostics, type DiagnosticsPayload } from './instrumentation'
 import {
   selectTargetPackage,
   type TargetPackageMeta,
@@ -272,6 +273,11 @@ export interface DecisionAnswer {
    * rejectedInsights.length ile eşdeğerdir; UI'da kolaylık için açık alan.
    */
   rejectedInsightCount: number
+  /**
+   * Faz 7.3.38: Opsiyonel observability payload — engine enstrümantasyon verisi.
+   * route.ts'te ?diagnostics=1 flag ile response'a eklenir. Üretimde gizlidir.
+   */
+  diagnostics?: DiagnosticsPayload
 }
 
 // ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
@@ -1437,6 +1443,15 @@ export function buildDecisionAnswer(
   const enginePortfolioCount = dedupeActions(engineResult.portfolio).length
   const rejectedInsightCount = rejectedInsights.length
 
+  // Faz 7.3.38: diagnostics payload — engine'e dokunmadan observability
+  const diagnostics = buildDiagnostics(
+    engineResult,
+    String(requestedTarget),
+    targetPackageContext?.currentCombinedScore ?? null,
+    actualRatingValidation?.postCombinedScore ?? null,
+    actualRatingValidation?.postActualRating ?? null,
+  )
+
   return {
     executiveAnswer,
     whatCompanyShouldDo,
@@ -1457,5 +1472,6 @@ export function buildDecisionAnswer(
     targetPackageMeta,
     enginePortfolioCount,
     rejectedInsightCount,
+    diagnostics,
   }
 }
