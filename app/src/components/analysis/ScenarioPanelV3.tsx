@@ -207,10 +207,10 @@ function OzetTab({ result }: { result: any }) {
     ?? null
   const transition  = result.engineResult?.reasoning?.transition
 
-  // Faz 7.3.8c: Üst başlık gerçek hesaba (postActualRating) bağlanır,
-  // V3 tahmini yalnız fallback olarak kalır.
-  const displayCurrentRating =
-    da?.actualRatingValidation?.currentActualRating ?? exec.currentRating
+  // Faz 7.3.33: Canonical kaynak — exec.currentRating tek referans.
+  // actualRatingValidation?.currentActualRating DEKA 2022'de BB döndürürken
+  // üst kartta "Mevcut Not: B" görünüyordu (kaynak tutarsızlığı).
+  const displayCurrentRating = exec.currentRating
   const displayTargetRating =
     da?.actualRatingValidation?.postActualRating
       ?? exec.achievableTarget

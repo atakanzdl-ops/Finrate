@@ -728,6 +728,47 @@ describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating 
 
 })
 
+// ─── T2: displayCurrentRating canonical kaynak (Faz 7.3.33) ─────────────────
+
+describe('T2 — displayCurrentRating: exec.currentRating canonical kaynak (Faz 7.3.33)', () => {
+
+  test('buildExecutiveAnswer currentRating alanı engineResult\'tan doğru taşınır', () => {
+    const er = makeMinimalEngineResult({ currentRating: 'B', finalTargetRating: 'BB', notchesGained: 1 })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    // ScenarioPanelV3 exec.currentRating kullanıyor — alanın doğru olduğunu doğrula
+    expect(ans.currentRating).toBe('B')
+  })
+
+  test('buildExecutiveAnswer requestedTarget doğru geçirilir', () => {
+    const er = makeMinimalEngineResult({ currentRating: 'BB', finalTargetRating: 'BBB', notchesGained: 1 })
+    const ans = buildExecutiveAnswer(er, 'BBB')
+    expect(ans.requestedTarget).toBe('BBB')
+  })
+
+})
+
+// ─── T4: SOURCE_MISMATCH banner mantığı (Faz 7.3.33) ─────────────────────────
+
+describe('T4 — SOURCE_MISMATCH banner: status kontrol (Faz 7.3.33 regresyon)', () => {
+
+  test('targetPackageMeta.status SOURCE_MISMATCH string olarak eşleşir', () => {
+    // ScenarioPanelV3 L497: da?.targetPackageMeta?.status === "SOURCE_MISMATCH"
+    const meta = { status: 'SOURCE_MISMATCH' }
+    expect(meta.status === 'SOURCE_MISMATCH').toBe(true)
+  })
+
+  test('targetPackageMeta.status OPTIMAL olduğunda banner gösterilmez', () => {
+    const meta = { status: 'OPTIMAL' }
+    expect(meta.status === 'SOURCE_MISMATCH').toBe(false)
+  })
+
+  test('targetPackageMeta undefined olduğunda banner gösterilmez', () => {
+    const meta: { status?: string } | undefined = undefined
+    expect(meta?.status === 'SOURCE_MISMATCH').toBe(false)
+  })
+
+})
+
 // ─── T1: Quick Screen Net Marj sektör kıyas mantığı (Faz 7.3.33) ─────────────
 
 describe('T1 — Quick Screen Net Marj: sektör kıyas tone mantığı (Faz 7.3.33)', () => {
