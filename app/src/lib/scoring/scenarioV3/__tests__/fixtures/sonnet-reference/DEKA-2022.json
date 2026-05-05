@@ -1,0 +1,50 @@
+{
+  "company": "DEKA",
+  "period": "2022-ANNUAL",
+  "requestedTarget": "BB",
+  "sonnetNotchesGained": 2,
+  "sonnetActions": [
+    {
+      "code": "A10_CASH_EQUITY_INJECTION",
+      "description": "Nakit Sermaye Artışı",
+      "estimatedNotchContribution": 0.8,
+      "ratioImpact": {
+        "debtToEquity": "+20pt",
+        "equityToAssets": "+10pt"
+      }
+    },
+    {
+      "code": "A05_RECEIVABLES_FACTORING",
+      "description": "Alacak Faktoring",
+      "estimatedNotchContribution": 0.5,
+      "ratioImpact": {
+        "dso": "-15 gün",
+        "currentRatio": "+2.0"
+      }
+    },
+    {
+      "code": "A12_COGS_REDUCTION",
+      "description": "COGS Optimizasyonu",
+      "estimatedNotchContribution": 0.4,
+      "ratioImpact": {
+        "operatingMargin": "+4.0pt",
+        "roe": "+2.0pt"
+      }
+    },
+    {
+      "code": "A07_INVENTORY_TURNOVER",
+      "description": "Stok Devir Hızı İyileştirme",
+      "estimatedNotchContribution": 0.3,
+      "ratioImpact": {
+        "currentRatio": "+2.0",
+        "acidTest": "+2.0",
+        "cashRatio": "+2.0pt"
+      }
+    }
+  ],
+  "sonnetTotalImpactPoints": 19,
+  "sonnetRatingPath": "B → BBB",
+  "notes": "Sonnet Claude analizi — 4 aksiyon, toplam +19 puan. Engine B seviyesinden çıkaramıyor (0 notch). Kalibrasyon farkı araştırılıyor (Faz 7.3.38).",
+  "generatedAt": "2026-05-05",
+  "source": "manuel-sonnet-analiz"
+}

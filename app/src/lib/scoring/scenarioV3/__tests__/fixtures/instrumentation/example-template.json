@@ -1,0 +1,33 @@
+{
+  "_comment": "Fixture şablonu — ?diagnostics=1 ile canlı API'den doldurun.",
+  "_howto": "POST /api/scenarios/v3?diagnostics=1 → response.diagnostics alanını buraya yapıştırın.",
+  "scenarioId": "COMPANY-PERIOD-target-RATING",
+  "company": "COMPANY",
+  "period": "YYYY-ANNUAL",
+  "requestedTarget": "BB",
+  "current": {
+    "combinedScore": null,
+    "rating": "B"
+  },
+  "actions": [
+    {
+      "code": "A10_CASH_EQUITY_INJECTION",
+      "estimatedNotchContribution": 0.0,
+      "cost": 0
+    }
+  ],
+  "post": {
+    "combinedScore": null,
+    "actualRating": null,
+    "engineAchievableTarget": "B"
+  },
+  "constraints": {
+    "bindingCeiling": null,
+    "guardrails": []
+  },
+  "decision": {
+    "notchesGained": 0,
+    "reachedTarget": false,
+    "sourceMismatch": false
+  }
+}
