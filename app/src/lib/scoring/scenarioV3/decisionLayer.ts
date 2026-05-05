@@ -1092,8 +1092,9 @@ function buildConsultantNarrative(
   let coreIssue = ''
 
   if (bindingCeiling) {
+    // Faz 7.3.33: "tavanını kırmanız mümkün değil" → tavan olduğunu netleştir
     coreIssue = `Rating iyileşmesinin önündeki temel engel: ${formatCeilingDisplay(cleanCeiling(bindingCeiling))}. ` +
-      `Bu sorun çözülmeden ${bindingCeiling.maxRating} tavanını kırmanız mümkün değil.`
+      `Bu kısıt sürdükçe ulaşılabilir tavan seviye ${bindingCeiling.maxRating}'dir; bu değer mevcut not değil, üst sınırdır.`
   } else if (sustainability?.constraints?.hasCeiling) {
     const reason = sustainability.constraints.ceilingReasons?.[0] ?? 'gelir kalitesi düşük'
     coreIssue = `Gelir kalitesi sorunu: ${reason}. Sürdürülebilir gelir tabanı oluşturulmadan rating iyileşmesi kalıcı olmaz.`

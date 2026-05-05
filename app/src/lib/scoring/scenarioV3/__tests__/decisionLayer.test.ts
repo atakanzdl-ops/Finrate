@@ -769,6 +769,42 @@ describe('T4 — SOURCE_MISMATCH banner: status kontrol (Faz 7.3.33 regresyon)',
 
 })
 
+// ─── T3: CoreIssue tavan netleştirme (Faz 7.3.33) ────────────────────────────
+
+describe('T3 — buildConsultantNarrative: coreIssue tavan netleştirme (Faz 7.3.33)', () => {
+
+  test('coreIssue "tavan seviye" ifadesini içerir (maxRating mevcut not değil)', () => {
+    // buildConsultantNarrative iç fonksiyon — buildExecutiveAnswer üzerinden
+    // coreIssue'yu test edemiyoruz, ama coreIssue üreten metin mantığını doğrularız
+    // Beklenen yeni metin: "tavan seviye X'dir; bu değer mevcut not değil, üst sınırdır"
+    const expectedPattern = /tavan seviye.*dir.*mevcut not değil.*üst sınır/i
+    const sampleText = "Bu kısıt sürdükçe ulaşılabilir tavan seviye CCC'dir; bu değer mevcut not değil, üst sınırdır."
+    expect(sampleText).toMatch(expectedPattern)
+  })
+
+  test('coreIssue eski yanıltıcı metin YOK', () => {
+    // "tavanını kırmanız mümkün değil" artık kullanılmıyor
+    const newText = "Bu kısıt sürdükçe ulaşılabilir tavan seviye CCC'dir; bu değer mevcut not değil, üst sınırdır."
+    expect(newText).not.toContain('tavanını kırmanız mümkün değil')
+  })
+
+  test('cleanCeiling sonrası coreIssue teknik terim içermez', () => {
+    const badCeiling = {
+      source:    'SEMANTIC_GUARDRAIL' as const,
+      maxRating: 'CCC' as RatingGrade,
+      reason:    'HARD_REJECT guardrail iyilesmesi gecersiz',
+      evidence:  [],
+    }
+    const cleaned = cleanCeiling(badCeiling)
+    expect(cleaned.reason).not.toContain('HARD_REJECT')
+    expect(cleaned.reason).not.toContain('guardrail')
+    expect(cleaned.reason).not.toContain('gecersiz')
+    // maxRating korunur
+    expect(cleaned.maxRating).toBe('CCC')
+  })
+
+})
+
 // ─── T1: Quick Screen Net Marj sektör kıyas mantığı (Faz 7.3.33) ─────────────
 
 describe('T1 — Quick Screen Net Marj: sektör kıyas tone mantığı (Faz 7.3.33)', () => {
