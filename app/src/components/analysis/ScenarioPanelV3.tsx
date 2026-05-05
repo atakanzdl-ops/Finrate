@@ -434,6 +434,11 @@ function AksiyonPlaniTab({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actions: any[] = da.whatCompanyShouldDo ?? []
 
+  // Faz 7.3.37: aksiyon bağlamı için reachability
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _exec: any    = da.executiveAnswer ?? {}
+  const isReachable   = (_exec.targetMatchesRequest ?? _exec.isTargetFeasible) === true
+
   const toggleAction = (idx: number) => {
     const newSet = new Set(expanded)
     if (newSet.has(idx)) newSet.delete(idx)
@@ -484,6 +489,12 @@ function AksiyonPlaniTab({
           </h3>
           <p className="text-sm text-[#64748B] mt-1">
             Öncelik sırasına göre {actions.length} aksiyon önerisi.
+          </p>
+          {/* Faz 7.3.37: isReachable koşullu bağlam mesajı */}
+          <p className="text-sm mt-2" style={{ color: isReachable ? '#0B7A6E' : '#64748B' }}>
+            {isReachable
+              ? 'Bu aksiyonlar uygulanırsa hedef seviyeye ulaşılabilir.'
+              : 'Mevcut yapısal kısıtlar nedeniyle hedef seviyeye kısa vadede ulaşılamamaktadır. Aşağıdaki aksiyonlar mevcut seviyenin korunmasına ve finansal dayanıklılığın güçlenmesine odaklanır.'}
           </p>
         </div>
 

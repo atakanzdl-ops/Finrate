@@ -1057,3 +1057,44 @@ describe('T1 — Quick Screen Net Marj: sektör kıyas tone mantığı (Faz 7.3.
   })
 
 })
+
+// ─── T_AK: Aksiyon Bağlam Mesajı (Faz 7.3.37 Sorun 2) ───────────────────────
+
+describe('T_AK — Aksiyon bağlam mesajı: isReachable koşullu metin (Faz 7.3.37)', () => {
+
+  /** Saf fonksiyon — UI bileşenine bağımlı değil */
+  function aksiyonBaglamMesaji(isReachable: boolean): string {
+    return isReachable
+      ? 'Bu aksiyonlar uygulanırsa hedef seviyeye ulaşılabilir.'
+      : 'Mevcut yapısal kısıtlar nedeniyle hedef seviyeye kısa vadede ulaşılamamaktadır. ' +
+        'Aşağıdaki aksiyonlar mevcut seviyenin korunmasına ve finansal dayanıklılığın güçlenmesine odaklanır.'
+  }
+
+  test('T_AK1: isReachable=true → olumlu bağlam mesajı', () => {
+    const msg = aksiyonBaglamMesaji(true)
+    expect(msg).toContain('hedef seviyeye ulaşılabilir')
+    expect(msg).not.toContain('ulaşılamamaktadır')
+  })
+
+  test('T_AK2: isReachable=false → kısıt bağlam mesajı', () => {
+    const msg = aksiyonBaglamMesaji(false)
+    expect(msg).toContain('ulaşılamamaktadır')
+    expect(msg).toContain('finansal dayanıklılığın güçlenmesine')
+    expect(msg).not.toContain('hedef seviyeye ulaşılabilir.')
+  })
+
+  test('T_AK3: isReachable=true → tavan/sınır jargonu YOK', () => {
+    const msg = aksiyonBaglamMesaji(true)
+    expect(msg).not.toContain('tavan')
+    expect(msg).not.toContain('üst sınır')
+    expect(msg).not.toContain('CCC')
+  })
+
+  test('T_AK4: isReachable=false → tavan/maxRating jargonu YOK', () => {
+    const msg = aksiyonBaglamMesaji(false)
+    expect(msg).not.toContain('tavan')
+    expect(msg).not.toContain('üst sınır')
+    expect(msg).not.toMatch(/CCC|BB|BBB/)
+  })
+
+})
