@@ -92,6 +92,7 @@ import {
   checkPortfolioAggregateRules,
   ACTION_DEPENDENCY_GRAPH,
 } from './semanticGuardrails'
+import type { GuardrailResult } from './semanticGuardrails'
 
 import {
   analyzeAssetProductivity,
@@ -1701,31 +1702,63 @@ function buildSustainabilityInput(
   }
 }
 
-function buildGuardrailResults(
-  ctx:       FirmContext,
+/**
+ * Faz 7.3.42 — Guardrail Timing Bug Fix
+ *
+ * ÖNCEKİ HATA:
+ *   - ctx = FINAL workingContext (tüm aksiyonlar uygulandıktan sonra)
+ *   - previouslySelectedActionIds = portfolio.filter(x !== a) (sırasız, gelecek aksiyonlar dahil)
+ *
+ * ÇÖZÜM:
+ *   - baseCtx (greedy başlamadan önceki baseline) ile başla
+ *   - Her aksiyon UYGULANMADAN ÖNCE guardrail check yap
+ *   - stepCtx'i aksiyonun transactions'ıyla güncelle
+ *   - prevIds sadece önceden geçen aksiyonları içerir
+ *
+ * SONUÇ: A06_INVENTORY_MONETIZATION (stok nakde çevirme) stoğu sıfırladıktan
+ * sonra kendisini "kaynak yok" diye reject etmiyordu artık.
+ */
+export function buildGuardrailResults(
+  baseCtx:   FirmContext,
   portfolio: SelectedAction[],
 ) {
-  return portfolio.flatMap(a => {
-    const action = ACTION_CATALOG_V3[a.actionId]
-    if (!action) return []
+  const allResults: GuardrailResult[] = []
+  let stepCtx  = { ...baseCtx, accountBalances: { ...baseCtx.accountBalances } }
+  const prevIds: string[] = []
 
+  for (const a of portfolio) {
+    const action = ACTION_CATALOG_V3[a.actionId]
+    if (!action) {
+      // Bilinmeyen aksiyon: context ve prevIds güncelle, sonraki aksiyonlar doğru baslangic alsin
+      stepCtx = updateFirmContextFromTransactions(stepCtx, a.transactions)
+      prevIds.push(a.actionId)
+      continue
+    }
+
+    // Guardrail check — aksiyon UYGULANMADAN ÖNCEKİ stepCtx ile
     const report = checkActionGuardrails({
       action,
       transactions:                a.transactions,
       proposedAmountTRY:           a.amountTRY,
-      accountBalances:             ctx.accountBalances,
+      accountBalances:             stepCtx.accountBalances,   // PRE-action ✓
       firmContext: {
-        totalAssets:   ctx.totalAssets,
-        totalEquity:   ctx.totalEquity,
-        totalRevenue:  ctx.totalRevenue,
-        netIncome:     ctx.netIncome,
-        sector:        ctx.sector,
+        totalAssets:   stepCtx.totalAssets,
+        totalEquity:   stepCtx.totalEquity,
+        totalRevenue:  stepCtx.totalRevenue,
+        netIncome:     stepCtx.netIncome,
+        sector:        stepCtx.sector,
       },
       horizon:                     a.horizon,
-      previouslySelectedActionIds: portfolio.filter(x => x !== a).map(x => x.actionId),
+      previouslySelectedActionIds: [...prevIds],              // sadece öncekiler ✓
     })
-    return report.results
-  })
+    allResults.push(...report.results)
+
+    // Aksiyonu uygula → sonraki aksiyon için context güncelle
+    stepCtx = updateFirmContextFromTransactions(stepCtx, a.transactions)
+    prevIds.push(a.actionId)
+  }
+
+  return allResults
 }
 
 function estimateNotchContribution(breakdown: ScoreBreakdown): number {
@@ -1814,7 +1847,8 @@ export function runEngineV3(input: EngineInput): EngineResult {
   const sectorMetrics = computeSectorMetrics(workingContext)
   const sector        = analyzeSectorIntelligence({ sector: input.sector, metrics: sectorMetrics })
 
-  let guardrailResults = buildGuardrailResults(workingContext, fullPortfolio)
+  // Faz 7.3.42: baselineContext (PRE-action) kullanılır — workingContext (FINAL) değil
+  let guardrailResults = buildGuardrailResults(baselineContext, fullPortfolio)
 
   const defaultTarget: RatingGrade = input.targetRating ?? 'BB'
 
@@ -1866,7 +1900,8 @@ export function runEngineV3(input: EngineInput): EngineResult {
     const sustInput2   = buildSustainabilityInput(workingContext, fullPortfolio, input.currentRating, input.targetRating)
     sustainability     = analyzeSustainability(sustInput2)
 
-    guardrailResults   = buildGuardrailResults(workingContext, fullPortfolio)
+    // Faz 7.3.42: repair sonrası da baselineContext (PRE-action) kullanılır
+    guardrailResults   = buildGuardrailResults(baselineContext, fullPortfolio)
 
     // PATCH 1: Repair sonrasi guncellenmis kapasite
     const portfolioNotchCapacityV2 = fullPortfolio.reduce(
