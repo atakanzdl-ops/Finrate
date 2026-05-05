@@ -28,8 +28,9 @@ app/backups/
 # Local debug/scrape artifacts
 app/src/_site_home_raw.txt
 
-# Debug scripts — hardcoded DB bağlantısı içeriyor
-app/scripts/
+# Debug scripts — hardcoded DB bağlantısı içeriyor (.mjs)
+# Faz 7.3.40: sadece .mjs dosyaları gizli; TypeScript scriptleri commit edilir
+app/scripts/*.mjs
 
 # Dev log dosyaları
 app/dev-*.log

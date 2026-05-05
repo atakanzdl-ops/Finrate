@@ -8,7 +8,8 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "backfill:dekam": "tsx scripts/backfill_dekam_pdf_accounts.ts"
+    "backfill:dekam": "tsx scripts/backfill_dekam_pdf_accounts.ts",
+    "fixtures:collect": "tsx scripts/collect-fixtures.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
