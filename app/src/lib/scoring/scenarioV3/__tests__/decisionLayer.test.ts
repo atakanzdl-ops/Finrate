@@ -727,3 +727,50 @@ describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating 
   })
 
 })
+
+// ─── T1: Quick Screen Net Marj sektör kıyas mantığı (Faz 7.3.33) ─────────────
+
+describe('T1 — Quick Screen Net Marj: sektör kıyas tone mantığı (Faz 7.3.33)', () => {
+
+  /** page.tsx Quick Screen tone hesabını yansıtan saf fonksiyon */
+  function quickScreenNetMarjTone(
+    netProfitMargin: number | null | undefined,
+    bmNetProfitMargin: number | null | undefined,
+  ): 'positive' | 'negative' {
+    return netProfitMargin != null && bmNetProfitMargin != null &&
+      netProfitMargin >= bmNetProfitMargin * 0.8
+      ? 'positive'
+      : 'negative'
+  }
+
+  test('marj %0.5, sektör eşiği %5.0 → negative (DEKA senaryosu)', () => {
+    expect(quickScreenNetMarjTone(0.005, 0.05)).toBe('negative')
+  })
+
+  test('marj %5.0, sektör eşiği %5.0 → positive (eşikte)', () => {
+    expect(quickScreenNetMarjTone(0.05, 0.05)).toBe('positive')
+  })
+
+  test('marj %4.1, sektör %5.0, eşik %80 = %4.0 → positive (sınır üstü)', () => {
+    // 0.041 >= 0.05 * 0.8 = 0.04 → true
+    expect(quickScreenNetMarjTone(0.041, 0.05)).toBe('positive')
+  })
+
+  test('marj %3.9, sektör %5.0, eşik %80 = %4.0 → negative (sınır altı)', () => {
+    // 0.039 < 0.04 → false
+    expect(quickScreenNetMarjTone(0.039, 0.05)).toBe('negative')
+  })
+
+  test('marj pozitif ama sektör benchmarkı null → negative (güvenli fallback)', () => {
+    expect(quickScreenNetMarjTone(0.10, null)).toBe('negative')
+  })
+
+  test('marj null → negative', () => {
+    expect(quickScreenNetMarjTone(null, 0.05)).toBe('negative')
+  })
+
+  test('marj negatif → negative (sektör kıyassız da olumsuz)', () => {
+    expect(quickScreenNetMarjTone(-0.02, 0.05)).toBe('negative')
+  })
+
+})

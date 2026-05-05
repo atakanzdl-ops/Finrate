@@ -596,12 +596,15 @@ function AnalizPageContent() {
         : 'Veri eksik',
     },
     {
-      tone: r.netProfitMargin != null && r.netProfitMargin >= 0 ? 'positive' : 'negative',
+      // Faz 7.3.33: sektör kıyasıyla değerlendir (>= 0 yetersizdi — pozitif ama düşük marjlar ZAYIF sayılıyordu)
+      tone: r.netProfitMargin != null && bm.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 ? 'positive' : 'negative',
       category: 'Karlılık',
       metric: 'Net Marj:',
       val: fmtPct(r.netProfitMargin),
       comment: r.netProfitMargin != null
-        ? (r.netProfitMargin >= 0 ? 'Pozitif faaliyet karlılığı, sürdürülebilir büyüme.' : 'Negatif net marj, maliyet baskısı.')
+        ? (bm.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8
+            ? 'Sektör ortalamasıyla uyumlu net marj, sürdürülebilir karlılık.'
+            : 'Net marj sektör ortalamasının altında, karlılık iyileştirme gerekli.')
         : 'Veri eksik',
     },
     {
