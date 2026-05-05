@@ -197,6 +197,25 @@ function TypeBadge({ type }: { type: string }) {
 
 // ─── OZET TAB ────────────────────────────────────────────────────────────────
 
+/**
+ * Faz 7.3.36: Hero card karar mesajı üretici.
+ * Saf fonksiyon — test edilebilir.
+ */
+export function buildHeroMessage(
+  isReachable: boolean,
+  current: string,
+  requested: string,
+): string {
+  if (isReachable) {
+    return requested
+      ? `Önerilen aksiyon planı uygulanırsa ${requested} seviyesine ulaşılabilir.`
+      : 'Önerilen aksiyon planı uygulanırsa hedeflenen seviyeye ulaşılabilir.'
+  }
+  return current
+    ? `Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır. ${current} seviyesinde kalınmaktadır.`
+    : 'Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır.'
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function OzetTab({ result }: { result: any }) {
   const da          = result.decisionAnswer
@@ -208,75 +227,52 @@ function OzetTab({ result }: { result: any }) {
   const transition  = result.engineResult?.reasoning?.transition
 
   // Faz 7.3.33: Canonical kaynak — exec.currentRating tek referans.
-  // actualRatingValidation?.currentActualRating DEKA 2022'de BB döndürürken
-  // üst kartta "Mevcut Not: B" görünüyordu (kaynak tutarsızlığı).
   const displayCurrentRating = exec.currentRating
-  // Faz 7.3.35: Engine kanonik kaynak — postActualRating öncelik kaldırıldı.
-  // postActualRating diagnostic sigorta; SOURCE_MISMATCH banner asenkronlukta uyarır.
-  const displayTargetRating =
-    exec.achievableTarget
-      ?? exec.achievableRating
+  // Faz 7.3.36: displayTargetRating kaldırıldı (hero card sadeleştirme — büyük rating değer artık gösterilmiyor)
 
   return (
     <div className="space-y-6">
 
-      {/* A. EXECUTIVE HERO CARD */}
-      <div
-        className="rounded-[12px] p-8 text-white"
-        style={{ background: '#0B3C5D', boxShadow: '0 10px 30px rgba(11,60,93,0.08)' }}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="text-xs uppercase tracking-wider text-[#2EC4B6] font-semibold mb-2">
-              {displayTargetRating === exec.requestedTarget ? 'Hedef Rating' : 'Ulaşılabilir Seviye'}
-            </div>
-            <div className="text-4xl font-bold">
-              {displayTargetRating}
-            </div>
-            <div className="text-sm text-white/70 mt-1">
-              Mevcut: {displayCurrentRating}
-              {exec.requestedTarget && exec.requestedTarget !== displayTargetRating && (
-                <> &bull; İstenen: {exec.requestedTarget}</>
-              )}
-            </div>
-          </div>
-
+      {/* A. EXECUTIVE HERO CARD — Faz 7.3.36: sadeleştirildi (tek mesaj, sıfır çelişki) */}
+      {(() => {
+        const isReachable = (exec.targetMatchesRequest ?? exec.isTargetFeasible) === true
+        const current     = exec.currentRating as string | undefined
+        const requested   = exec.requestedTarget as string | undefined
+        const heroMsg     = buildHeroMessage(isReachable, current ?? '', requested ?? '')
+        return (
           <div
-            className={`px-3 py-1.5 rounded-[8px] text-xs font-medium
-              ${exec.targetMatchesRequest ?? exec.isTargetFeasible
-                ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}
+            className="rounded-[12px] p-8 text-white"
+            style={{ background: '#0B3C5D', boxShadow: '0 10px 30px rgba(11,60,93,0.08)' }}
           >
-            {exec.targetMatchesRequest ?? exec.isTargetFeasible ? 'Hedef Ulaşılabilir' : 'Hedef Sınırlı'}
-          </div>
-        </div>
-
-        {exec.headline && (
-          <div className="text-lg leading-relaxed mt-4">
-            {exec.headline}
-          </div>
-        )}
-
-        <div className="mt-4 pt-4 border-t border-white/10 space-y-2 text-sm">
-          {(exec.executiveSummary ?? exec.mainReason ?? exec.subtitle) && (
-            <div className="flex items-start gap-2">
-              <Info size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
-              <span className="text-white/80">{exec.executiveSummary ?? exec.mainReason ?? exec.subtitle}</span>
+            <div className="flex items-start justify-between mb-4">
+              <div className="text-sm text-white/80">
+                Mevcut: {displayCurrentRating}
+                {requested ? <> → Hedef: {requested}</> : null}
+              </div>
+              <div
+                className={`px-3 py-1.5 rounded-[8px] text-xs font-medium ${
+                  isReachable
+                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}
+              >
+                {isReachable ? 'Hedef Ulaşılabilir' : 'Hedef Ulaşılamıyor'}
+              </div>
             </div>
-          )}
-          {exec.confidence && (
-            <div className="flex items-start gap-2">
-              <Shield size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
-              <span className="text-white/80">
+
+            <div className="text-lg leading-relaxed mt-2">{heroMsg}</div>
+
+            {exec.confidence && (
+              <div className="mt-4 pt-4 border-t border-white/10 text-sm text-white/80">
                 Güven:{' '}
                 <strong className="text-white">
                   {exec.confidence === 'HIGH' ? 'Yüksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}
                 </strong>
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* B. CAPACITY WARNING */}
       {transition?.blockedByPortfolioCapacity && (
@@ -290,7 +286,7 @@ function OzetTab({ result }: { result: any }) {
               <div className="text-sm text-amber-800">
                 Teorik rating tavanı mevcut olsa da seçilen aksiyon portföyü bu seviyeyi taşımıyor.
                 Mevcut portföyle ulaşılabilir en yüksek seviye:{' '}
-                <strong>{displayTargetRating}</strong>.
+                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
               </div>
             </div>
           </div>
@@ -490,16 +486,6 @@ function AksiyonPlaniTab({
           <div className="text-sm text-amber-900">
             Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. En yakın gerçekçi seviye:{' '}
             <strong>{da.targetPackageMeta.achievedRating}</strong>.
-          </div>
-        </div>
-      )}
-
-      {/* SOURCE_MISMATCH BANNER (Faz 7.3.20) — rating kaynakları çelişiyor, aksiyonlar engine'den */}
-      {da?.targetPackageMeta?.status === 'SOURCE_MISMATCH' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
-          <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
-          <div className="text-sm text-amber-900">
-            Rating kaynakları arasında tutarsızlık tespit edildi. Önerilen aksiyonlar engine analizine göre listelenmiştir.
           </div>
         </div>
       )}
