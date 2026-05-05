@@ -728,6 +728,67 @@ describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating 
 
 })
 
+// ─── T_HERO: Hero card buildHeroMessage mantığı (Faz 7.3.36) ─────────────────
+
+describe('T_HERO — buildHeroMessage: hero card karar mesajı (Faz 7.3.36)', () => {
+
+  /** ScenarioPanelV3.tsx buildHeroMessage ile aynı implementasyon */
+  function buildHeroMessage(isReachable: boolean, current: string, requested: string): string {
+    if (isReachable) {
+      return requested
+        ? `Önerilen aksiyon planı uygulanırsa ${requested} seviyesine ulaşılabilir.`
+        : 'Önerilen aksiyon planı uygulanırsa hedeflenen seviyeye ulaşılabilir.'
+    }
+    return current
+      ? `Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır. ${current} seviyesinde kalınmaktadır.`
+      : 'Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır.'
+  }
+
+  // T_HERO1: isReachable=true → "Ulaşılabilir" mesajı
+  test('T_HERO1: isReachable=true, requested=BB → "BB seviyesine ulaşılabilir"', () => {
+    const msg = buildHeroMessage(true, 'B', 'BB')
+    expect(msg).toContain('BB seviyesine ulaşılabilir')
+    expect(msg).not.toContain('ulaşılamamaktadır')
+  })
+
+  // T_HERO2: isReachable=false → "Ulaşılamamaktadır" mesajı
+  test('T_HERO2: isReachable=false, current=B → "ulaşılamamaktadır" + "B seviyesinde kalınmaktadır"', () => {
+    const msg = buildHeroMessage(false, 'B', 'BB')
+    expect(msg).toContain('ulaşılamamaktadır')
+    expect(msg).toContain('B seviyesinde kalınmaktadır')
+    expect(msg).not.toContain('ulaşılabilir')
+  })
+
+  // T_HERO3: isReachable=true, requested boş → genel mesaj
+  test('T_HERO3: isReachable=true, requested="" → genel "hedeflenen seviyeye ulaşılabilir"', () => {
+    const msg = buildHeroMessage(true, 'CCC', '')
+    expect(msg).toContain('hedeflenen seviyeye ulaşılabilir')
+    expect(msg).not.toContain('seviyesine ulaşılabilir') // belirli rating içermiyor
+  })
+
+  // T_HERO4: isReachable=false, current boş → kısa mesaj
+  test('T_HERO4: isReachable=false, current="" → "ulaşılamamaktadır" (current yok)', () => {
+    const msg = buildHeroMessage(false, '', 'BB')
+    expect(msg).toContain('ulaşılamamaktadır')
+    expect(msg).not.toContain('seviyesinde kalınmaktadır') // current yok
+  })
+
+  // T_HERO5: Eski "Ulaşılabilir Seviye" başlığı YOK (mesaj string içermiyor)
+  test('T_HERO5: hiçbir mesaj "Ulaşılabilir Seviye" jargonunu içermiyor', () => {
+    const msgs = [
+      buildHeroMessage(true, 'B', 'BB'),
+      buildHeroMessage(false, 'B', 'BB'),
+      buildHeroMessage(true, 'CCC', ''),
+      buildHeroMessage(false, '', ''),
+    ]
+    for (const msg of msgs) {
+      expect(msg).not.toContain('Ulaşılabilir Seviye')
+      expect(msg).not.toContain('HEDEF RATING')
+    }
+  })
+
+})
+
 // ─── T_BEST: Sol panel deterministik best sort (Faz 7.3.35) ──────────────────
 
 describe('T_BEST — Sol panel group best seçimi: deterministik yıl+dönem sort (Faz 7.3.35)', () => {
