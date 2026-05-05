@@ -884,8 +884,9 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 
   if (bindingCeiling) {
     parts.push(
+      // Faz 7.3.34: Çekirdek Mesele ile tutarlı — "tavan/üst sınır" netliği
       `${formatCeilingDisplay(cleanCeiling(bindingCeiling))} koşulları değişmediği sürece ` +
-      `firma ${bindingCeiling.maxRating} seviyesinin üzerine çıkamaz.`
+      `ulaşılabilir en yüksek seviye ${bindingCeiling.maxRating} olarak kalır; bu değer mevcut not değil, üst sınırdır.`
     )
   }
 

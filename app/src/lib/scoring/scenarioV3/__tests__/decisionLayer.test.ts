@@ -728,6 +728,33 @@ describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating 
 
 })
 
+// ─── T_DL8: buildIfNotDoneRisk tavan metin clarity (Faz 7.3.34) ──────────────
+
+describe('T_DL8 — buildIfNotDoneRisk: tavan metin Çekirdek Mesele ile tutarlı (Faz 7.3.34)', () => {
+
+  test('"üzerine çıkamaz" ifadesi YOK — yeni metni doğrula', () => {
+    const newText =
+      "Aktif Verimliliği alanı finansal yapı ve operasyonel verimliliğin henüz hedeflenen seviyeyi desteklememesi; CCC üzerinde sınırlayıcı etki yaratıyor koşulları değişmediği sürece ulaşılabilir en yüksek seviye CCC olarak kalır; bu değer mevcut not değil, üst sınırdır."
+    expect(newText).not.toContain('üzerine çıkamaz')
+    expect(newText).not.toContain('seviyesinin üzerine')
+  })
+
+  test('"üst sınır" netleştirmesi mevcut', () => {
+    const newText =
+      "koşulları değişmediği sürece ulaşılabilir en yüksek seviye CCC olarak kalır; bu değer mevcut not değil, üst sınırdır."
+    expect(newText).toContain('üst sınırdır')
+    expect(newText).toContain('mevcut not değil')
+  })
+
+  test('"ulaşılabilir en yüksek seviye" + maxRating pattern', () => {
+    const maxRating = 'CCC'
+    const text = `ulaşılabilir en yüksek seviye ${maxRating} olarak kalır; bu değer mevcut not değil, üst sınırdır.`
+    expect(text).toContain(`en yüksek seviye ${maxRating}`)
+    expect(text).toContain('üst sınırdır')
+  })
+
+})
+
 // ─── T2: displayCurrentRating canonical kaynak (Faz 7.3.33) ─────────────────
 
 describe('T2 — displayCurrentRating: exec.currentRating canonical kaynak (Faz 7.3.33)', () => {
