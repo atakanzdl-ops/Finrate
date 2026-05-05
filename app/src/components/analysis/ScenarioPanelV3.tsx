@@ -211,9 +211,10 @@ function OzetTab({ result }: { result: any }) {
   // actualRatingValidation?.currentActualRating DEKA 2022'de BB döndürürken
   // üst kartta "Mevcut Not: B" görünüyordu (kaynak tutarsızlığı).
   const displayCurrentRating = exec.currentRating
+  // Faz 7.3.35: Engine kanonik kaynak — postActualRating öncelik kaldırıldı.
+  // postActualRating diagnostic sigorta; SOURCE_MISMATCH banner asenkronlukta uyarır.
   const displayTargetRating =
-    da?.actualRatingValidation?.postActualRating
-      ?? exec.achievableTarget
+    exec.achievableTarget
       ?? exec.achievableRating
 
   return (

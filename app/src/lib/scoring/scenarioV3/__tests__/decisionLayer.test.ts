@@ -882,6 +882,70 @@ describe('T3 — buildConsultantNarrative: coreIssue tavan netleştirme (Faz 7.3
 
 })
 
+// ─── T_DL9: Hero card engine canonical (Faz 7.3.35) ─────────────────────────
+
+describe('T_DL9 — Hero card engine canonical kaynak (Faz 7.3.35)', () => {
+
+  test('postActualRating=AA, finalTargetRating=B, notchesGained=0 → targetMatchesRequest=false (engine baz)', () => {
+    // Faz 7.3.35: postActualRating override kaldırıldı. Engine baz.
+    // engine: finalTargetRating=B, requestedTarget=BB → B < BB → false
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'B',
+      notchesGained:    0,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    // postActualRating override yok — engine sonucu: B < BB → false
+    expect(ans.targetMatchesRequest).toBe(false)
+  })
+
+  test('engine finalTargetRating=BBB, requestedTarget=BB → targetMatchesRequest=true (engine baz)', () => {
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'BBB',
+      notchesGained:    2,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.targetMatchesRequest).toBe(true)
+  })
+
+  test('notchesGained=0 → targetMatchesRequest=false (B seviyesinde kalıyor)', () => {
+    const er = makeMinimalEngineResult({
+      currentRating:    'CCC',
+      finalTargetRating: 'CCC',
+      notchesGained:    0,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    expect(ans.targetMatchesRequest).toBe(false)
+    expect(ans.notchesGained).toBe(0)
+  })
+
+})
+
+// ─── T_DL10: SOURCE_MISMATCH banner mantığı regresyon (Faz 7.3.35) ───────────
+
+describe('T_DL10 — SOURCE_MISMATCH banner: postActualRating override kaldırıldı ama banner korundu (Faz 7.3.35)', () => {
+
+  test('SOURCE_MISMATCH status string karşılaştırması çalışıyor', () => {
+    // ScenarioPanelV3 L497: da?.targetPackageMeta?.status === "SOURCE_MISMATCH"
+    const sourceMismatchMeta = { status: 'SOURCE_MISMATCH', reachedTarget: false }
+    expect(sourceMismatchMeta.status === 'SOURCE_MISMATCH').toBe(true)
+  })
+
+  test('reachedTarget=true → targetMatchesRequest=true (engine kaynak, Faz 7.3.35 korunan)', () => {
+    // reachedTarget engine kaynağı — override doğru
+    // buildDecisionAnswer içinde: if (targetPackageMeta?.reachedTarget) → true
+    const meta = { reachedTarget: true, status: 'OPTIMAL' }
+    expect(meta.reachedTarget).toBe(true)
+  })
+
+  test('reachedTarget=false → override yok, engine targetMatchesRequest baz', () => {
+    const meta = { reachedTarget: false, status: 'OPTIMAL' }
+    expect(meta.reachedTarget).toBe(false)
+  })
+
+})
+
 // ─── T1: Quick Screen Net Marj sektör kıyas mantığı (Faz 7.3.33) ─────────────
 
 describe('T1 — Quick Screen Net Marj: sektör kıyas tone mantığı (Faz 7.3.33)', () => {

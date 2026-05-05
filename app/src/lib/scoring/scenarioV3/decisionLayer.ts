@@ -1391,13 +1391,9 @@ export function buildDecisionAnswer(
   const filteredEngineResult: EngineResult = { ...engineResult, portfolio: portfolioForUI }
 
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
-  // Faz 7.3.32: Badge senkronizasyonu — UI postActualRating gösterirken targetMatchesRequest
-  // finalTargetRating'e bakıyordu (asenkron). postActualRating varsa baz al.
-  if (actualRatingValidation?.postActualRating) {
-    executiveAnswer.targetMatchesRequest =
-      ratingToIndex(actualRatingValidation.postActualRating as RatingGrade) >=
-      ratingToIndex(requestedTarget)
-  }
+  // Faz 7.3.35: postActualRating override kaldırıldı — engine kanonik kaynak.
+  // postActualRating diagnostic sigorta; SOURCE_MISMATCH banner asenkronlukta uyarır.
+  // reachedTarget engine kaynağı olduğundan override korunur.
   if (targetPackageMeta?.reachedTarget) {
     executiveAnswer.targetMatchesRequest = true
   }
