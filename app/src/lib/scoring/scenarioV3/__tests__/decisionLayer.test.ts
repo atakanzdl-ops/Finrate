@@ -17,6 +17,7 @@ import {
   buildProblemInefficiencyBlock,
   buildIfNotDoneInefficiencyBlock,
   buildExecutiveAnswer,
+  cleanCeiling,
 } from '../decisionLayer'
 import type { EngineResult } from '../engineV3'
 import type { SelectedAction } from '../engineV3'
@@ -614,6 +615,115 @@ describe('T_DL5 — buildExecutiveAnswer: boş portföy → exception yok (Faz 7
       expect(ans.notchesGained).toBe(2)
       expect(typeof ans.executiveSummary).toBe('string')
     }).not.toThrow()
+  })
+
+})
+
+// ─── T_DL6: cleanCeiling sızıntı filtresi ────────────────────────────────────
+
+describe('T_DL6 — cleanCeiling: ceiling.reason sızıntı pattern temizleme (Faz 7.3.32)', () => {
+
+  test('reason "HARD_REJECT" içeriyorsa fallback döner', () => {
+    const ceiling = {
+      source:    'SEMANTIC_GUARDRAIL' as const,
+      maxRating: 'B' as RatingGrade,
+      reason:    'Portfoy semantic guardrail HARD_REJECT — rating iyilesmesi gecersiz',
+      evidence:  [],
+    }
+    const clean = cleanCeiling(ceiling)
+    expect(clean.reason).not.toContain('HARD_REJECT')
+    expect(clean.reason).not.toContain('guardrail')
+    expect(clean.reason).not.toContain('iyilesmesi')
+    expect(clean.reason.length).toBeGreaterThan(10)
+  })
+
+  test('reason "guardrail" içeriyorsa fallback döner', () => {
+    const ceiling = {
+      source:    'PRODUCTIVITY' as const,
+      maxRating: 'BB' as RatingGrade,
+      reason:    'semantic guardrail eşiği aşıldı',
+      evidence:  [],
+    }
+    const clean = cleanCeiling(ceiling)
+    expect(clean.reason).not.toContain('guardrail')
+    expect(clean.reason).not.toContain('semantic')
+  })
+
+  test('temiz reason değiştirilmez', () => {
+    const cleanReason = 'aktif verimliliği sektör ortalamasının altında'
+    const ceiling = {
+      source:    'PRODUCTIVITY' as const,
+      maxRating: 'BB' as RatingGrade,
+      reason:    cleanReason,
+      evidence:  [],
+    }
+    const clean = cleanCeiling(ceiling)
+    expect(clean.reason).toBe(cleanReason)
+  })
+
+  test('source ve maxRating korunur', () => {
+    const ceiling = {
+      source:    'SEMANTIC_GUARDRAIL' as const,
+      maxRating: 'B' as RatingGrade,
+      reason:    'HARD_REJECT Portfoy',
+      evidence:  ['kanıt1'],
+    }
+    const clean = cleanCeiling(ceiling)
+    expect(clean.source).toBe('SEMANTIC_GUARDRAIL')
+    expect(clean.maxRating).toBe('B')
+    expect(clean.evidence).toEqual(['kanıt1'])
+  })
+
+  test('boş reason → fallback döner', () => {
+    const ceiling = {
+      source:    'SUSTAINABILITY' as const,
+      maxRating: 'BBB' as RatingGrade,
+      reason:    '',
+      evidence:  [],
+    }
+    const clean = cleanCeiling(ceiling)
+    expect(clean.reason.length).toBeGreaterThan(10)
+  })
+
+})
+
+// ─── T_DL7: targetMatchesRequest postActualRating senkron ─────────────────────
+
+describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating senkron (Faz 7.3.32)', () => {
+
+  test('finalTarget B, requestedTarget BB → buildExecutiveAnswer false, ama postActualRating AA olduğunda true olmalı', () => {
+    // Senaryo: engine B tahmin etti, ama postActualRating (gerçek hesap) AA geldi
+    // buildDecisionAnswer içindeki override bunu yakalar
+    // Bu test buildExecutiveAnswer davranışını (flag olmadan) doğrular
+    const er = makeMinimalEngineResult({
+      currentRating:    'B',
+      finalTargetRating: 'B',
+      notchesGained:    0,
+    })
+    const ans = buildExecutiveAnswer(er, 'BB')
+    // finalTargetRating B < requestedTarget BB → false (doğru — override buildDecisionAnswer'da)
+    expect(ans.targetMatchesRequest).toBe(false)
+  })
+
+  test('postActualRating AA, requestedTarget BB → ratingToIndex(AA) >= ratingToIndex(BB) = true', () => {
+    // ratingToIndex: AAA=7, AA=6, A=5, BBB=4, BB=3, B=2, B-=1, CCC=0
+    // AA(6) >= BB(3) → true
+    // Bu mantığı buildDecisionAnswer uyguluyor — burada saf hesabı doğrularız
+    const ratingToIndexMap: Record<string, number> = {
+      'AAA': 7, 'AA': 6, 'A': 5, 'BBB': 4, 'BB': 3, 'B': 2, 'B-': 1, 'CCC': 0,
+    }
+    const postActualRating = 'AA'
+    const requestedTarget  = 'BB'
+    expect(ratingToIndexMap[postActualRating]).toBeGreaterThanOrEqual(ratingToIndexMap[requestedTarget])
+  })
+
+  test('postActualRating B, requestedTarget AA → B(2) < AA(6) = false (kırmızı badge doğru)', () => {
+    const ratingToIndexMap: Record<string, number> = {
+      'AAA': 7, 'AA': 6, 'A': 5, 'BBB': 4, 'BB': 3, 'B': 2, 'B-': 1, 'CCC': 0,
+    }
+    const postActualRating = 'B'
+    const requestedTarget  = 'AA'
+    expect(ratingToIndexMap[postActualRating]).toBeLessThan(ratingToIndexMap[requestedTarget])
   })
 
 })

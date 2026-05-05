@@ -509,6 +509,30 @@ export function consolidateByActionId(actions: SelectedAction[]): SelectedAction
   return Array.from(map.values())
 }
 
+// ─── Faz 7.3.32: Ceiling reason sızıntı filtresi ─────────────────────────────
+
+/**
+ * formatCeilingDisplay'e geçmeden önce ceiling.reason'ı sanitize eder.
+ * displayMaps.ts yasak olduğundan filter burada uygulanır.
+ */
+export function cleanCeiling(ceiling: CeilingConstraint): CeilingConstraint {
+  let reason = ceiling.reason
+  if (
+    !reason ||
+    reason.includes('HARD_REJECT') ||
+    reason.includes('REJECT') ||
+    reason.includes('guardrail') ||
+    reason.includes('semantic') ||
+    reason.includes('iyilesmesi') ||
+    reason.includes('gecersiz') ||
+    reason.includes('guclenme') ||
+    reason.includes('Portfoy')
+  ) {
+    reason = 'finansal yapı ve operasyonel verimliliğin henüz hedeflenen seviyeyi desteklememesi'
+  }
+  return { ...ceiling, reason }
+}
+
 // ─── BUILDER: EXECUTIVE ANSWER ───────────────────────────────────────────────
 
 export function buildExecutiveAnswer(
@@ -831,7 +855,7 @@ function buildTargetFeasibilityExplanation(
   }
 
   if (bindingCeiling) {
-    parts.push(`${formatCeilingDisplay(bindingCeiling)}.`)
+    parts.push(`${formatCeilingDisplay(cleanCeiling(bindingCeiling))}.`)
   }
 
   if (feasibility) {
@@ -860,7 +884,7 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
 
   if (bindingCeiling) {
     parts.push(
-      `${formatCeilingDisplay(bindingCeiling)} koşulları değişmediği sürece ` +
+      `${formatCeilingDisplay(cleanCeiling(bindingCeiling))} koşulları değişmediği sürece ` +
       `firma ${bindingCeiling.maxRating} seviyesinin üzerine çıkamaz.`
     )
   }
@@ -1068,7 +1092,7 @@ function buildConsultantNarrative(
   let coreIssue = ''
 
   if (bindingCeiling) {
-    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${formatCeilingDisplay(bindingCeiling)}. ` +
+    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${formatCeilingDisplay(cleanCeiling(bindingCeiling))}. ` +
       `Bu sorun çözülmeden ${bindingCeiling.maxRating} tavanını kırmanız mümkün değil.`
   } else if (sustainability?.constraints?.hasCeiling) {
     const reason = sustainability.constraints.ceilingReasons?.[0] ?? 'gelir kalitesi düşük'
@@ -1365,6 +1389,16 @@ export function buildDecisionAnswer(
   const filteredEngineResult: EngineResult = { ...engineResult, portfolio: portfolioForUI }
 
   const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
+  // Faz 7.3.32: Badge senkronizasyonu — UI postActualRating gösterirken targetMatchesRequest
+  // finalTargetRating'e bakıyordu (asenkron). postActualRating varsa baz al.
+  if (actualRatingValidation?.postActualRating) {
+    executiveAnswer.targetMatchesRequest =
+      ratingToIndex(actualRatingValidation.postActualRating as RatingGrade) >=
+      ratingToIndex(requestedTarget)
+  }
+  if (targetPackageMeta?.reachedTarget) {
+    executiveAnswer.targetMatchesRequest = true
+  }
   const whatCompanyShouldDo          = buildActionPlan(filteredEngineResult)
   const oneNotchPlan                 = buildOneNotchPlan(engineResult)
   const twoNotchPlan                 = buildTwoNotchPlan(engineResult)
