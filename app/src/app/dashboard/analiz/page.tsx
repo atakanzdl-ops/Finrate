@@ -761,7 +761,13 @@ function AnalizPageContent() {
             <p className="card-desc uppercase tracking-[0.3em] mb-4">Şirketler</p>
             <div className="space-y-2">
               {Object.entries(entityGroups).map(([, group]) => {
-                const best = group[0] // en yeni (sorted desc by year)
+                // Faz 7.3.35: deterministik sort — yıl DESC, dönem DESC
+                const _PERIOD_ORDER: Record<string, number> = { ANNUAL: 0, Q1: 1, Q2: 2, Q3: 3, Q4: 4 }
+                const _sorted = [...group].sort((a, b) => {
+                  if (a.year !== b.year) return b.year - a.year
+                  return (_PERIOD_ORDER[b.period] ?? 0) - (_PERIOD_ORDER[a.period] ?? 0)
+                })
+                const best = _sorted[0] // en son dönem
                 const isActive = selected?.entity?.id === best.entity?.id
                 const score = Math.round(combinedScore(best))
                 const rating = combinedRating(combinedScore(best))

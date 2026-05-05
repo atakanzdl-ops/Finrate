@@ -728,6 +728,56 @@ describe('T_DL7 — buildExecutiveAnswer: targetMatchesRequest postActualRating 
 
 })
 
+// ─── T_BEST: Sol panel deterministik best sort (Faz 7.3.35) ──────────────────
+
+describe('T_BEST — Sol panel group best seçimi: deterministik yıl+dönem sort (Faz 7.3.35)', () => {
+
+  const PERIOD_ORDER: Record<string, number> = { ANNUAL: 0, Q1: 1, Q2: 2, Q3: 3, Q4: 4 }
+
+  function pickBest(group: Array<{ year: number; period: string }>): { year: number; period: string } {
+    const sorted = [...group].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year
+      return (PERIOD_ORDER[b.period] ?? 0) - (PERIOD_ORDER[a.period] ?? 0)
+    })
+    return sorted[0]
+  }
+
+  test('2022 ANNUAL + 2023 Q1 → 2023 Q1 seçilir (yıl önce)', () => {
+    const best = pickBest([{ year: 2022, period: 'ANNUAL' }, { year: 2023, period: 'Q1' }])
+    expect(best).toEqual({ year: 2023, period: 'Q1' })
+  })
+
+  test('Aynı yılda ANNUAL < Q1 < Q4 → Q4 seçilir', () => {
+    const best = pickBest([
+      { year: 2024, period: 'ANNUAL' },
+      { year: 2024, period: 'Q1' },
+      { year: 2024, period: 'Q4' },
+    ])
+    expect(best).toEqual({ year: 2024, period: 'Q4' })
+  })
+
+  test('Tek kayıt → o kayıt seçilir', () => {
+    const best = pickBest([{ year: 2022, period: 'ANNUAL' }])
+    expect(best).toEqual({ year: 2022, period: 'ANNUAL' })
+  })
+
+  test('Girdi mutate edilmez (sort kopya üzerinde)', () => {
+    const group = [{ year: 2023, period: 'Q1' }, { year: 2022, period: 'ANNUAL' }]
+    pickBest(group)
+    expect(group[0]).toEqual({ year: 2023, period: 'Q1' }) // orijinal sıra korunur
+  })
+
+  test('DEKA senaryosu: 2022 ANNUAL, 2023 Q1, 2023 Q4 → 2023 Q4', () => {
+    const best = pickBest([
+      { year: 2022, period: 'ANNUAL' },
+      { year: 2023, period: 'Q1' },
+      { year: 2023, period: 'Q4' },
+    ])
+    expect(best).toEqual({ year: 2023, period: 'Q4' })
+  })
+
+})
+
 // ─── T_DL8: buildIfNotDoneRisk tavan metin clarity (Faz 7.3.34) ──────────────
 
 describe('T_DL8 — buildIfNotDoneRisk: tavan metin Çekirdek Mesele ile tutarlı (Faz 7.3.34)', () => {
