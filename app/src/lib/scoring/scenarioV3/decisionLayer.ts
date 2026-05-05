@@ -883,10 +883,9 @@ function buildIfNotDoneRisk(engineResult: EngineResult): string {
   const parts: string[] = []
 
   if (bindingCeiling) {
+    // Faz 7.3.37: maxRating/tavan jargonu kaldırıldı — sade hedef mesajı
     parts.push(
-      // Faz 7.3.34: Çekirdek Mesele ile tutarlı — "tavan/üst sınır" netliği
-      `${formatCeilingDisplay(cleanCeiling(bindingCeiling))} koşulları değişmediği sürece ` +
-      `ulaşılabilir en yüksek seviye ${bindingCeiling.maxRating} olarak kalır; bu değer mevcut not değil, üst sınırdır.`
+      'Mevcut yapısal kısıtlar değişmediği sürece hedef seviyeye ulaşmak mümkün olmayacaktır.'
     )
   }
 
@@ -1093,9 +1092,9 @@ function buildConsultantNarrative(
   let coreIssue = ''
 
   if (bindingCeiling) {
-    // Faz 7.3.33: "tavanını kırmanız mümkün değil" → tavan olduğunu netleştir
-    coreIssue = `Rating iyileşmesinin önündeki temel engel: ${formatCeilingDisplay(cleanCeiling(bindingCeiling))}. ` +
-      `Bu kısıt sürdükçe ulaşılabilir tavan seviye ${bindingCeiling.maxRating}'dir; bu değer mevcut not değil, üst sınırdır.`
+    // Faz 7.3.37: maxRating/tavan jargonu kaldırıldı — sade hedef mesajı
+    coreIssue = 'Rating iyileşmesinin önündeki temel engel: yapısal finansal verimlilik mevcut seviyeyi ' +
+      'korumaya katkı sağlasa da hedef not artışını henüz desteklemiyor. Bu kısıt çözülmeden hedeflenen seviyeye ulaşmak mümkün değil.'
   } else if (sustainability?.constraints?.hasCeiling) {
     const reason = sustainability.constraints.ceilingReasons?.[0] ?? 'gelir kalitesi düşük'
     coreIssue = `Gelir kalitesi sorunu: ${reason}. Sürdürülebilir gelir tabanı oluşturulmadan rating iyileşmesi kalıcı olmaz.`

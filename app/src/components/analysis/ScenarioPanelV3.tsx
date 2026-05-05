@@ -274,24 +274,7 @@ function OzetTab({ result }: { result: any }) {
         )
       })()}
 
-      {/* B. CAPACITY WARNING */}
-      {transition?.blockedByPortfolioCapacity && (
-        <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-            <div>
-              <div className="font-semibold text-amber-900 mb-1">
-                Portföy Kapasite Uyarısı
-              </div>
-              <div className="text-sm text-amber-800">
-                Teorik rating tavanı mevcut olsa da seçilen aksiyon portföyü bu seviyeyi taşımıyor.
-                Mevcut portföyle ulaşılabilir en yüksek seviye:{' '}
-                <strong>{exec.achievableTarget ?? exec.achievableRating}</strong>.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* B. CAPACITY WARNING — Faz 7.3.37: tavan jargonu kaldırıldı */}
 
       {/* C. DATA QUALITY WARNING */}
       {da.dataQualityWarning && (

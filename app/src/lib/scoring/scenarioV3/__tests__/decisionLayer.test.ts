@@ -839,29 +839,30 @@ describe('T_BEST — Sol panel group best seçimi: deterministik yıl+dönem sor
 
 })
 
-// ─── T_DL8: buildIfNotDoneRisk tavan metin clarity (Faz 7.3.34) ──────────────
+// ─── T_DL8: buildIfNotDoneRisk tavan metin clarity (Faz 7.3.37 güncelleme) ────
 
-describe('T_DL8 — buildIfNotDoneRisk: tavan metin Çekirdek Mesele ile tutarlı (Faz 7.3.34)', () => {
+describe('T_DL8 — buildIfNotDoneRisk: tavan/maxRating jargonu kaldırıldı (Faz 7.3.37)', () => {
 
-  test('"üzerine çıkamaz" ifadesi YOK — yeni metni doğrula', () => {
+  test('"üzerine çıkamaz" + eski rating jargonu YOK', () => {
     const newText =
-      "Aktif Verimliliği alanı finansal yapı ve operasyonel verimliliğin henüz hedeflenen seviyeyi desteklememesi; CCC üzerinde sınırlayıcı etki yaratıyor koşulları değişmediği sürece ulaşılabilir en yüksek seviye CCC olarak kalır; bu değer mevcut not değil, üst sınırdır."
+      'Mevcut yapısal kısıtlar değişmediği sürece hedef seviyeye ulaşmak mümkün olmayacaktır.'
     expect(newText).not.toContain('üzerine çıkamaz')
     expect(newText).not.toContain('seviyesinin üzerine')
+    expect(newText).not.toContain('üst sınırdır')
+    expect(newText).not.toContain('mevcut not değil')
   })
 
-  test('"üst sınır" netleştirmesi mevcut', () => {
+  test('sade hedef mesajı içerir', () => {
     const newText =
-      "koşulları değişmediği sürece ulaşılabilir en yüksek seviye CCC olarak kalır; bu değer mevcut not değil, üst sınırdır."
-    expect(newText).toContain('üst sınırdır')
-    expect(newText).toContain('mevcut not değil')
+      'Mevcut yapısal kısıtlar değişmediği sürece hedef seviyeye ulaşmak mümkün olmayacaktır.'
+    expect(newText).toContain('hedef seviyeye ulaşmak mümkün olmayacaktır')
   })
 
-  test('"ulaşılabilir en yüksek seviye" + maxRating pattern', () => {
-    const maxRating = 'CCC'
-    const text = `ulaşılabilir en yüksek seviye ${maxRating} olarak kalır; bu değer mevcut not değil, üst sınırdır.`
-    expect(text).toContain(`en yüksek seviye ${maxRating}`)
-    expect(text).toContain('üst sınırdır')
+  test('maxRating literal içermez', () => {
+    const newText =
+      'Mevcut yapısal kısıtlar değişmediği sürece hedef seviyeye ulaşmak mümkün olmayacaktır.'
+    // Faz 7.3.37: artık maxRating string inject edilmiyor
+    expect(newText).not.toMatch(/CCC|BB|BBB|B\+|AA/)
   })
 
 })
@@ -907,26 +908,29 @@ describe('T4 — SOURCE_MISMATCH banner: status kontrol (Faz 7.3.33 regresyon)',
 
 })
 
-// ─── T3: CoreIssue tavan netleştirme (Faz 7.3.33) ────────────────────────────
+// ─── T3: CoreIssue tavan netleştirme (Faz 7.3.37 güncelleme) ─────────────────
 
-describe('T3 — buildConsultantNarrative: coreIssue tavan netleştirme (Faz 7.3.33)', () => {
+describe('T3 — buildConsultantNarrative: coreIssue maxRating/tavan kaldırıldı (Faz 7.3.37)', () => {
 
-  test('coreIssue "tavan seviye" ifadesini içerir (maxRating mevcut not değil)', () => {
-    // buildConsultantNarrative iç fonksiyon — buildExecutiveAnswer üzerinden
-    // coreIssue'yu test edemiyoruz, ama coreIssue üreten metin mantığını doğrularız
-    // Beklenen yeni metin: "tavan seviye X'dir; bu değer mevcut not değil, üst sınırdır"
-    const expectedPattern = /tavan seviye.*dir.*mevcut not değil.*üst sınır/i
-    const sampleText = "Bu kısıt sürdükçe ulaşılabilir tavan seviye CCC'dir; bu değer mevcut not değil, üst sınırdır."
-    expect(sampleText).toMatch(expectedPattern)
+  test('coreIssue sade hedef mesajı içerir (maxRating yok)', () => {
+    // Faz 7.3.37: tavan seviye X / üst sınır ifadeleri kaldırıldı
+    const newText =
+      'Rating iyileşmesinin önündeki temel engel: yapısal finansal verimlilik mevcut seviyeyi ' +
+      'korumaya katkı sağlasa da hedef not artışını henüz desteklemiyor. Bu kısıt çözülmeden hedeflenen seviyeye ulaşmak mümkün değil.'
+    expect(newText).toContain('hedeflenen seviyeye ulaşmak mümkün değil')
+    expect(newText).not.toContain('üst sınırdır')
+    expect(newText).not.toContain('mevcut not değil')
   })
 
   test('coreIssue eski yanıltıcı metin YOK', () => {
-    // "tavanını kırmanız mümkün değil" artık kullanılmıyor
-    const newText = "Bu kısıt sürdükçe ulaşılabilir tavan seviye CCC'dir; bu değer mevcut not değil, üst sınırdır."
+    const newText =
+      'Rating iyileşmesinin önündeki temel engel: yapısal finansal verimlilik mevcut seviyeyi ' +
+      'korumaya katkı sağlasa da hedef not artışını henüz desteklemiyor. Bu kısıt çözülmeden hedeflenen seviyeye ulaşmak mümkün değil.'
     expect(newText).not.toContain('tavanını kırmanız mümkün değil')
+    expect(newText).not.toMatch(/tavan seviye.*dir/i)
   })
 
-  test('cleanCeiling sonrası coreIssue teknik terim içermez', () => {
+  test('cleanCeiling sonrası teknik terim içermez', () => {
     const badCeiling = {
       source:    'SEMANTIC_GUARDRAIL' as const,
       maxRating: 'CCC' as RatingGrade,
@@ -937,7 +941,7 @@ describe('T3 — buildConsultantNarrative: coreIssue tavan netleştirme (Faz 7.3
     expect(cleaned.reason).not.toContain('HARD_REJECT')
     expect(cleaned.reason).not.toContain('guardrail')
     expect(cleaned.reason).not.toContain('gecersiz')
-    // maxRating korunur
+    // maxRating korunur (cleanCeiling sadece reason'ı değiştirir)
     expect(cleaned.maxRating).toBe('CCC')
   })
 
