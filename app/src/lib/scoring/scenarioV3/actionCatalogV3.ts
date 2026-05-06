@@ -563,9 +563,9 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
 
   suggestedAmount: {
     basis: 'source_account',
-    minPctOfBasis: 0.05,
-    typicalPctOfBasis: 0.10,
-    maxPctOfBasis: 0.20,
+    minPctOfBasis: 0.02,
+    typicalPctOfBasis: 0.04,
+    maxPctOfBasis: 0.10,
     absoluteMinTRY: 2_000_000,
   },
 

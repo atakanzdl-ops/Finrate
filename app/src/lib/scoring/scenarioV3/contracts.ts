@@ -601,6 +601,39 @@ export const MATERIALITY_BY_HORIZON: Record<HorizonKey, MaterialityThreshold> = 
   },
 }
 
+// ============ DİNAMİK MATERYALİTE HELPER (FAZ 7.3.43B — GÜN 1) ============
+//
+// Runtime entegrasyonu GÜN 3'te (engineV3.ts).
+// Bu helper EXPORT edilir ama HENÜ HİÇBİR YER çağırmaz — runtime etkisi SIFIR.
+// MATERIALITY_BY_HORIZON sabiti korunmaktadır (geri uyumluluk).
+
+/**
+ * Aktif büyüklüğüne göre ölçeklenen dinamik materyalite tabanını hesaplar.
+ *
+ * @param horizon  - Aksiyon ufku ('short' | 'medium' | 'long')
+ * @param totalAssets - Firmanın toplam aktifi (TRY)
+ * @returns Minimum anlamlı tutar (TRY) — sabit taban ile aktif yüzdesi
+ *          arasındaki büyük olan değer.
+ */
+export function getDynamicMaterialityFloor(
+  horizon: 'short' | 'medium' | 'long',
+  totalAssets: number,
+): number {
+  const baseFloor = {
+    short:  250_000,
+    medium: 500_000,
+    long:   1_000_000,
+  }[horizon]
+
+  const scaleFactor = {
+    short:  0.005,   // %0.5
+    medium: 0.01,    // %1.0
+    long:   0.01,    // %1.0
+  }[horizon]
+
+  return Math.max(baseFloor, totalAssets * scaleFactor)
+}
+
 // ============ MULTI-SENARYO MOTORU — SKOR KONTRATLARI (FAZ 1) ============
 // Bu tipler Faz 2+'de tüketilecek. Mevcut kod etkilenmez.
 
