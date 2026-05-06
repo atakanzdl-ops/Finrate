@@ -59,6 +59,7 @@ import type {
 import {
   SUSTAINABILITY_MULTIPLIER,
   MATERIALITY_BY_HORIZON,
+  getDynamicMaterialityFloor,
 } from './contracts'
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
@@ -819,7 +820,20 @@ function calculateAmountCandidates(
   const basis     = getBasisAmount(action, context)
   const matLimit  = MATERIALITY_BY_HORIZON[horizon]
 
-  const minAbs    = Math.max(sa.absoluteMinTRY, matLimit.minAbsoluteAmountTRY)
+  // NaN-safe totalAssets (defensive: sıfır-bakiye firmalar)
+  const safeAssets = Number.isFinite(context.totalAssets)
+    ? Math.max(0, context.totalAssets)
+    : 0
+
+  // Hibrit floor: max(static, dynamic)
+  //   Küçük firma: MATERIALITY_BY_HORIZON static korur
+  //   Büyük firma (>250M medium / >300M short / >400M long): dynamic yükseltir
+  const dynamicFloor = getDynamicMaterialityFloor(horizon, safeAssets)
+  const minAbs = Math.max(
+    sa.absoluteMinTRY,
+    matLimit.minAbsoluteAmountTRY,
+    dynamicFloor,
+  )
   const maxAbs    = sa.absoluteMaxTRY ?? (basis * sa.maxPctOfBasis * 2)
 
   const minAmt        = Math.max(basis * sa.minPctOfBasis,     minAbs)
