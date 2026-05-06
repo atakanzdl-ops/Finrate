@@ -796,7 +796,6 @@ function calculateAmountCandidates(
 
   if (useRatioBased && action.computeAmount) {
     const v = action.computeAmount(context)
-    // null / 0 / negatif → fallback'e geç.
     if (v !== null && v > 0) {
       // Materiality bypass: computeAmount aktif aksiyonlarda
       // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
@@ -809,6 +808,10 @@ function calculateAmountCandidates(
         ratioTransparency: transparency ?? undefined,
       }]
     }
+    // Faz 7.3.43D-pre: computeAmount null/0/negatif → mevcut durum zaten iyi
+    // veya hesap verisi yetersiz. Generic yüzde fallback'e düşme — boş array.
+    // Etki: A12 useRatioBasedAmount=true (her zaman); A05 env flag=true ise.
+    return []
   }
   // ─── eski yüzde mantığı (değiştirilmedi) ──────────────────────────────
 

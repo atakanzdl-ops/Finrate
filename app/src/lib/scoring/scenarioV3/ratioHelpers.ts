@@ -344,8 +344,12 @@ function buildMarginRatioTransparency(
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
   const sectorMedian = bm?.value ?? action.targetRatio?.fallback ?? 0.30
 
-  // Aksiyon sonrası gerçekçi marj — sektör medyanını aşmaz
-  const realisticTarget = Math.min(current + amount / netSales, sectorMedian)
+  // Aksiyon sonrası gerçekçi marj — sektör medyanını aşmaz.
+  // Faz 7.3.43D-pre: mevcut marj zaten sektör medyanı üstündeyse
+  // realisticTarget = current (aşağı yön gösterme).
+  const realisticTarget = current >= sectorMedian
+    ? current
+    : Math.min(current + amount / netSales, sectorMedian)
 
   return {
     kind: 'margin',
