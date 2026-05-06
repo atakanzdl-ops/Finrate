@@ -764,9 +764,9 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
 
   suggestedAmount: {
     basis: 'assets',
-    minPctOfBasis: 0.03,
-    typicalPctOfBasis: 0.08,
-    maxPctOfBasis: 0.20,
+    minPctOfBasis: 0.02,
+    typicalPctOfBasis: 0.05,
+    maxPctOfBasis: 0.12,
     absoluteMinTRY: 2_000_000,
   },
 
@@ -1208,9 +1208,9 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
 
   suggestedAmount: {
     basis: 'source_account',
-    minPctOfBasis: 0.20,
-    typicalPctOfBasis: 0.50,
-    maxPctOfBasis: 1.00,
+    minPctOfBasis: 0.10,
+    typicalPctOfBasis: 0.20,
+    maxPctOfBasis: 0.50,
     absoluteMinTRY: 1_000_000,
   },
 

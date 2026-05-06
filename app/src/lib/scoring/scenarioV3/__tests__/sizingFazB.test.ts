@@ -102,19 +102,19 @@ describe('getDynamicMaterialityFloor — Faz 7.3.43B', () => {
 
 describe('Non-regression: A10/A15/A18 sizing değişmedi', () => {
 
-  test('T7: A10 suggestedAmount — typical %8, min %3, max %20 (assets)', () => {
+  test('T7: A10 suggestedAmount — typical %5, min %2, max %12 (assets) [GÜN 2]', () => {
     const sa = ACTION_CATALOG_V3['A10_CASH_EQUITY_INJECTION']!.suggestedAmount
-    expect(sa.typicalPctOfBasis).toBe(0.08)
-    expect(sa.minPctOfBasis).toBe(0.03)
-    expect(sa.maxPctOfBasis).toBe(0.20)
+    expect(sa.typicalPctOfBasis).toBe(0.05)
+    expect(sa.minPctOfBasis).toBe(0.02)
+    expect(sa.maxPctOfBasis).toBe(0.12)
     expect(sa.basis).toBe('assets')
   })
 
-  test('T8: A15 suggestedAmount — typical %50, min %20, max %100 (source_account)', () => {
+  test('T8: A15 suggestedAmount — typical %20, min %10, max %50 (source_account) [GÜN 2]', () => {
     const sa = ACTION_CATALOG_V3['A15_DEBT_TO_EQUITY_SWAP']!.suggestedAmount
-    expect(sa.typicalPctOfBasis).toBe(0.50)
-    expect(sa.minPctOfBasis).toBe(0.20)
-    expect(sa.maxPctOfBasis).toBe(1.00)
+    expect(sa.typicalPctOfBasis).toBe(0.20)
+    expect(sa.minPctOfBasis).toBe(0.10)
+    expect(sa.maxPctOfBasis).toBe(0.50)
     expect(sa.basis).toBe('source_account')
   })
 
