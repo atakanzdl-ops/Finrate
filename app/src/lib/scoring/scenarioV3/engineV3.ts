@@ -1184,13 +1184,6 @@ function runGreedySelection(
 
   const selected:      SelectedAction[] = []
   let currentContext = { ...context, accountBalances: { ...context.accountBalances } }
-
-  // Faz 7.3.43F: Baseline totalAssets snapshot — greedy döngüsü başlamadan
-  // immutable olarak alınır. updateFirmContextFromTransactions currentContext'i
-  // mutasyona uğratır ama baselineTotalAssets ASLA değişmez.
-  // checkPortfolioAggregateRules'a paslanır → EQUITY_POOL_CAP baseline-safe.
-  const baselineTotalAssets = context.totalAssets
-
   let iterationCount = 0
   const maxIterations = 50
 
@@ -1290,12 +1283,10 @@ function runGreedySelection(
           { actionId: candidate.action.id, amountTRY: candidate.amountCandidate.amountTRY },
         ],
         firmContext: {
-          totalAssets:          currentContext.totalAssets,
-          totalEquity:          currentContext.totalEquity,
-          totalRevenue:         currentContext.totalRevenue,
-          netIncome:            currentContext.netIncome,
-          operatingCashFlow:    currentContext.operatingCashFlow,
-          baselineTotalAssets:  baselineTotalAssets,
+          totalAssets:   currentContext.totalAssets,
+          totalEquity:   currentContext.totalEquity,
+          totalRevenue:  currentContext.totalRevenue,
+          netIncome:     currentContext.netIncome,
         },
       })
 
@@ -1410,12 +1401,11 @@ function runGreedySelection(
 // ─── LOCAL REPAIR ─────────────────────────────────────────────────────────────
 
 function runLocalRepair(
-  selected:             SelectedAction[],
-  context:              FirmContext,
-  missedOpportunities:  unknown[],
-  algorithmTrace:       string[],
-  decisionTrace:        DecisionTraceNode[],
-  baselineTotalAssets:  number,   // Faz 7.3.43F: EQUITY_POOL_CAP baseline
+  selected:         SelectedAction[],
+  context:          FirmContext,
+  missedOpportunities: unknown[],
+  algorithmTrace:   string[],
+  decisionTrace:    DecisionTraceNode[],
 ): SelectedAction[] {
   const repaired    = [...selected]
   let iterCount     = 0
@@ -1484,12 +1474,10 @@ function runLocalRepair(
         { actionId: action.id, amountTRY: typical.amountTRY },
       ],
       firmContext: {
-        totalAssets:          repairContext.totalAssets,
-        totalEquity:          repairContext.totalEquity,
-        totalRevenue:         repairContext.totalRevenue,
-        netIncome:            repairContext.netIncome,
-        operatingCashFlow:    repairContext.operatingCashFlow,
-        baselineTotalAssets:  baselineTotalAssets,   // Faz 7.3.43F
+        totalAssets:   repairContext.totalAssets,
+        totalEquity:   repairContext.totalEquity,
+        totalRevenue:  repairContext.totalRevenue,
+        netIncome:     repairContext.netIncome,
       },
     })
 
@@ -1911,7 +1899,6 @@ export function runEngineV3(input: EngineInput): EngineResult {
   const repaired = runLocalRepair(
     fullPortfolio, workingContext, reasoning.missedOpportunities,
     algorithmTrace, decisionTrace,
-    baselineContext.totalAssets,   // Faz 7.3.43F: EQUITY_POOL_CAP baseline
   )
 
   if (repaired.length > fullPortfolio.length) {
