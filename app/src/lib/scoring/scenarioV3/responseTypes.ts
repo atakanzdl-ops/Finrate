@@ -45,6 +45,32 @@ export interface V2ComparisonDto {
   note: string
 }
 
+// ─── FAZ 7.3.44: 3 PLAN TİPLERİ ─────────────────────────────────────────────
+
+export interface PlanSummaryDto {
+  /** Hedef rating bu plan ile ulaşılabilir mi */
+  targetReachable: boolean
+  /** Portföy toplam tutarı (TRY) */
+  totalAmount:     number
+  /** Portföydeki aksiyon sayısı */
+  actionCount:     number
+}
+
+export interface PlanDto {
+  /** Plan kimliği */
+  id:             'min' | 'moderate' | 'aggressive'
+  /** Kullanıcıya gösterilen Türkçe başlık */
+  label:          string
+  /** Engine'e geçirilen aggressiveness değeri */
+  aggressiveness: 'conservative' | 'typical' | 'aggressive'
+  /** Bu plana ait banker karar cevabı */
+  decisionAnswer: DecisionAnswer
+  /** Bu plana ait ham engine çıktısı (DTO) */
+  engineResult:   EngineResultResponseDto
+  /** Özet metrikler (UI kart görünümü için) */
+  summary:        PlanSummaryDto
+}
+
 export interface ScenarioV3ApiResponse {
   engine:         'v3'
   analysisId:     string
@@ -53,8 +79,12 @@ export interface ScenarioV3ApiResponse {
   targetRating:   RatingGrade
   notchesGained:  number
   confidence:     'HIGH' | 'MEDIUM' | 'LOW'
+  /** Geriye uyumluluk: typical plan decisionAnswer */
   decisionAnswer: DecisionAnswer
+  /** Geriye uyumluluk: typical plan engineResult */
   engineResult:   EngineResultResponseDto
   scenarios:      ScenarioCardDto[]
+  /** Faz 7.3.44: conservative / typical / aggressive 3 alternatif plan */
+  plans?:         PlanDto[]
   v2Comparison?:  V2ComparisonDto
 }

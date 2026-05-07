@@ -92,6 +92,7 @@ function setupMocks(opts: {
 
   jest.doMock('@/lib/scoring/scenarioV3/responseMapper', () => ({
     formatScenariosForResponse: jest.fn((scens: unknown[]) => scens),
+    buildEngineResultDto:       jest.fn((er: unknown) => er),
   }))
 
   jest.doMock('@/lib/scoring/scenarioV3/adaptToEngineResult', () => ({
@@ -328,5 +329,131 @@ describe('POST /api/scenarios/v3', () => {
     expect(subjMod.calcSubjectiveScore).not.toHaveBeenCalled()
     // combineScores(objectiveScore, 0) çağrılmış — 0 ikinci argüman
     expect(subjMod.combineScores).toHaveBeenCalledWith(expect.any(Number), 0)
+  })
+
+  // ── Faz 7.3.44: T1-T7 — 3 Plan API ──────────────────────────────────────────
+
+  test('T1 — 3 plan response: plans dizisi 3 elemanli', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.plans).toBeDefined()
+    expect(Array.isArray(body.plans)).toBe(true)
+    expect(body.plans).toHaveLength(3)
+  })
+
+  test('T2 — 3 plan response: plan id degerleri [min, moderate, aggressive]', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(body.plans.map((p: any) => p.id)).toEqual(['min', 'moderate', 'aggressive'])
+  })
+
+  test('T3 — 3 plan response: aggressiveness degerleri dogru', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(body.plans.map((p: any) => p.aggressiveness)).toEqual([
+      'conservative', 'typical', 'aggressive',
+    ])
+  })
+
+  test('T4 — Geriye uyumluluk: body.decisionAnswer typical (moderate) plan ile ayni', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(body.decisionAnswer).toEqual(body.plans[1].decisionAnswer)
+  })
+
+  test('T5 — body.scenarios mevcut (geriye uyumluluk)', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(body.scenarios).toBeDefined()
+  })
+
+  test('T6 — runEngineV3 3 kez cagrildi, her biri dogru aggressiveness ile', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    await callPost(req)
+
+    const engineV3Mod = await import('@/lib/scoring/scenarioV3/engineV3') as any
+    expect(engineV3Mod.runEngineV3).toHaveBeenCalledTimes(3)
+    expect(engineV3Mod.runEngineV3).toHaveBeenNthCalledWith(
+      1, expect.objectContaining({ options: { aggressiveness: 'conservative' } }),
+    )
+    expect(engineV3Mod.runEngineV3).toHaveBeenNthCalledWith(
+      2, expect.objectContaining({ options: { aggressiveness: 'typical' } }),
+    )
+    expect(engineV3Mod.runEngineV3).toHaveBeenNthCalledWith(
+      3, expect.objectContaining({ options: { aggressiveness: 'aggressive' } }),
+    )
+  })
+
+  test('T7 — Her plan summary alanlari iceriyor: targetReachable, totalAmount, actionCount', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    for (const plan of body.plans) {
+      expect(plan.summary).toBeDefined()
+      expect(typeof plan.summary.targetReachable).toBe('boolean')
+      expect(typeof plan.summary.totalAmount).toBe('number')
+      expect(typeof plan.summary.actionCount).toBe('number')
+    }
   })
 })

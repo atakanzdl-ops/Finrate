@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma }                    from '@/lib/db'
 import { getUserIdFromRequest }      from '@/lib/auth'
 import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioEngine'
-import { formatScenariosForResponse }        from '@/lib/scoring/scenarioV3/responseMapper'
+import { formatScenariosForResponse, buildEngineResultDto } from '@/lib/scoring/scenarioV3/responseMapper'
 import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
+import type { EngineResult }               from '@/lib/scoring/scenarioV3/engineV3'
 import { calculateRatiosFromAccounts }        from '@/lib/scoring/ratios'
 import { calculateScore, scoreToRating }      from '@/lib/scoring/score'
 import { combineScores, calcSubjectiveScore }  from '@/lib/scoring/subjective'
@@ -15,7 +16,7 @@ import {
   normalizeLegacyRating,
 }                                    from '@/lib/scoring/scenarioV3/ratingReasoning'
 
-// ─── SECTOR STRING → SECTORCODE MAPPING ──────────────────────────────────────
+// --- SECTOR STRING -> SECTORCODE MAPPING ---
 
 /**
  * V2 sector string'lerini V3 SectorCode'a esler.
@@ -23,8 +24,8 @@ import {
  */
 function mapSectorCode(sectorStr: string | null | undefined): SectorCode {
   if (!sectorStr) return 'MANUFACTURING'
-  // toLocaleLowerCase('tr') kullanilir: Turkce 'I' → 'ı', 'İ' → 'i' (ASCII i)
-  // .toLowerCase() yanlis: 'İnşaat'.toLowerCase() === 'i̇nşaat' (dotted, ASCII degil)
+  // toLocaleLowerCase('tr') kullanilir: Turkce 'I' -> 'i', 'I' -> 'i' (ASCII i)
+  // .toLowerCase() yanlis: 'Insaat'.toLowerCase() === 'i?nsaat' (dotted, ASCII degil)
   const s = sectorStr.toLocaleLowerCase('tr')
   if (s.includes('inşaat') || s.includes('insaat') || s.includes('taahhüt') || s.includes('construction')) return 'CONSTRUCTION'
   if (s.includes('imalat') || s.includes('üretim') || s.includes('sanayi') || s.includes('manufactur'))   return 'MANUFACTURING'
@@ -35,7 +36,7 @@ function mapSectorCode(sectorStr: string | null | undefined): SectorCode {
   return 'MANUFACTURING'
 }
 
-// ─── INCOME STATEMENT BUILDER ────────────────────────────────────────────────
+// --- INCOME STATEMENT BUILDER ---
 
 /**
  * TDHP hesap bakiyelerinden gelir tablosu ozeti tureter.
@@ -45,23 +46,23 @@ function mapSectorCode(sectorStr: string | null | undefined): SectorCode {
  * (V2 ratios.ts ile tutarli: netSales = 600+601+602 - 610+611+612)
  *
  * 6xx hesaplar TDHP'de:
- *   600 Yurtici Satislar   → pozitif
- *   601 Yurtdisi Satislar  → pozitif
- *   602 Diger Gelirler     → pozitif
- *   610 Satis Iadeleri     → contra (negatif veya pozitif konvansiyona gore)
- *   611 Satis Iskontosu    → contra
- *   612 Diger Indirimler   → contra
- *   620-623 COGS           → negatif (gider)
- *   630 Satis Pazarlama    → negatif
- *   631 Genel Yonetim      → negatif
- *   660 Kisa Vadeli Faiz   → negatif
- *   661 Uzun Vadeli Faiz   → negatif
+ *   600 Yurtici Satislar   -> pozitif
+ *   601 Yurtdisi Satislar  -> pozitif
+ *   602 Diger Gelirler     -> pozitif
+ *   610 Satis Iadeleri     -> contra (negatif veya pozitif konvansiyona gore)
+ *   611 Satis Iskontosu    -> contra
+ *   612 Diger Indirimler   -> contra
+ *   620-623 COGS           -> negatif (gider)
+ *   630 Satis Pazarlama    -> negatif
+ *   631 Genel Yonetim      -> negatif
+ *   660 Kisa Vadeli Faiz   -> negatif
+ *   661 Uzun Vadeli Faiz   -> negatif
  *
  * Net Sales formulu: (600+601+602) - (610+611+612)
  * COGS:              620+621+622+623
  */
 function buildIncomeStatement(balances: Record<string, number>) {
-  // Dogal isaretli dogrudan toplam — Math.abs KULLANILMAZ
+  // Dogal isaretli dogrudan toplam -- Math.abs KULLANILMAZ
   const getSum = (codes: string[]) =>
     codes.reduce((sum, code) => sum + (balances[code] ?? 0), 0)
 
@@ -94,31 +95,31 @@ function buildIncomeStatement(balances: Record<string, number>) {
   }
 }
 
-// ─── CURRENT RATING HELPER ───────────────────────────────────────────────────
+// --- CURRENT RATING HELPER ---
 
 /**
  * targetGrade string'i V3 RatingGrade'e parse eder.
- * Legacy 22-notch değerler normalize edilir.
+ * Legacy 22-notch degerler normalize edilir.
  * Gecersiz deger 'BBB'e fallback.
  */
 function parseRatingGrade(grade: string): RatingGrade {
   if ((RATING_ORDER as string[]).includes(grade)) return grade as RatingGrade
-  // Legacy notch değer (BBB-, B+ vs) → normalize
+  // Legacy notch deger (BBB-, B+ vs) -> normalize
   const normalized = normalizeLegacyRating(grade)
   return normalized
 }
 
-// ─── ROUTE HANDLER ────────────────────────────────────────────────────────────
+// --- ROUTE HANDLER ---
 
 export async function POST(req: NextRequest) {
   try {
-    // ── 1. AUTH ──────────────────────────────────────────────────────────────
+    // 1. AUTH
     const userId = getUserIdFromRequest(req)
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ── 2. BODY PARSE ─────────────────────────────────────────────────────────
+    // 2. BODY PARSE
     const body = await req.json()
     const {
       analysisId,
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'analysisId gerekli' }, { status: 400 })
     }
 
-    // ── 3. DB — financialData OLMADAN ─────────────────────────────────────────
+    // 3. DB -- financialData OLMADAN
     // V3 sadece financialAccounts (TDHP hesap kodlari) kullanir.
     // V2'den farkli: financialData: true CIKARILDI (schema_v3 uyumu)
     const analysis = await prisma.analysis.findFirst({
@@ -169,27 +170,27 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // ── 4. HESAP BAKIYELERİ ───────────────────────────────────────────────────
+    // 4. HESAP BAKIYELERI
     const balances: Record<string, number> = {}
     for (const acc of analysis.financialAccounts) {
       balances[acc.accountCode] = Number(acc.amount)
     }
 
-    // ── 5. GELİR TABLOSU ──────────────────────────────────────────────────────
+    // 5. GELIR TABLOSU
     // buildIncomeStatement: Math.abs KULLANILMAZ (6xx hesaplar dogal isaretli)
     const incomeStatement = buildIncomeStatement(balances)
 
-    // ── 6. SEKTOR KODU ────────────────────────────────────────────────────────
+    // 6. SEKTOR KODU
     const sector = mapSectorCode(analysis.entity.sector)
 
-    // ── 7. MEVCUT RATİNG ─────────────────────────────────────────────────────
-    // Oncelik 1: clientCurrentGrade — UI'dan gelen, header ile AYNI kaynak
+    // 7. MEVCUT RATING
+    // Oncelik 1: clientCurrentGrade -- UI'dan gelen, header ile AYNI kaynak
     //            (page.tsx: combinedRating(combinedScore(analysis)))
-    //            Bu, tüm kullaniciya gosterilen rating ile senaryo motorunun
+    //            Bu, tum kullaniciya gosterilen rating ile senaryo motorunun
     //            kullandigi rating'in tutarli olmasini garantiler.
     // Oncelik 2: analysis.finalRating (DB'de sakli, V2 motoru tarafindan yazilmis)
-    // Oncelik 3: scoreFinal'den turet (fallback — eksik data durumu)
-    // normalizeLegacyRating: 22-notch legacy değerler (BBB-, B+) → 10 kategori
+    // Oncelik 3: scoreFinal'den turet (fallback -- eksik data durumu)
+    // normalizeLegacyRating: 22-notch legacy degerler (BBB-, B+) -> 10 kategori
     const currentRating: RatingGrade =
       clientCurrentGrade
         ? normalizeLegacyRating(clientCurrentGrade as string)
@@ -206,25 +207,13 @@ export async function POST(req: NextRequest) {
           })()
     const targetRating  = parseRatingGrade(targetGrade)
 
-    // ── 8. V3 ENGINE ─────────────────────────────────────────────────────────
-    const { engineResult, scenarios } = await selectScenarioEngineWithScenarios({
-      sector,
-      currentRating,
-      targetRating,
-      accountBalances: balances,
-      incomeStatement,
-    })
-
-    // ── 9. DECISION LAYER ─────────────────────────────────────────────────────
-    // Faz 7.3.7-FIX2: A21 severity icin currentRatio hesapla
-    const ratios = calculateRatiosFromAccounts(analysis.financialAccounts)
-
-    // Faz 7.3.8a: Mevcut objektif skor — ratios + orijinal sektör string'i
-    const rawSector = analysis.entity.sector ?? ''
+    // 8. ORTAK BAGLAM (engine oncesi -- tum planlar icin 1 kez hesaplanir)
+    const ratios                = calculateRatiosFromAccounts(analysis.financialAccounts)
+    const rawSector             = analysis.entity.sector ?? ''
     const currentScoreResult    = calculateScore(ratios, rawSector)
     const currentObjectiveScore = currentScoreResult.finalScore
 
-    // subjectiveTotal — 1. Katman: SubjectiveInput tablosu; 2. Katman: ratios JSON; 3. Fallback 0
+    // subjectiveTotal -- 1. Katman: SubjectiveInput tablosu; 2. Katman: ratios JSON; 3. Fallback 0
     let subjectiveTotal = 0
     const subjectiveRow = await prisma.subjectiveInput.findUnique({
       where: { entityId: analysis.entity.id },
@@ -244,54 +233,125 @@ export async function POST(req: NextRequest) {
       } catch { /* fallback 0 */ }
     }
 
-    const currentCombinedScore  = combineScores(currentObjectiveScore, subjectiveTotal)
-    const currentActualRating   = scoreToRating(currentCombinedScore)
+    const currentCombinedScore = combineScores(currentObjectiveScore, subjectiveTotal)
+    const currentActualRating  = scoreToRating(currentCombinedScore)
 
-    // Faz 7.3.8a: Tüm aksiyonların transaction'larını topla
-    // Aynı actionId+amount kombinasyonu birden fazla gelirse ilkini al (set ile dedupe)
-    const seenActions = new Set<string>()
-    const allTransactions = (engineResult.portfolio ?? [])
-      .filter(a => {
-        const key = `${a.actionId}::${a.amountTRY}`
-        if (seenActions.has(key)) return false
-        seenActions.add(key)
-        return true
-      })
-      .flatMap(a => a.transactions ?? [])
-
-    // Faz 7.3.8a: Post-action rating doğrulaması
-    const actualRatingValidation = calculateActualPostActionRating({
-      initialBalances:       balances,
-      transactions:          allTransactions,
-      sector:                rawSector,
-      subjectiveTotal,
-      v3EstimatedRating:     engineResult.finalTargetRating,
-      currentObjectiveScore,
-      currentCombinedScore,
-      currentActualRating,
-    })
-
-    const decisionAnswer = buildDecisionAnswer(
-      engineResult,
+    // 9. V3 ENGINE -- 3 PLAN PARALEL (Faz 7.3.44)
+    const baseInput = {
+      sector,
+      currentRating,
       targetRating,
-      null,                    // v2Result — V2 karsilastirma bu route'ta calistirilmiyor
-      balances,                // PATCH 1: dataQualityWarning icin hesap sayisi
-      ratios,                  // Faz 7.3.7-FIX2: A21 cari oran sapması
-      actualRatingValidation,  // Faz 7.3.8a: post-action rating doğrulama
-      {                        // Faz 7.3.8d: hedef pakete göre minimal subset için bağlam
+      accountBalances: balances,
+      incomeStatement,
+    }
+
+    const [conservativeResult, typicalResult, aggressiveResult] = await Promise.all([
+      selectScenarioEngineWithScenarios({ ...baseInput, options: { aggressiveness: 'conservative' } }),
+      selectScenarioEngineWithScenarios({ ...baseInput, options: { aggressiveness: 'typical'      } }),
+      selectScenarioEngineWithScenarios({ ...baseInput, options: { aggressiveness: 'aggressive'   } }),
+    ])
+
+    // Geriye uyumluluk: typical plan ana kanal olarak kullanilir
+    const { engineResult, scenarios } = typicalResult
+
+    // buildPlanData: her plan icin transactions -> validation -> decisionAnswer -> dto
+    const buildPlanData = (er: EngineResult) => {
+      const seen = new Set<string>()
+      const txs  = (er.portfolio ?? [])
+        .filter(a => {
+          const key = `${a.actionId}::${a.amountTRY}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .flatMap(a => a.transactions ?? [])
+
+      const validation = calculateActualPostActionRating({
+        initialBalances:       balances,
+        transactions:          txs,
         sector:                rawSector,
         subjectiveTotal,
+        v3EstimatedRating:     er.finalTargetRating ?? targetRating,
         currentObjectiveScore,
-        currentCombinedScore:  currentCombinedScore,
-        currentActualRating:   currentActualRating,
-        // Faz 7.3.19: erken çıkış için engine rating kaynağı (currentActualRating'den farklı olabilir)
-        decisionCurrentRating: engineResult.currentRating,
-      },
-    )
+        currentCombinedScore,
+        currentActualRating,
+      })
 
-    // ── 10. RESPONSE ──────────────────────────────────────────────────────────
-    // Faz 7.3.38: ?diagnostics=1 flag — üretimde varsayılan kapalı
-    // try-catch: test ortamında req.url undefined olabilir → false fallback
+      const da = buildDecisionAnswer(
+        er,
+        targetRating,
+        null,
+        balances,
+        ratios,
+        validation,
+        {
+          sector:                rawSector,
+          subjectiveTotal,
+          currentObjectiveScore,
+          currentCombinedScore,
+          currentActualRating,
+          decisionCurrentRating: er.currentRating,
+        },
+      )
+
+      return {
+        decisionAnswer:  da,
+        engineResultDto: buildEngineResultDto(er),
+        totalAmount:     (er.portfolio ?? []).reduce((s, a) => s + a.amountTRY, 0),
+        actionCount:     (er.portfolio ?? []).length,
+      }
+    }
+
+    const conservativePlanData = buildPlanData(conservativeResult.engineResult)
+    const typicalPlanData      = buildPlanData(typicalResult.engineResult)
+    const aggressivePlanData   = buildPlanData(aggressiveResult.engineResult)
+
+    // Geriye uyumluluk: typical plan decisionAnswer ana kanal
+    const decisionAnswer = typicalPlanData.decisionAnswer
+
+    // Faz 7.3.44: 3 alternatif plan array
+    const plans = [
+      {
+        id:             'min'          as const,
+        label:          'Asgari Müdahale',
+        aggressiveness: 'conservative' as const,
+        decisionAnswer: conservativePlanData.decisionAnswer,
+        engineResult:   conservativePlanData.engineResultDto,
+        summary: {
+          targetReachable: conservativePlanData.decisionAnswer.executiveAnswer?.targetMatchesRequest ?? false,
+          totalAmount:     conservativePlanData.totalAmount,
+          actionCount:     conservativePlanData.actionCount,
+        },
+      },
+      {
+        id:             'moderate' as const,
+        label:          'Dengeli',
+        aggressiveness: 'typical'  as const,
+        decisionAnswer: typicalPlanData.decisionAnswer,
+        engineResult:   typicalPlanData.engineResultDto,
+        summary: {
+          targetReachable: typicalPlanData.decisionAnswer.executiveAnswer?.targetMatchesRequest ?? false,
+          totalAmount:     typicalPlanData.totalAmount,
+          actionCount:     typicalPlanData.actionCount,
+        },
+      },
+      {
+        id:             'aggressive' as const,
+        label:          'Hızlı Dönüşüm',
+        aggressiveness: 'aggressive' as const,
+        decisionAnswer: aggressivePlanData.decisionAnswer,
+        engineResult:   aggressivePlanData.engineResultDto,
+        summary: {
+          targetReachable: aggressivePlanData.decisionAnswer.executiveAnswer?.targetMatchesRequest ?? false,
+          totalAmount:     aggressivePlanData.totalAmount,
+          actionCount:     aggressivePlanData.actionCount,
+        },
+      },
+    ]
+
+    // 10. RESPONSE
+    // Faz 7.3.38: ?diagnostics=1 flag -- uretimde varsayilan kapali
+    // try-catch: test ortaminda req.url undefined olabilir -> false fallback
     let diagnosticsMode = false
     try { diagnosticsMode = new URL(req.url).searchParams.get('diagnostics') === '1' } catch { /* noop */ }
 
@@ -304,33 +364,22 @@ export async function POST(req: NextRequest) {
       notchesGained:  engineResult.notchesGained,
       confidence:     engineResult.confidence,
 
-      // Ana karar cevabi — UI bu objeyi kullanir
+      // Ana karar cevabi -- UI bu objeyi kullanir (geriye uyumluluk: typical)
       decisionAnswer,
 
-      // Opsiyonel observability payload — ?diagnostics=1 ile açılır
+      // Opsiyonel observability payload -- ?diagnostics=1 ile acilir
       ...(diagnosticsMode ? { diagnostics: decisionAnswer.diagnostics } : {}),
 
-      // Raw engine result — debug ve advanced kullanim icin
-      engineResult: {
-        version:            engineResult.version,
-        finalTargetRating:  engineResult.finalTargetRating,
-        confidenceModifier: engineResult.confidenceModifier,
-        portfolio:          engineResult.portfolio,
-        horizons:           engineResult.horizons,
-        feasibility:        engineResult.feasibility,
-        reasoning:          engineResult.reasoning,
-        decisionTrace:      engineResult.decisionTrace,
-        // PATCH 2: BankerPerspective metrics icin
-        layerSummaries:     engineResult.layerSummaries ?? null,
-        debug:              process.env.NODE_ENV === 'development'
-          ? engineResult.debug
-          : undefined,
-      },
+      // Raw engine result -- geriye uyumluluk: typical plan
+      engineResult: buildEngineResultDto(engineResult),
 
-      // Senaryo kartları — Faz 7.1B additive alan
+      // Senaryo kartlari -- Faz 7.1B additive alan (geriye uyumluluk: typical)
       scenarios: formatScenariosForResponse(scenarios),
 
-      // Opsiyonel V2 karsilastirma — henuz desteklenmiyor bu route'ta
+      // Faz 7.3.44: 3 alternatif plan (conservative / typical / aggressive)
+      plans,
+
+      // Opsiyonel V2 karsilastirma -- henuz desteklenmiyor bu route'ta
       v2Comparison: includeV2Comparison
         ? { note: 'V2 karşılaştırması bu endpoint üzerinden desteklenmiyor. /api/scenarios/v2 ve /api/scenarios/v3 sonuçlarını client-side karşılaştırın.' }
         : undefined,
