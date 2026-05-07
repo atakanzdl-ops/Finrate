@@ -714,6 +714,59 @@ function AksiyonPlaniTab({
   )
 }
 
+// ─── renderTargetFeasibilitySection ──────────────────────────────────────────
+
+/**
+ * Faz 7.3.45.1: Detay tab Section D render mantığı.
+ * Pure function — react-dom/server ile test edilebilir export.
+ *
+ * Secenek C (override mesaji):
+ *   overrideReached=true && hasConflict=true →
+ *     Tek tutarli pozitif mesaj. feasText DOM'a YANSIMAZ.
+ * Normal branch:
+ *   Sanitize edilmis feasText gosterilir.
+ */
+export function renderTargetFeasibilitySection(opts: {
+  overrideReached: boolean
+  hasConflict:     boolean
+  feasText:        string
+  target:          string
+}): JSX.Element {
+  const { overrideReached, hasConflict, feasText, target } = opts
+
+  if (overrideReached && hasConflict) {
+    return (
+      <>
+        <h3
+          className="text-lg font-bold text-[#0B3C5D] mb-3 flex items-center gap-2"
+          style={{ fontFamily: 'Outfit, sans-serif' }}
+        >
+          <Shield size={18} className="text-[#2EC4B6]" />
+          Hedef Değerlendirmesi
+        </h3>
+        <div className="text-[#1E293B] leading-relaxed">
+          Portföy analizi{target ? ` ${target}` : ''}{' '}
+          seviyesine ulaşılabileceğini doğruladı.
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <h3
+        className="text-lg font-bold text-[#0B3C5D] mb-3"
+        style={{ fontFamily: 'Outfit, sans-serif' }}
+      >
+        Hedef Değerlendirmesi
+      </h3>
+      <div className="text-[#1E293B] leading-relaxed whitespace-pre-line">
+        {feasText}
+      </div>
+    </>
+  )
+}
+
 // ─── DETAY TAB ────────────────────────────────────────────────────────────────
 
 function DetayTab({
@@ -858,59 +911,23 @@ function DetayTab({
       )}
 
       {/* D. TARGET FEASIBILITY */}
-      {/* Faz 7.3.45: Seçenek C + Seçenek Y
-          - sanitizeJargon: PRODUCTIVITY/CAPS enum → Türkçe (Sorun 2)
-          - overrideReached: targetMatchesRequest override ile çelişki giderildi (Sorun 1)
-            Engine ceiling tahmini "B max" diyebilir ama portföy paketi
-            gerçek ledger hesabıyla hedefe ulaşabileceğini doğrularsa
-            Özet ile tutarlı "Ulaşılabilir" mesajı gösterilir.
-            Motor tahmini teknik detay olarak <details> içinde korunur.
+      {/* Faz 7.3.45: sanitizeJargon (Sorun 2) + override mesaji (Sorun 1)
+          Faz 7.3.45.1: <details> kaldirildi — tek tutarli mesaj.
+                         Render mantigi renderTargetFeasibilitySection'a tasindi.
       */}
       {da.targetFeasibilityExplanation && (() => {
-        const overrideReached = da.executiveAnswer?.targetMatchesRequest === true
-        const feasText        = sanitizeJargon(da.targetFeasibilityExplanation)
-        const hasConflict     = feasText.includes('ulaşılamıyor')
-
+        const feasText = sanitizeJargon(da.targetFeasibilityExplanation)
         return (
           <div
             className="bg-white border border-[#E5E9F0] rounded-[12px] p-6"
             style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
           >
-            {overrideReached && hasConflict ? (
-              <>
-                <h3
-                  className="text-lg font-bold text-[#0B3C5D] mb-3 flex items-center gap-2"
-                  style={{ fontFamily: 'Outfit, sans-serif' }}
-                >
-                  <Shield size={18} className="text-[#2EC4B6]" />
-                  Hedef Değerlendirmesi
-                </h3>
-                <div className="text-[#1E293B] leading-relaxed mb-4">
-                  Portföy analizi{da.executiveAnswer?.requestedTarget ? ` ${da.executiveAnswer.requestedTarget}` : ''}{' '}
-                  seviyesine ulaşılabileceğini doğruladı.
-                </div>
-                <details className="group">
-                  <summary className="text-xs text-[#64748B] cursor-pointer select-none hover:text-[#0B3C5D] transition-colors">
-                    Motor tahmini detayı
-                  </summary>
-                  <div className="mt-3 text-sm text-[#64748B] leading-relaxed whitespace-pre-line border-t border-[#E5E9F0] pt-3">
-                    {feasText}
-                  </div>
-                </details>
-              </>
-            ) : (
-              <>
-                <h3
-                  className="text-lg font-bold text-[#0B3C5D] mb-3"
-                  style={{ fontFamily: 'Outfit, sans-serif' }}
-                >
-                  Hedef Değerlendirmesi
-                </h3>
-                <div className="text-[#1E293B] leading-relaxed whitespace-pre-line">
-                  {feasText}
-                </div>
-              </>
-            )}
+            {renderTargetFeasibilitySection({
+              overrideReached: da.executiveAnswer?.targetMatchesRequest === true,
+              hasConflict:     feasText.includes('ulaşılamıyor'),
+              feasText,
+              target:          da.executiveAnswer?.requestedTarget ?? '',
+            })}
           </div>
         )
       })()}

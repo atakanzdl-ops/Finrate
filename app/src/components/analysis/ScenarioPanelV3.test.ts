@@ -1,16 +1,17 @@
 /**
- * ScenarioPanelV3 — Pure helper unit tests (Faz 7.3.45)
+ * ScenarioPanelV3 — Pure helper unit tests (Faz 7.3.45 + 7.3.45.1)
  *
- * React render testi YOK — sadece export edilen saf fonksiyonlar test edilir.
- * Bu dosya 'use client' component'ini import ETMEZ;
- * sadece named export olan pure fn'leri alır.
+ * Sadece named export olan pure fn'ler test edilir.
+ * 'use client' component'i import ETMEZ.
  *
  * Test kapsamı:
  *   T_SJ1-4: sanitizeJargon — jargon temizleme
- *   T_DETAY1: override case mantığı — çelişki giderme
+ *   T_DETAY1-3: override case mantığı — çelişki giderme
+ *   T_DETAY4-5: renderTargetFeasibilitySection — react-dom/server render
  */
 
-import { sanitizeJargon } from './ScenarioPanelV3'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { sanitizeJargon, renderTargetFeasibilitySection } from './ScenarioPanelV3'
 
 // ─── T_SJ: sanitizeJargon ─────────────────────────────────────────────────────
 
@@ -130,6 +131,52 @@ describe('T_DETAY — override case mantığı (Faz 7.3.45)', () => {
 
     // Override DEĞİL — normal path, temiz metin gösterilir
     expect(feasText).toBe(rawFeasText)  // değişmemiş (temiz Türkçe)
+  })
+
+})
+
+// ─── T_DETAY_RENDER: renderTargetFeasibilitySection (Faz 7.3.45.1) ─────────
+
+describe('T_DETAY_RENDER — renderTargetFeasibilitySection render dogrulamasi', () => {
+
+  test('T_DETAY4: override+conflict → tek pozitif mesaj, feasText DOM\'da yok', () => {
+    const html = renderToStaticMarkup(
+      renderTargetFeasibilitySection({
+        overrideReached: true,
+        hasConflict:     true,
+        feasText:        'BB hedefine ulasılamıyor — ulasılabilir maksimum: B',
+        target:          'BB',
+      })
+    )
+
+    // Pozitif override mesaji mevcut (ASCII-safe kontrol: 'seviyesine' sadece override mesajinda)
+    expect(html).toContain('seviyesine')
+    expect(html).toContain('BB')
+
+    // feasText DOM'da YOK — cakisma yok
+    expect(html).not.toContain('ulasılamıyor')
+    expect(html).not.toContain('ulasılabilir maksimum')
+
+    // <details> blogu kaldirildi — hic yok
+    expect(html).not.toContain('Motor tahmini detayı')
+  })
+
+  test('T_DETAY5: normal branch (override yok) → feasText gosterilir', () => {
+    const html = renderToStaticMarkup(
+      renderTargetFeasibilitySection({
+        overrideReached: false,
+        hasConflict:     true,
+        feasText:        'BB hedefine ulasılamıyor — Aktif Verimlilik tavanı B',
+        target:          'BB',
+      })
+    )
+
+    // Normal path: sanitize edilmis feasText gosterilir
+    expect(html).toContain('ulasılamıyor')
+    expect(html).toContain('Aktif Verimlilik')
+
+    // Pozitif override mesaji YOK
+    expect(html).not.toContain('seviyesine')
   })
 
 })
