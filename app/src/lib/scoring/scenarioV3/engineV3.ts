@@ -60,6 +60,7 @@ import {
   SUSTAINABILITY_MULTIPLIER,
   MATERIALITY_BY_HORIZON,
   getDynamicMaterialityFloor,
+  getLogScaleDampener,
 } from './contracts'
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
@@ -834,12 +835,19 @@ function calculateAmountCandidates(
     matLimit.minAbsoluteAmountTRY,
     dynamicFloor,
   )
-  const maxAbs    = sa.absoluteMaxTRY ?? (basis * sa.maxPctOfBasis * 2)
 
-  const minAmt        = Math.max(basis * sa.minPctOfBasis,     minAbs)
-  const typicalAmt    = Math.max(basis * sa.typicalPctOfBasis, minAbs)
-  const aggressiveAmt = Math.min(typicalAmt * 1.5,             maxAbs)
-  const maxRealAmt    = Math.min(basis * sa.maxPctOfBasis,     maxAbs)
+  // Faz 7.3.43E: Logaritmik scale dampener
+  // Büyük firmalarda yüzde-bazlı tutarları kırar; küçük firmada scale=1.
+  // safeAssets GÜN 3'ten (L823-826) — yeniden tanımlama yok.
+  const scale       = getLogScaleDampener(safeAssets)
+  const scaledBasis = basis * scale
+
+  const maxAbs    = sa.absoluteMaxTRY ?? (scaledBasis * sa.maxPctOfBasis * 2)
+
+  const minAmt        = Math.max(scaledBasis * sa.minPctOfBasis,     minAbs)
+  const typicalAmt    = Math.max(scaledBasis * sa.typicalPctOfBasis, minAbs)
+  const aggressiveAmt = Math.min(typicalAmt * 1.5,                   maxAbs)
+  const maxRealAmt    = Math.min(scaledBasis * sa.maxPctOfBasis,     maxAbs)
 
   // Materiality alt siniri
   const matMin = context.totalAssets * matLimit.minAmountPctOfAssets

@@ -634,6 +634,43 @@ export function getDynamicMaterialityFloor(
   return Math.max(baseFloor, totalAssets * scaleFactor)
 }
 
+// ============ LOGARİTMİK SCALE DAMPENER (FAZ 7.3.43E — GÜN 4) ============
+//
+// Büyük firmalarda yüzde-bazlı aksiyon tutarlarının doğal kırılması.
+// Formül: scale = 1 / (1 + log10(assets / 50M) × 0.7)
+// Clamp: 0.40 ≤ scale ≤ 1.0 | Boost yasak: assets < 50M → scale = 1
+//
+// Doğrulanmış değerler (3 AI konsensüsü + Node.js teyit):
+//   50M:  1.000 (etkisiz — DEKA kalibrasyonu)
+//   102M: 0.822 (−18%)
+//   357M: 0.626 (−37%)
+//   1B:   0.523 (−48%)
+
+/**
+ * Logaritmik ölçek dampener.
+ * Büyük firmalarda (>50M aktif) yüzde-bazlı aksiyon tutarlarını
+ * aşağı kırar; küçük firmalarda scale=1 (boost yok).
+ *
+ * @param totalAssets - Firmanın toplam aktifi (TRY) — NaN/negatif güvenli
+ * @returns 0.40 ≤ scale ≤ 1.0
+ */
+export function getLogScaleDampener(totalAssets: number): number {
+  // NaN-safe (GÜN 3 paterni)
+  const safeAssets = Number.isFinite(totalAssets)
+    ? Math.max(0, totalAssets)
+    : 0
+
+  // Boost yasak: küçük firma (< 50M) için scale = 1
+  const assetsForScale = Math.max(safeAssets, 50_000_000)
+
+  // Logaritmik dampener (kalibrasyon sabiti: 0.7)
+  const ratio = assetsForScale / 50_000_000
+  const scale = 1 / (1 + Math.log10(ratio) * 0.7)
+
+  // Güvenlik clamp: 0.40 ≤ scale ≤ 1.0
+  return Math.max(0.40, Math.min(1.0, scale))
+}
+
 // ============ MULTI-SENARYO MOTORU — SKOR KONTRATLARI (FAZ 1) ============
 // Bu tipler Faz 2+'de tüketilecek. Mevcut kod etkilenmez.
 
