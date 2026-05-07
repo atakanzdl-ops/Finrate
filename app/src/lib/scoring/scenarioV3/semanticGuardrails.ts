@@ -74,6 +74,8 @@ export type GuardrailRuleCode =
   | 'PORTFOLIO_CASH_INCOHERENCE'
   | 'PORTFOLIO_REVENUE_UNREALISTIC'
   | 'PORTFOLIO_LIQUIDITY_NET_NEGATIVE'
+  // Faz 7.3.43F — Equity Pool Cap
+  | 'EQUITY_POOL_CAP'
 
 export interface GuardrailResult {
   pass:             boolean
@@ -271,6 +273,10 @@ export interface PortfolioGuardrailInput {
     totalEquity:  number
     totalRevenue: number
     netIncome:    number
+    /** K6 B: OCF cap (opsiyonel — mevcutsa OCF × 3 ile assetsCap kıyaslanır) */
+    operatingCashFlow?:   number | null
+    /** K9 B: Baseline snapshot — greedy başlamadan önce alınır, mutasyondan etkilenmez */
+    baselineTotalAssets?: number
   }
 }
 
@@ -691,6 +697,59 @@ export const PORTFOLIO_AGGREGATE_RULES: PortfolioAggregateRule[] = [
           context: { netLiquidity, threshold },
         }
       }
+      return null
+    },
+  },
+  // ─── Faz 7.3.43F: EQUITY_POOL_CAP ───────────────────────────────────────────
+  {
+    ruleCode: 'EQUITY_POOL_CAP',
+    description: 'Sermaye güçlendirme aksiyonları toplamı baseline aktif × %15 üst sınırını aşmaz',
+    check: (input) => {
+      const portfolio = input.portfolio || []
+      const fc        = input.firmContext
+
+      // K9 B: Baseline totalAssets (immutable snapshot — greedy mutasyonundan korunur)
+      // Geriye uyumluluk: baselineTotalAssets yoksa totalAssets fallback
+      const rawBaseline = Number.isFinite(fc.baselineTotalAssets)
+        ? fc.baselineTotalAssets
+        : fc.totalAssets
+      const safeBaseline = Number.isFinite(rawBaseline)
+        ? Math.max(0, rawBaseline!)
+        : 0
+
+      // K7: Kesin equity ID listesi (A10 + A10B + A15)
+      const EQUITY_IDS = [
+        'A10_CASH_EQUITY_INJECTION',
+        'A10B_PROMISSORY_NOTE_EQUITY_INJECTION',
+        'A15_DEBT_TO_EQUITY_SWAP',
+      ]
+
+      const equityActions = portfolio.filter(a => EQUITY_IDS.includes(a.actionId))
+      const equitySum     = equityActions.reduce((s, a) => s + (a.amountTRY || 0), 0)
+
+      const assetsCap = safeBaseline * 0.15
+
+      // K6 B: OCF cap (opsiyonel — mevcutsa OCF × 3 ile assetsCap karşılaştırılır)
+      let effectiveCap = assetsCap
+      const ocf = fc.operatingCashFlow
+      if (Number.isFinite(ocf) && ocf! > 0) {
+        effectiveCap = Math.min(assetsCap, ocf! * 3)
+      }
+
+      if (equitySum > effectiveCap) {
+        return {
+          pass:            false,
+          severity:        'SOFT_BLOCK',  // K4: KESİN — ASLA 'WARNING'
+          ruleCode:        'EQUITY_POOL_CAP',
+          message:
+            `Sermaye güçlendirme toplamı ${(equitySum / 1e6).toFixed(1)}M TL > ` +
+            `baseline cap ${(effectiveCap / 1e6).toFixed(1)}M TL ` +
+            `(baseline aktif ${(safeBaseline / 1e6).toFixed(0)}M TL × %15)`,
+          affectedActionId: equityActions.map(a => a.actionId).join(','),
+          portfolioLevel:   true,
+        }
+      }
+
       return null
     },
   },
