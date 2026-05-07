@@ -782,8 +782,9 @@ function buildAccountingImpactTable(engineResult: EngineResult): AccountingImpac
 function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
   const productivity = engineResult.layerSummaries.productivity as {
     productivityScore: number
-    metrics: { trappedAssetsShare: number }
+    metrics: { trappedAssetsShare: number; salesToAssets?: number }
     inefficiencyFlags: Array<{ type: string; severity: string; description: string }>
+    sectorExpectations?: { salesToAssets?: { expected: number } }
   } | null
 
   if (!productivity) {
@@ -810,11 +811,28 @@ function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
     )
   }
 
-  if (trapped > 0.60) {
-    parts.push(
-      `Varlıkların %${(trapped * 100).toFixed(0)}'i atıl durumda — ` +
-      'bu varlıklar nakde çevrilmeden nakit yaratma kapasitesi artmaz.'
-    )
+  // Faz 7.3.43X: "atıl varlık" cümlesi kaldırıldı (trappedAssetsShare formülü
+  // "çalışma sermayesi kilitlenmesi" anlamında; clamp yokluğu %100+ üretiyordu).
+  // Yerine aktif devir hızı bazlı profesyonel metin.
+  const salesToAssets  = productivity.metrics.salesToAssets
+  const sectorExpected = productivity.sectorExpectations?.salesToAssets?.expected
+
+  if (salesToAssets !== undefined && salesToAssets >= 0) {
+    const turnoverPct = (salesToAssets * 100).toFixed(1)
+    if (sectorExpected !== undefined && sectorExpected > 0) {
+      const sectorPct = (sectorExpected * 100).toFixed(0)
+      parts.push(
+        `Aktif devir hızı %${turnoverPct} (sektör beklentisi %${sectorPct}). ` +
+        'Bu seviyede sadece sermaye enjeksiyonu sınırlı etki üretir; satışa ve ' +
+        'nakde dönüş hızını artıran operasyonel aksiyonlar eşlik etmelidir.'
+      )
+    } else {
+      parts.push(
+        `Aktif devir hızı %${turnoverPct}. ` +
+        'Bu seviyede sadece sermaye enjeksiyonu sınırlı etki üretir; satışa ve ' +
+        'nakde dönüş hızını artıran operasyonel aksiyonlar eşlik etmelidir.'
+      )
+    }
   }
 
   const criticalFlags = productivity.inefficiencyFlags.filter(f => f.severity === 'CRITICAL').slice(0, 2)
