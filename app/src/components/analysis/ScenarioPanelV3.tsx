@@ -111,6 +111,41 @@ function toStringArray(value: unknown): string[] {
   return []
 }
 
+// ─── sanitizeJargon ──────────────────────────────────────────────────────────
+
+/**
+ * Backend'den gelen ham string'lerdeki teknik İngilizce/CAPS jargonu
+ * mali müşavire yönelik Türkçe'ye çevirir.
+ *
+ * Saf fonksiyon — test edilebilir export.
+ * Kural: backend algoritması dokunulmaz; sadece UI render katmanında çalışır.
+ */
+export function sanitizeJargon(text: string): string {
+  if (!text) return text
+  const JARGON_MAP: Record<string, string> = {
+    // Ceiling source terimleri — raw reason içinden sızan CAPS
+    'PRODUCTIVITY tavanı':          'Aktif Verimlilik tavanı',
+    'productivity tavanı':          'aktif verimlilik tavanı',
+    'productivity score':           'aktif verimlilik skoru',
+    'productivity':                 'aktif verimlilik',
+    'PRODUCTIVITY':                 'Aktif Verimlilik',
+    // InefficiencyType enum isimleri
+    'SALES_ASSET_MISMATCH':         'Aktif Devir Hızı Sorunu',
+    'RECEIVABLE_SLOWDOWN':          'Tahsilat Yavaşlaması',
+    'INVENTORY_LOCK':               'Stok Kilitlenmesi',
+    'WIP_LOCK':                     'Yarı Mamul Kilitlenmesi',
+    'ADVANCES_LOCK':                'Avans Kilitlenmesi',
+    'OPERATING_YIELD_GAP':          'Operasyonel Verimlilik Açığı',
+    'CASH_GENERATION_GAP':          'Nakit Üretim Yetersizliği',
+    'FIXED_ASSET_UNDERUTILIZATION': 'Aktif Kullanım Sorunu',
+  }
+  let result = text
+  for (const [key, value] of Object.entries(JARGON_MAP)) {
+    result = result.replaceAll(key, value)
+  }
+  return result
+}
+
 // ─── classifyLeg ─────────────────────────────────────────────────────────────
 
 /**
@@ -823,22 +858,62 @@ function DetayTab({
       )}
 
       {/* D. TARGET FEASIBILITY */}
-      {da.targetFeasibilityExplanation && (
-        <div
-          className="bg-white border border-[#E5E9F0] rounded-[12px] p-6"
-          style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
-        >
-          <h3
-            className="text-lg font-bold text-[#0B3C5D] mb-3"
-            style={{ fontFamily: 'Outfit, sans-serif' }}
+      {/* Faz 7.3.45: Seçenek C + Seçenek Y
+          - sanitizeJargon: PRODUCTIVITY/CAPS enum → Türkçe (Sorun 2)
+          - overrideReached: targetMatchesRequest override ile çelişki giderildi (Sorun 1)
+            Engine ceiling tahmini "B max" diyebilir ama portföy paketi
+            gerçek ledger hesabıyla hedefe ulaşabileceğini doğrularsa
+            Özet ile tutarlı "Ulaşılabilir" mesajı gösterilir.
+            Motor tahmini teknik detay olarak <details> içinde korunur.
+      */}
+      {da.targetFeasibilityExplanation && (() => {
+        const overrideReached = da.executiveAnswer?.targetMatchesRequest === true
+        const feasText        = sanitizeJargon(da.targetFeasibilityExplanation)
+        const hasConflict     = feasText.includes('ulaşılamıyor')
+
+        return (
+          <div
+            className="bg-white border border-[#E5E9F0] rounded-[12px] p-6"
+            style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
           >
-            Hedef Değerlendirmesi
-          </h3>
-          <div className="text-[#1E293B] leading-relaxed whitespace-pre-line">
-            {da.targetFeasibilityExplanation}
+            {overrideReached && hasConflict ? (
+              <>
+                <h3
+                  className="text-lg font-bold text-[#0B3C5D] mb-3 flex items-center gap-2"
+                  style={{ fontFamily: 'Outfit, sans-serif' }}
+                >
+                  <Shield size={18} className="text-[#2EC4B6]" />
+                  Hedef Değerlendirmesi
+                </h3>
+                <div className="text-[#1E293B] leading-relaxed mb-4">
+                  Portföy analizi{da.executiveAnswer?.requestedTarget ? ` ${da.executiveAnswer.requestedTarget}` : ''}{' '}
+                  seviyesine ulaşılabileceğini doğruladı.
+                </div>
+                <details className="group">
+                  <summary className="text-xs text-[#64748B] cursor-pointer select-none hover:text-[#0B3C5D] transition-colors">
+                    Motor tahmini detayı
+                  </summary>
+                  <div className="mt-3 text-sm text-[#64748B] leading-relaxed whitespace-pre-line border-t border-[#E5E9F0] pt-3">
+                    {feasText}
+                  </div>
+                </details>
+              </>
+            ) : (
+              <>
+                <h3
+                  className="text-lg font-bold text-[#0B3C5D] mb-3"
+                  style={{ fontFamily: 'Outfit, sans-serif' }}
+                >
+                  Hedef Değerlendirmesi
+                </h3>
+                <div className="text-[#1E293B] leading-relaxed whitespace-pre-line">
+                  {feasText}
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
     </div>
   )
