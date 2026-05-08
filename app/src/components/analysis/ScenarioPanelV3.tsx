@@ -52,6 +52,8 @@ import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
 import type { DecisionInsight } from '@/lib/scoring/scenarioV3/contracts'
+import { AccountImpactTable, computeDelta, formatTRY } from './AccountImpactTable'
+import type { AccountingImpactRow } from '@/lib/scoring/scenarioV3/decisionLayer'
 
 // ─── PROPS ───────────────────────────────────────────────────────────────────
 
@@ -551,6 +553,16 @@ function AksiyonPlaniTab({
           )}
           {actions.map((action, idx) => {
             const isOpen = expanded.has(idx)
+            // Faz 7.3.48: Leg verisi — collapsed özet + expand tablo için
+            const _legData = da.accountingLegsByAction?.[action.actionId]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const _legRaw: any[] = [
+              ...(_legData?.debits  ?? []).map((l: any) => ({ ...l, legSide: 'DEBIT'  as const })),
+              ...(_legData?.credits ?? []).map((l: any) => ({ ...l, legSide: 'CREDIT' as const })),
+            ]
+            const _legs: AccountingImpactRow[] = _legRaw.filter((l: any) => l.accountCode !== '690')
+            const _accountCount = _legs.length
+            const _delta        = computeDelta(_legs, action.amountTRY)
             return (
               <div key={idx}>
                 {/* V3 başlık şeridi: # + aksiyon adı + neden seçildi tek satır + sağda ufuk/tip/tutar */}
@@ -565,14 +577,18 @@ function AksiyonPlaniTab({
                   >
                     {action.priority ?? idx + 1}
                   </div>
-                  {/* Aksiyon adı + neden seçildi tek satır */}
+                  {/* Aksiyon adı + hesap özeti (Faz 7.3.48) */}
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-[#1E293B]">{action.actionName}</div>
-                    {(action.why ?? toStringArray(action.whySelected)[0]) && (
+                    {_accountCount > 0 ? (
+                      <div className="text-xs text-[#64748B] mt-0.5">
+                        {_accountCount} hesap etkileniyor · Δ {formatTRY(_delta)}
+                      </div>
+                    ) : (action.why ?? toStringArray(action.whySelected)[0]) ? (
                       <div className="text-xs text-[#64748B] mt-0.5 truncate">
                         {action.why ?? toStringArray(action.whySelected)[0]}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   {/* Sağda: ufuk badge + tip + tutar + chevron */}
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -588,112 +604,48 @@ function AksiyonPlaniTab({
                   </div>
                 </button>
 
-                {/* Expand detay — Faz 7.3.5C1: Aksiyon kart yeni iki sütun layout */}
-                {isOpen && (() => {
-                  // Leg sınıflama: debit/credit → aktif/pasif/gelir + yön
-                  const legData = da.accountingLegsByAction?.[action.actionId]
-                  const debs: { accountCode: string; accountName: string; amountFormatted: string }[] = legData?.debits  ?? []
-                  const creds: { accountCode: string; accountName: string; amountFormatted: string }[] = legData?.credits ?? []
-                  type CL = { code: string; name: string; amountFormatted: string; direction: 'increase' | 'decrease' }
-                  const allLegs: CL[] = [
-                    ...debs.map(l  => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'DEBIT')  })),
-                    ...creds.map(l => ({ code: l.accountCode, name: l.accountName, amountFormatted: l.amountFormatted, direction: classifyLeg(l.accountCode, 'CREDIT') })),
-                  ].filter(leg => leg.code !== '690')  // 690 kapanış hesabı — UI'da gizle, 590 görünür
-                  const activeLegs  = allLegs.filter(l => l.code.charAt(0) === '1' || l.code.charAt(0) === '2')
-                  const passiveLegs = allLegs.filter(l => ['3','4','5'].includes(l.code.charAt(0)))
-                  const incomeLegs  = allLegs.filter(l => l.code.charAt(0) === '6' || l.code.charAt(0) === '7')
+                {/* Expand detay — Faz 7.3.48: AccountImpactTable */}
+                {isOpen && (
+                  <div style={{ borderTop: '1px solid #E5E9F0', padding: '1.25rem 1.5rem', background: '#FAFBFC' }}>
 
-                  const renderLegGroup = (group: CL[]) =>
-                    group.length === 0
-                      ? <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>Etkilenmez</p>
-                      : <>{group.map((leg, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              background: leg.direction === 'increase' ? '#F0FDFA' : '#FEF2F2',
-                              borderRadius: 6,
-                              padding: '8px 12px',
-                              marginBottom: 6,
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <div>
-                              <span style={{ fontSize: 11, color: '#94A3B8', marginRight: 6, fontFamily: 'monospace' }}>{leg.code}</span>
-                              <span style={{ fontSize: 13, color: leg.direction === 'increase' ? '#115E59' : '#991B1B', fontWeight: 500 }}>
-                                {leg.name}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: leg.direction === 'increase' ? '#0F766E' : '#B91C1C', whiteSpace: 'nowrap' }}>
-                              {leg.direction === 'increase' ? '+' : '−'}{leg.amountFormatted}
-                            </span>
-                          </div>
-                        ))}</>
+                    {/* İki sütun grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
 
-                  return (
-                    <div style={{ borderTop: '1px solid #E5E9F0', padding: '1.25rem 1.5rem', background: '#FAFBFC' }}>
-
-                      {/* İki sütun grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-
-                        {/* SOL — BİLANÇO / GELİR TABLOSU */}
-                        <div>
-                          {allLegs.length === 0 ? (
-                            <p style={{ margin: 0, fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>
-                              Muhasebe etkisi mevcut değil
-                            </p>
-                          ) : (
-                            <>
-                              <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
-                                Bilanço — aktif taraf
-                              </p>
-                              {renderLegGroup(activeLegs)}
-
-                              <div style={{ marginTop: 14 }}>
-                                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
-                                  Pasif taraf
-                                </p>
-                                {renderLegGroup(passiveLegs)}
-                              </div>
-
-                              <div style={{ marginTop: 14 }}>
-                                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
-                                  Gelir tablosu
-                                </p>
-                                {renderLegGroup(incomeLegs)}
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {/* SAĞ — RASYO ETKİSİ */}
-                        {action.ratioTransparency != null && (
-                          <div>
-                            <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
-                              Rasyo Etkisi
-                            </p>
-                            <RatioTransparencyBlock data={action.ratioTransparency} />
-                          </div>
-                        )}
-
+                      {/* SOL — Mevcut / Önerilen / Δ (Faz 7.3.48) */}
+                      <div>
+                        <AccountImpactTable
+                          legs={_legs}
+                          currentBalances={result.currentAccountBalances ?? {}}
+                          actionAmountTRY={action.amountTRY}
+                        />
                       </div>
 
-                      {/* FOOTER — FİNRATE YORUMU */}
-                      {action.bankerPerspective && (
-                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #E5E9F0' }}>
-                          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#0B3C5D', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                            FİNRATE YORUMU
+                      {/* SAĞ — RASYO ETKİSİ */}
+                      {action.ratioTransparency != null && (
+                        <div>
+                          <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>
+                            Rasyo Etkisi
                           </p>
-                          <p style={{ margin: 0, fontSize: 14, color: '#0B3C5D', lineHeight: 1.65 }}>
-                            {action.bankerPerspective}
-                          </p>
+                          <RatioTransparencyBlock data={action.ratioTransparency} />
                         </div>
                       )}
 
                     </div>
-                  )
-                })()}
+
+                    {/* FOOTER — FİNRATE YORUMU */}
+                    {action.bankerPerspective && (
+                      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #E5E9F0' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#0B3C5D', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          FİNRATE YORUMU
+                        </p>
+                        <p style={{ margin: 0, fontSize: 14, color: '#0B3C5D', lineHeight: 1.65 }}>
+                          {action.bankerPerspective}
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+                )}
               </div>
             )
           })}
@@ -970,6 +922,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       }
       const successData = data as ScenarioV3ApiResponse
       setResult(successData)
+      setExpandedActions(new Set([0]))   // Faz 7.3.48: ilk aksiyonu otomatik aç
       setActiveTab('ozet')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata')

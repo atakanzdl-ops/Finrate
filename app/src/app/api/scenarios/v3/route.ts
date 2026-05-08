@@ -379,6 +379,9 @@ export async function POST(req: NextRequest) {
       // Faz 7.3.44: 3 alternatif plan (conservative / typical / aggressive)
       plans,
 
+      // Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için
+      currentAccountBalances: balances,
+
       // Opsiyonel V2 karsilastirma -- henuz desteklenmiyor bu route'ta
       v2Comparison: includeV2Comparison
         ? { note: 'V2 karşılaştırması bu endpoint üzerinden desteklenmiyor. /api/scenarios/v2 ve /api/scenarios/v3 sonuçlarını client-side karşılaştırın.' }

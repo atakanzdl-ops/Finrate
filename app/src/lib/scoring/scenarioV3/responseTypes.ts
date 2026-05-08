@@ -87,4 +87,6 @@ export interface ScenarioV3ApiResponse {
   /** Faz 7.3.44: conservative / typical / aggressive 3 alternatif plan */
   plans?:         PlanDto[]
   v2Comparison?:  V2ComparisonDto
+  /** Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için */
+  currentAccountBalances?: Record<string, number>
 }

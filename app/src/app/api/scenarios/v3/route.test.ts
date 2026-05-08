@@ -456,4 +456,53 @@ describe('POST /api/scenarios/v3', () => {
       expect(typeof plan.summary.actionCount).toBe('number')
     }
   })
+
+  // ── Faz 7.3.48: T_R1-T_R2 — currentAccountBalances ───────────────────────────
+
+  test('T_R1 — currentAccountBalances response\'da mevcut', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    setupMocks({
+      userId:              'user-1',
+      analysis:            VALID_ANALYSIS,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toHaveProperty('currentAccountBalances')
+  })
+
+  test('T_R2 — currentAccountBalances Record<string,number> formatinda — financialAccounts\'tan turemu', async () => {
+    process.env.ENABLE_MULTI_SCENARIO_V3 = 'false'
+    const analysisWithAccounts = {
+      ...VALID_ANALYSIS,
+      financialAccounts: [
+        { accountCode: '100', amount: '500000' },
+        { accountCode: '300', amount: '250000' },
+      ],
+    }
+    setupMocks({
+      userId:              'user-1',
+      analysis:            analysisWithAccounts,
+      runEngineV3Behavior: 'success',
+    })
+
+    const req = createMockRequest(VALID_BODY)
+    const res = await callPost(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    const bal: Record<string, unknown> = body.currentAccountBalances ?? {}
+    // Her giriş: string key → number value
+    for (const [key, val] of Object.entries(bal)) {
+      expect(typeof key).toBe('string')
+      expect(typeof val).toBe('number')
+    }
+    // 100 ve 300 hesapları doğru amount ile yansımış
+    expect(bal['100']).toBe(500000)
+    expect(bal['300']).toBe(250000)
+  })
 })
