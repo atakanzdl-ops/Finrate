@@ -29,6 +29,11 @@ type MismatchModal = {
   message:  string
 }
 
+type DetectionMissingModal = {
+  year:    number
+  message: string
+}
+
 const PERIODS = [
   { value: 'ANNUAL', label: 'Kesin Beyan (Tam Yıl)' },
   { value: 'Q1', label: '1. Geçici Vergi (Oca-Mar)' },
@@ -55,6 +60,7 @@ export default function MultiYearUploadPage() {
   const [error, setError] = useState('')
   const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
   const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
+  const [detectionMissingModal, setDetectionMissingModal] = useState<DetectionMissingModal | null>(null)
 
   const hasAtLeastOneUploadedYear = YEARS.some((year) => uploads[year]?.uploaded)
 
@@ -66,7 +72,7 @@ export default function MultiYearUploadPage() {
     setYearUpload(year, { file, status: 'idle', error: undefined })
   }
 
-  const uploadYear = async (year: number, overwrite = false) => {
+  const uploadYear = async (year: number, overwrite = false, confirmDetectionMissing = false) => {
     const selectedFile = uploads[year]?.file
     if (!selectedFile) {
       setYearUpload(year, { error: 'Önce dosya seçin.', status: 'error' })
@@ -82,6 +88,7 @@ export default function MultiYearUploadPage() {
       fd.append('year', String(year))
       fd.append('period', period)
       if (overwrite) fd.append('overwrite', 'true')
+      if (confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
 
       const res = await fetch(`/api/entities/${entityId}/upload`, {
         method: 'POST',
@@ -90,6 +97,12 @@ export default function MultiYearUploadPage() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
+        // 409 — Parser yıl tespit edemedi → soft warning onay modalı
+        if (res.status === 409 && data.error === 'DETECTED_YEAR_MISSING_CONFIRM') {
+          setDetectionMissingModal({ year, message: data.message ?? 'Dosyada yıl bulunamadı. Formda seçilen yıla kaydedilecek. Onaylıyor musunuz?' })
+          setYearUpload(year, { status: 'idle', error: undefined })
+          return
+        }
         // 409 — Aynı kaynaktan veri zaten var → onay modalı
         if (res.status === 409 && data.error === 'DUPLICATE_DATA') {
           setConflictModal({ year, conflicts: data.conflicts ?? [] })
@@ -126,6 +139,13 @@ export default function MultiYearUploadPage() {
     const year = conflictModal.year
     setConflictModal(null)
     uploadYear(year, true)
+  }
+
+  const onDetectionMissingConfirm = () => {
+    if (!detectionMissingModal) return
+    const year = detectionMissingModal.year
+    setDetectionMissingModal(null)
+    uploadYear(year, false, true)
   }
 
   const onAnalyze = async () => {
@@ -175,6 +195,27 @@ export default function MultiYearUploadPage() {
             <button type="button" onClick={() => setMismatchModal(null)}
               className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
               Dosyayı Değiştir
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 409 — DETECTED_YEAR_MISSING_CONFIRM: Soft warning onay modalı */}
+    {detectionMissingModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Yıl Bilgisi Bulunamadı</h3>
+          <p className="text-sm text-slate-600 mb-4">{detectionMissingModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setDetectionMissingModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              İptal
+            </button>
+            <button type="button" onClick={onDetectionMissingConfirm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: '#0B3C5D' }}>
+              Onayla
             </button>
           </div>
         </div>

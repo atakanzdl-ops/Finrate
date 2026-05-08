@@ -102,11 +102,12 @@ function setupMocks(opts: {
 }
 
 function createMockRequest(opts: {
-  fileName:   string
-  year?:      number | null
-  period?:    string | null
-  fileSize?:  number          // Faz 7.3.49 A: boyut limiti testi için
-  overwrite?: boolean         // Faz 7.3.50A: üzerine yaz onayı
+  fileName:                  string
+  year?:                     number | null
+  period?:                   string | null
+  fileSize?:                 number          // Faz 7.3.49 A: boyut limiti testi için
+  overwrite?:                boolean         // Faz 7.3.50A: üzerine yaz onayı
+  confirmDetectionMissing?:  boolean         // Faz 7.3.50A.1: soft warning onayı
 }) {
   const file = {
     name:        opts.fileName,
@@ -115,10 +116,11 @@ function createMockRequest(opts: {
   }
   const formData = {
     get: jest.fn((key: string) => {
-      if (key === 'file')      return file
-      if (key === 'year')      return opts.year   != null ? String(opts.year)  : null
-      if (key === 'period')    return opts.period != null ? opts.period          : null
-      if (key === 'overwrite') return opts.overwrite === true ? 'true' : null
+      if (key === 'file')                     return file
+      if (key === 'year')                     return opts.year   != null ? String(opts.year)  : null
+      if (key === 'period')                   return opts.period != null ? opts.period          : null
+      if (key === 'overwrite')                return opts.overwrite === true ? 'true' : null
+      if (key === 'confirmDetectionMissing')  return opts.confirmDetectionMissing === true ? 'true' : null
       return null
     }),
   }
@@ -513,11 +515,22 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     expect(body.error).toBe('YEAR_MISMATCH')
   })
 
-  // T4: detectedYear null + form var → form fallback, başarılı
-  test('T4 — detectedYear null + formYear var → form yılı kullanılır, 200', async () => {
+  // T4a: detectedYear null + form var + confirmDetectionMissing=false → 409 soft warning
+  test('T4a — detectedYear null + formYear var → 409 DETECTED_YEAR_MISSING_CONFIRM (Faz 7.3.50A.1)', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
     const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
     const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DETECTED_YEAR_MISSING_CONFIRM')
+  })
+
+  // T4b: detectedYear null + form var + confirmDetectionMissing=true → form yılı kullanılır, 200
+  test('T4b — detectedYear null + formYear var + confirmDetectionMissing=true → 200 (Faz 7.3.50A.1)', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
     expect(res.status).not.toBe(422)
     expect(res.status).not.toBe(400)
   })
@@ -748,6 +761,100 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     expect(c.existingSource).toBe('EXCEL')
     expect(c.incomingSource).toBe('EXCEL')
     expect(c.existingUploadDate).toBeDefined()
+  })
+
+})
+
+// ─── Faz 7.3.50A.1: PREFLIGHT 1.5 (detectedYear null soft warning) ────────────
+
+describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3.50A.1)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // T1: Single-row, detectedYear=null, formYear=2024 → 409 DETECTED_YEAR_MISSING_CONFIRM
+  test('T1 — detectedYear null + formYear 2024 → 409 DETECTED_YEAR_MISSING_CONFIRM', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DETECTED_YEAR_MISSING_CONFIRM')
+    expect(typeof body.message).toBe('string')
+    expect(body.message).toContain('2024')
+    expect(body.detected).toBeDefined()
+    expect(body.detected.year).toBeNull()
+    expect(body.form).toBeDefined()
+    expect(body.form.year).toBe(2024)
+  })
+
+  // T2: confirmDetectionMissing=true → PREFLIGHT 1.5 atlanır, upsert çağrıldı
+  test('T2 — confirmDetectionMissing=true → PREFLIGHT 1.5 bypass, upsert çağrıldı', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // T3: formYear null + detectedYear null → PREFLIGHT 1 (400 MISSING_YEAR_CONTEXT), PREFLIGHT 1.5 tetiklenmez
+  test('T3 — formYear null + detectedYear null → 400 MISSING_YEAR_CONTEXT (PREFLIGHT 1, PREFLIGHT 1.5 değil)', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    const req = createMockRequest({ fileName: 'dosya.pdf', year: null, period: null })
+    const res = await callPost(req)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('MISSING_YEAR_CONTEXT')
+  })
+
+  // T7: Multi-row Excel + detectedYear null → PREFLIGHT 1.5 tetiklenmez (multi-year istisnası)
+  test('T7 — multiRowWithYears=true + detectedYear null row var → PREFLIGHT 1.5 tetiklenmez', async () => {
+    // İlk satır yılsız, ikinci yıllı: multiRowWithYears sadece hepsinde yıl varsa true
+    // Bu test: TEK satır null → PREFLIGHT 1.5 tetiklenir (yukarıdaki T1 ile aynı)
+    // Burada MULTI satır tüm yıllı durumda PREFLIGHT 1.5 atlanır
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [
+        PREFLIGHT_ROW(2023, 'ANNUAL'),
+        PREFLIGHT_ROW(2024, 'ANNUAL'),
+      ],
+      isExcel: true,
+    })
+    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL' })
+    const res = await callPost(req)
+    // multiRowWithYears=true → shouldValidateAgainstForm=false → PREFLIGHT 1.5 da atlanır
+    expect(res.status).not.toBe(409)
+  })
+
+  // T8: Single-row, detectedYear=null, confirmDetectionMissing=false → upsert ÇAĞRILMADI
+  test('T8 — detectedYear null, confirm=false → 409, upsert ÇAĞRILMADI', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    expect(upsertMock).not.toHaveBeenCalled()
   })
 
 })

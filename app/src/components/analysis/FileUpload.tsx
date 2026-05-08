@@ -35,6 +35,11 @@ interface MismatchModal {
   message: string
 }
 
+interface DetectionMissingModal {
+  entryIdx: number
+  message:  string
+}
+
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i)
 
@@ -64,6 +69,7 @@ export function FileUpload({ entityId, onImported }: Props) {
   const [globalPeriod, setGlobalPeriod] = useState('ANNUAL')
   const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
   const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
+  const [detectionMissingModal, setDetectionMissingModal] = useState<DetectionMissingModal | null>(null)
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files)
@@ -86,7 +92,7 @@ export function FileUpload({ entityId, onImported }: Props) {
     setEntries(prev => prev.map((e, i) => i === idx ? { ...e, ...patch } : e))
   }
 
-  async function uploadOne(entry: FileEntry, idx: number, overwrite = false): Promise<boolean> {
+  async function uploadOne(entry: FileEntry, idx: number, overwrite = false, confirmDetectionMissing = false): Promise<boolean> {
     updateEntry(idx, { status: 'uploading' })
     try {
       const fd = new FormData()
@@ -94,9 +100,16 @@ export function FileUpload({ entityId, onImported }: Props) {
       fd.append('year', String(entry.year))
       fd.append('period', entry.period)
       if (overwrite) fd.append('overwrite', 'true')
+      if (confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
       const res = await fetch(`/api/entities/${entityId}/upload`, { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
+        // 409 — Parser yıl tespit edemedi → soft warning onay modalı
+        if (res.status === 409 && d.error === 'DETECTED_YEAR_MISSING_CONFIRM') {
+          setDetectionMissingModal({ entryIdx: idx, message: d.message ?? 'Dosyada yıl bulunamadı. Formda seçilen yıla kaydedilecek. Onaylıyor musunuz?' })
+          updateEntry(idx, { status: 'pending', error: undefined })
+          return false
+        }
         // 409 — Aynı kaynaktan veri var → onay modalı
         if (res.status === 409 && d.error === 'DUPLICATE_DATA') {
           setConflictModal({ entryIdx: idx, conflicts: d.conflicts ?? [] })
@@ -138,6 +151,16 @@ export function FileUpload({ entityId, onImported }: Props) {
     const entry = entries[entryIdx]
     if (!entry) return
     const ok = await uploadOne(entry, entryIdx, true)
+    if (ok) onImported()
+  }
+
+  async function onDetectionMissingConfirm() {
+    if (!detectionMissingModal) return
+    const { entryIdx } = detectionMissingModal
+    setDetectionMissingModal(null)
+    const entry = entries[entryIdx]
+    if (!entry) return
+    const ok = await uploadOne(entry, entryIdx, false, true)
     if (ok) onImported()
   }
 
@@ -192,6 +215,27 @@ export function FileUpload({ entityId, onImported }: Props) {
             <button type="button" onClick={() => setMismatchModal(null)}
               className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
               Dosyayı Değiştir
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 409 — DETECTED_YEAR_MISSING_CONFIRM: Soft warning onay modalı */}
+    {detectionMissingModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Yıl Bilgisi Bulunamadı</h3>
+          <p className="text-sm text-slate-600 mb-4">{detectionMissingModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setDetectionMissingModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              İptal
+            </button>
+            <button type="button" onClick={onDetectionMissingConfirm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: '#0B3C5D' }}>
+              Onayla
             </button>
           </div>
         </div>

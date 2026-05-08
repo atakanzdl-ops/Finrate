@@ -1,8 +1,9 @@
 /**
- * uploadValidation.ts — Upload veri bütünlüğü validation yardımcıları (Faz 7.3.50A)
+ * uploadValidation.ts — Upload veri bütünlüğü validation yardımcıları (Faz 7.3.50A / 7.3.50A.1)
  *
- * validateYearPeriodMatch: parser tespiti ile form değerini karşılaştır
- * checkDuplicates:         source bazlı duplicate kontrolü (MIXED merge koruması)
+ * validateYearPeriodMatch:  parser tespiti ile form değerini karşılaştır
+ * checkDuplicates:          source bazlı duplicate kontrolü (MIXED merge koruması)
+ * checkDetectionMissing:    parser yıl tespit edemediyse onay iste (soft warning)
  */
 
 import { UPLOAD_ERRORS } from '@/lib/i18n/uploadErrors'
@@ -109,4 +110,46 @@ export async function checkDuplicates(
   }
 
   return { conflicts }
+}
+
+// ─── DetectionMissingResult ───────────────────────────────────────────────────
+
+export interface DetectionMissingResult {
+  ok:        boolean
+  error?:    'DETECTED_YEAR_MISSING_CONFIRM'
+  detected?: { year: null; period?: string | null }
+  form?:     { year: number; period?: string | null }
+  message?:  string
+}
+
+/**
+ * Parser yıl tespit edemediyse (detectedYear null) ve form yılı varsa → onay iste.
+ *
+ * KURAL:
+ *   confirmed=true                        → ok: true (bypass)
+ *   detected.year == null && form.year    → ok: false, 409 soft warning
+ *   detected.year != null                 → ok: true (parser tespit etti, onay gerekmez)
+ *
+ * @param detected  Parser'ın tespit ettiği year/period (null ise tespit yok)
+ * @param form      Formdan gelen year/period
+ * @param confirmed confirmDetectionMissing=true ise bypass
+ */
+export function checkDetectionMissing(
+  detected:  { year?: number | null; period?: string | null },
+  form:      { year?: number | null; period?: string | null },
+  confirmed: boolean,
+): DetectionMissingResult {
+  if (confirmed) return { ok: true }
+
+  if (detected.year == null && form.year != null) {
+    return {
+      ok:       false,
+      error:    'DETECTED_YEAR_MISSING_CONFIRM',
+      message:  UPLOAD_ERRORS.DETECTED_YEAR_MISSING_CONFIRM(form.year),
+      detected: { year: null, period: detected.period ?? null },
+      form:     { year: form.year, period: form.period ?? null },
+    }
+  }
+
+  return { ok: true }
 }

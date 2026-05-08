@@ -149,6 +149,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
+    // PREFLIGHT 1.5 — DETECTED_YEAR_MISSING_CONFIRM (Faz 7.3.50A.1)
+    // Parser yıl tespit edemediyse (detectedYear null) + formYear var → onay iste
+    // confirm=true ise bypass → form yılıyla devam
+    const confirmDetectionMissing = formData.get('confirmDetectionMissing') === 'true'
+    if (!confirmDetectionMissing) {
+      for (const row of parsedRows) {
+        if (row.detectedYear == null && formYear) {
+          return jsonUtf8({
+            error:    'DETECTED_YEAR_MISSING_CONFIRM',
+            message:  UPLOAD_ERRORS.DETECTED_YEAR_MISSING_CONFIRM(formYear),
+            detected: { year: null, period: row.detectedPeriod ?? null },
+            form:     { year: formYear, period: formPeriod },
+          }, { status: 409 })
+        }
+      }
+    }
+
     // PREFLIGHT 2 — YEAR/PERIOD MISMATCH (multi-year Excel istisnasında atlanır)
     // Her ikisi de varsa ve farklıysa → 422. Parser null döndürdüyse form fallback → geçer.
     if (shouldValidateAgainstForm) {

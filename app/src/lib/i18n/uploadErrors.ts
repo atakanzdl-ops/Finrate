@@ -14,4 +14,7 @@ export const UPLOAD_ERRORS = {
 
   DUPLICATE_DATA: (count: number): string =>
     `${count} dönem için aynı kaynaktan veri zaten var. Üzerine yazmak ister misiniz?`,
+
+  DETECTED_YEAR_MISSING_CONFIRM: (formYear: number): string =>
+    `Dosyada yıl bilgisi bulunamadı. Formda seçtiğiniz ${formYear} yılına kaydedilecek. Onaylıyor musunuz?`,
 } as const
