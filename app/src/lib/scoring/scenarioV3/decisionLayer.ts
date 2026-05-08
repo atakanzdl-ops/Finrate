@@ -566,14 +566,15 @@ export function cleanCeiling(ceiling: CeilingConstraint): CeilingConstraint {
 // ─── BUILDER: CANONICAL OUTCOME ──────────────────────────────────────────────
 
 /**
- * Faz 7.3.47: Tek rating karar üreticisi. Yalnızca buildDecisionAnswer çağırır.
+ * Faz 7.3.47 Hotfix: isFeasible SADECE engine'den — packageReached secondary signal.
  *
- * Primary  : engine.finalTargetRating + targetPackageMeta.reachedTarget
- * Secondary: actualRatingValidation → authority/confidence kalibrasyonu
+ * Primary  : engine.finalTargetRating → isFeasible (semantic guardrail korunur)
+ * Secondary: packageReached (score.ts klasik) veya actualRatingValidation
+ *            → authority/confidence kalibrasyonu (isFeasible kararını değiştirmez)
  *
- * reachedTarget semantiği: selectTargetPackage'in gerçek score.ts hesabı ile
- * onayladığı "hedefe ulaşıldı" sinyali — engine pipeline'ının parçası,
- * dış doğrulama değil. engineFeasible=false olsa da isFeasible=true yapabilir.
+ * reachedTarget semantiği: selectTargetPackage'in gerçek score.ts hesabı.
+ * Semantic guardrail'i ezmez; authority kalibrasyonunda secondary sinyal olarak
+ * kullanılır. engine=false + packageReached=true → engine kazanır, MEDIUM.
  */
 function buildCanonicalOutcome(
   engineResult:           EngineResult,
@@ -581,10 +582,10 @@ function buildCanonicalOutcome(
   requestedTarget:        RatingGrade,
   reachedTarget?:         boolean,
 ): CanonicalOutcome {
-  // ── Primary: engine + package-level signal ──────────────────────────────────
+  // ── Primary: SADECE engine kararı — packageReached semantic guardrail'i ezmez ──
   const engineFeasible = ratingToIndex(engineResult.finalTargetRating) >= ratingToIndex(requestedTarget)
   const packageReached = reachedTarget === true
-  const isFeasible     = engineFeasible || packageReached
+  const isFeasible     = engineFeasible   // || packageReached kaldırıldı (Faz 7.3.47 Hotfix)
 
   // constraintReason: sadece feasible=false durumunda (jargon-free)
   const bindingCeiling = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
@@ -595,24 +596,30 @@ function buildCanonicalOutcome(
          : undefined))
     : undefined
 
-  // ── Secondary: validation → authority/confidence kalibrasyonu ───────────────
+  // ── Authority/confidence: secondary signal (validation tercihli, yoksa packageReached) ──
+  // Her iki kaynak uyumlu → consensus, HIGH
+  // Çelişki (engine ≠ secondary) → engine kazanır, MEDIUM
+  // Secondary yok → engine solo, engineResult.confidence
   const valAvail    = actualRatingValidation?.ledgerApplied === true
   const valFeasible = valAvail &&
     ratingToIndex(actualRatingValidation!.postActualRating as RatingGrade) >= ratingToIndex(requestedTarget)
 
+  const hasSecondary      = valAvail || reachedTarget !== undefined
+  const secondaryFeasible = valAvail ? valFeasible : packageReached
+
   let authority: CanonicalOutcome['authority']
   let confidence: CanonicalOutcome['confidence']
 
-  if (!valAvail) {
-    // Validation yok — engine tek kaynak
+  if (!hasSecondary) {
+    // Secondary sinyal yok — engine tek kaynak
     authority  = 'engine'
     confidence = engineResult.confidence ?? 'MEDIUM'
-  } else if (isFeasible === valFeasible) {
-    // Her iki kaynak uyumlu
+  } else if (engineFeasible === secondaryFeasible) {
+    // Her iki kaynak uyumlu → consensus, HIGH
     authority  = 'consensus'
     confidence = 'HIGH'
   } else {
-    // Çelişki — engine (+ package) kazanır
+    // Çelişki → engine kazanır, MEDIUM
     authority  = 'engine'
     confidence = 'MEDIUM'
   }

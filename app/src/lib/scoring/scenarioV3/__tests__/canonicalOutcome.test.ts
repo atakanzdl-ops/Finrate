@@ -10,7 +10,10 @@
  * T4: canonicalOutcome.isFeasible = executiveAnswer.targetMatchesRequest (3 sekme tutarlı)
  * T5: achievable='CCC' → oneNotchPlan ve twoNotchPlan isAchievable=false (smart kapı)
  * T6: achievable='BB', requested='BBB' → B planı TRUE (B≤BB), BB planı TRUE (BB≤BB)
- * T7: targetPackageMeta.reachedTarget=true → engine=false ama canonicalOutcome.isFeasible=true
+ * T7: engine=false + packageReached=true → engine kazanır, isFeasible=false (Faz 7.3.47 Hotfix)
+ * T8: ENES/DEKAM 2024 regresyon — engine=CCC + packageReached=true → engine kazanır
+ * T9: engine=false + packageReached=false → her iki kaynak uyumlu → consensus, HIGH
+ * T10: engine=true + packageReached=false → çelişki → engine, MEDIUM
  */
 
 import { buildDecisionAnswer } from '../decisionLayer'
@@ -78,7 +81,7 @@ function bda(er: EngineResult, requested: RatingGrade, validation?: ActualRating
   return buildDecisionAnswer(er, requested, null, undefined, undefined, validation ?? null)
 }
 
-/** buildDecisionAnswer wrapper — targetPackageContext ile (T7) */
+/** buildDecisionAnswer wrapper — targetPackageContext ile (T7-T10) */
 function bdaWithContext(
   er:       EngineResult,
   requested: RatingGrade,
@@ -264,14 +267,15 @@ describe('T6 — smart kapı: achievable=BB, requested=BBB → B ve BB planları
   })
 })
 
-// ─── T7: targetPackageMeta.reachedTarget=true → engine=false ama isFeasible=true
+// ─── T7: engine authority — packageReached diagnostic, engine kazanır ──────
 
-describe('T7 — reachedTarget override: engine=B (B<BB) ama paket onayı → isFeasible=true', () => {
+describe('T7 — engine authority: engine=B (B<BB), packageReached=true → engine kazanır, isFeasible=false', () => {
+  // Faz 7.3.47 Hotfix: isFeasible = engineFeasible (sadece).
   // engine: finalTargetRating=B < requestedTarget=BB → engineFeasible=false
   // targetPackageContext: currentActualRating='BB' >= requestedTarget='BB'
-  //   → selectTargetPackage'de currentIdx(BB=3) >= targetIdx(BB=3)
-  //   → AND decisionCurrentRating='BB' >= targetIdx → reachedTarget=true
-  // → packageReached=true → canonicalOutcome.isFeasible=true
+  //   → selectTargetPackage'de currentIdx(BB=5) >= targetIdx(BB=5) → reachedTarget=true
+  // → packageReached=true (secondary, çelişki) → authority='engine', MEDIUM
+  // → isFeasible = engineFeasible = false (semantic guardrail korunur)
   const er = makeER({ currentRating: 'B-', finalTargetRating: 'B', notchesGained: 1 })
   const ctx = {
     sector:                'İMALAT',
@@ -282,23 +286,144 @@ describe('T7 — reachedTarget override: engine=B (B<BB) ama paket onayı → is
     decisionCurrentRating: 'BB',
   }
 
-  test('targetPackageMeta.reachedTarget = true (score.ts: zaten BB seviyesinde)', () => {
+  test('targetPackageMeta.reachedTarget = true (score.ts: zaten BB seviyesinde — diagnostic korunur)', () => {
     const da = bdaWithContext(er, 'BB', ctx)
     expect(da.targetPackageMeta?.reachedTarget).toBe(true)
   })
 
-  test('canonicalOutcome.isFeasible = true (packageReached override)', () => {
+  test('canonicalOutcome.isFeasible = false (engine kazanır, semantic guardrail)', () => {
     const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.isFeasible).toBe(false)
+  })
+
+  test('canonicalOutcome.authority = engine (çelişki: engine=false, package=true)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.authority).toBe('engine')
+  })
+
+  test('canonicalOutcome.confidence = MEDIUM (çelişki)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.confidence).toBe('MEDIUM')
+  })
+
+  test('executiveAnswer.targetMatchesRequest = false (canonicalOutcome ile senkron)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.executiveAnswer.targetMatchesRequest).toBe(false)
+  })
+
+  test('targetFeasibilityExplanation "ulaşılamıyor" içerir (engine kararı)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.targetFeasibilityExplanation).toContain('ulaşılamıyor')
+  })
+})
+
+// ─── T8: ENES/DEKAM 2024 regresyon — engine=CCC + packageReached=true → engine kazanır
+
+describe('T8 — ENES/DEKAM 2024 regresyon: engine=CCC + packageReached=true → engine kazanır', () => {
+  // engine.finalTargetRating=CCC < requested=BB → engineFeasible=false
+  // ctx.currentActualRating='BB' >= 'BB' → selectTargetPackage: reachedTarget=true
+  // Semantic guardrail (ör. PRODUCTIVITY tavanı) CCC'de kilitliyor — engine kazanır
+  const er = makeER({ currentRating: 'CCC', finalTargetRating: 'CCC', notchesGained: 0 })
+  const ctx = {
+    sector:                'İMALAT',
+    subjectiveTotal:       0,
+    currentObjectiveScore: 50,
+    currentCombinedScore:  55,
+    currentActualRating:   'BB',
+    decisionCurrentRating: 'BB',
+  }
+
+  test('canonicalOutcome.isFeasible = false (engine kazanır)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.isFeasible).toBe(false)
+  })
+
+  test('canonicalOutcome.achievableRating = CCC (engine)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.achievableRating).toBe('CCC')
+  })
+
+  test('canonicalOutcome.authority = engine (semantic guardrail ezdirmiyor)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.authority).toBe('engine')
+  })
+
+  test('canonicalOutcome.confidence = MEDIUM (çelişki)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.canonicalOutcome.confidence).toBe('MEDIUM')
+  })
+
+  test('targetPackageMeta.reachedTarget = true (diagnostic — korunur)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.targetPackageMeta?.reachedTarget).toBe(true)
+  })
+
+  test('executiveAnswer.targetMatchesRequest = false (canonical ile senkron)', () => {
+    const da = bdaWithContext(er, 'BB', ctx)
+    expect(da.executiveAnswer.targetMatchesRequest).toBe(false)
+  })
+})
+
+// ─── T9: engine=false + packageReached=false → her ikisi de hayır → consensus, HIGH
+
+describe('T9 — iki kaynak da ulaşılamaz: engine=CCC + packageReached=false → consensus, HIGH', () => {
+  // ctx.currentActualRating='B' < requestedTarget='BB' → selectTargetPackage çalışır
+  // engine.portfolio=[] (boş) → NOT_REACHED → reachedTarget=false
+  // engineFeasible=false, secondaryFeasible=false → uyumlu → consensus, HIGH
+  const er = makeER({ currentRating: 'CCC', finalTargetRating: 'CCC', notchesGained: 0 })
+  const ctxNearMiss = {
+    sector:                'İMALAT',
+    subjectiveTotal:       0,
+    currentObjectiveScore: 20,
+    currentCombinedScore:  25,
+    currentActualRating:   'B',
+    decisionCurrentRating: 'B',
+  }
+
+  test('canonicalOutcome.isFeasible = false', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
+    expect(da.canonicalOutcome.isFeasible).toBe(false)
+  })
+
+  test('authority = consensus (her iki kaynak da ulaşılamıyor diyor)', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
+    expect(da.canonicalOutcome.authority).toBe('consensus')
+  })
+
+  test('confidence = HIGH', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
+    expect(da.canonicalOutcome.confidence).toBe('HIGH')
+  })
+})
+
+// ─── T10: engine=true + packageReached=false → çelişki → engine, MEDIUM ────
+
+describe('T10 — engine ulaşılabilir, package hayır: engine=BB + packageReached=false → engine, MEDIUM', () => {
+  // engine.finalTargetRating=BB >= requestedTarget=BB → engineFeasible=true
+  // ctx.currentActualRating='B' < 'BB', engine.portfolio=[] → reachedTarget=false
+  // engineFeasible=true, secondaryFeasible=false → çelişki → engine, MEDIUM
+  const er = makeER({ currentRating: 'CCC', finalTargetRating: 'BB', notchesGained: 1 })
+  const ctxNearMiss = {
+    sector:                'İMALAT',
+    subjectiveTotal:       0,
+    currentObjectiveScore: 20,
+    currentCombinedScore:  25,
+    currentActualRating:   'B',
+    decisionCurrentRating: 'B',
+  }
+
+  test('canonicalOutcome.isFeasible = true (engine kazanır)', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
     expect(da.canonicalOutcome.isFeasible).toBe(true)
   })
 
-  test('executiveAnswer.targetMatchesRequest = true (canonicalOutcome ile senkron)', () => {
-    const da = bdaWithContext(er, 'BB', ctx)
-    expect(da.executiveAnswer.targetMatchesRequest).toBe(true)
+  test('authority = engine (çelişki: engine=true, package=false)', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
+    expect(da.canonicalOutcome.authority).toBe('engine')
   })
 
-  test('targetFeasibilityExplanation "ulaşılamıyor" içermez (T4 ile tutarlı)', () => {
-    const da = bdaWithContext(er, 'BB', ctx)
-    expect(da.targetFeasibilityExplanation).not.toContain('ulaşılamıyor')
+  test('confidence = MEDIUM', () => {
+    const da = bdaWithContext(er, 'BB', ctxNearMiss)
+    expect(da.canonicalOutcome.confidence).toBe('MEDIUM')
   })
 })
