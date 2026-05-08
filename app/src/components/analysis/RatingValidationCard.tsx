@@ -14,6 +14,7 @@
 
 import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react'
 import type { ActualRatingValidation } from '@/lib/scoring/scenarioV3/postActionRating'
+import type { CanonicalOutcome } from '@/lib/scoring/scenarioV3/responseTypes'
 
 // ─── Yardımcı (test edilebilir export) ───────────────────────────────────────
 
@@ -40,12 +41,14 @@ export function showSubjectiveNote(subjectiveTotal: number): boolean {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  validation: ActualRatingValidation
+  validation:       ActualRatingValidation
+  /** Faz 7.3.47: Canonical outcome — otorite açıklaması için opsiyonel */
+  canonicalOutcome?: CanonicalOutcome
 }
 
 // ─── Bileşen ─────────────────────────────────────────────────────────────────
 
-export function RatingValidationCard({ validation: v }: Props) {
+export function RatingValidationCard({ validation: v, canonicalOutcome }: Props) {
   const kase = getValidationCase(v)
 
   // ── CASE 1: Yevmiye uygulanamadı ─────────────────────────────────────────
@@ -200,12 +203,15 @@ export function RatingValidationCard({ validation: v }: Props) {
             />
           </div>
 
-          {/* Blok C — Tutarsızlık uyarısı */}
+          {/* Blok C — Tutarsızlık notu (Faz 7.3.47: yumuşatıldı) */}
           <div className="mt-3 bg-amber-100 rounded-md p-3 flex gap-2">
             <Info className="text-amber-700 shrink-0 mt-0.5" size={14} />
             <p className="text-xs text-amber-800">
-              V3 tahmini ile gerçek skor hesabı arasında fark var.
-              Karar için gerçek skor hesabı esas alınmalıdır.
+              Motor değerlendirmesi: {canonicalOutcome?.achievableRating ?? v.v3EstimatedRating}.
+              Klasik skor doğrulaması: {v.postActualRating}.
+              {canonicalOutcome?.authority === 'engine'
+                ? ' Motor değerlendirmesi esas alınmıştır; klasik skor doğrulaması yardımcı kontroldür.'
+                : ''}
             </p>
           </div>
 

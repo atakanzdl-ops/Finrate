@@ -5,7 +5,7 @@ import type { EngineResult } from './engineV3'
 
 export type { RatingGrade } from './ratingReasoning'
 export type { ScoreCategory } from '../scoreImpactProfile'
-export type { DecisionAnswer } from './decisionLayer'
+export type { DecisionAnswer, CanonicalOutcome } from './decisionLayer'
 
 export interface ActionPreviewDto {
   actionId: string

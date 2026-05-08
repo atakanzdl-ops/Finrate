@@ -270,7 +270,8 @@ function OzetTab({ result }: { result: any }) {
 
       {/* A. EXECUTIVE HERO CARD — Faz 7.3.36: sadeleştirildi (tek mesaj, sıfır çelişki) */}
       {(() => {
-        const isReachable = (exec.targetMatchesRequest ?? exec.isTargetFeasible) === true
+        // Faz 7.3.47: canonicalOutcome tek kaynak (fallback: exec.targetMatchesRequest)
+        const isReachable = (da.canonicalOutcome?.isFeasible ?? exec.targetMatchesRequest ?? exec.isTargetFeasible) === true
         const current     = exec.currentRating as string | undefined
         const requested   = exec.requestedTarget as string | undefined
         const heroMsg     = buildHeroMessage(isReachable, current ?? '', requested ?? '')
@@ -469,10 +470,10 @@ function AksiyonPlaniTab({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actions: any[] = da.whatCompanyShouldDo ?? []
 
-  // Faz 7.3.37: aksiyon bağlamı için reachability
+  // Faz 7.3.47: canonicalOutcome tek kaynak (fallback: exec.targetMatchesRequest)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const _exec: any    = da.executiveAnswer ?? {}
-  const isReachable   = (_exec.targetMatchesRequest ?? _exec.isTargetFeasible) === true
+  const isReachable   = (da.canonicalOutcome?.isFeasible ?? _exec.targetMatchesRequest ?? _exec.isTargetFeasible) === true
 
   const toggleAction = (idx: number) => {
     const newSet = new Set(expanded)
@@ -923,7 +924,8 @@ function DetayTab({
             style={{ boxShadow: '0 1px 2px rgba(10,30,60,0.05)' }}
           >
             {renderTargetFeasibilitySection({
-              overrideReached: da.executiveAnswer?.targetMatchesRequest === true,
+              // Faz 7.3.47: canonicalOutcome tek kaynak
+              overrideReached: (da.canonicalOutcome?.isFeasible ?? da.executiveAnswer?.targetMatchesRequest) === true,
               hasConflict:     feasText.includes('ulaşılamıyor'),
               feasText,
               target:          da.executiveAnswer?.requestedTarget ?? '',

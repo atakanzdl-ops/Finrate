@@ -91,6 +91,25 @@ export interface ExecutiveAnswer {
   ceilingNote?: string
 }
 
+// ─── CANONICAL OUTCOME (Faz 7.3.47) ─────────────────────────────────────────
+
+/**
+ * Tek, tutarlı karar kaynağı. buildDecisionAnswer'da üretilir,
+ * 3 sekme (Özet / Aksiyon Planı / Detay) bu alandan okur.
+ *
+ * authority: 'engine'    → engine kararı (+ opsiyonel packageReached)
+ *            'consensus' → engine + validation uyumlu
+ *            'validation'→ gelecek rezervi (şu an üretilmiyor)
+ */
+export interface CanonicalOutcome {
+  requestedTarget:   string
+  achievableRating:  string
+  isFeasible:        boolean
+  authority:         'engine' | 'validation' | 'consensus'
+  constraintReason?: string
+  confidence:        'HIGH' | 'MEDIUM' | 'LOW'
+}
+
 // ─── ACTION PLAN ROW ─────────────────────────────────────────────────────────
 
 export type ActionHorizonLabel = 'Kısa Vade (0-6 ay)' | 'Orta Vade (6-18 ay)' | 'Uzun Vade (18-36 ay)'
@@ -278,6 +297,11 @@ export interface DecisionAnswer {
    * route.ts'te ?diagnostics=1 flag ile response'a eklenir. Üretimde gizlidir.
    */
   diagnostics?: DiagnosticsPayload
+  /**
+   * Faz 7.3.47: Tek tutarlı rating kararı — 3 sekme bu alandan okur.
+   * Üretim: buildDecisionAnswer içindeki buildCanonicalOutcome.
+   */
+  canonicalOutcome: CanonicalOutcome
 }
 
 // ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
@@ -539,6 +563,70 @@ export function cleanCeiling(ceiling: CeilingConstraint): CeilingConstraint {
   return { ...ceiling, reason }
 }
 
+// ─── BUILDER: CANONICAL OUTCOME ──────────────────────────────────────────────
+
+/**
+ * Faz 7.3.47: Tek rating karar üreticisi. Yalnızca buildDecisionAnswer çağırır.
+ *
+ * Primary  : engine.finalTargetRating + targetPackageMeta.reachedTarget
+ * Secondary: actualRatingValidation → authority/confidence kalibrasyonu
+ *
+ * reachedTarget semantiği: selectTargetPackage'in gerçek score.ts hesabı ile
+ * onayladığı "hedefe ulaşıldı" sinyali — engine pipeline'ının parçası,
+ * dış doğrulama değil. engineFeasible=false olsa da isFeasible=true yapabilir.
+ */
+function buildCanonicalOutcome(
+  engineResult:           EngineResult,
+  actualRatingValidation: ActualRatingValidation | null | undefined,
+  requestedTarget:        RatingGrade,
+  reachedTarget?:         boolean,
+): CanonicalOutcome {
+  // ── Primary: engine + package-level signal ──────────────────────────────────
+  const engineFeasible = ratingToIndex(engineResult.finalTargetRating) >= ratingToIndex(requestedTarget)
+  const packageReached = reachedTarget === true
+  const isFeasible     = engineFeasible || packageReached
+
+  // constraintReason: sadece feasible=false durumunda (jargon-free)
+  const bindingCeiling = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
+  const constraintReason = !isFeasible
+    ? (engineResult.feasibility?.reason ??
+       (bindingCeiling
+         ? `${ceilingTypeToDisplay(bindingCeiling.source)}: ${bindingCeiling.reason}`
+         : undefined))
+    : undefined
+
+  // ── Secondary: validation → authority/confidence kalibrasyonu ───────────────
+  const valAvail    = actualRatingValidation?.ledgerApplied === true
+  const valFeasible = valAvail &&
+    ratingToIndex(actualRatingValidation!.postActualRating as RatingGrade) >= ratingToIndex(requestedTarget)
+
+  let authority: CanonicalOutcome['authority']
+  let confidence: CanonicalOutcome['confidence']
+
+  if (!valAvail) {
+    // Validation yok — engine tek kaynak
+    authority  = 'engine'
+    confidence = engineResult.confidence ?? 'MEDIUM'
+  } else if (isFeasible === valFeasible) {
+    // Her iki kaynak uyumlu
+    authority  = 'consensus'
+    confidence = 'HIGH'
+  } else {
+    // Çelişki — engine (+ package) kazanır
+    authority  = 'engine'
+    confidence = 'MEDIUM'
+  }
+
+  return {
+    requestedTarget:  String(requestedTarget),
+    achievableRating: engineResult.finalTargetRating,
+    isFeasible,
+    authority,
+    constraintReason,
+    confidence,
+  }
+}
+
 // ─── BUILDER: EXECUTIVE ANSWER ───────────────────────────────────────────────
 
 export function buildExecutiveAnswer(
@@ -660,7 +748,7 @@ function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
 
 // ─── BUILDER: NOTCH PLANS ────────────────────────────────────────────────────
 
-function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
+function buildOneNotchPlan(engineResult: EngineResult, canonicalOutcome: CanonicalOutcome): NotchPlan {
   const scenario = engineResult.reasoning.oneNotchScenario as NotchScenario
   const currentIdx = ratingToIndex(engineResult.currentRating)
   const targetRating = (
@@ -679,6 +767,10 @@ function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
   const keyAction   = requiredActions[0]
   const template    = keyAction ? ACTION_CATALOG_V3[keyAction] : undefined
 
+  // Faz 7.3.47: smart kapı — plan hedefi canonicalOutcome.achievableRating'i aşamaz
+  const planAchievable = scenario.isAchievable &&
+    ratingToIndex(targetRating) <= ratingToIndex(canonicalOutcome.achievableRating as RatingGrade)
+
   return {
     targetNotches:       1,
     targetRating,
@@ -688,7 +780,7 @@ function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
     ),
     totalAmountTRY:       totalAmount,
     totalAmountFormatted: formatTRY(totalAmount),
-    isAchievable:         scenario.isAchievable,
+    isAchievable:         planAchievable,
     blockedBy:            scenario.blockedBy,
     keyAction:            template?.name,
     narrative:            scenario.narrative,
@@ -696,7 +788,7 @@ function buildOneNotchPlan(engineResult: EngineResult): NotchPlan {
   }
 }
 
-function buildTwoNotchPlan(engineResult: EngineResult): NotchPlan {
+function buildTwoNotchPlan(engineResult: EngineResult, canonicalOutcome: CanonicalOutcome): NotchPlan {
   const scenario = engineResult.reasoning.twoNotchScenario as NotchScenario
   const currentIdx = ratingToIndex(engineResult.currentRating)
   const targetIdx  = Math.min(currentIdx + 2, RATING_ORDER.length - 1)
@@ -710,6 +802,10 @@ function buildTwoNotchPlan(engineResult: EngineResult): NotchPlan {
   const keyAction   = requiredActions[0]
   const template    = keyAction ? ACTION_CATALOG_V3[keyAction] : undefined
 
+  // Faz 7.3.47: smart kapı — plan hedefi canonicalOutcome.achievableRating'i aşamaz
+  const planAchievable = scenario.isAchievable &&
+    ratingToIndex(targetRating) <= ratingToIndex(canonicalOutcome.achievableRating as RatingGrade)
+
   return {
     targetNotches:       2,
     targetRating,
@@ -719,7 +815,7 @@ function buildTwoNotchPlan(engineResult: EngineResult): NotchPlan {
     ),
     totalAmountTRY:       totalAmount,
     totalAmountFormatted: formatTRY(totalAmount),
-    isAchievable:         scenario.isAchievable,
+    isAchievable:         planAchievable,
     blockedBy:            scenario.blockedBy,
     keyAction:            template?.name,
     narrative:            scenario.narrative,
@@ -848,8 +944,9 @@ function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
 // ─── BUILDER: TARGET FEASIBILITY EXPLANATION ─────────────────────────────────
 
 function buildTargetFeasibilityExplanation(
-  engineResult: EngineResult,
-  requestedTarget: RatingGrade,
+  engineResult:     EngineResult,
+  requestedTarget:  RatingGrade,
+  canonicalOutcome: CanonicalOutcome,
 ): string {
   const {
     currentRating,
@@ -861,7 +958,8 @@ function buildTargetFeasibilityExplanation(
   } = engineResult
 
   const bindingCeiling = engineResult.reasoning.bindingCeiling as CeilingConstraint | null
-  const targetAchieved = ratingToIndex(finalTargetRating) >= ratingToIndex(requestedTarget)
+  // Faz 7.3.47: canonicalOutcome tek karar kaynağı — kendi hesabı yok
+  const targetAchieved = canonicalOutcome.isFeasible
 
   const parts: string[] = []
 
@@ -1413,19 +1511,27 @@ export function buildDecisionAnswer(
   // Bu sayede notch plans, missed opps, executive answer vb. tum engineResult'tan okur.
   const filteredEngineResult: EngineResult = { ...engineResult, portfolio: portfolioForUI }
 
-  const executiveAnswer              = buildExecutiveAnswer(engineResult, requestedTarget)
-  // Faz 7.3.35: postActualRating override kaldırıldı — engine kanonik kaynak.
-  // postActualRating diagnostic sigorta; SOURCE_MISMATCH banner asenkronlukta uyarır.
-  // reachedTarget engine kaynağı olduğundan override korunur.
-  if (targetPackageMeta?.reachedTarget) {
-    executiveAnswer.targetMatchesRequest = true
-  }
+  // Faz 7.3.47: canonical outcome ÖNCE üretilir — tüm alt builder'lar bu kaynaktan okur.
+  // reachedTarget engine pipeline kaynağı; override değil, tamamlayıcı sinyal.
+  const canonicalOutcome = buildCanonicalOutcome(
+    engineResult,
+    actualRatingValidation,
+    requestedTarget,
+    targetPackageMeta?.reachedTarget,
+  )
+
+  const executiveAnswer = buildExecutiveAnswer(engineResult, requestedTarget)
+  // Faz 7.3.47: exec patching — canonicalOutcome tek kaynak olduğundan
+  // eski reachedTarget override'ı kaldırıldı; ikisi artık tutarlı.
+  executiveAnswer.targetMatchesRequest = canonicalOutcome.isFeasible
+  executiveAnswer.achievableTarget     = canonicalOutcome.achievableRating as typeof executiveAnswer.achievableTarget
+
   const whatCompanyShouldDo          = buildActionPlan(filteredEngineResult)
-  const oneNotchPlan                 = buildOneNotchPlan(engineResult)
-  const twoNotchPlan                 = buildTwoNotchPlan(engineResult)
+  const oneNotchPlan                 = buildOneNotchPlan(engineResult, canonicalOutcome)
+  const twoNotchPlan                 = buildTwoNotchPlan(engineResult, canonicalOutcome)
   const accountingImpactTable        = buildAccountingImpactTable(filteredEngineResult)
   const whyCapitalAloneIsNotEnough   = buildWhyCapitalAloneNotEnough(engineResult)
-  const targetFeasibilityExplanation = buildTargetFeasibilityExplanation(engineResult, requestedTarget)
+  const targetFeasibilityExplanation = buildTargetFeasibilityExplanation(engineResult, requestedTarget, canonicalOutcome)
   const ifNotDoneRisk                = buildIfNotDoneRisk(engineResult)
   const uiReadyRows                  = buildUiReadyRows(filteredEngineResult)
   const rejectedInsights             = buildRejectedInsights(engineResult)
@@ -1491,5 +1597,6 @@ export function buildDecisionAnswer(
     enginePortfolioCount,
     rejectedInsightCount,
     diagnostics,
+    canonicalOutcome,
   }
 }
