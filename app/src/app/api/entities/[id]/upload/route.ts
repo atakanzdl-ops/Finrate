@@ -46,6 +46,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const file     = formData.get('file') as File | null
     if (!file) return jsonUtf8({ error: 'Dosya bulunamadı.' }, { status: 400 })
 
+    // Faz 7.3.49 A: Boyut limiti — arrayBuffer() ÖNCE kontrol et
+    const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10 MB
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return jsonUtf8(
+        { error: 'Dosya çok büyük. Maksimum 10 MB boyutunda dosya yükleyebilirsiniz.' },
+        { status: 413 },
+      )
+    }
+
     // Yıl / dönem override (form'dan gelen)
     const overrideYear   = formData.get('year')   ? Number(formData.get('year'))          : null
     const overridePeriod = formData.get('period')  ? String(formData.get('period'))        : null

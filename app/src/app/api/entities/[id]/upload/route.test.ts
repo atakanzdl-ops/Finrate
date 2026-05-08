@@ -103,9 +103,11 @@ function createMockRequest(opts: {
   fileName:   string
   year?:      number | null
   period?:    string | null
+  fileSize?:  number          // Faz 7.3.49 A: boyut limiti testi için
 }) {
   const file = {
     name:        opts.fileName,
+    size:        opts.fileSize ?? 0,
     arrayBuffer: jest.fn(() => Promise.resolve(Buffer.alloc(0))),
   }
   const formData = {
@@ -406,4 +408,55 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
     // cash (bilanço) Q+BEYANNAME'de yazılmamalı
     expect(createArg.cash == null).toBe(true)
   })
+})
+
+// ── Faz 7.3.49 A: Dosya boyutu limiti (T1-T3) ────────────────────────────────
+
+describe('POST /api/entities/[id]/upload — dosya boyutu limiti (Faz 7.3.49 A)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  test('T1 — 11 MB dosya → 413 Payload Too Large', async () => {
+    setupMocks({ userId: 'user-1' })
+    const req = createMockRequest({ fileName: 'buyuk.xlsx', fileSize: 11 * 1024 * 1024 })
+    const res = await callPost(req)
+    expect(res.status).toBe(413)
+    const body = await res.json()
+    expect(body.error).toMatch(/büyük|MB/i)
+  })
+
+  test('T2 — tam 10 MB (sınır değeri) → kabul edilir (413 değil)', async () => {
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'ANNUAL', fields: { revenue: 1_000_000 },
+        unmapped: [], docType: 'BEYANNAME', rawAccounts: [],
+        meta: { parseWarnings: [], reverseBalanceWarnings: [], path: null, confidence: null },
+      }],
+      isExcel: true,
+    })
+    // tam 10 MB: file.size > MAX_UPLOAD_BYTES → false → kabul
+    const req = createMockRequest({ fileName: 'sinir.xlsx', fileSize: 10 * 1024 * 1024 })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(413)
+  })
+
+  test('T3 — 9 MB dosya → 413 değil, işleme devam eder', async () => {
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'ANNUAL', fields: { revenue: 500_000 },
+        unmapped: [], docType: 'BEYANNAME', rawAccounts: [],
+        meta: { parseWarnings: [], reverseBalanceWarnings: [], path: null, confidence: null },
+      }],
+      isExcel: true,
+    })
+    const req = createMockRequest({ fileName: 'kucuk.xlsx', fileSize: 9 * 1024 * 1024 })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(413)
+  })
+
 })

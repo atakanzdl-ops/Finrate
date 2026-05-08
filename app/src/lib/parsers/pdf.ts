@@ -331,7 +331,7 @@ export function parseEkSection(section: string): { cari: Record<string, number>;
 
     const detected = detectEkSection(line)
     if (detected !== null) {
-      console.log('[ek] section=>', detected, '| line:', line.slice(0, 60))
+      if (process.env.NODE_ENV !== 'production') console.log('[ek] section=>', detected, '| line:', line.slice(0, 60))   // Faz 7.3.49 B: hassas log gate
       sec = detected
     }
 
@@ -343,10 +343,10 @@ export function parseEkSection(section: string): { cari: Record<string, number>;
 
     const field = matchBilField(label, sec)
     if (!field) {
-      console.log('[ek] NO MATCH sec=', sec, '| label:', label.slice(0, 60), '| nums:', nums)
+      if (process.env.NODE_ENV !== 'production') console.log('[ek] NO MATCH sec=', sec, '| label:', label.slice(0, 60), '| nums:', nums)   // Faz 7.3.49 B: hassas log gate
       continue
     }
-    console.log('[ek] MATCH field=', field, 'sec=', sec, '| nums:', nums)
+    if (process.env.NODE_ENV !== 'production') console.log('[ek] MATCH field=', field, 'sec=', sec, '| nums:', nums)   // Faz 7.3.49 B: hassas log gate
 
     // Gelir tablosu satırlarında 100 TL'den küçük değerler form artefaktı — yoksay
     const minAbs = sec === 'gelir' ? 100 : 0
@@ -1258,9 +1258,9 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     console.log('[pdf] kurumlar_yillik ekIdx=', ekIdx, 'year=', year)
     if (ekIdx !== -1) {
       const slice = text.slice(ekIdx, ekIdx + 20000)
-      console.log('[pdf] ek slice ilk 800 char:\n', slice.slice(0, 800))
+      if (process.env.NODE_ENV !== 'production') console.log('[pdf] ek slice ilk 800 char:\n', slice.slice(0, 800))   // Faz 7.3.49 B: hassas log gate
       const raw = parseEkSection(slice)
-      console.log('[pdf] raw.cari=', JSON.stringify(raw.cari))
+      if (process.env.NODE_ENV !== 'production') console.log('[pdf] raw.cari=', JSON.stringify(raw.cari))   // Faz 7.3.49 B: hassas log gate
       console.log('[pdf] raw.onceki keys=', Object.keys(raw.onceki))
       // raw.cari = her satırın SON sayısı = cari dönem (2 sütunluda sağ, tek sütunluda tek)
       return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME' }]

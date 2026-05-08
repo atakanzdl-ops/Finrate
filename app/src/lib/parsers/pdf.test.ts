@@ -231,3 +231,45 @@ describe('parseEkSection — Faz 7.3.24 matchBilField pattern fix', () => {
     expect(cari.profitReserves).toBeCloseTo(2_000_000, 0)
   })
 })
+
+// ── Faz 7.3.49 B: Hassas console.log gating (T4-T5) ──────────────────────────
+
+describe('pdf.ts hassas console.log gating (Faz 7.3.49 B)', () => {
+
+  test('T4 — NODE_ENV=production: [ek] logları yazılmaz', () => {
+    const spy  = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const prev = process.env.NODE_ENV
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.env as any).NODE_ENV = 'production'
+
+    // parseEkSection içindeki L334/L346/L349 gate edilmeli
+    parseEkSection('Dönen Varlıklar 1.000,00\nKısa Vadeli Yükümlülükler 500,00')
+
+    const ekLogs = spy.mock.calls.filter(c => typeof c[0] === 'string' && (c[0] as string).startsWith('[ek]'))
+    expect(ekLogs).toHaveLength(0)
+
+    spy.mockRestore()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.env as any).NODE_ENV = prev
+  })
+
+  test('T5 — NODE_ENV!=production: gate açık, [ek] log çağrılabilir', () => {
+    const spy  = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const prev = process.env.NODE_ENV
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.env as any).NODE_ENV = 'development'
+
+    parseEkSection('Dönen Varlıklar 1.000,00\nKısa Vadeli Yükümlülükler 500,00')
+
+    // Gate koşulu doğrulama: development !== production → gate geçer → log yazılabilir
+    expect(process.env.NODE_ENV !== 'production').toBe(true)
+    // Input section + field eşleştiğinden log çağrılmış olmalı
+    const ekLogs = spy.mock.calls.filter(c => typeof c[0] === 'string' && (c[0] as string).startsWith('[ek]'))
+    expect(ekLogs.length).toBeGreaterThan(0)
+
+    spy.mockRestore()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(process.env as any).NODE_ENV = prev
+  })
+
+})
