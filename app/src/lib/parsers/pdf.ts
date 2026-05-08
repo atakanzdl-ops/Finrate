@@ -684,7 +684,7 @@ function parseTdhpNum(s: string): number | null {
  * Tek sayı varsa onu döndür (zaten cari dönem).
  * Virgülsüz sayılar (satır numaraları "1.", "2.") yakalanmaz.
  */
-function cariDonemNum(line: string): number | null {
+function cariDonemNum(line: string, pickFirst = false): number | null {
   // Önce: virgüllü TR formatı (katı) — 1.234.567,89 veya 0,00
   // Satır numarası "1." atlanır (nokta grubu + virgül zorunlu)
   let m = line.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
@@ -692,7 +692,8 @@ function cariDonemNum(line: string): number | null {
   // parseTdhpNum dots-stripped → doğru parse; sadece katı format null döndürdüğünde devreye girer
   if (!m || m.length === 0) m = line.match(/\d{1,3}(?:\.\d{3})+/g)
   if (!m || m.length === 0) return null
-  const val = m.length >= 2 ? m[1] : m[0]   // index 1 = cari dönem
+  // pickFirst=true: gelir_yillik (1001A) formunda sol kolon = cari dönem (Faz 7.3.46)
+  const val = m.length >= 2 ? (pickFirst ? m[0] : m[1]) : m[0]
   return parseTdhpNum(val)
 }
 
@@ -1030,9 +1031,12 @@ function matchTdhpCode(labelNorm: string, sub: TdhpSubSection | null): string | 
  * - Code deduplikasyon: ilk eşleşen kazanır
  */
 export function extractTdhpRawAccountsFromText(
-  text: string
+  text: string,
+  formType?: string
 ): Array<{ code: string; amount: number }> {
   const resultMap = new Map<string, number>()
+  // 1001A (gelir_yillik) formunda kolon sırası KVB'den TERS: sol = cari dönem (Faz 7.3.46)
+  const pickFirst = formType === 'gelir_yillik'
 
   const ctx: TdhpContext = { main: null, sub: null }
   let isDuranVarlik = false  // Duran varlık bölümündeyiz mi?
@@ -1075,7 +1079,7 @@ export function extractTdhpRawAccountsFromText(
     }
 
     // ── Sayı var mı? ─────────────────────────────────────────────────────────
-    const amount = cariDonemNum(line)
+    const amount = cariDonemNum(line, pickFirst)
 
     // Alt bölüm tespiti: sayısı olmayan satırlar OR sayı var ama önce sub-section dene
     if (amount === null || amount === 0) {
@@ -1191,13 +1195,14 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     throw e
   }
 
-  // TDHP ayrıntılı bilanço/gelir tablosu ham hesap kodlarını çıkar
-  const tdhpRawAccounts = extractTdhpRawAccountsFromText(text)
-
-  // 1) PDF Mizan
+  // 1) PDF Mizan — TDHP parser'dan önce
   if (detectPdfMizan(text)) return parsePdfMizan(text)
 
+  // detectType önce: gelir_yillik formunda TDHP sol kolon (cari dönem) seçimi için (Faz 7.3.46)
   const type = detectType(text)
+
+  // TDHP ayrıntılı bilanço/gelir tablosu ham hesap kodlarını çıkar
+  const tdhpRawAccounts = extractTdhpRawAccountsFromText(text, type)
   const { year, period } = extractYearPeriod(text)
   // year null ise upload route'daki overrideYear devreye girer — erken çıkma yok
   if (!year && type === 'unknown') return []

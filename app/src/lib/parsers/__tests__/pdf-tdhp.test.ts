@@ -404,4 +404,63 @@ describe('extractTdhpRawAccountsFromText', () => {
       expect(result.find(r => r.code === '102')).toBeDefined()
     })
   })
+
+  // ─── T1-T5: gelir_yillik kolon seçimi + regresyon (Faz 7.3.46) ──────────────
+  //
+  // 1001A (Gelir Vergisi) formunda TDHP sütun sırası KVB'den TERS:
+  //   Sol (birinci) = cari dönem, Sağ (ikinci) = önceki dönem
+  // KVB'de: Sol = önceki, Sağ = cari
+  //
+  // Mini TDHP metin: "I- DÖNEN VARLIKLAR" + "A- Hazır Değerler" + "Kasa <sol> <sağ>"
+  //   sol=500.000,00 (cari), sağ=100.000,00 (önceki)
+  // Kod 100 (Kasa): gelir_yillik → 500000, kurumlar_yillik → 100000
+
+  describe('T1-T3: gelir_yillik formType → sol kolon (cari dönem) seçilir', () => {
+    const MINI_TEXT = [
+      'I- DÖNEN VARLIKLAR',
+      'A- Hazır Değerler',
+      'Kasa                   500.000,00    100.000,00',
+    ].join('\n')
+
+    it('T1: formType=gelir_yillik → Kasa sol kolon (500.000) = cari dönem', () => {
+      const result = extractTdhpRawAccountsFromText(MINI_TEXT, 'gelir_yillik')
+      const kasa = result.find(r => r.code === '100')
+      expect(kasa).toBeDefined()
+      expect(kasa!.amount).toBeCloseTo(500000, -1)
+    })
+
+    it('T2: formType yok (KVB davranışı) → Kasa sağ kolon (100.000) = cari dönem', () => {
+      const result = extractTdhpRawAccountsFromText(MINI_TEXT)
+      const kasa = result.find(r => r.code === '100')
+      expect(kasa).toBeDefined()
+      expect(kasa!.amount).toBeCloseTo(100000, -1)
+    })
+
+    it('T3: gelir_yillik + MINI_TEXT → en az 1 hesap kodu üretilir (boş kalmaz)', () => {
+      const result = extractTdhpRawAccountsFromText(MINI_TEXT, 'gelir_yillik')
+      expect(result.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('T4-T5: DEKAM regresyon — formType eklenmeden eski davranış korunur (Faz 7.3.46)', () => {
+    it('T4: DEKAM 2023 → formType olmadan beklenen kodlar hâlâ üretilir', () => {
+      const fx = asFixture(dekam2023)
+      const result = extractTdhpRawAccountsFromText(fx.rawText)
+      expect(result.length).toBeGreaterThan(0)
+      const resultMap = new Map(result.map(r => [r.code, r.amount]))
+      for (const exp of fx.expectedAccounts) {
+        expect(resultMap.has(exp.code)).toBe(true)
+      }
+    })
+
+    it('T5: DEKAM 2022 → formType olmadan beklenen kodlar hâlâ üretilir', () => {
+      const fx = asFixture(dekam2022)
+      const result = extractTdhpRawAccountsFromText(fx.rawText)
+      expect(result.length).toBeGreaterThan(0)
+      const resultMap = new Map(result.map(r => [r.code, r.amount]))
+      for (const exp of fx.expectedAccounts) {
+        expect(resultMap.has(exp.code)).toBe(true)
+      }
+    })
+  })
 })
