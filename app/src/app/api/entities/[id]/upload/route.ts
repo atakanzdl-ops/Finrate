@@ -6,6 +6,8 @@ import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
+import { checkDuplicates }         from '@/lib/validation/uploadValidation'
+import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
 
 // ─── Alan grupları: hangi docType hangi alanları yazabilir (Faz 7.3.16) ────────
 const BALANCE_SHEET_FIELDS = new Set([
@@ -56,8 +58,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Yıl / dönem override (form'dan gelen)
-    const overrideYear   = formData.get('year')   ? Number(formData.get('year'))          : null
-    const overridePeriod = formData.get('period')  ? String(formData.get('period'))        : null
+    const formYear   = formData.get('year')   ? Number(formData.get('year'))  : null
+    const formPeriod = formData.get('period') ? String(formData.get('period')) : null
 
     const fileName = file.name.toLowerCase()
     const isExcel  = fileName.endsWith('.xlsx') || fileName.endsWith('.xls')
@@ -95,20 +97,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })),
     })
 
+    // Faz 7.3.50A: detectedYear/detectedPeriod'u override ÖNCE etiketle
+    parsedRows = parsedRows.map(row => ({
+      ...row,
+      detectedYear:   row.year   ?? null,
+      detectedPeriod: row.period ?? null,
+    }))
+
     // Yıl/dönem override mantığı:
     // - Birden fazla satır varsa ve her satırın zaten yılı tespit edildiyse (dikey Excel gibi)
     //   override UYGULANMAZ — her satır kendi yıl/dönemini korur.
     // - Tek satır veya yılsız satır varsa (PDF, yatay Excel) override uygulanır.
-    const multiRowWithYears = parsedRows.length > 1 && parsedRows.every(r => r.year != null)
+    const multiRowWithYears         = parsedRows.length > 1 && parsedRows.every(r => r.year != null)
+    const shouldValidateAgainstForm = !multiRowWithYears
 
-    // Override öncesi PDF'den tespit edilen yılları sakla (mismatch uyarısı için)
-    const detectedYears: (number | null)[] = parsedRows.map(r => r.year ?? null)
-
-    if (!multiRowWithYears && (overrideYear || overridePeriod)) {
+    if (!multiRowWithYears && (formYear || formPeriod)) {
       parsedRows = parsedRows.map(row => ({
         ...row,
-        year:   overrideYear   ?? row.year,
-        period: overridePeriod ?? row.period,
+        year:   formYear   ?? row.year,
+        period: formPeriod ?? row.period,
       }))
     }
 
@@ -127,6 +134,66 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           parseWarnings: ['Parser okunabilir Excel satırı üretemedi.'],
         },
       }, { status: 400 })
+    }
+
+    // ─── Faz 7.3.50A: PREFLIGHT validation ──────────────────────────────────────
+
+    // PREFLIGHT 1 — MISSING_YEAR_CONTEXT
+    // Boş satır filtresi sonrası hâlâ yılsız satır varsa (hem parser hem form null)
+    for (const row of parsedRows) {
+      if (!row.year) {
+        return jsonUtf8({
+          error:   'MISSING_YEAR_CONTEXT',
+          message: UPLOAD_ERRORS.MISSING_YEAR_CONTEXT,
+        }, { status: 400 })
+      }
+    }
+
+    // PREFLIGHT 2 — YEAR/PERIOD MISMATCH (multi-year Excel istisnasında atlanır)
+    // Her ikisi de varsa ve farklıysa → 422. Parser null döndürdüyse form fallback → geçer.
+    if (shouldValidateAgainstForm) {
+      for (const row of parsedRows) {
+        if (formYear && row.detectedYear && formYear !== row.detectedYear) {
+          return jsonUtf8({
+            error:    'YEAR_MISMATCH',
+            message:  UPLOAD_ERRORS.YEAR_MISMATCH(row.detectedYear as number, formYear),
+            detected: { year: row.detectedYear, period: row.detectedPeriod },
+            form:     { year: formYear, period: formPeriod },
+          }, { status: 422 })
+        }
+        if (formPeriod && row.detectedPeriod && formPeriod !== row.detectedPeriod) {
+          return jsonUtf8({
+            error:    'PERIOD_MISMATCH',
+            message:  UPLOAD_ERRORS.PERIOD_MISMATCH(row.detectedPeriod as string, formPeriod),
+            detected: { year: row.detectedYear, period: row.detectedPeriod },
+            form:     { year: formYear, period: formPeriod },
+          }, { status: 422 })
+        }
+      }
+    }
+
+    // PREFLIGHT 3 — DUPLICATE SOURCE CHECK
+    // existing.source === incomingSource → 409 (aynı kaynaktan üst üste)
+    // existing.source === 'MIXED'        → 409 (MIXED üzerine tek kaynak yazılmaz)
+    // farklı source VE MIXED değil       → conflict YOK → MIXED merge (L~356) devam eder
+    const overwriteConfirmed = formData.get('overwrite') === 'true'
+    const incomingSource     = isExcel ? 'EXCEL' : isCsv ? 'CSV' : 'PDF'
+    if (!overwriteConfirmed) {
+      const { conflicts } = await checkDuplicates(
+        prisma,
+        entityId,
+        parsedRows
+          .filter((row): row is typeof row & { year: number } => typeof row.year === 'number')
+          .map(row => ({ year: row.year, period: (row.period as string) ?? 'ANNUAL' })),
+        incomingSource as 'EXCEL' | 'CSV' | 'PDF',
+      )
+      if (conflicts.length > 0) {
+        return jsonUtf8({
+          error:    'DUPLICATE_DATA',
+          message:  UPLOAD_ERRORS.DUPLICATE_DATA(conflicts.length),
+          conflicts,
+        }, { status: 409 })
+      }
     }
 
     const results = []
@@ -157,7 +224,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     for (const [index, row] of parsedRows.entries()) {
       if (!row.year) continue
 
-      const source = isExcel ? 'EXCEL' : isCsv ? 'CSV' : 'PDF'
+      const source = incomingSource
       const period = (row.period as string) ?? 'ANNUAL'
       const docType = (row.docType ?? 'UNKNOWN') as string
 
@@ -576,20 +643,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         })
       }
 
-      // PDF'den okunan yıl ile form override'ı farklıysa mismatch bilgisi ekle
-      const detectedYear = detectedYears[index] ?? null
-      const yearMismatch = (overrideYear && detectedYear && detectedYear !== overrideYear)
-        ? { detected: detectedYear, saved: overrideYear }
-        : null
+      // Faz 7.3.50A: yearMismatch kaldırıldı — artık PREFLIGHT 2'de 422 bloklayıcı
       results.push({
         index,
-        year: row.year,
-        period: row.period,
-        rating: score.finalRating,
-        score: score.finalScore,
+        year:     row.year,
+        period:   row.period,
+        rating:   score.finalRating,
+        score:    score.finalScore,
         unmapped: row.unmapped,
-        meta: row.meta,
-        yearMismatch,
+        meta:     row.meta,
       })
     }
 

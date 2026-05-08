@@ -22,14 +22,16 @@ function makeAnalysis(id = ANALYSIS_ID) {
 }
 
 function setupMocks(opts: {
-  userId:       string | null
-  parsedRows?:  object[]
-  deleteMock?:  jest.Mock
-  createMock?:  jest.Mock
-  isExcel?:     boolean
+  userId:           string | null
+  parsedRows?:      object[]
+  deleteMock?:      jest.Mock
+  createMock?:      jest.Mock
+  isExcel?:         boolean
+  findUniqueMock?:  jest.Mock   // Faz 7.3.50A: existing record simülasyonu
 }) {
-  const deleteMock = opts.deleteMock ?? jest.fn(() => Promise.resolve({ count: 0 }))
-  const createMock = opts.createMock ?? jest.fn(() => Promise.resolve({ count: 1 }))
+  const deleteMock     = opts.deleteMock    ?? jest.fn(() => Promise.resolve({ count: 0 }))
+  const createMock     = opts.createMock    ?? jest.fn(() => Promise.resolve({ count: 1 }))
+  const findUniqueMock = opts.findUniqueMock ?? jest.fn(() => Promise.resolve(null))
 
   jest.doMock('next/server', () => ({
     NextResponse: { json: jest.fn((body: unknown, init?: { status?: number }) => ({ status: init?.status ?? 200, json: async () => body })) },
@@ -50,7 +52,7 @@ function setupMocks(opts: {
         findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })),
       },
       financialData: {
-        findUnique: jest.fn(() => Promise.resolve(null)),
+        findUnique: findUniqueMock,
         upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })),
         findFirst: jest.fn(() => Promise.resolve(null)),
       },
@@ -96,7 +98,7 @@ function setupMocks(opts: {
     parsePdfBuffer: jest.fn(() => Promise.resolve(parsedRows)),
   }))
 
-  return { deleteMock, createMock }
+  return { deleteMock, createMock, findUniqueMock }
 }
 
 function createMockRequest(opts: {
@@ -104,6 +106,7 @@ function createMockRequest(opts: {
   year?:      number | null
   period?:    string | null
   fileSize?:  number          // Faz 7.3.49 A: boyut limiti testi için
+  overwrite?: boolean         // Faz 7.3.50A: üzerine yaz onayı
 }) {
   const file = {
     name:        opts.fileName,
@@ -112,9 +115,10 @@ function createMockRequest(opts: {
   }
   const formData = {
     get: jest.fn((key: string) => {
-      if (key === 'file')   return file
-      if (key === 'year')   return opts.year   != null ? String(opts.year)  : null
-      if (key === 'period') return opts.period != null ? opts.period          : null
+      if (key === 'file')      return file
+      if (key === 'year')      return opts.year   != null ? String(opts.year)  : null
+      if (key === 'period')    return opts.period != null ? opts.period          : null
+      if (key === 'overwrite') return opts.overwrite === true ? 'true' : null
       return null
     }),
   }
@@ -457,6 +461,293 @@ describe('POST /api/entities/[id]/upload — dosya boyutu limiti (Faz 7.3.49 A)'
     const req = createMockRequest({ fileName: 'kucuk.xlsx', fileSize: 9 * 1024 * 1024 })
     const res = await callPost(req)
     expect(res.status).not.toBe(413)
+  })
+
+})
+
+// ─── Faz 7.3.50A: PREFLIGHT validation (T1-T16) ──────────────────────────────
+
+const PREFLIGHT_ROW = (year: number | null, period: string | null = null) => ({
+  year, period,
+  fields:      { revenue: 5_000_000 },
+  unmapped:    [],
+  docType:     'BEYANNAME',
+  rawAccounts: [],
+  meta:        { parseWarnings: [], reverseBalanceWarnings: [], path: null, confidence: null },
+})
+
+describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // T1: Year mismatch → 422
+  test('T1 — formYear ≠ detectedYear → 422 YEAR_MISMATCH', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2023, 'ANNUAL')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('YEAR_MISMATCH')
+  })
+
+  // T2: Period mismatch → 422
+  test('T2 — formPeriod ≠ detectedPeriod → 422 PERIOD_MISMATCH', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'Q1')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'Q3' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('PERIOD_MISMATCH')
+  })
+
+  // T3: Year + period farklı → YEAR_MISMATCH (year önce kontrol edilir)
+  test('T3 — year + period ikisi de farklı → 422 YEAR_MISMATCH (year önce)', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2023, 'Q1')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'Q3' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('YEAR_MISMATCH')
+  })
+
+  // T4: detectedYear null + form var → form fallback, başarılı
+  test('T4 — detectedYear null + formYear var → form yılı kullanılır, 200', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    expect(res.status).not.toBe(400)
+  })
+
+  // T5: detectedYear var + form null → parser yılı kullanılır, başarılı
+  test('T5 — detectedYear var + formYear null → parser yılı kullanılır, 200', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: null, period: null })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    expect(res.status).not.toBe(400)
+  })
+
+  // T6: Hem parser hem form null → 400 MISSING_YEAR_CONTEXT
+  test('T6 — parser yıl yok + form yıl yok → 400 MISSING_YEAR_CONTEXT', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: null, period: null })
+    const res = await callPost(req)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('MISSING_YEAR_CONTEXT')
+  })
+
+  // T7 (KRİTİK): existing EXCEL + incoming PDF → conflict YOK, MIXED merge, upsert çağrıldı
+  test('T7 — existing EXCEL + incoming PDF → conflict YOK, upsert çağrıldı (MIXED merge korundu)', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    const findUniqueMock = jest.fn(() =>
+      Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }),
+    )
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: null, period: null })
+    const res = await callPost(req)
+    // 409 tetiklenmemeli (farklı source → no conflict)
+    expect(res.status).not.toBe(409)
+    // upsert çağrıldı (MIXED merge akışı devam etti)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // T8: existing EXCEL + incoming EXCEL → 409
+  test('T8 — existing EXCEL + incoming EXCEL → 409 DUPLICATE_DATA', async () => {
+    const findUniqueMock = jest.fn(() =>
+      Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }),
+    )
+    setupMocks({
+      userId:          'user-1',
+      parsedRows:      [PREFLIGHT_ROW(2024, 'ANNUAL')],
+      isExcel:         true,
+      findUniqueMock,
+    })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DUPLICATE_DATA')
+  })
+
+  // T9: existing MIXED + incoming PDF → 409
+  test('T9 — existing MIXED + incoming PDF → 409 DUPLICATE_DATA', async () => {
+    const findUniqueMock = jest.fn(() =>
+      Promise.resolve({ source: 'MIXED', updatedAt: new Date() }),
+    )
+    setupMocks({
+      userId:          'user-1',
+      parsedRows:      [PREFLIGHT_ROW(2024, 'ANNUAL')],
+      isExcel:         false,
+      findUniqueMock,
+    })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DUPLICATE_DATA')
+  })
+
+  // T10: overwrite=true → PREFLIGHT 3 atlanır, upsert çağrıldı
+  test('T10 — overwrite=true → 409 tetiklenmez, upsert çağrıldı', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    const findUniqueMock = jest.fn(() =>
+      Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }),
+    )
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: true })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', overwrite: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // T11 (KRİTİK): Boş satır filtresi — tüm-null fields → 400 "okunabilir veri yok"
+  test('T11 — tüm-null alanlar → boş satır filtresi devreye girer → 400 okunabilir veri yok', async () => {
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [{
+        year: 2024, period: 'ANNUAL',
+        fields: { revenue: null, cash: null },   // tüm null
+        unmapped: [], docType: 'BEYANNAME', rawAccounts: [],
+        meta: { parseWarnings: [], reverseBalanceWarnings: [], path: null, confidence: null },
+      }],
+      isExcel: false,
+    })
+    const req = createMockRequest({ fileName: 'bos.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    // Mevcut "okunabilir veri" mesajı — PREFLIGHT'tan önce tetiklenir
+    expect(body.error).toMatch(/okunabilir veri/i)
+  })
+
+  // T12 (KRİTİK): Multi-year Excel istisnası — MISMATCH tetiklenmez
+  test('T12 — parsedRows.length>1 + hepsinde year + formYear farklı → MISMATCH tetiklenmez', async () => {
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [
+        PREFLIGHT_ROW(2023, 'ANNUAL'),
+        PREFLIGHT_ROW(2024, 'ANNUAL'),
+      ],
+      isExcel: true,
+    })
+    // formYear=2025 ≠ 2023/2024 ama multiRowWithYears=true → shouldValidateAgainstForm=false
+    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+  })
+
+  // T13 (KRİTİK): PREFLIGHT regresyon — 3 yaz işlemi ASLA çağrılmadı
+  test('T13 — PREFLIGHT başarısız → financialData.upsert + analysis.upsert + $executeRaw ASLA çağrılmadı', async () => {
+    const upsertFDMock       = jest.fn()
+    const upsertAnalysisMock = jest.fn()
+    const executeRawMock     = jest.fn()
+
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2023, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertFDMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: upsertAnalysisMock },
+        financialAccount: { deleteMany: jest.fn(), createMany: jest.fn() },
+        $executeRaw:      executeRawMock,
+      },
+    }))
+
+    // formYear=2024 ≠ detectedYear=2023 → YEAR_MISMATCH → 422 → döngüye girilmez
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+
+    expect(res.status).toBe(422)
+    expect(upsertFDMock).not.toHaveBeenCalled()
+    expect(upsertAnalysisMock).not.toHaveBeenCalled()
+    expect(executeRawMock).not.toHaveBeenCalled()
+  })
+
+  // T14: Mevcut başarılı tek yıl akışı BOZULMADI
+  test('T14 — mevcut başarılı tek yıl akışı: upsert çağrıldı, 200', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    expect(res.status).not.toBe(400)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // T15: 422 response contract — { error, message, detected, form }
+  test('T15 — 422 response contract: { error, message, detected, form }', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2023, 'ANNUAL')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('YEAR_MISMATCH')
+    expect(typeof body.message).toBe('string')
+    expect(body.message.length).toBeGreaterThan(0)
+    expect(body.detected).toBeDefined()
+    expect(body.detected.year).toBe(2023)
+    expect(body.form).toBeDefined()
+    expect(body.form.year).toBe(2024)
+  })
+
+  // T16: 409 response contract — { error, message, conflicts: [...] }
+  test('T16 — 409 response contract: { error, message, conflicts: [{ year, period, existingSource, incomingSource, existingUploadDate }] }', async () => {
+    const uploadDate = new Date('2025-01-15')
+    const findUniqueMock = jest.fn(() =>
+      Promise.resolve({ source: 'EXCEL', updatedAt: uploadDate }),
+    )
+    setupMocks({
+      userId:          'user-1',
+      parsedRows:      [PREFLIGHT_ROW(2024, 'ANNUAL')],
+      isExcel:         true,
+      findUniqueMock,
+    })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DUPLICATE_DATA')
+    expect(typeof body.message).toBe('string')
+    expect(Array.isArray(body.conflicts)).toBe(true)
+    expect(body.conflicts.length).toBe(1)
+    const c = body.conflicts[0]
+    expect(c.year).toBe(2024)
+    expect(c.period).toBe('ANNUAL')
+    expect(c.existingSource).toBe('EXCEL')
+    expect(c.incomingSource).toBe('EXCEL')
+    expect(c.existingUploadDate).toBeDefined()
   })
 
 })

@@ -10,15 +10,29 @@ interface Props {
 }
 
 interface FileEntry {
-  file: File
-  year: number
-  period: string
-  status: 'pending' | 'uploading' | 'done' | 'error'
-  rating?: string
-  score?: number
-  error?: string
+  file:      File
+  year:      number
+  period:    string
+  status:    'pending' | 'uploading' | 'done' | 'error'
+  rating?:   string
+  score?:    number
+  error?:    string
   unmapped?: string[]
-  yearMismatch?: { detected: number; saved: number } | null
+}
+
+interface ConflictModal {
+  entryIdx:  number
+  conflicts: Array<{
+    year:               number
+    period:             string
+    existingSource:     string
+    incomingSource:     string
+    existingUploadDate: string
+  }>
+}
+
+interface MismatchModal {
+  message: string
 }
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -48,6 +62,8 @@ export function FileUpload({ entityId, onImported }: Props) {
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [globalYear, setGlobalYear] = useState(CURRENT_YEAR - 1)
   const [globalPeriod, setGlobalPeriod] = useState('ANNUAL')
+  const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
+  const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files)
@@ -70,32 +86,59 @@ export function FileUpload({ entityId, onImported }: Props) {
     setEntries(prev => prev.map((e, i) => i === idx ? { ...e, ...patch } : e))
   }
 
-  async function uploadOne(entry: FileEntry, idx: number): Promise<boolean> {
+  async function uploadOne(entry: FileEntry, idx: number, overwrite = false): Promise<boolean> {
     updateEntry(idx, { status: 'uploading' })
     try {
       const fd = new FormData()
       fd.append('file', entry.file)
       fd.append('year', String(entry.year))
       fd.append('period', entry.period)
+      if (overwrite) fd.append('overwrite', 'true')
       const res = await fetch(`/api/entities/${entityId}/upload`, { method: 'POST', body: fd })
-      const d = await res.json()
+      const d = await res.json().catch(() => ({}))
       if (!res.ok) {
+        // 409 — Aynı kaynaktan veri var → onay modalı
+        if (res.status === 409 && d.error === 'DUPLICATE_DATA') {
+          setConflictModal({ entryIdx: idx, conflicts: d.conflicts ?? [] })
+          updateEntry(idx, { status: 'pending', error: undefined })
+          return false
+        }
+        // 422 — Yıl/dönem uyuşmazlığı → bilgi modalı
+        if (res.status === 422 && (d.error === 'YEAR_MISMATCH' || d.error === 'PERIOD_MISMATCH')) {
+          setMismatchModal({ message: d.message ?? 'Dosya yılı/dönemi formda seçilenle uyuşmuyor.' })
+          updateEntry(idx, { status: 'error', error: d.message })
+          return false
+        }
+        // 400 MISSING_YEAR_CONTEXT
+        if (res.status === 400 && d.error === 'MISSING_YEAR_CONTEXT') {
+          updateEntry(idx, { status: 'error', error: d.message ?? 'Dosyada yıl bulunamadı.' })
+          return false
+        }
         updateEntry(idx, { status: 'error', error: d.error ?? 'Yükleme başarısız.' })
         return false
       }
       const first = d.results?.[0]
       updateEntry(idx, {
-        status: 'done',
-        rating: first?.rating,
-        score: first?.score,
+        status:   'done',
+        rating:   first?.rating,
+        score:    first?.score,
         unmapped: first?.unmapped ?? [],
-        yearMismatch: first?.yearMismatch ?? null,
       })
       return true
     } catch {
       updateEntry(idx, { status: 'error', error: 'Bağlantı hatası.' })
       return false
     }
+  }
+
+  async function onOverwriteConfirm() {
+    if (!conflictModal) return
+    const { entryIdx } = conflictModal
+    setConflictModal(null)
+    const entry = entries[entryIdx]
+    if (!entry) return
+    const ok = await uploadOne(entry, entryIdx, true)
+    if (ok) onImported()
   }
 
   async function uploadAll() {
@@ -114,6 +157,47 @@ export function FileUpload({ entityId, onImported }: Props) {
   const selectClass = 'px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-slate-400'
 
   return (
+    <>
+    {/* 409 — DUPLICATE_DATA: Üzerine yaz onay modalı */}
+    {conflictModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Veri Zaten Mevcut</h3>
+          <p className="text-sm text-slate-600 mb-4">
+            {conflictModal.conflicts.length} dönem için aynı kaynaktan veri zaten var.
+            Üzerine yazmak ister misiniz?
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setConflictModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              İptal
+            </button>
+            <button type="button" onClick={onOverwriteConfirm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: '#0B3C5D' }}>
+              Üzerine Yaz
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 422 — YEAR/PERIOD_MISMATCH: Bilgi modalı */}
+    {mismatchModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Yıl / Dönem Uyuşmazlığı</h3>
+          <p className="text-sm text-slate-600 mb-4">{mismatchModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setMismatchModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              Dosyayı Değiştir
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="space-y-3">
       {/* Dropzone */}
       <div
@@ -187,13 +271,7 @@ export function FileUpload({ entityId, onImported }: Props) {
                     <span className="text-slate-400 ml-1">({entry.score?.toFixed(1)})</span>
                   </p>
                 )}
-                {entry.status === 'done' && entry.yearMismatch && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                    <AlertCircle size={11} className="shrink-0" />
-                    PDF&apos;de tespit edilen yıl <strong>{entry.yearMismatch.detected}</strong>, ancak{' '}
-                    <strong>{entry.yearMismatch.saved}</strong> olarak kaydedildi. Yanlışsa kaydı silin ve doğru yılı seçin.
-                  </p>
-                )}
+                {/* yearMismatch amber uyarı kaldırıldı — Faz 7.3.50A: PREFLIGHT 2'de 422 bloklayıcı */}
                 {entry.status === 'error' && (
                   <p className="text-xs text-red-500">{entry.error}</p>
                 )}
@@ -252,5 +330,6 @@ export function FileUpload({ entityId, onImported }: Props) {
         </button>
       )}
     </div>
+    </>
   )
 }
