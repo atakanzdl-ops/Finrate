@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import {
   Building2, Filter, Download, Loader2,
   LayoutDashboard, BarChart3, Sliders, Star, TrendingUp,
-  ChevronDown, Info,
+  ChevronDown, Info, AlertTriangle,
 } from 'lucide-react'
 import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
@@ -41,6 +41,9 @@ interface Analysis {
   ratios: Record<string, number | null>
   entity?: { id: string; name: string; sector?: string | null }
   financialData?: FinData
+  hasBalanceAccounts?: boolean
+  hasIncomeAccounts?: boolean
+  missingQuarterlySourceWarning?: 'MIZAN_MISSING' | 'BEYANNAME_MISSING' | null
 }
 
 type TabId = 'overview' | 'ratios' | 'scenario' | 'subjective' | 'trend'
@@ -885,6 +888,19 @@ function AnalizPageContent() {
                 )}
               </div>
             </div>
+
+            {/* Eksik Veri Uyarısı (Faz 7.3.50A.10) — Q dönem tek kaynak */}
+            {selected?.missingQuarterlySourceWarning && (
+              <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 mb-4 flex items-start gap-3">
+                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                <div className="text-sm text-amber-900">
+                  <strong className="block mb-1">Eksik Veri Uyarısı</strong>
+                  {selected.missingQuarterlySourceWarning === 'BEYANNAME_MISSING'
+                    ? 'Bu Q dönem analizi için sadece bilanço (mizan) yüklenmiştir. Tam analiz için ilgili dönemin geçici KV beyannamesi PDF\'ini de yükleyin.'
+                    : 'Bu Q dönem analizi için sadece gelir tablosu (beyanname) yüklenmiştir. Tam analiz için ilgili dönemin mizan dosyasını da yükleyin.'}
+                </div>
+              </div>
+            )}
 
             {/* ── Tab Bar ───────────────────────── */}
             <div className="tab-group p-1">

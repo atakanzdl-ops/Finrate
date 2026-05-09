@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
+import {
+  detectMissingQuarterlySource,
+  hasBalanceAccounts,
+  hasIncomeAccounts,
+} from '@/lib/analysis/missingDataDetection'
 
 export async function GET(req: NextRequest) {
   const userId = getUserIdFromRequest(req)
@@ -23,6 +28,9 @@ export async function GET(req: NextRequest) {
       activityScore: true,
       ratios: true,
       entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
+      financialAccounts: {
+        select: { accountCode: true },
+      },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,
@@ -42,14 +50,22 @@ export async function GET(req: NextRequest) {
   })
 
   const analyses = raw.map((a: (typeof raw)[number]) => {
-    const parsedRatios = a.ratios ? JSON.parse(a.ratios as string) : null
+    const { financialAccounts, ...rest } = a
+
+    const parsedRatios = rest.ratios ? JSON.parse(rest.ratios as string) : null
     const overallCoverage: number | null = parsedRatios?.__overallCoverage ?? null
     const insufficientCategories: string[] = parsedRatios?.__insufficientCategories ?? []
+
+    const accountCodes = (financialAccounts ?? []).map(fa => fa.accountCode)
+
     return {
-      ...a,
+      ...rest,
       ratios: parsedRatios,
       overallCoverage,
       insufficientCategories,
+      hasBalanceAccounts:              hasBalanceAccounts(accountCodes),
+      hasIncomeAccounts:               hasIncomeAccounts(accountCodes),
+      missingQuarterlySourceWarning:   detectMissingQuarterlySource(a.period, accountCodes),
     }
   })
 
