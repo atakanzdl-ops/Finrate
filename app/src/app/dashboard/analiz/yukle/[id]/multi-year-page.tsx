@@ -34,6 +34,23 @@ type DetectionMissingModal = {
   message: string
 }
 
+type EntityHardModal = {
+  message: string
+}
+
+type EntitySoftModal = {
+  year:    number
+  error:   'ENTITY_TAX_UNVERIFIED_CONFIRM' | 'ENTITY_TC_UNVERIFIED_CONFIRM' | 'ENTITY_TITLE_MISMATCH_CONFIRM' | 'ENTITY_UNVERIFIED_CONFIRM'
+  message: string
+}
+
+// Upload options object — replaces positional boolean params
+interface UploadYearOptions {
+  overwrite?:               boolean
+  confirmDetectionMissing?: boolean
+  confirmEntityUnverified?: boolean
+}
+
 const PERIODS = [
   { value: 'ANNUAL', label: 'Kesin Beyan (Tam Yıl)' },
   { value: 'Q1', label: '1. Geçici Vergi (Oca-Mar)' },
@@ -61,6 +78,8 @@ export default function MultiYearUploadPage() {
   const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
   const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
   const [detectionMissingModal, setDetectionMissingModal] = useState<DetectionMissingModal | null>(null)
+  const [entityHardModal, setEntityHardModal] = useState<EntityHardModal | null>(null)
+  const [entitySoftModal, setEntitySoftModal] = useState<EntitySoftModal | null>(null)
 
   const hasAtLeastOneUploadedYear = YEARS.some((year) => uploads[year]?.uploaded)
 
@@ -72,7 +91,7 @@ export default function MultiYearUploadPage() {
     setYearUpload(year, { file, status: 'idle', error: undefined })
   }
 
-  const uploadYear = async (year: number, overwrite = false, confirmDetectionMissing = false) => {
+  const uploadYear = async (year: number, opts: UploadYearOptions = {}) => {
     const selectedFile = uploads[year]?.file
     if (!selectedFile) {
       setYearUpload(year, { error: 'Önce dosya seçin.', status: 'error' })
@@ -87,8 +106,9 @@ export default function MultiYearUploadPage() {
       fd.append('file', selectedFile)
       fd.append('year', String(year))
       fd.append('period', period)
-      if (overwrite) fd.append('overwrite', 'true')
-      if (confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
+      if (opts.overwrite)               fd.append('overwrite', 'true')
+      if (opts.confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
+      if (opts.confirmEntityUnverified) fd.append('confirmEntityUnverified', 'true')
 
       const res = await fetch(`/api/entities/${entityId}/upload`, {
         method: 'POST',
@@ -120,6 +140,26 @@ export default function MultiYearUploadPage() {
           setYearUpload(year, { status: 'error', error: data.message ?? 'Dosyada yıl bulunamadı.' })
           return
         }
+        // 422 — ENTITY_TAX_NUMBER_MISMATCH (HARD — bypass YOK)
+        if (res.status === 422 && data.error === 'ENTITY_TAX_NUMBER_MISMATCH') {
+          setEntityHardModal({ message: data.message ?? 'Dosya farklı bir firmaya ait.' })
+          setYearUpload(year, { status: 'error', error: data.message })
+          return
+        }
+        // 409 — ENTITY soft senaryolar (CASE 2-5)
+        if (
+          res.status === 409 &&
+          (
+            data.error === 'ENTITY_TAX_UNVERIFIED_CONFIRM' ||
+            data.error === 'ENTITY_TC_UNVERIFIED_CONFIRM'  ||
+            data.error === 'ENTITY_TITLE_MISMATCH_CONFIRM' ||
+            data.error === 'ENTITY_UNVERIFIED_CONFIRM'
+          )
+        ) {
+          setEntitySoftModal({ year, error: data.error, message: data.message ?? 'Firma kimliği doğrulanamadı. Devam etmek ister misiniz?' })
+          setYearUpload(year, { status: 'idle', error: undefined })
+          return
+        }
         setYearUpload(year, {
           status:   'error',
           uploaded: false,
@@ -138,14 +178,21 @@ export default function MultiYearUploadPage() {
     if (!conflictModal) return
     const year = conflictModal.year
     setConflictModal(null)
-    uploadYear(year, true)
+    uploadYear(year, { overwrite: true })
   }
 
   const onDetectionMissingConfirm = () => {
     if (!detectionMissingModal) return
     const year = detectionMissingModal.year
     setDetectionMissingModal(null)
-    uploadYear(year, false, true)
+    uploadYear(year, { confirmDetectionMissing: true })
+  }
+
+  const onEntityUnverifiedConfirm = () => {
+    if (!entitySoftModal) return
+    const year = entitySoftModal.year
+    setEntitySoftModal(null)
+    uploadYear(year, { confirmEntityUnverified: true })
   }
 
   const onAnalyze = async () => {
@@ -216,6 +263,43 @@ export default function MultiYearUploadPage() {
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
               style={{ background: '#0B3C5D' }}>
               Onayla
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 422 — ENTITY_TAX_NUMBER_MISMATCH: Hard hata — sadece kapat */}
+    {entityHardModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Firma Uyuşmazlığı</h3>
+          <p className="text-sm text-slate-600 mb-4">{entityHardModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setEntityHardModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              Kapat
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 409 — ENTITY soft senaryolar (CASE 2-5): Onay modalı */}
+    {entitySoftModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Firma Kimliği Doğrulanamadı</h3>
+          <p className="text-sm text-slate-600 mb-4">{entitySoftModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setEntitySoftModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              İptal
+            </button>
+            <button type="button" onClick={onEntityUnverifiedConfirm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: '#0B3C5D' }}>
+              Yine de Devam Et
             </button>
           </div>
         </div>

@@ -40,6 +40,23 @@ interface DetectionMissingModal {
   message:  string
 }
 
+interface EntityHardModal {
+  message: string
+}
+
+interface EntitySoftModal {
+  entryIdx: number
+  error:    'ENTITY_TAX_UNVERIFIED_CONFIRM' | 'ENTITY_TC_UNVERIFIED_CONFIRM' | 'ENTITY_TITLE_MISMATCH_CONFIRM' | 'ENTITY_UNVERIFIED_CONFIRM'
+  message:  string
+}
+
+// Upload options object — replaces positional boolean params
+interface UploadOneOptions {
+  overwrite?:               boolean
+  confirmDetectionMissing?: boolean
+  confirmEntityUnverified?: boolean
+}
+
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i)
 
@@ -70,6 +87,8 @@ export function FileUpload({ entityId, onImported }: Props) {
   const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
   const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
   const [detectionMissingModal, setDetectionMissingModal] = useState<DetectionMissingModal | null>(null)
+  const [entityHardModal, setEntityHardModal] = useState<EntityHardModal | null>(null)
+  const [entitySoftModal, setEntitySoftModal] = useState<EntitySoftModal | null>(null)
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files)
@@ -92,15 +111,16 @@ export function FileUpload({ entityId, onImported }: Props) {
     setEntries(prev => prev.map((e, i) => i === idx ? { ...e, ...patch } : e))
   }
 
-  async function uploadOne(entry: FileEntry, idx: number, overwrite = false, confirmDetectionMissing = false): Promise<boolean> {
+  async function uploadOne(entry: FileEntry, idx: number, opts: UploadOneOptions = {}): Promise<boolean> {
     updateEntry(idx, { status: 'uploading' })
     try {
       const fd = new FormData()
       fd.append('file', entry.file)
       fd.append('year', String(entry.year))
       fd.append('period', entry.period)
-      if (overwrite) fd.append('overwrite', 'true')
-      if (confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
+      if (opts.overwrite)               fd.append('overwrite', 'true')
+      if (opts.confirmDetectionMissing) fd.append('confirmDetectionMissing', 'true')
+      if (opts.confirmEntityUnverified) fd.append('confirmEntityUnverified', 'true')
       const res = await fetch(`/api/entities/${entityId}/upload`, { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -127,6 +147,26 @@ export function FileUpload({ entityId, onImported }: Props) {
           updateEntry(idx, { status: 'error', error: d.message ?? 'Dosyada yıl bulunamadı.' })
           return false
         }
+        // 422 — ENTITY_TAX_NUMBER_MISMATCH (HARD — bypass YOK)
+        if (res.status === 422 && d.error === 'ENTITY_TAX_NUMBER_MISMATCH') {
+          setEntityHardModal({ message: d.message ?? 'Dosya farklı bir firmaya ait.' })
+          updateEntry(idx, { status: 'error', error: d.message })
+          return false
+        }
+        // 409 — ENTITY soft senaryolar (CASE 2-5)
+        if (
+          res.status === 409 &&
+          (
+            d.error === 'ENTITY_TAX_UNVERIFIED_CONFIRM' ||
+            d.error === 'ENTITY_TC_UNVERIFIED_CONFIRM'  ||
+            d.error === 'ENTITY_TITLE_MISMATCH_CONFIRM' ||
+            d.error === 'ENTITY_UNVERIFIED_CONFIRM'
+          )
+        ) {
+          setEntitySoftModal({ entryIdx: idx, error: d.error, message: d.message ?? 'Firma kimliği doğrulanamadı. Devam etmek ister misiniz?' })
+          updateEntry(idx, { status: 'pending', error: undefined })
+          return false
+        }
         updateEntry(idx, { status: 'error', error: d.error ?? 'Yükleme başarısız.' })
         return false
       }
@@ -150,7 +190,7 @@ export function FileUpload({ entityId, onImported }: Props) {
     setConflictModal(null)
     const entry = entries[entryIdx]
     if (!entry) return
-    const ok = await uploadOne(entry, entryIdx, true)
+    const ok = await uploadOne(entry, entryIdx, { overwrite: true })
     if (ok) onImported()
   }
 
@@ -160,7 +200,17 @@ export function FileUpload({ entityId, onImported }: Props) {
     setDetectionMissingModal(null)
     const entry = entries[entryIdx]
     if (!entry) return
-    const ok = await uploadOne(entry, entryIdx, false, true)
+    const ok = await uploadOne(entry, entryIdx, { confirmDetectionMissing: true })
+    if (ok) onImported()
+  }
+
+  async function onEntityUnverifiedConfirm() {
+    if (!entitySoftModal) return
+    const { entryIdx } = entitySoftModal
+    setEntitySoftModal(null)
+    const entry = entries[entryIdx]
+    if (!entry) return
+    const ok = await uploadOne(entry, entryIdx, { confirmEntityUnverified: true })
     if (ok) onImported()
   }
 
@@ -236,6 +286,43 @@ export function FileUpload({ entityId, onImported }: Props) {
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
               style={{ background: '#0B3C5D' }}>
               Onayla
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 422 — ENTITY_TAX_NUMBER_MISMATCH: Hard hata — sadece kapat */}
+    {entityHardModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Firma Uyuşmazlığı</h3>
+          <p className="text-sm text-slate-600 mb-4">{entityHardModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setEntityHardModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              Kapat
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 409 — ENTITY soft senaryolar (CASE 2-5): Onay modalı */}
+    {entitySoftModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <h3 className="text-base font-bold text-[#0B3C5D] mb-2">Firma Kimliği Doğrulanamadı</h3>
+          <p className="text-sm text-slate-600 mb-4">{entitySoftModal.message}</p>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setEntitySoftModal(null)}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+              İptal
+            </button>
+            <button type="button" onClick={onEntityUnverifiedConfirm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: '#0B3C5D' }}>
+              Yine de Devam Et
             </button>
           </div>
         </div>

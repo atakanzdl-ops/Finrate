@@ -49,7 +49,7 @@ function setupMocks(opts: {
   jest.doMock('@/lib/db', () => ({
     prisma: {
       entity: {
-        findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })),
+        findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })),
       },
       financialData: {
         findUnique: findUniqueMock,
@@ -108,6 +108,7 @@ function createMockRequest(opts: {
   fileSize?:                 number          // Faz 7.3.49 A: boyut limiti testi için
   overwrite?:                boolean         // Faz 7.3.50A: üzerine yaz onayı
   confirmDetectionMissing?:  boolean         // Faz 7.3.50A.1: soft warning onayı
+  confirmEntityUnverified?:  boolean         // Faz 7.3.50A.3: firma kimlik bypass
 }) {
   const file = {
     name:        opts.fileName,
@@ -121,6 +122,7 @@ function createMockRequest(opts: {
       if (key === 'period')                   return opts.period != null ? opts.period          : null
       if (key === 'overwrite')                return opts.overwrite === true ? 'true' : null
       if (key === 'confirmDetectionMissing')  return opts.confirmDetectionMissing === true ? 'true' : null
+      if (key === 'confirmEntityUnverified')  return opts.confirmEntityUnverified === true ? 'true' : null
       return null
     }),
   }
@@ -163,7 +165,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: true,
     })
 
-    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     // deleteMany: OR ile 1-5xx prefix olmalı (6 silinmez)
@@ -203,7 +205,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: false,
     })
 
-    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     // deleteMany: sadece startsWith '6'
@@ -238,7 +240,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: false,
     })
 
-    const req = createMockRequest({ fileName: 'kvb.pdf', year: 2024, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'kvb.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     await callPost(req)
 
     // deleteMany: analiz tüm kayıtları silinmeli (OR veya startsWith yok)
@@ -271,7 +273,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: false,
     })
 
-    const req = createMockRequest({ fileName: 'bilinmeyen.pdf', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'bilinmeyen.pdf', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     expect(deleteMock).not.toHaveBeenCalled()
@@ -293,7 +295,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: true,
     })
 
-    const req = createMockRequest({ fileName: 'mizan2.xlsx', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'mizan2.xlsx', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     // deleteMany çağrıldı, createMany skipDuplicates:true ile çağrıldı
@@ -317,7 +319,7 @@ describe('POST /api/entities/[id]/upload — FinancialAccount merge mantığı',
       isExcel: false,
     })
 
-    const req = createMockRequest({ fileName: 'bilinmeyen2.pdf', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'bilinmeyen2.pdf', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     // undefined docType → ?? 'UNKNOWN' → deleteMany ve createMany çağrılmaz
@@ -359,7 +361,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
     // upsert mock'u override et
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
@@ -367,7 +369,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
       },
     }))
 
-    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     expect(upsertMock).toHaveBeenCalled()
@@ -396,7 +398,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
     })
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
@@ -404,7 +406,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
       },
     }))
 
-    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'Q3' })
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'Q3', confirmEntityUnverified: true })
     await callPost(req)
 
     expect(upsertMock).toHaveBeenCalled()
@@ -445,7 +447,7 @@ describe('POST /api/entities/[id]/upload — dosya boyutu limiti (Faz 7.3.49 A)'
       isExcel: true,
     })
     // tam 10 MB: file.size > MAX_UPLOAD_BYTES → false → kabul
-    const req = createMockRequest({ fileName: 'sinir.xlsx', fileSize: 10 * 1024 * 1024 })
+    const req = createMockRequest({ fileName: 'sinir.xlsx', fileSize: 10 * 1024 * 1024, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(413)
   })
@@ -460,7 +462,7 @@ describe('POST /api/entities/[id]/upload — dosya boyutu limiti (Faz 7.3.49 A)'
       }],
       isExcel: true,
     })
-    const req = createMockRequest({ fileName: 'kucuk.xlsx', fileSize: 9 * 1024 * 1024 })
+    const req = createMockRequest({ fileName: 'kucuk.xlsx', fileSize: 9 * 1024 * 1024, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(413)
   })
@@ -528,7 +530,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
   // T4b: detectedYear null + form var + confirmDetectionMissing=true → form yılı kullanılır, 200
   test('T4b — detectedYear null + formYear var + confirmDetectionMissing=true → 200 (Faz 7.3.50A.1)', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
-    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(409)
     expect(res.status).not.toBe(422)
@@ -538,7 +540,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
   // T5: detectedYear var + form null → parser yılı kullanılır, başarılı
   test('T5 — detectedYear var + formYear null → parser yılı kullanılır, 200', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
-    const req = createMockRequest({ fileName: 'b.pdf', year: null, period: null })
+    const req = createMockRequest({ fileName: 'b.pdf', year: null, period: null, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(422)
     expect(res.status).not.toBe(400)
@@ -563,14 +565,14 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
-    const req = createMockRequest({ fileName: 'beyanname.pdf', year: null, period: null })
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: null, period: null, confirmEntityUnverified: true })
     const res = await callPost(req)
     // 409 tetiklenmemeli (farklı source → no conflict)
     expect(res.status).not.toBe(409)
@@ -589,7 +591,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       isExcel:         true,
       findUniqueMock,
     })
-    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).toBe(409)
     const body = await res.json()
@@ -607,7 +609,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       isExcel:         false,
       findUniqueMock,
     })
-    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).toBe(409)
     const body = await res.json()
@@ -623,14 +625,14 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: true })
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
-    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', overwrite: true })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', overwrite: true, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(409)
     expect(upsertMock).toHaveBeenCalled()
@@ -667,7 +669,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       isExcel: true,
     })
     // formYear=2025 ≠ 2023/2024 ama multiRowWithYears=true → shouldValidateAgainstForm=false
-    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(422)
   })
@@ -705,14 +707,14 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
-    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'beyanname.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(422)
     expect(res.status).not.toBe(400)
@@ -747,7 +749,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       isExcel:         true,
       findUniqueMock,
     })
-    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).toBe(409)
     const body = await res.json()
@@ -796,14 +798,14 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
     jest.doMock('@/lib/db', () => ({
       prisma: {
-        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
         financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
-    const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true })
+    const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL', confirmDetectionMissing: true, confirmEntityUnverified: true })
     const res = await callPost(req)
     expect(res.status).not.toBe(409)
     expect(upsertMock).toHaveBeenCalled()
@@ -832,7 +834,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
       ],
       isExcel: true,
     })
-    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL' })
+    const req = createMockRequest({ fileName: 'multi.xlsx', year: 2025, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
     // multiRowWithYears=true → shouldValidateAgainstForm=false → PREFLIGHT 1.5 da atlanır
     expect(res.status).not.toBe(409)
@@ -852,6 +854,264 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
       },
     }))
     const req = createMockRequest({ fileName: 'dosya.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+
+})
+
+// ─── Faz 7.3.50A.3: PREFLIGHT 4 — Entity Identity (T7-T19) ──────────────────
+
+/**
+ * Kimlik satırı: PREFLIGHT_ROW + identity.
+ * parsedRows[0].identity → checkEntityIdentity tarafından kullanılır.
+ */
+function IDENTITY_ROW(identity: Record<string, unknown>) {
+  return {
+    ...PREFLIGHT_ROW(2024, 'ANNUAL'),
+    identity,
+  }
+}
+
+/** Entity mock'u ile birlikte route.ts'teki entity fetch'i override eder.
+ *  identity: parsedRows[0].identity değeri — belirtilmezse LOW kullanılır */
+function setupWithEntity(entityOverride: Record<string, unknown>, identity?: Record<string, unknown>) {
+  const id = identity ?? { sourceConfidence: 'LOW' as const }
+  setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW(id)], isExcel: false })
+  jest.doMock('@/lib/db', () => ({
+    prisma: {
+      entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', ...entityOverride })) },
+      financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)) },
+      analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+      financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+      $executeRaw:      jest.fn(() => Promise.resolve(1)),
+    },
+  }))
+}
+
+describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.3.50A.3)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // ── T7 HARD: VKN mismatch → 422 ────────────────────────────────────────────
+  test('T7 — VKN mismatch → 422 ENTITY_TAX_NUMBER_MISMATCH', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+  })
+
+  // ── T7a ÖNCELİK 0: VKN match → soft kontroller atlanır, ok ─────────────────
+  test('T7a — VKN match (priority 0) → ok, entity accepted even if confidence=LOW', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'HIGH' })], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: '1234567890' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    // VKN eşleşti → PREFLIGHT 4 ok → PREFLIGHT 3 (no duplicate) → upsert
+    expect(res.status).not.toBe(409)
+    expect(res.status).not.toBe(422)
+  })
+
+  // ── T8 SOFT: VKN var + entity VKN yok → 409 ENTITY_TAX_UNVERIFIED_CONFIRM ──
+  test('T8 — VKN detected + entity.taxNumber null → 409 ENTITY_TAX_UNVERIFIED_CONFIRM', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: null }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TAX_UNVERIFIED_CONFIRM')
+  })
+
+  // ── T9 SOFT: TC var → 409 ENTITY_TC_UNVERIFIED_CONFIRM ─────────────────────
+  test('T9 — TC kimlik detected, no VKN → 409 ENTITY_TC_UNVERIFIED_CONFIRM', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: null }, { tcKimlik: '12345678901', sourceConfidence: 'MEDIUM' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TC_UNVERIFIED_CONFIRM')
+  })
+
+  // ── T10 SOFT: Unvan fuzzy mismatch → 409 ENTITY_TITLE_MISMATCH_CONFIRM ──────
+  test('T10 — title detected, fuzzy mismatch → 409 ENTITY_TITLE_MISMATCH_CONFIRM', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: null }, { title: 'Farklı Şirket A.Ş.', sourceConfidence: 'MEDIUM' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TITLE_MISMATCH_CONFIRM')
+  })
+
+  // ── T11 SOFT: LOW confidence → 409 ENTITY_UNVERIFIED_CONFIRM ───────────────
+  test('T11 — sourceConfidence=LOW → 409 ENTITY_UNVERIFIED_CONFIRM', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: null }, { sourceConfidence: 'LOW' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_UNVERIFIED_CONFIRM')
+  })
+
+  // ── T12: Title fuzzy MATCH → ok (akış devam eder) ──────────────────────────
+  test('T12 — title detected, fuzzy match → ok, upsert called', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ title: 'Test Firması Ltd. Şti.', sourceConfidence: 'MEDIUM' })], isExcel: false })
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(res.status).not.toBe(422)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // ── T13 bypass: confirmEntityUnverified=true → CASE 5 bypass ───────────────
+  test('T13 — confirmEntityUnverified=true + LOW → 409 bypass, upsert called', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ sourceConfidence: 'LOW' })], isExcel: false })
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupWithEntity({ name: 'Test Firması', taxNumber: null })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // ── T14 bypass: confirmEntityUnverified=true → CASE 2 bypass ───────────────
+  test('T14 — confirmEntityUnverified=true + VKN unverified → bypass, upsert called', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'HIGH' })], isExcel: false })
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(upsertMock).toHaveBeenCalled()
+  })
+
+  // ── T15 HARD bypass impossible: VKN mismatch + confirmed=true → still 422 ───
+  test('T15 — VKN mismatch + confirmEntityUnverified=true → still 422 (HARD, no bypass)', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+  })
+
+  // ── T16: 422 response contract for ENTITY_TAX_NUMBER_MISMATCH ───────────────
+  test('T16 — 422 ENTITY_TAX_NUMBER_MISMATCH response contract: { error, message, detected, entity }', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', title: 'Farklı Firma', sourceConfidence: 'HIGH' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+    expect(typeof body.message).toBe('string')
+    expect(body.message.length).toBeGreaterThan(0)
+    expect(body.detected).toBeDefined()
+    expect(body.entity).toBeDefined()
+  })
+
+  // ── T17: 409 response contract for ENTITY_TAX_UNVERIFIED_CONFIRM ─────────────
+  test('T17 — 409 ENTITY_TAX_UNVERIFIED_CONFIRM response contract: { error, message, detected, entity }', async () => {
+    setupWithEntity({ name: 'Test Firması', taxNumber: null }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('ENTITY_TAX_UNVERIFIED_CONFIRM')
+    expect(typeof body.message).toBe('string')
+    expect(body.detected).toBeDefined()
+    expect(body.entity).toBeDefined()
+  })
+
+  // ── T17b ÖNCELİK 0: VKN match → CASE 5 (LOW) atlanır ──────────────────────
+  test('T17b — VKN match precedes ENTITY_UNVERIFIED: no 409 even without confirmEntityUnverified', async () => {
+    // Dosyada VKN ve LOW confidence. Entity VKN eşleşiyor.
+    // ÖNCELİK 0 → ok:true → PREFLIGHT 4 pass
+    setupMocks({
+      userId: 'user-1',
+      parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'LOW' })],
+      isExcel: false,
+    })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: '1234567890' })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(409)
+    expect(res.status).not.toBe(422)
+  })
+
+  // ── T18 regresyon: PREFLIGHT 3 çalışmaya devam eder ────────────────────────
+  test('T18 — after PREFLIGHT 4 pass, PREFLIGHT 3 still blocks DUPLICATE (confirmEntityUnverified but no overwrite)', async () => {
+    const findUniqueMock = jest.fn(() => Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }))
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ sourceConfidence: 'LOW' })], isExcel: true, findUniqueMock })
+    const req = createMockRequest({ fileName: 'mizan.xlsx', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    // PREFLIGHT 4 bypass (confirmEntityUnverified) → PREFLIGHT 3 (aynı kaynak → 409 DUPLICATE)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toBe('DUPLICATE_DATA')
+  })
+
+  // ── T19: PREFLIGHT 4 fail → upsert ASLA çağrılmadı ────────────────────────
+  test('T19 — ENTITY_UNVERIFIED → upsert never called', async () => {
+    const upsertMock = jest.fn()
+    setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ sourceConfidence: 'LOW' })], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(), createMany: jest.fn() },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
     const res = await callPost(req)
     expect(res.status).toBe(409)
     expect(upsertMock).not.toHaveBeenCalled()

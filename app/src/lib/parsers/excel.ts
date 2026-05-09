@@ -7,6 +7,16 @@ import * as XLSX from 'xlsx'
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+/** Parser'ın dosyadan çıkardığı firma kimlik bilgisi (Faz 7.3.50A.3) */
+export interface ParsedIdentity {
+  taxNumber?: string | null    // VKN (10 hane)
+  tcKimlik?: string | null     // TC Kimlik (11 hane)
+  title?: string | null        // Mükellef unvanı
+  sourceConfidence: 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
 export interface ParseMeta {
   path: 'mizan' | 'vertical' | 'horizontal'
   totalRows: number
@@ -31,6 +41,7 @@ export interface ParsedRow {
   beyanType?: string
   rawAccounts?: Array<{ code: string; amount: number }>
   reversals?: import('@/lib/scoring/reversalMap').ReversalEntry[]
+  identity?: ParsedIdentity
 }
 
 // ─── norm: Türkçe → ASCII, küçük harf ────────────────────────────────────────
@@ -44,6 +55,64 @@ function norm(s: unknown): string {
     .replace(/[üÜ]/g, 'u')
     .replace(/[öÖ]/g, 'o')
     .replace(/[çÇ]/g, 'c')
+}
+
+// ─── Excel identity extraction ───────────────────────────────────────────────
+
+/**
+ * Excel/CSV sayfasının headerIdx öncesi satırlarından VKN / unvan çıkarır.
+ * headerIdx varsa: 0 → headerIdx-1 taranır (veri satırları atlanır).
+ * headerIdx yoksa: 0 → 19 (ilk 20 satır).
+ */
+export function parseExcelIdentity(rows: unknown[][], headerIdx?: number): ParsedIdentity {
+  const scanEnd = Math.min(headerIdx ?? 20, rows.length)
+
+  let taxNumber: string | null = null
+  let title:     string | null = null
+
+  for (let i = 0; i < scanEnd && (!taxNumber || !title); i++) {
+    const row = rows[i] as unknown[]
+    for (let j = 0; j < row.length; j++) {
+      const cell = row[j]
+      if (cell == null) continue
+      const s = String(cell).trim()
+      const n = norm(s)
+
+      // VKN tek hücrede: "VKN: 1234567890" veya "Vergi No: 1234567890"
+      if (!taxNumber) {
+        const m = n.match(/vkn[:\s]+(\d{10})/) ?? n.match(/vergi (?:kimlik )?no[:\s]+(\d{10})/)
+        if (m) { taxNumber = m[1]; continue }
+      }
+
+      // VKN iki hücre: label hücresi → yanındaki 10 haneli sayı
+      if (!taxNumber && j + 1 < row.length) {
+        const nextVal = String(row[j + 1] ?? '').trim()
+        if ((n.includes('vkn') || n.includes('vergi kimlik') || n.includes('vergi no')) && /^\d{10}$/.test(nextVal)) {
+          taxNumber = nextVal
+        }
+      }
+
+      // Unvan tek hücrede: "Firma: ENES ATLI" / "Ünvan: DEKAM LTD."
+      if (!title) {
+        const tm = n.match(/^(?:firma|unvan|mukellef|ticari unvan)[:\s]+(.{2,})/)
+        if (tm) { title = tm[1].trim(); continue }
+      }
+
+      // Unvan iki hücre: label hücresi → yanındaki metin hücresi
+      if (!title && j + 1 < row.length) {
+        const nextVal = String(row[j + 1] ?? '').trim()
+        if (
+          (n.includes('firma') || n.includes('unvan') || n.includes('mukellef') || n.includes('ticari unvan')) &&
+          nextVal.length > 1 && !/^\d+$/.test(nextVal)
+        ) {
+          title = nextVal
+        }
+      }
+    }
+  }
+
+  const sourceConfidence: 'HIGH' | 'MEDIUM' | 'LOW' = taxNumber ? 'HIGH' : title ? 'MEDIUM' : 'LOW'
+  return { taxNumber, title, sourceConfidence }
 }
 
 // ─── Sayı çözümleme ───────────────────────────────────────────────────────────
@@ -648,14 +717,18 @@ export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Prom
   // 1) Dikey format (çok yıllı, başlık satırında yıllar)
   if (detectVerticalFormat(rows)) {
     console.info('[excel] parse path: vertical', { sheetName, rowCount: rows.length })
+    const vertHeader = findVerticalYearHeader(rows)
+    const identity   = parseExcelIdentity(rows, vertHeader?.headerIdx)
     const result = parseVerticalExcel(rows)
     if (!result.length) console.warn('[excel] vertical empty', { sheetName })
-    return result
+    return result.map(r => ({ ...r, identity }))
   }
 
   // 2) Mizan (DETAY MİZAN)
   if (detectMizanFormat(rows)) {
     console.info('[excel] parse path: mizan', { sheetName, rowCount: rows.length })
+    const mizanHeader = findMizanHeader(rows)
+    const identity    = parseExcelIdentity(rows, mizanHeader?.headerIdx)
     const result = await parseMizanRows(rows)
     const meta = result[0]?.meta
     console.info('[excel:mizan] summary', {
@@ -664,12 +737,14 @@ export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Prom
       otherIncome: result[0]?.fields?.otherIncome ?? null,
     })
     if (!result.length) console.warn('[excel] mizan parse empty', { sheetName, rowCount: rows.length })
-    return result
+    return result.map(r => ({ ...r, identity }))
   }
 
   // 3) Yatay format (tek satır = bir dönem)
   console.info('[excel] parse path: horizontal', { sheetName, rowCount: rows.length })
   const headerRow = rows[0] as (string | null)[]
+  // Yatay formatta satır 0 = başlık → 0'dan önce tarama yok → LOW
+  const horzIdentity = parseExcelIdentity(rows, 1)
   const results: ParsedRow[] = []
 
   for (const row of rows.slice(1)) {
@@ -689,7 +764,7 @@ export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Prom
       else if (row[i] != null && n) unmapped.push(n)
     })
 
-    if (Object.keys(fields).length > 0) results.push({ year, period: period ?? 'ANNUAL', fields, unmapped })
+    if (Object.keys(fields).length > 0) results.push({ year, period: period ?? 'ANNUAL', fields, unmapped, identity: horzIdentity })
   }
 
   if (!results.length) console.warn('[excel] horizontal empty', { sheetName })
@@ -701,5 +776,7 @@ export async function parseExcelBuffer(buffer: Buffer, _fileName?: string): Prom
 export async function parseCsvText(text: string): Promise<ParsedRow[]> {
   const wb = XLSX.read(text, { type: 'string' })
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-  return parseExcelBuffer(Buffer.from(buf))
+  const rows = await parseExcelBuffer(Buffer.from(buf))
+  // CSV dosyalarında yapısal metadata (VKN/unvan) yok → LOW
+  return rows.map(r => ({ ...r, identity: { sourceConfidence: 'LOW' as const } }))
 }

@@ -6,7 +6,7 @@ import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
-import { checkDuplicates }         from '@/lib/validation/uploadValidation'
+import { checkDuplicates, checkEntityIdentity } from '@/lib/validation/uploadValidation'
 import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
 
 // ─── Alan grupları: hangi docType hangi alanları yazabilir (Faz 7.3.16) ────────
@@ -186,6 +186,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             form:     { year: formYear, period: formPeriod },
           }, { status: 422 })
         }
+      }
+    }
+
+    // PREFLIGHT 4 — ENTITY IDENTITY CHECK (Faz 7.3.50A.3)
+    // Dosyada bulunan VKN/TC/unvan ile sisteme kayıtlı entity karşılaştırılır.
+    // ÖNCELİK 0: VKN match → tüm soft kontroller atlanır.
+    // CASE 1 HARD (422): VKN var + entity VKN var + farklı → ret (bypass YOK).
+    // CASE 2-5 SOFT (409): confirmEntityUnverified=true ile bypass edilir.
+    {
+      const confirmEntityUnverified = formData.get('confirmEntityUnverified') === 'true'
+      const detectedIdentity        = parsedRows[0]?.identity ?? { sourceConfidence: 'LOW' as const }
+      const identityResult          = checkEntityIdentity(detectedIdentity, entity, confirmEntityUnverified)
+      if (!identityResult.ok) {
+        const status = identityResult.error === 'ENTITY_TAX_NUMBER_MISMATCH' ? 422 : 409
+        return jsonUtf8({
+          error:    identityResult.error,
+          message:  identityResult.message,
+          detected: identityResult.detected,
+          entity:   identityResult.entity,
+        }, { status })
       }
     }
 

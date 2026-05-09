@@ -18,7 +18,7 @@
  *   'sermaye yedeg' → 'sermaye yedek', 'kar yedeg' → 'kar yedek'
  */
 
-import { detectPdfType, extractTdhpRawAccountsFromText, parseEkSection } from './pdf'
+import { detectPdfType, extractTdhpRawAccountsFromText, parseEkSection, parseTaxIdentity } from './pdf'
 
 // ─── detectPdfType ────────────────────────────────────────────────────────────
 
@@ -270,6 +270,51 @@ describe('pdf.ts hassas console.log gating (Faz 7.3.49 B)', () => {
     spy.mockRestore()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(process.env as any).NODE_ENV = prev
+  })
+
+})
+
+// ─── parseTaxIdentity (Faz 7.3.50A.3) ────────────────────────────────────────
+
+/**
+ * T1-T3: parseTaxIdentity — metin string üzerinde çalışır, binary PDF gerektirmez.
+ * norm() kalıbı: Türkçe → ASCII küçük harf dönüşümü.
+ */
+
+describe('parseTaxIdentity (Faz 7.3.50A.3)', () => {
+
+  // T1: VKN tespit
+  test('T1 — "Vergi Kimlik No: 1234567890" → taxNumber tespit edilir, sourceConfidence=HIGH', () => {
+    const text = 'GELİR İDARESİ BAŞKANLIĞI\nVergi Kimlik No: 1234567890\nMükellef Adı: Test Firması'
+    const result = parseTaxIdentity(text)
+    expect(result.taxNumber).toBe('1234567890')
+    expect(result.sourceConfidence).toBe('HIGH')
+  })
+
+  // T2: TC kimlik no tespit
+  test('T2 — "T.C. Kimlik No: 12345678901" → tcKimlik tespit edilir, taxNumber yok', () => {
+    const text = 'Vergi Dairesi: İstanbul\nT.C. Kimlik No: 12345678901\nAd Soyad: Ahmet Yılmaz'
+    const result = parseTaxIdentity(text)
+    expect(result.tcKimlik).toBe('12345678901')
+    expect(result.taxNumber).toBeFalsy()
+    expect(result.sourceConfidence).toBe('HIGH')
+  })
+
+  // T3: Hiç metadata yok → sourceConfidence=LOW
+  test('T3 — Metadata olmayan metin → sourceConfidence=LOW', () => {
+    const text = 'Bu belge herhangi bir vergi veya kimlik bilgisi içermemektedir.'
+    const result = parseTaxIdentity(text)
+    expect(result.taxNumber).toBeFalsy()
+    expect(result.tcKimlik).toBeFalsy()
+    expect(result.sourceConfidence).toBe('LOW')
+  })
+
+  // T4: Unvan tespit
+  test('T4 — "Mükellef Adı Unvanı: Test Firması A.Ş." → title tespit edilir', () => {
+    const text = 'GVK Beyannamesi\nMükellef Adı Unvanı: Test Firması A.Ş.\nVergi Dairesi: Kadıköy'
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeTruthy()
+    expect(result.title).toContain('Test')
   })
 
 })

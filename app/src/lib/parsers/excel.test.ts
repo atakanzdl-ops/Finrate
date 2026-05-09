@@ -19,7 +19,7 @@ jest.mock('@/lib/scoring/reversalMap', () => ({
   })),
 }))
 
-import { parseMizanRows } from './excel'
+import { parseMizanRows, parseExcelIdentity } from './excel'
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -577,5 +577,60 @@ describe('parseMizanRows — Faz 7.3.25 MIZAN_MAP (128, 192, 267)', () => {
     const rows = makeMinimalRows([{ code: '264', bakBorc: 5_740_000 }])
     const result = await parseMizanRows(rows)
     expect(result[0]?.fields?.intangibleAssets).toBe(5_740_000)
+  })
+})
+
+// ─── parseExcelIdentity (Faz 7.3.50A.3) ──────────────────────────────────────
+
+/**
+ * T4-T6: parseExcelIdentity — pre-header satır taraması.
+ * rows: 2D array (unknown[][]) — gerçek Excel yüklenmez.
+ */
+
+describe('parseExcelIdentity (Faz 7.3.50A.3)', () => {
+
+  // T4: VKN tek hücre "Vergi Kimlik No: 1234567890"
+  test('T4 — tek hücre "Vergi Kimlik No: 1234567890" → taxNumber tespit edilir', () => {
+    const rows: unknown[][] = [
+      ['Vergi Kimlik No: 1234567890'],
+      ['Firma Adı: Test Firması A.Ş.'],
+      ['Hesap Kodu', 'Hesap Adı', 'Borç', 'Alacak'],  // header row (idx=2)
+    ]
+    const result = parseExcelIdentity(rows, 2)
+    expect(result.taxNumber).toBe('1234567890')
+    expect(result.sourceConfidence).toBe('HIGH')
+  })
+
+  // T5: İki hücre etiket/değer pattern — ['Vergi No', '9876543210']
+  test('T5 — iki hücre label/value → taxNumber tespit edilir', () => {
+    const rows: unknown[][] = [
+      ['Vergi No', '9876543210'],
+      ['Hesap Kodu', 'Açıklama', 'Borç', 'Alacak'],  // header (idx=1)
+    ]
+    const result = parseExcelIdentity(rows, 1)
+    expect(result.taxNumber).toBe('9876543210')
+  })
+
+  // T6: Hiç metadata yok → sourceConfidence=LOW
+  test('T6 — pre-header satırlarda metadata yok → sourceConfidence=LOW', () => {
+    const rows: unknown[][] = [
+      ['Rapor Tarihi: 2024-01-01'],
+      ['Hesap Kodu', 'Açıklama', 'Borç', 'Alacak'],  // header (idx=1)
+    ]
+    const result = parseExcelIdentity(rows, 1)
+    expect(result.taxNumber).toBeFalsy()
+    expect(result.tcKimlik).toBeFalsy()
+    expect(result.sourceConfidence).toBe('LOW')
+  })
+
+  // T6a: headerIdx undefined → 0..19 tarar, VKN bulur
+  test('T6a — headerIdx=undefined → 0..19 tarar, VKN bulur', () => {
+    const rows: unknown[][] = [
+      ['VKN: 1111111111'],
+      ['Başlık satırı'],
+    ]
+    const result = parseExcelIdentity(rows)
+    expect(result.taxNumber).toBe('1111111111')
+    expect(result.sourceConfidence).toBe('HIGH')
   })
 })

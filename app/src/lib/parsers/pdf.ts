@@ -5,7 +5,7 @@
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PDFParse } = require('pdf-parse')
-import type { ParsedRow } from './excel'
+import type { ParsedRow, ParsedIdentity } from './excel'
 
 // ─── norm ─────────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,76 @@ function norm(s: unknown): string {
     .replace(/[öÖ]/g, 'o')
     .replace(/[çÇ]/g, 'c')
     .replace(/[âÂ]/g, 'a')  // Faz 7.3.24: "Kâr" (U+00E2) → 'a' — TDHP PDF'lerde kar/kâr tutarsız
+}
+
+// ─── Tax Identity extraction (Faz 7.3.50A.3) ────────────────────────────────
+
+/**
+ * PDF beyanname metninden VKN / TC Kimlik / mükellef unvanı çıkarır.
+ * SADECE beyanname formları için (1010, 1001A, 0011, 1001B).
+ * parsePdfMizan KAPSAM DIŞI — bu fonksiyon orada çağrılmaz.
+ *
+ * Tüm karşılaştırmalar norm() ile yapılır (Türkçe literal yok).
+ */
+export function parseTaxIdentity(pdfText: string): ParsedIdentity {
+  const n = norm(pdfText)
+
+  // VKN (10 hane)
+  let taxNumber: string | null = null
+  const VKN_PATS = [
+    /vergi kimlik no[su]?[\s:]*\n?\s*(\d{10})/,
+    /vkn[\s:]*\n?\s*(\d{10})/,
+    /vergi no[su]?[\s:]*\n?\s*(\d{10})/,
+    /mukellefin\s+vergi[^0-9]{0,30}(\d{10})/,
+  ]
+  for (const pat of VKN_PATS) {
+    const m = n.match(pat)
+    if (m) { taxNumber = m[1]; break }
+  }
+
+  // TC Kimlik (11 hane)
+  let tcKimlik: string | null = null
+  const TC_PATS = [
+    /t\.?c\.?\s*kimlik\s*no[su]?[\s:]*\n?\s*(\d{11})/,
+    /kimlik\s+no[su]?[\s:]*\n?\s*(\d{11})/,
+  ]
+  for (const pat of TC_PATS) {
+    const m = n.match(pat)
+    if (m) { tcKimlik = m[1]; break }
+  }
+
+  // Mükellef unvanı — raw satır tara (norm match, ham değer kullan)
+  let title: string | null = null
+  const TITLE_LABELS = [
+    'mukellef adi', 'mukellef unvani', 'ticari unvani',
+    'mukellef ad',  'mukellef unvan',  'ticari unvan',
+    'ad soyad',     'unvani',
+  ]
+  const rawLines = pdfText.split('\n')
+  outer: for (let i = 0; i < rawLines.length; i++) {
+    const nl = norm(rawLines[i])
+    for (const label of TITLE_LABELS) {
+      if (nl.includes(label)) {
+        // Aynı satırda iki nokta varsa → iki noktadan sonraki değer
+        const colonIdx = rawLines[i].indexOf(':')
+        if (colonIdx !== -1) {
+          const after = rawLines[i].slice(colonIdx + 1).trim()
+          if (after.length > 1 && !/^\d{10,11}$/.test(after)) { title = after; break outer }
+        }
+        // Sonraki satır
+        if (i + 1 < rawLines.length) {
+          const next = rawLines[i + 1].trim()
+          if (next.length > 1 && !/^\d{10,11}$/.test(next)) { title = next; break outer }
+        }
+        break
+      }
+    }
+  }
+
+  const sourceConfidence: 'HIGH' | 'MEDIUM' | 'LOW' =
+    (taxNumber || tcKimlik) ? 'HIGH' : title ? 'MEDIUM' : 'LOW'
+
+  return { taxNumber, tcKimlik, title, sourceConfidence }
 }
 
 // ─── Sayı ayrıştırma ──────────────────────────────────────────────────────────
@@ -1195,8 +1265,11 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     throw e
   }
 
-  // 1) PDF Mizan — TDHP parser'dan önce
+  // 1) PDF Mizan — TDHP parser'dan önce (parsePdfMizan KAPSAM DIŞI — Faz 7.3.50A.4)
   if (detectPdfMizan(text)) return parsePdfMizan(text)
+
+  // Beyanname identity (Faz 7.3.50A.3) — mizan check'ten SONRA hesaplanır
+  const identity = parseTaxIdentity(text)
 
   // detectType önce: gelir_yillik formunda TDHP sol kolon (cari dönem) seçimi için (Faz 7.3.46)
   const type = detectType(text)
@@ -1231,7 +1304,7 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     const fromRight = { ...bilFields.cari,   ...gelFields.cari   }  // sağ sütun
     const fields1001A = Object.keys(fromLeft).length > 0 ? fromLeft : fromRight
     const rawAcc1001A = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
-    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [], rawAccounts: rawAcc1001A, docType: 'BEYANNAME' }]
+    if (Object.keys(fields1001A).length > 0) return [{ year, period: 'ANNUAL', fields: fields1001A, unmapped: [], rawAccounts: rawAcc1001A, docType: 'BEYANNAME', identity }]
     return []
   }
 
@@ -1241,11 +1314,11 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
     const gelIdx = findNormIdx(text, 'gelir tablosu')
     if (gelIdx !== -1) {
       const { cari } = parseEkSection(text.slice(gelIdx, gelIdx + 4000))
-      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
+      if (Object.keys(cari).length > 0) return [{ year, period, fields: cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME', identity }]
     }
     const full = parseEkSection(text)
-    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
-    return [{ year, period, fields: parseTaxForm(text), unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME' }]
+    if (Object.keys(full.cari).length > 0) return [{ year, period, fields: full.cari, unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME', identity }]
+    return [{ year, period, fields: parseTaxForm(text), unmapped: [], rawAccounts: rawAccGV, docType: 'BEYANNAME', identity }]
   }
 
   // 4) Kurumlar Vergisi Yıllık (1010)
@@ -1263,9 +1336,9 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
       if (process.env.NODE_ENV !== 'production') console.log('[pdf] raw.cari=', JSON.stringify(raw.cari))   // Faz 7.3.49 B: hassas log gate
       console.log('[pdf] raw.onceki keys=', Object.keys(raw.onceki))
       // raw.cari = her satırın SON sayısı = cari dönem (2 sütunluda sağ, tek sütunluda tek)
-      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME' }]
+      return [{ year, period: 'ANNUAL', fields: { ...raw.cari, ...taxFields }, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME', identity }]
     }
-    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME' }]
+    return [{ year, period: 'ANNUAL', fields: taxFields, unmapped: [], rawAccounts: rawAccKV, docType: 'BEYANNAME', identity }]
   }
 
   // 5) Kurumlar Geçici Vergi (1032-KV)
@@ -1277,7 +1350,7 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
       const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
       // Geçici vergide taxExpense gelir tablosu kalemi değil
       const { taxExpense: _t, ...taxNoTax } = taxFields
-      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
+      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
     }
     const rawFull = parseEkSection(text)
     const { taxExpense: _t2, ...taxNoTax2 } = taxFields
@@ -1287,13 +1360,13 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
         hasRevenue: rawFull.cari.revenue != null,
         hasCogs: rawFull.cari.cogs != null,
       })
-      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
+      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
     }
-    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME' }]
+    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
   }
 
   // 6) Bilinmeyen: satır bazlı fallback
   const fallbackRows = parseFallback(text, year, period)
   const rawAccFallback = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
-  return fallbackRows.map(r => ({ ...r, rawAccounts: rawAccFallback, docType: 'BEYANNAME' }))
+  return fallbackRows.map(r => ({ ...r, rawAccounts: rawAccFallback, docType: 'BEYANNAME', identity }))
 }
