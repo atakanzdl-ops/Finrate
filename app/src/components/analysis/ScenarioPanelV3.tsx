@@ -558,10 +558,14 @@ function AksiyonPlaniTab({
       >
         <div className="p-6 border-b border-[#E5E9F0]">
           <h3 className="text-lg font-bold text-[#0B3C5D]" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Firma Ne Yapmalı?
+            {da?.canonicalOutcome?.isFeasible === false
+              ? "Mevcut Seviyeyi Koruma — Aksiyon Önerileri"
+              : "Firma Ne Yapmalı?"}
           </h3>
           <p className="text-sm text-[#64748B] mt-1">
-            Öncelik sırasına göre {actions.length} aksiyon önerisi.
+            {da?.canonicalOutcome?.isFeasible === false
+              ? "Aşağıdaki aksiyonlar BBB hedefine taşımaz; mevcut seviyeyi korumak için sıralanmıştır."
+              : `Öncelik sırasına göre ${actions.length} aksiyon önerisi.`}
           </p>
           {/* Faz 7.3.37: isReachable koşullu bağlam mesajı */}
           <p className="text-sm mt-2" style={{ color: isReachable ? '#0B7A6E' : '#64748B' }}>
@@ -569,6 +573,12 @@ function AksiyonPlaniTab({
               ? 'Bu aksiyonlar uygulanırsa hedef seviyeye ulaşılabilir.'
               : 'Mevcut yapısal kısıtlar nedeniyle hedef seviyeye kısa vadede ulaşılamamaktadır. Aşağıdaki aksiyonlar mevcut seviyenin korunmasına ve finansal dayanıklılığın güçlenmesine odaklanır.'}
           </p>
+          {/* Faz 7.3.50A.5: infeasible uyarı kutusu */}
+          {da?.canonicalOutcome?.isFeasible === false && (
+            <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-3 text-sm text-amber-900 mt-3">
+              Bu firma için yapısal sorunlar bulunmaktadır. Aşağıdaki aksiyonlar finansal dayanıklılığı güçlendirir ancak rating'i yükseltmek için operasyonel iyileşme (maliyet/fiyat/marj revizyonu) gibi stratejik kararlar da gerekebilir.
+            </div>
+          )}
         </div>
 
         {/* Tablo baslik — V3 flex header */}
