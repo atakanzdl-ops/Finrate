@@ -24,7 +24,80 @@ function norm(s: unknown): string {
     .replace(/[âÂ]/g, 'a')  // Faz 7.3.24: "Kâr" (U+00E2) → 'a' — TDHP PDF'lerde kar/kâr tutarsız
 }
 
-// ─── Tax Identity extraction (Faz 7.3.50A.3) ────────────────────────────────
+// ─── Tax Identity helpers (Faz 7.3.50A.3.1) ─────────────────────────────────
+// EXPORTS YOK — sadece parseTaxIdentity içinden kullanılır.
+
+/** norm() + noktalama temizleme — label karşılaştırması için, global norm() dokunulmaz */
+function normIdentityLabel(line: string): string {
+  return norm(line)
+    .replace(/[()\/,.:;-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const SMMM_BOUNDARY_PATTERNS: RegExp[] = [
+  /beyannameyi\s+duzenleyen\s+mukellef/,
+  /beyannameyi\s+duzenleyen\s+sm\b/,
+  /beyannameyi\s+duzenleyen\s+smmm/,
+  /\bsm\s*\/\s*smmm\b/,
+  /mali\s+musavir\s+bilgileri/,
+]
+
+/** Adayları reddeden pattern'lar — normIdentityLabel sonrası test edilir */
+const TITLE_REJECT_PATTERNS: RegExp[] = [
+  /^adi\s+unvanin\s+devami$/,           // "Adı (Unvanın Devamı)"
+  /^soyadi\s+unvani$/,                   // " Soyadı (Unvanı)" etiket satırı
+  /^soyadi\s+adi\s+unvani$/,            // "Soyadı, Adı (Unvanı)"
+  /^ticaret\s+sicil\s+no/,              // "Ticaret Sicil No..."
+  /^irtibat\s+tel/,                      // "İrtibat Tel No"
+  /^e[\s-]?posta\s+adresi/,            // "E-Posta Adresi"
+  /^vergi\s+kimlik/,                     // "Vergi Kimlik Numarası"
+  /^vergi\s+no/,                         // "Vergi No"
+  /^tc[\s.]?kimlik/,                     // "TC Kimlik No"
+  /^kimlik\s+no/,                        // "Kimlik No"
+  /^mukellef\s+adi$/,                    // form etiketi
+  /^mukellef\s+unvani$/,                 // form etiketi
+  /^\d+$/,                               // sadece rakam (VKN, sayı)
+  /^[\d\s]+$/,                           // normIdentityLabel sonrası rakam+boşluk
+  /@/,                                   // e-posta adresi
+  /\d{1,3}\.\d{3}/,                     // TR formatlı sayı (1.234.567)
+  /^onay\s+zamani/,                      // "Onay Zamanı"
+  /^duzeltme\s+nedeni/,                  // "Düzeltme Nedeni"
+  /vergi\s+dairesi/,                     // "Vergi Dairesi"
+  /beyanname/,                           // beyanname türü etiketleri
+]
+
+/** Şirket türü suffix'leri — unvan parçalarını birleştirmek için */
+const COMPANY_SUFFIX_RE = /^(anonim sirketi|limited sirketi|anonim ortakligi|limited|ltd sti|a\.?s\.?|ltd\.?|sirketi)$/
+
+/**
+ * rawLines içinde ilk SMMM_BOUNDARY_PATTERNS eşleşmesinin satır indeksini döner.
+ * Eşleşme yoksa rawLines.length döner (tüm satırlar mükellef bloğu).
+ */
+function getMukellefLineRange(rawLines: string[]): number {
+  for (let i = 0; i < rawLines.length; i++) {
+    const nl = norm(rawLines[i])
+    for (const pat of SMMM_BOUNDARY_PATTERNS) {
+      if (pat.test(nl)) return i
+    }
+  }
+  return rawLines.length
+}
+
+/**
+ * Bir aday satırın form etiketi ya da meta-veri olduğunu kontrol eder.
+ * Uzunluk < 2 veya TITLE_REJECT_PATTERNS eşleşmesi varsa true döner.
+ */
+function isRejectedTitle(candidate: string): boolean {
+  if (candidate.trim().length < 2) return true
+  const nl = normIdentityLabel(candidate)
+  for (const pat of TITLE_REJECT_PATTERNS) {
+    if (pat.test(nl)) return true
+  }
+  return false
+}
+
+// ─── Tax Identity extraction (Faz 7.3.50A.3 / 7.3.50A.3.1) ─────────────────
 
 /**
  * PDF beyanname metninden VKN / TC Kimlik / mükellef unvanı çıkarır.
@@ -32,59 +105,106 @@ function norm(s: unknown): string {
  * parsePdfMizan KAPSAM DIŞI — bu fonksiyon orada çağrılmaz.
  *
  * Tüm karşılaştırmalar norm() ile yapılır (Türkçe literal yok).
+ * Faz 7.3.50A.3.1: DEKAM yapısı (değer-ÖNCE VKN + unvan birleştirme) desteği eklendi.
  */
 export function parseTaxIdentity(pdfText: string): ParsedIdentity {
-  const n = norm(pdfText)
+  const rawLines = pdfText.split('\n')
+  const normLines = rawLines.map(l => norm(l))
+  const n         = norm(pdfText)
 
-  // VKN (10 hane)
+  // SMMM blok sınırı — mükellefi SMMM'den ayır
+  const smmBoundary = getMukellefLineRange(rawLines)
+
+  // ── VKN (10 hane) ────────────────────────────────────────────────────────────
   let taxNumber: string | null = null
+
+  // 1) Klasik label→value pattern'ları (birleşik metin ya da satır atlayan)
   const VKN_PATS = [
-    /vergi kimlik no[su]?[\s:]*\n?\s*(\d{10})/,
-    /vkn[\s:]*\n?\s*(\d{10})/,
-    /vergi no[su]?[\s:]*\n?\s*(\d{10})/,
-    /mukellefin\s+vergi[^0-9]{0,30}(\d{10})/,
+    /vergi kimlik no[su]?[\s:]*\n?\s*(\d{10})(?!\d)/,
+    /vkn[\s:]*\n?\s*(\d{10})(?!\d)/,
+    /vergi no[su]?[\s:]*\n?\s*(\d{10})(?!\d)/,
+    /mukellefin\s+vergi[^0-9]{0,30}(\d{10})(?!\d)/,
   ]
   for (const pat of VKN_PATS) {
     const m = n.match(pat)
     if (m) { taxNumber = m[1]; break }
   }
 
-  // TC Kimlik (11 hane)
+  // 2) Label-öncesi VKN fallback (DEKAM yapısı: değer ÖNCE, etiket sonraki satırlarda)
+  if (!taxNumber) {
+    for (let i = 0; i < smmBoundary; i++) {
+      const trimmed = rawLines[i].trim()
+      if (!/^\d{10}$/.test(trimmed)) continue
+      // Lookahead: sonraki 10 satırda "vergi kimlik" veya "vkn" etiketi var mı?
+      for (let j = i + 1; j < Math.min(i + 11, smmBoundary); j++) {
+        if (normLines[j].includes('vergi kimlik') || normLines[j].includes('vkn')) {
+          taxNumber = trimmed
+          break
+        }
+      }
+      if (taxNumber) break
+    }
+  }
+
+  // ── TC Kimlik (11 hane) ───────────────────────────────────────────────────────
   let tcKimlik: string | null = null
   const TC_PATS = [
-    /t\.?c\.?\s*kimlik\s*no[su]?[\s:]*\n?\s*(\d{11})/,
-    /kimlik\s+no[su]?[\s:]*\n?\s*(\d{11})/,
+    /t\.?c\.?\s*kimlik\s*no[su]?[\s:]*\n?\s*(\d{11})(?!\d)/,
+    /kimlik\s+no[su]?[\s:]*\n?\s*(\d{11})(?!\d)/,
   ]
   for (const pat of TC_PATS) {
     const m = n.match(pat)
     if (m) { tcKimlik = m[1]; break }
   }
 
-  // Mükellef unvanı — raw satır tara (norm match, ham değer kullan)
+  // ── Mükellef unvanı ───────────────────────────────────────────────────────────
   let title: string | null = null
-  const TITLE_LABELS = [
-    'mukellef adi', 'mukellef unvani', 'ticari unvani',
-    'mukellef ad',  'mukellef unvan',  'ticari unvan',
-    'ad soyad',     'unvani',
+  const TITLE_LABELS_LOCAL = [
+    'soyadi unvani',      // " Soyadı (Unvanı)"         — DEKAM header label
+    'soyadi adi unvani',  // "Soyadı, Adı (Unvanı)"     — DEKAM imza bloğu
+    'mukellef adi',       'mukellef unvani',
+    'mukellef ad',        'mukellef unvan',
+    'ticari unvani',      'ticari unvan',
+    'ad soyad',           'unvani',
   ]
-  const rawLines = pdfText.split('\n')
-  outer: for (let i = 0; i < rawLines.length; i++) {
-    const nl = norm(rawLines[i])
-    for (const label of TITLE_LABELS) {
-      if (nl.includes(label)) {
-        // Aynı satırda iki nokta varsa → iki noktadan sonraki değer
-        const colonIdx = rawLines[i].indexOf(':')
-        if (colonIdx !== -1) {
-          const after = rawLines[i].slice(colonIdx + 1).trim()
-          if (after.length > 1 && !/^\d{10,11}$/.test(after)) { title = after; break outer }
+
+  outer: for (let i = 0; i < smmBoundary; i++) {
+    const lnl = normIdentityLabel(rawLines[i])
+    for (const label of TITLE_LABELS_LOCAL) {
+      if (lnl !== label && !lnl.includes(label)) continue
+      // Aynı satırda ":" varsa → iki noktadan sonraki değer
+      const colonIdx = rawLines[i].indexOf(':')
+      if (colonIdx !== -1) {
+        const after = rawLines[i].slice(colonIdx + 1).trim()
+        if (after.length >= 2 && !isRejectedTitle(after)) {
+          title = after
+          break outer
         }
-        // Sonraki satır
-        if (i + 1 < rawLines.length) {
-          const next = rawLines[i + 1].trim()
-          if (next.length > 1 && !/^\d{10,11}$/.test(next)) { title = next; break outer }
-        }
-        break
       }
+      // Sonraki 8 satırda aday topla (SMMM sınırına kadar)
+      const candidates: string[] = []
+      for (let j = i + 1; j < Math.min(i + 9, smmBoundary); j++) {
+        const next = rawLines[j].trim()
+        if (!next || next.length < 2) continue
+        if (isRejectedTitle(next)) continue
+        candidates.push(next)
+        if (candidates.length >= 4) break
+      }
+      if (candidates.length > 0) {
+        // COMPANY_SUFFIX_RE: suffix içeren aday varsa komşu parça ile birleştir
+        const suffixIdx = candidates.findIndex(c => COMPANY_SUFFIX_RE.test(norm(c).trim()))
+        if (suffixIdx > 0) {
+          // Suffix önceki parça + suffix: "DEKAM YAPI" + "ANONİM ŞİRKETİ"
+          title = candidates[suffixIdx - 1] + ' ' + candidates[suffixIdx]
+        } else if (suffixIdx === 0 && candidates.length > 1) {
+          // Suffix ilk sırada: diğer parça öne alınır
+          title = candidates[1] + ' ' + candidates[0]
+        } else {
+          title = candidates[0]
+        }
+        break outer
+      }
+      break
     }
   }
 

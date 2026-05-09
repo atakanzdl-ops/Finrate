@@ -19,6 +19,9 @@
  */
 
 import { detectPdfType, extractTdhpRawAccountsFromText, parseEkSection, parseTaxIdentity } from './pdf'
+import dekam2024 from './__fixtures__/dekam-2024-kv.json'
+import dekam2023 from './__fixtures__/dekam-2023-kv.json'
+import dekam2022 from './__fixtures__/dekam-2022-kv.json'
 
 // ─── detectPdfType ────────────────────────────────────────────────────────────
 
@@ -315,6 +318,160 @@ describe('parseTaxIdentity (Faz 7.3.50A.3)', () => {
     const result = parseTaxIdentity(text)
     expect(result.title).toBeTruthy()
     expect(result.title).toContain('Test')
+  })
+
+})
+
+// ─── parseTaxIdentity — Faz 7.3.50A.3.1 Hotfix (DEKAM + Reject + VKN) ───────
+//
+// T_FIX1–T_FIX5 : DEKAM gerçek fixture regresyon testleri
+// T_FIX6–T_FIX10: Reject pattern black-box testleri
+// T_FIX11–T_FIX13: VKN multi-line / bitişik / label-öncesi
+// T_FIX14        : 11-haneli sayı VKN olarak yakalanmaz (digit boundary)
+// T_FIX15        : SMMM bloğu izolasyonu (mükellef VKN alınır, SMMM ignore)
+
+describe('parseTaxIdentity — Faz 7.3.50A.3.1 Hotfix', () => {
+
+  // ── T_FIX1–T_FIX5: DEKAM fixture regresyon ──────────────────────────────────
+
+  test('T_FIX1 — DEKAM 2024: VKN "2731120400" tespit edilir (label-öncesi yapı)', () => {
+    const result = parseTaxIdentity(dekam2024.rawText)
+    expect(result.taxNumber).toBe('2731120400')
+  })
+
+  test('T_FIX2 — DEKAM 2024: title "DEKAM YAPI" içerir', () => {
+    const result = parseTaxIdentity(dekam2024.rawText)
+    expect(result.title).toBeTruthy()
+    expect(result.title).toContain('DEKAM')
+  })
+
+  test('T_FIX3 — DEKAM 2023: VKN "2731120400" tespit edilir', () => {
+    const result = parseTaxIdentity(dekam2023.rawText)
+    expect(result.taxNumber).toBe('2731120400')
+  })
+
+  test('T_FIX4 — DEKAM 2022: VKN "2731120400" tespit edilir (Düzeltme Nedeni satırı içeren)', () => {
+    const result = parseTaxIdentity(dekam2022.rawText)
+    expect(result.taxNumber).toBe('2731120400')
+  })
+
+  test('T_FIX5 — DEKAM 2024: "Adı (Unvanın Devamı)" form etiketi title olarak alınmaz', () => {
+    const result = parseTaxIdentity(dekam2024.rawText)
+    // Title form etiketini içermemeli
+    expect(result.title).not.toContain('Devamı')
+    expect(result.title).not.toContain('Unvanın')
+    // Title geçerli şirket adı içermeli
+    expect(result.title).toContain('DEKAM')
+  })
+
+  // ── T_FIX6–T_FIX10: Reject pattern black-box ────────────────────────────────
+
+  test('T_FIX6 — Sonraki satırlar yalnızca form etiketlerinden oluşuyorsa title yakalanmaz', () => {
+    const text = [
+      'Mükellef Adı',
+      'Adı (Unvanın Devamı)',    // form etiketi → reject
+      'Vergi Kimlik Numarası',   // metadata → reject
+      '',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeNull()
+  })
+
+  test('T_FIX7 — Sonraki satır e-posta adresi ise title olarak alınmaz', () => {
+    const text = [
+      'Mükellef Unvanı',
+      'info@testfirma.com.tr',   // e-posta → reject
+      'Vergi Dairesi: İstanbul',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeNull()
+  })
+
+  test('T_FIX8 — Sonraki satır TR formatlı sayı ("1.234.567,89") ise title olarak alınmaz', () => {
+    const text = [
+      'Mükellef Unvanı',
+      '1.234.567,89',            // TR formatlı sayı → reject
+      '',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeNull()
+  })
+
+  test('T_FIX9 — 10 haneli sayı aday olarak reddedilir, title yakalanmaz', () => {
+    const text = [
+      'Mükellef Adı',
+      '1234567890',              // 10 haneli sayı → /^\d+$/ → reject
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeNull()
+    // VKN de yakalanmaz (lookahead boş — "vergi kimlik" sonraki satırlarda yok)
+    expect(result.taxNumber).toBeNull()
+  })
+
+  test('T_FIX10 — COMPANY_SUFFIX_RE: suffix ilk sıradaysa sıralama düzeltilir', () => {
+    const text = [
+      'Mükellef Adı',
+      'ANONİM ŞİRKETİ',         // suffix → index 0
+      'TEST FİRMASI',            // ad parçası → index 1
+      '0,00',                    // sayı → reject
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeTruthy()
+    // İsim önce, suffix sonra
+    expect(result.title).toContain('TEST')
+    expect(result.title).toContain('ANONİM')
+    // Sıralama: "TEST FİRMASI ANONİM ŞİRKETİ"
+    expect(result.title!.indexOf('TEST')).toBeLessThan(result.title!.indexOf('ANONİM'))
+  })
+
+  // ── T_FIX11–T_FIX13: VKN pattern varyantları ────────────────────────────────
+
+  test('T_FIX11 — Çok satırlı VKN: "Vergi Kimlik No:\\n1234567890" → taxNumber', () => {
+    const text = 'Başlık\nVergi Kimlik No:\n1234567890\nMükellef'
+    const result = parseTaxIdentity(text)
+    expect(result.taxNumber).toBe('1234567890')
+  })
+
+  test('T_FIX12 — Bitişik VKN: "Vergi Kimlik No1234567890" → taxNumber', () => {
+    const text = 'Başlık\nVergi Kimlik No1234567890\n'
+    const result = parseTaxIdentity(text)
+    expect(result.taxNumber).toBe('1234567890')
+  })
+
+  test('T_FIX13 — Label-öncesi VKN (DEKAM yapısı): değer önce, etiket sonra → taxNumber', () => {
+    const text = [
+      'Form başlığı',
+      '9876543210',              // VKN değeri (etiket ÖNCE)
+      'Ara metin satır 1',
+      'Ara metin satır 2',
+      'Vergi Kimlik Numarası',   // etiket (değerden SONRA)
+      'Başka içerik',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.taxNumber).toBe('9876543210')
+  })
+
+  // ── T_FIX14: Digit boundary ─────────────────────────────────────────────────
+
+  test('T_FIX14 — 11 haneli sayı VKN olarak yakalanmaz (digit boundary (?!\\d))', () => {
+    const text = [
+      '12345678901',             // 11 hane — VKN değil
+      'Vergi Kimlik Numarası',
+      '',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    // 11 haneli sayı label-öncesi (/^\d{10}$/ → FAIL) ve classic (?!\d) koruması
+    expect(result.taxNumber).toBeNull()
+  })
+
+  // ── T_FIX15: SMMM bloğu izolasyonu ─────────────────────────────────────────
+
+  test('T_FIX15 — DEKAM 2024: mükellef VKN yakalanır, SMMM VKN (11514125066) alınmaz', () => {
+    const result = parseTaxIdentity(dekam2024.rawText)
+    // Mükellef VKN
+    expect(result.taxNumber).toBe('2731120400')
+    // SMMM VKN'si (11514125066) TC kimlik olarak da alınmamalı
+    expect(result.tcKimlik).toBeNull()
   })
 
 })
