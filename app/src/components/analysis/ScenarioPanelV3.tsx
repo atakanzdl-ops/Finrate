@@ -192,7 +192,7 @@ export function buildOperationalWarning(
   const absPercent    = Math.abs(grossMargin * 100).toFixed(1)
   const formattedMargin = `-%${absPercent}`
 
-  return `Bu yol haritası bilanço odaklıdır. Mevcut brüt marjınız ${formattedMargin} (negatif). Sermaye artışı ve bilanço aksiyonları kısa vadede finansal yapıyı güçlendirir, ancak kalıcı rating yükselişi için maliyet yönetimi, fiyat revizyonu veya marj iyileştirme stratejileri gereklidir.`
+  return `Bu yol haritası bilanço odaklıdır. Mevcut brüt marjınız ${formattedMargin} (negatif). Sermaye artışı ve bilanço aksiyonları kısa vadede finansal yapıyı güçlendirir, ancak kalıcı rating yükselişi için maliyet yönetimi, fiyat revizyonu veya marj iyileştirme stratejileri gereklidir. Ayrıca, brüt zarar nedeniyle bazı aksiyonların (Net Satış Artışı, Avans→Hasılat) hesap detayı hesaplanamamıştır; marj pozitife döndüğünde detaylar netleşir.`
 }
 
 // ─── sanitizeJargon ──────────────────────────────────────────────────────────

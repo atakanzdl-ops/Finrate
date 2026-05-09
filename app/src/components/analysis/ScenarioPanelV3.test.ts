@@ -276,6 +276,9 @@ describe('computeGrossMarginFromBalances + buildOperationalWarning (Faz 7.3.50A.
     expect(warning).toContain('negatif')
     expect(warning).toContain('-%6.9')
     expect(warning).toContain('maliyet')
+    expect(warning).toContain('Net Satış Artışı')
+    expect(warning).toContain('Avans')
+    expect(warning).toContain('netleşir')
   })
 
   // T_OW5 — pozitif marj → null (uyarı yok)
@@ -295,6 +298,18 @@ describe('computeGrossMarginFromBalances + buildOperationalWarning (Faz 7.3.50A.
   // T_OW7 — boş balances → null (netSales 0)
   test('T_OW7 — boş balances → buildOperationalWarning null', () => {
     expect(buildOperationalWarning({})).toBeNull()
+  })
+
+  // T_OW8 — ek paragraf negatif marjda eklenir
+  test('T_OW8 — negatif marj → ek paragraf (hesap detayı + pozitife döndüğünde)', () => {
+    const warning = buildOperationalWarning({
+      '600': 327862353.91,
+      '602': 195061.12,
+      '621': 350592677,
+    })
+    expect(warning).toBeTruthy()
+    expect(warning).toContain('hesap detayı hesaplanamamıştır')
+    expect(warning).toContain('pozitife döndüğünde')
   })
 
 })
