@@ -137,7 +137,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
           <h1 className="text-xl font-bold" style={{ color: '#0B3C5D' }}>{entity.name}</h1>
           <p className="text-slate-400 text-xs mt-0.5">
             {entity.sector && `${entity.sector} · `}
-            {entity.taxNumber && `VKN: ${entity.taxNumber} · `}
+            {entity.taxNumber && `VKN/TCKN: ${entity.taxNumber} · `}
             {entity.financialData.length} dönem veri
           </p>
         </div>

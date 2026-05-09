@@ -331,17 +331,18 @@ export default function SirketlerPage() {
                 />
               </div>
 
-              {/* VKN */}
+              {/* VKN / TCKN */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Vergi Kimlik No</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">VKN / TCKN</label>
                 <input
                   type="text"
                   value={editForm.taxNumber}
                   onChange={(e) => setEditForm(p => ({ ...p, taxNumber: e.target.value }))}
-                  placeholder="10 haneli VKN"
+                  placeholder="Örn: 1234567890 veya 12345678901"
                   maxLength={11}
                   className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
                 />
+                <p className="mt-1 text-xs text-gray-400">Sermaye şirketi için 10 haneli VKN, şahıs şirketi için 11 haneli TCKN.</p>
               </div>
 
               {/* Sektör */}
@@ -435,17 +436,18 @@ export default function SirketlerPage() {
                 />
               </div>
 
-              {/* VKN */}
+              {/* VKN / TCKN */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Vergi Kimlik No</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">VKN / TCKN</label>
                 <input
                   type="text"
                   value={form.taxNumber}
                   onChange={(e) => setField('taxNumber', e.target.value)}
-                  placeholder="10 haneli VKN"
+                  placeholder="Örn: 1234567890 veya 12345678901"
                   maxLength={11}
                   className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
                 />
+                <p className="mt-1 text-xs text-gray-400">Sermaye şirketi için 10 haneli VKN, şahıs şirketi için 11 haneli TCKN.</p>
               </div>
 
               {/* Sektör */}

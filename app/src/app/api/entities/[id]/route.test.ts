@@ -236,4 +236,87 @@ describe('PATCH /api/entities/[id]', () => {
     expect(analysisUpdateMock).not.toHaveBeenCalled()
   })
 
+  // ─── Faz 7.3.50A.3.3 — VKN/TCKN Validation Simetri ─────────────────────
+
+  // ── T_API_PATCH1: VKN 10 hane → 200 ──────────────────────────────────────
+
+  test('T_API_PATCH1 — VKN 10 hane → 200 (geçerli)', async () => {
+    setupMocks({
+      userId:       'user-1',
+      existing:     makeExisting({ sector: null }),
+      updateResult: { id: 'e-1', name: 'Test Şirket', taxNumber: '1234567890', sector: null, entityType: 'STANDALONE' },
+    })
+
+    const req = createMockRequest({ taxNumber: '1234567890' })
+    const res = await callPatch(req)
+
+    expect(res.status).toBe(200)
+  })
+
+  // ── T_API_PATCH2: TCKN 11 hane → 200 ─────────────────────────────────────
+
+  test('T_API_PATCH2 — TCKN 11 hane → 200 (şahıs şirketi için geçerli)', async () => {
+    setupMocks({
+      userId:       'user-1',
+      existing:     makeExisting({ sector: null }),
+      updateResult: { id: 'e-1', name: 'ATLI ENES', taxNumber: '35356829180', sector: null, entityType: 'STANDALONE' },
+    })
+
+    const req = createMockRequest({ taxNumber: '35356829180' }) // 11 hane
+    const res = await callPatch(req)
+
+    expect(res.status).toBe(200)
+  })
+
+  // ── T_API_PATCH3: 9 haneli → 400, yeni hata mesajı ───────────────────────
+
+  test('T_API_PATCH3 — 9 haneli taxNumber → 400, VKN/TCKN mesajı', async () => {
+    setupMocks({
+      userId:   'user-1',
+      existing: makeExisting({ sector: null }),
+    })
+
+    const req = createMockRequest({ taxNumber: '123456789' }) // 9 hane
+    const res = await callPatch(req)
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/VKN\/TCKN/)
+    expect(body.error).toMatch(/10 veya 11/)
+  })
+
+  // ── T_API_PATCH4: boş string → normalize → null ile update ───────────────
+
+  test('T_API_PATCH4 — taxNumber boş string → normalizeTaxNumber → null ile update', async () => {
+    const { entityUpdateMock } = setupMocks({
+      userId:       'user-1',
+      existing:     makeExisting({ sector: null }),
+      updateResult: { id: 'e-1', name: 'Test Şirket', taxNumber: null, sector: null, entityType: 'STANDALONE' },
+    })
+
+    const req = createMockRequest({ taxNumber: '' })
+    const res = await callPatch(req)
+
+    expect(res.status).toBe(200)
+    const updateData = entityUpdateMock.mock.calls[0][0].data
+    expect(updateData.taxNumber).toBeNull()
+  })
+
+  // ── T_API_PATCH5: taxNumber undefined → update data'ya eklenmemeli ────────
+
+  test('T_API_PATCH5 — taxNumber undefined → update dataya eklenmez (mevcut korunur)', async () => {
+    const { entityUpdateMock } = setupMocks({
+      userId:       'user-1',
+      existing:     makeExisting({ sector: null }),
+      updateResult: { id: 'e-1', name: 'Yeni Ad', taxNumber: '9999999999', sector: null, entityType: 'STANDALONE' },
+    })
+
+    const req = createMockRequest({ name: 'Yeni Ad' }) // taxNumber body'de yok
+    const res = await callPatch(req)
+
+    expect(res.status).toBe(200)
+    const updateData = entityUpdateMock.mock.calls[0][0].data
+    expect(updateData).not.toHaveProperty('taxNumber')
+  })
+
 })

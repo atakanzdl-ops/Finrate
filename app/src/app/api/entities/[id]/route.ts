@@ -5,6 +5,7 @@ import { getUserIdFromRequest } from '@/lib/auth'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
+import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
 
 const VALID_SECTORS = new Set([
   'Üretim', 'Ticaret', 'Hizmet', 'İnşaat', 'Turizm', 'Tarım',
@@ -48,10 +49,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (name !== undefined && name.trim().length < 2) {
       return jsonUtf8({ error: 'Şirket adı en az 2 karakter olmalıdır.' }, { status: 400 })
     }
-    if (taxNumber !== undefined && taxNumber !== null && taxNumber !== '') {
-      if (!/^\d{10}$/.test(String(taxNumber))) {
-        return jsonUtf8({ error: 'VKN 10 haneli rakam olmalıdır.' }, { status: 400 })
-      }
+    if (taxNumber !== undefined && !isValidOptionalTaxNumber(taxNumber)) {
+      return jsonUtf8({ error: 'VKN/TCKN 10 veya 11 haneli rakam olmalıdır.' }, { status: 400 })
     }
     if (sector !== undefined && sector !== null && sector !== '') {
       if (!VALID_SECTORS.has(sector)) {
@@ -67,11 +66,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Sektör değişti mi? (boş string → null normalleştirmesi dahil)
     const sectorChanged = sector !== undefined && (sector || null) !== existing.sector
 
+    const normalizedTaxNumber = normalizeTaxNumber(taxNumber)
+
     const entity = await prisma.entity.update({
       where: { id },
       data: {
         ...(name        !== undefined && { name: name.trim() }),
-        ...(taxNumber   !== undefined && { taxNumber: taxNumber || null }),
+        ...(taxNumber   !== undefined && { taxNumber: normalizedTaxNumber }),
         ...(sector      !== undefined && { sector: sector || null }),
         ...(entityType  !== undefined && { entityType }),
         ...(groupId     !== undefined && { groupId }),

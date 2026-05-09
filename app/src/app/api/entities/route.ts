@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
+import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
 
 // GET /api/entities — kullanıcının şirketleri
 export async function GET(req: NextRequest) {
@@ -40,12 +41,17 @@ export async function POST(req: NextRequest) {
     if (!name || name.trim().length < 2) {
       return jsonUtf8({ error: 'Şirket adı en az 2 karakter olmalıdır.' }, { status: 400 })
     }
+    if (taxNumber !== undefined && !isValidOptionalTaxNumber(taxNumber)) {
+      return jsonUtf8({ error: 'VKN/TCKN 10 veya 11 haneli rakam olmalıdır.' }, { status: 400 })
+    }
+
+    const normalizedTaxNumber = normalizeTaxNumber(taxNumber)
 
     const entity = await prisma.entity.create({
       data: {
         userId,
         name: name.trim(),
-        taxNumber: taxNumber ?? null,
+        taxNumber: normalizedTaxNumber,
         sector: sector ?? null,
         entityType: entityType ?? 'STANDALONE',
         groupId: groupId ?? null,
