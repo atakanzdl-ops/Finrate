@@ -453,15 +453,17 @@ describe('parseTaxIdentity — Faz 7.3.50A.3.1 Hotfix', () => {
 
   // ── T_FIX14: Digit boundary ─────────────────────────────────────────────────
 
-  test('T_FIX14 — 11 haneli sayı VKN olarak yakalanmaz (digit boundary (?!\\d))', () => {
+  test('T_FIX14 — 11 haneli sayı VKN olmaz; "Vergi Kimlik Numarası" TC lookahead tetiklemez', () => {
     const text = [
       '12345678901',             // 11 hane — VKN değil
-      'Vergi Kimlik Numarası',
+      'Vergi Kimlik Numarası',   // VKN etiketi — TC lookahead /tc kimlik|kimlik no/ eşleşmez
       '',
     ].join('\n')
     const result = parseTaxIdentity(text)
     // 11 haneli sayı label-öncesi (/^\d{10}$/ → FAIL) ve classic (?!\d) koruması
     expect(result.taxNumber).toBeNull()
+    // "Vergi Kimlik Numarası" norm'u "tc kimlik" veya "kimlik no" içermiyor → TC de yakalanmaz
+    expect(result.tcKimlik).toBeNull()
   })
 
   // ── T_FIX15: SMMM bloğu izolasyonu ─────────────────────────────────────────
@@ -472,6 +474,137 @@ describe('parseTaxIdentity — Faz 7.3.50A.3.1 Hotfix', () => {
     expect(result.taxNumber).toBe('2731120400')
     // SMMM VKN'si (11514125066) TC kimlik olarak da alınmamalı
     expect(result.tcKimlik).toBeNull()
+  })
+
+})
+
+// ─── parseTaxIdentity — Faz 7.3.50A.3.2 Hotfix (1001A GVB + Şahıs) ──────────
+//
+// T_FIX16–T_FIX18: ENES 1001A inline fixture (TC label-öncesi + şahıs title)
+// T_FIX19–T_FIX21: Title birleştirme edge-case'leri
+// T_FIX22–T_FIX23: TC label-öncesi çeşitli label formatları
+// T_FIX24        : DEKAM regresyon — tcKimlik = null korunur
+// T_FIX25        : Eski TC format (TC_PATS classic) koruma
+
+describe('parseTaxIdentity — Faz 7.3.50A.3.2 Hotfix', () => {
+
+  // ── ENES 1001A sentetik fixture (K3 ile doğrulanmış yapı) ───────────────────
+  const ENES_1001A = [
+    'YILLIK GELİR VERGİSİ BEYANNAMESİ',
+    '1001A',
+    ' Soyadı (Unvanı)',
+    ' Adı (Unvanın Devamı)',
+    ' Ticaret Sicil No İrtibat Tel No',
+    ' E-Posta Adresi',
+    '35356829180',              // TC kimlik (etiket ÖNCE gelir — label-öncesi yapı)
+    'ATLI',                     // Soyadı
+    'ENES',                     // Adı
+    '772343-0 216 4718228',
+    'enes.atli877@gmail.com',
+    'Vergi Kimlik Numarası (TC Kimlik No)',  // bileşik etiket — "tc kimlik" içerir
+  ].join('\n')
+
+  // ── T_FIX16–T_FIX18: ENES 1001A ────────────────────────────────────────────
+
+  test('T_FIX16 — ENES 1001A: TC kimlik "35356829180" tespit edilir (label-öncesi yapı)', () => {
+    const result = parseTaxIdentity(ENES_1001A)
+    expect(result.tcKimlik).toBe('35356829180')
+  })
+
+  test('T_FIX17 — ENES 1001A: title "ATLI" ve "ENES" içerir (şahıs birleştirme)', () => {
+    const result = parseTaxIdentity(ENES_1001A)
+    expect(result.title).toBeTruthy()
+    expect(result.title).toContain('ATLI')
+    expect(result.title).toContain('ENES')
+  })
+
+  test('T_FIX18 — ENES 1001A: sourceConfidence = HIGH (tcKimlik set)', () => {
+    const result = parseTaxIdentity(ENES_1001A)
+    expect(result.sourceConfidence).toBe('HIGH')
+  })
+
+  // ── T_FIX19–T_FIX21: Title birleştirme edge-case'leri ──────────────────────
+
+  test('T_FIX19 — Şahıs: personal context + 2 name candidate → title birleştirme yapılır', () => {
+    const text = [
+      ' Soyadı (Unvanı)',    // personal context trigger
+      'YILMAZ',
+      'MEHMET',
+      '35356829180',
+      'Vergi Kimlik Numarası (TC Kimlik No)',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.title).toBeTruthy()
+    expect(result.title).toContain('YILMAZ')
+    expect(result.title).toContain('MEHMET')
+  })
+
+  test('T_FIX20 — Non-personal context (mukellef adi) + 2 name-like candidate → birleştirme yok', () => {
+    const text = [
+      'Mükellef Adı',         // NOT personal context (/soyadi unvani/ eşleşmez)
+      'YILMAZ',
+      'MEHMET',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    // title sadece ilk aday olmalı (birleştirme yapılmaz)
+    expect(result.title).toBe('YILMAZ')
+  })
+
+  test('T_FIX21 — Personal context ama digit içeren aday: looksLikeName false → birleştirme yok', () => {
+    const text = [
+      ' Soyadı (Unvanı)',     // personal context
+      'YILMAZ3',              // rakam içeriyor → looksLikeName = false
+      'MEHMET',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    // looksLikeName false olduğu için birleştirilmez — ilk aday
+    expect(result.title).toBe('YILMAZ3')
+  })
+
+  // ── T_FIX22–T_FIX23: TC label-öncesi çeşitli label formatları ──────────────
+
+  test('T_FIX22 — TC label-öncesi: bileşik "Vergi Kimlik Numarası (TC Kimlik No)" → tcKimlik', () => {
+    const text = [
+      'Form başlığı',
+      '11111111111',                          // 11-digit TC değeri
+      'Ara metin',
+      'Vergi Kimlik Numarası (TC Kimlik No)', // "tc kimlik" içerir
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.tcKimlik).toBe('11111111111')
+  })
+
+  test('T_FIX23 — TC label-öncesi: "Kimlik No" etiketi → tcKimlik', () => {
+    const text = [
+      'Form başlığı',
+      '22222222222',   // 11-digit TC değeri
+      'Ara metin',
+      'Kimlik No',     // "kimlik no" içerir
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.tcKimlik).toBe('22222222222')
+  })
+
+  // ── T_FIX24: DEKAM regresyon ─────────────────────────────────────────────────
+
+  test('T_FIX24 — DEKAM 2024 regresyon: mükellef bloğunda 11 hane yok → tcKimlik = null', () => {
+    const result = parseTaxIdentity(dekam2024.rawText)
+    expect(result.tcKimlik).toBeNull()
+    // VKN korunur
+    expect(result.taxNumber).toBe('2731120400')
+  })
+
+  // ── T_FIX25: Eski TC format (TC_PATS classic) koruma ────────────────────────
+
+  test('T_FIX25 — Eski TC format: "Kimlik No: 12345678901" classic TC_PATS ile yakalanır', () => {
+    const text = [
+      'Vergi Dairesi: Mersin',
+      'Kimlik No: 12345678901',  // TC_PATS[1]: /kimlik\s+no[su]?[\s:]*/
+      'Mükellef',
+    ].join('\n')
+    const result = parseTaxIdentity(text)
+    expect(result.tcKimlik).toBe('12345678901')
+    expect(result.sourceConfidence).toBe('HIGH')
   })
 
 })

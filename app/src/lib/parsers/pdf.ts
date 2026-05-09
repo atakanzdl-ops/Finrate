@@ -157,6 +157,23 @@ export function parseTaxIdentity(pdfText: string): ParsedIdentity {
     if (m) { tcKimlik = m[1]; break }
   }
 
+  // 3) Label-öncesi TC fallback (1001A GVB yapısı: TC değeri etiket satırından önce gelir)
+  //    Lookahead: "tc kimlik" veya "kimlik no" içeren satır → mükellef TC kimliği
+  //    "Vergi Kimlik Numarası" (VKN etiketi) kasıtlı dışlanır — T_FIX14 korunur.
+  if (!tcKimlik) {
+    for (let i = 0; i < smmBoundary; i++) {
+      const trimmed = rawLines[i].trim()
+      if (!/^\d{11}$/.test(trimmed)) continue
+      for (let j = i + 1; j < Math.min(i + 11, smmBoundary); j++) {
+        if (/tc kimlik|kimlik no/.test(normLines[j])) {
+          tcKimlik = trimmed
+          break
+        }
+      }
+      if (tcKimlik) break
+    }
+  }
+
   // ── Mükellef unvanı ───────────────────────────────────────────────────────────
   let title: string | null = null
   const TITLE_LABELS_LOCAL = [
@@ -200,7 +217,24 @@ export function parseTaxIdentity(pdfText: string): ParsedIdentity {
           // Suffix ilk sırada: diğer parça öne alınır
           title = candidates[1] + ' ' + candidates[0]
         } else {
-          title = candidates[0]
+          // Şahıs mükellef context: "Soyadı (Unvanı)" vb. etiket + kişi adı parçaları → birleştir
+          const isPersonalContext =
+            /soyadi unvani|adi unvanin devami|soyadi adi unvani/.test(lnl)
+          const looksLikeName = (s: string) => {
+            const t = s.trim()
+            return t.length >= 2 && t.length <= 30 && !/\d/.test(t) && !/[@.]/.test(t)
+          }
+          if (
+            isPersonalContext &&
+            candidates.length >= 2 &&
+            looksLikeName(candidates[0]) &&
+            looksLikeName(candidates[1])
+          ) {
+            // Soyad + Ad: PDF sırası (soyad önce) — "ATLI ENES"
+            title = candidates[0] + ' ' + candidates[1]
+          } else {
+            title = candidates[0]
+          }
         }
         break outer
       }
