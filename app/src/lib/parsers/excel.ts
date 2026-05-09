@@ -480,6 +480,17 @@ const MIZAN_MAP: Record<string, string> = {
   '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets', '267': 'intangibleAssets', // Faz 7.3.25: 267 Diğer Maddi Olmayan
   '280': 'longTermPrepaidExpenses',
   '580': 'retainedLosses',
+  // Gelir tablosu – 60x/61x/62x/63x/66x (Faz 7.3.50A.6)
+  // 60x: Brüt Satışlar → bakAlacak (_A)
+  '600': 'grossRevenue_A', '601': 'grossRevenue_A', '602': 'grossRevenue_A',
+  // 61x: Satış İndirimleri → bakBorç
+  '610': 'salesReturns',   '611': 'salesReturns',   '612': 'salesReturns',
+  // 62x: Satışların Maliyeti → bakBorç
+  '620': 'costOfGoods',    '621': 'costOfGoods',    '622': 'costOfGoods',    '623': 'costOfGoods',
+  // 63x: Faaliyet Giderleri → bakBorç
+  '630': 'sellingExpenses', '631': 'sellingExpenses', '632': 'sellingExpenses',
+  // 66x: Finansman Giderleri → bakBorç
+  '660': 'interestCost',   '661': 'interestCost',
   // Gelir tablosu – 64x/65x/67x/68x (mizan'da görünebilir)
   // 64x: Diğer Olağan Gelir ve Karlar → bakAlacak (_A)
   '640': 'otherIncome_A', '641': 'otherIncome_A', '642': 'otherIncome_A',

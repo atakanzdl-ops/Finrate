@@ -634,3 +634,78 @@ describe('parseExcelIdentity (Faz 7.3.50A.3)', () => {
     expect(result.sourceConfidence).toBe('HIGH')
   })
 })
+
+// ─── T_MIZ: Mizan Parser Gelir Tablosu Hesapları (Faz 7.3.50A.6) ─────────────
+
+describe('parseMizanRows — gelir tablosu 60x/61x/62x/63x/66x (Faz 7.3.50A.6)', () => {
+
+  // T_MIZ1: 600 bakAlacak → rawAccounts'a kaydedilmeli
+  test('T_MIZ1 — 600 bakAlacak 327M → rawAccounts code=600, amount=327_000_000', async () => {
+    const rows = makeMizanRows([{ code: '600', bakAlacak: 327_000_000 }])
+    const result = await parseMizanRows(rows)
+    const acc = result[0]?.rawAccounts?.find(a => a.code === '600')
+    expect(acc).toBeDefined()
+    expect(acc?.amount).toBe(327_000_000)
+  })
+
+  // T_MIZ2: 610 bakBorç → rawAccounts'a kaydedilmeli
+  test('T_MIZ2 — 610 bakBorç 12M → rawAccounts code=610, amount=12_000_000', async () => {
+    const rows = makeMizanRows([{ code: '610', bakBorc: 12_000_000 }])
+    const result = await parseMizanRows(rows)
+    const acc = result[0]?.rawAccounts?.find(a => a.code === '610')
+    expect(acc).toBeDefined()
+    expect(acc?.amount).toBe(12_000_000)
+  })
+
+  // T_MIZ3: 620 bakBorç → rawAccounts'a kaydedilmeli
+  test('T_MIZ3 — 620 bakBorç 185M → rawAccounts code=620, amount=185_000_000', async () => {
+    const rows = makeMizanRows([{ code: '620', bakBorc: 185_000_000 }])
+    const result = await parseMizanRows(rows)
+    const acc = result[0]?.rawAccounts?.find(a => a.code === '620')
+    expect(acc).toBeDefined()
+    expect(acc?.amount).toBe(185_000_000)
+  })
+
+  // T_MIZ4: 660 bakBorç → rawAccounts'a kaydedilmeli
+  test('T_MIZ4 — 660 bakBorç 8M → rawAccounts code=660, amount=8_000_000', async () => {
+    const rows = makeMizanRows([{ code: '660', bakBorc: 8_000_000 }])
+    const result = await parseMizanRows(rows)
+    const acc = result[0]?.rawAccounts?.find(a => a.code === '660')
+    expect(acc).toBeDefined()
+    expect(acc?.amount).toBe(8_000_000)
+  })
+
+  // T_MIZ5: 600+601+602 → fields.grossRevenue toplamı
+  test('T_MIZ5 — 600+601+602 bakAlacak → fields.grossRevenue birikir', async () => {
+    const rows = makeMizanRows([
+      { code: '600', bakAlacak: 200_000_000 },
+      { code: '601', bakAlacak:  80_000_000 },
+      { code: '602', bakAlacak:  40_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.grossRevenue).toBe(320_000_000)
+  })
+
+  // T_MIZ6: 620+621+622+623 → fields.costOfGoods toplamı
+  test('T_MIZ6 — 620+621+622+623 bakBorç → fields.costOfGoods birikir', async () => {
+    const rows = makeMizanRows([
+      { code: '620', bakBorc: 100_000_000 },
+      { code: '621', bakBorc:  30_000_000 },
+      { code: '622', bakBorc:  20_000_000 },
+      { code: '623', bakBorc:  10_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.costOfGoods).toBe(160_000_000)
+  })
+
+  // T_MIZ7: 660+661 → fields.interestCost toplamı
+  test('T_MIZ7 — 660+661 bakBorç → fields.interestCost birikir', async () => {
+    const rows = makeMizanRows([
+      { code: '660', bakBorc: 5_000_000 },
+      { code: '661', bakBorc: 3_000_000 },
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result[0]?.fields?.interestCost).toBe(8_000_000)
+  })
+
+})
