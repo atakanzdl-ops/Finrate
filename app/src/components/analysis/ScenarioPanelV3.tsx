@@ -48,7 +48,7 @@ import {
   GitCompare,
 } from 'lucide-react'
 import { getTargetRatingOptions } from '@/lib/scoring/uiRating'
-import { normalizeLegacyRating } from '@/lib/scoring/scenarioV3/ratingReasoning'
+import { normalizeLegacyRating, ratingToIndex, RATING_ORDER } from '@/lib/scoring/scenarioV3/ratingReasoning'
 import { RatioTransparencyBlock } from './RatioTransparencyBlock'
 import type { ScenarioV3ApiResponse } from '@/lib/scoring/scenarioV3/responseTypes'
 import type { DecisionInsight } from '@/lib/scoring/scenarioV3/contracts'
@@ -111,6 +111,39 @@ function toStringArray(value: unknown): string[] {
   }
   if (typeof value === 'string' && value.trim()) return [value]
   return []
+}
+
+// ─── buildNotReachedBannerMessage (Faz 7.3.50A.4) ───────────────────────────
+
+/** Bilinen bir rating string'ini normalize eder; bilinmiyorsa null döner. */
+function parseKnownRating(value: string | undefined | null): string | null {
+  if (!value) return null
+  const clean = value.trim().toUpperCase().replace(/[+-]/g, '')
+  return (RATING_ORDER as readonly string[]).includes(clean) ? clean : null
+}
+
+/**
+ * "Hedef rating'e ulaşılamıyor" uyarı banner mesajını oluşturur.
+ *
+ * Mantık:
+ *   achievable <= current → "current seviyesinde kalınmaktadır"
+ *   achievable >  current → "en yakın gerçekçi seviye: achievable"
+ *   boş / geçersiz input  → fallback
+ *
+ * Saf fonksiyon — test edilebilir export.
+ */
+export function buildNotReachedBannerMessage(
+  currentRating:   string | undefined | null,
+  achievableRating: string | undefined | null,
+): string {
+  const FALLBACK = `Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor.`
+  const current   = parseKnownRating(currentRating)
+  const achievable = parseKnownRating(achievableRating)
+  if (!current || !achievable) return FALLBACK
+  const currentIdx   = ratingToIndex(current)
+  const achievableIdx = ratingToIndex(achievable)
+  if (achievableIdx <= currentIdx) return `Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. Mevcut ${current} seviyesinde kalınmaktadır.`
+  return `Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. En yakın gerçekçi seviye: ${achievable}.`
 }
 
 // ─── sanitizeJargon ──────────────────────────────────────────────────────────
@@ -510,8 +543,10 @@ function AksiyonPlaniTab({
         <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3">
           <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
           <div className="text-sm text-amber-900">
-            Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. En yakın gerçekçi seviye:{' '}
-            <strong>{da.canonicalOutcome.achievableRating}</strong>.
+            {buildNotReachedBannerMessage(
+              _exec.currentRating,
+              da.canonicalOutcome?.achievableRating
+            )}
           </div>
         </div>
       )}

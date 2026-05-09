@@ -11,7 +11,7 @@
  */
 
 import { renderToStaticMarkup } from 'react-dom/server'
-import { sanitizeJargon, renderTargetFeasibilitySection } from './ScenarioPanelV3'
+import { sanitizeJargon, renderTargetFeasibilitySection, buildNotReachedBannerMessage } from './ScenarioPanelV3'
 
 // ─── T_SJ: sanitizeJargon ─────────────────────────────────────────────────────
 
@@ -177,6 +177,57 @@ describe('T_DETAY_RENDER — renderTargetFeasibilitySection render dogrulamasi',
 
     // Pozitif override mesaji YOK
     expect(html).not.toContain('seviyesine')
+  })
+
+})
+
+// ─── T_UI: buildNotReachedBannerMessage (Faz 7.3.50A.4) ─────────────────────
+
+describe('buildNotReachedBannerMessage (Faz 7.3.50A.4)', () => {
+
+  const FALLBACK = "Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor."
+
+  // T_UI1 — ANA BUG: achievable < current → kalınır mesajı (CCC gösterilmez)
+  test('T_UI1 — achievable(CCC) < current(B) → mevcut seviyede kalinir, CCC gosterilmez', () => {
+    const msg = buildNotReachedBannerMessage('B', 'CCC')
+    expect(msg).toContain('B seviyesinde kalınmaktadır')
+    expect(msg).not.toContain('CCC')
+  })
+
+  // T_UI2 — Engine doğru: achievable > current → en yakın seviye gösterilir
+  test('T_UI2 — achievable(BB) > current(B) → en yakin gercekci seviye BB', () => {
+    const msg = buildNotReachedBannerMessage('B', 'BB')
+    expect(msg).toContain('En yakın gerçekçi seviye: BB')
+  })
+
+  // T_UI3 — Eşit: achievable === current → kalınır mesajı
+  test('T_UI3 — achievable(B) === current(B) → mevcut seviyede kalinir', () => {
+    const msg = buildNotReachedBannerMessage('B', 'B')
+    expect(msg).toContain('B seviyesinde kalınmaktadır')
+  })
+
+  // T_UI4 — Boş input → fallback
+  test('T_UI4 — undefined/null input → fallback mesaji', () => {
+    expect(buildNotReachedBannerMessage(undefined, undefined)).toBe(FALLBACK)
+    expect(buildNotReachedBannerMessage('B', null)).toBe(FALLBACK)
+    expect(buildNotReachedBannerMessage(null, 'BB')).toBe(FALLBACK)
+  })
+
+  // T_UI5 — Geçersiz rating → fallback
+  test('T_UI5 — gecersiz rating string → fallback mesaji', () => {
+    expect(buildNotReachedBannerMessage('B', 'XYZ')).toBe(FALLBACK)
+    expect(buildNotReachedBannerMessage('XYZ', 'B')).toBe(FALLBACK)
+  })
+
+  // T_UI6 — Input normalize: trim + uppercase + +/- temizleme
+  test('T_UI6 — input normalize: trim + case + +/- → dogru karar', () => {
+    // '  b  ' ve '  ccc  ' → B(idx=4) ve CCC(idx=3) → achievable < current → kalinir
+    const msg1 = buildNotReachedBannerMessage('  b  ', '  ccc  ')
+    expect(msg1).toContain('B seviyesinde kalınmaktadır')
+
+    // 'B+' → B (idx=4), 'B' → B (idx=4) → esit → kalinir
+    const msg2 = buildNotReachedBannerMessage('B+', 'B')
+    expect(msg2).toContain('B seviyesinde kalınmaktadır')
   })
 
 })
