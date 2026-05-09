@@ -257,6 +257,13 @@ export function checkEntityIdentity(
     detected.taxNumber === entity.taxNumber
   if (vknMatch) return { ok: true }
 
+  // ÖNCELİK 0 ek: TC=VKN match (Faz 7.3.50A.3.4)
+  // Atakan kuralı: şahıs mükellefinde entity.taxNumber = 11 hane TCKN
+  // parser detected.taxNumber set etmese de tcKimlik ile match → identity OK
+  if (detected.tcKimlik && entity.taxNumber && detected.tcKimlik === entity.taxNumber) {
+    return { ok: true }
+  }
+
   // CASE 1 HARD — VKN mismatch
   if (detected.taxNumber && entity.taxNumber && detected.taxNumber !== entity.taxNumber) {
     return {
@@ -264,6 +271,22 @@ export function checkEntityIdentity(
       error:    'ENTITY_TAX_NUMBER_MISMATCH',
       message:  UPLOAD_ERRORS.ENTITY_TAX_NUMBER_MISMATCH(
         detected.title ?? detected.taxNumber,
+        entity.name ?? '',
+      ),
+      detected: { taxNumber: detected.taxNumber, tcKimlik: detected.tcKimlik, title: detected.title },
+      entity:   { name: entity.name, taxNumber: entity.taxNumber },
+    }
+  }
+
+  // CASE 1b HARD — TC mismatch (Faz 7.3.50A.3.4)
+  // detected.tcKimlik var + entity.taxNumber dolu + farklı → yanlış firma sayfasına
+  // şahıs dosyası yüklenmiş; confirmed bypass-resistant (CASE 1 ile aynı grup)
+  if (detected.tcKimlik && entity.taxNumber && detected.tcKimlik !== entity.taxNumber) {
+    return {
+      ok:       false,
+      error:    'ENTITY_TAX_NUMBER_MISMATCH',
+      message:  UPLOAD_ERRORS.ENTITY_TAX_NUMBER_MISMATCH(
+        detected.title ?? detected.tcKimlik,
         entity.name ?? '',
       ),
       detected: { taxNumber: detected.taxNumber, tcKimlik: detected.tcKimlik, title: detected.title },
@@ -284,8 +307,9 @@ export function checkEntityIdentity(
     }
   }
 
-  // CASE 3 SOFT — VKN yok, TC var
-  if (!detected.taxNumber && detected.tcKimlik) {
+  // CASE 3 SOFT — VKN yok, TC var, entity.taxNumber NULL (Faz 7.3.50A.3.4: şart revize)
+  // entity.taxNumber dolu ise: A1 (match) veya CASE 1b (mismatch) zaten karar vermiştir
+  if (!detected.taxNumber && detected.tcKimlik && !entity.taxNumber) {
     return {
       ok:       false,
       error:    'ENTITY_TC_UNVERIFIED_CONFIRM',

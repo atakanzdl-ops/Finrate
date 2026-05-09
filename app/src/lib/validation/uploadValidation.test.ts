@@ -351,6 +351,85 @@ describe('checkEntityIdentity (Faz 7.3.50A.3)', () => {
     )
     expect(result.ok).toBe(true)
   })
+
+  // ─── Faz 7.3.50A.3.4 — mirror-aware testleri ─────────────────────────────
+
+  // T_VAL1 — ENES senaryosu: TC=VKN match → sessiz ok:true (modal çıkmaz)
+  test('T_VAL1 — ENES: detected.tcKimlik === entity.taxNumber → ok:true (TC=VKN match)', () => {
+    const result = checkEntityIdentity(
+      { tcKimlik: '35356829180', title: 'ATLI ENES', sourceConfidence: 'HIGH' },
+      { name: 'enes', taxNumber: '35356829180' },
+      false,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.error).toBeUndefined()
+  })
+
+  // T_VAL2 — TC mismatch hard: detected.tcKimlik !== entity.taxNumber → ENTITY_TAX_NUMBER_MISMATCH
+  test('T_VAL2 — TC mismatch hard → ok:false, ENTITY_TAX_NUMBER_MISMATCH', () => {
+    const result = checkEntityIdentity(
+      { tcKimlik: '11111111111', sourceConfidence: 'HIGH' },
+      { name: 'Test Firması', taxNumber: '35356829180' },
+      false,
+    )
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+  })
+
+  // T_VAL3 — DEKAM VKN match regresyon
+  test('T_VAL3 — DEKAM: VKN match korundu → ok:true', () => {
+    const result = checkEntityIdentity(
+      { taxNumber: '2731120400', sourceConfidence: 'HIGH' },
+      { name: 'DEKAM YAPI', taxNumber: '2731120400' },
+      false,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.error).toBeUndefined()
+  })
+
+  // T_VAL4 — T21b regresyon: entity.taxNumber null + TC detected → TC_UNVERIFIED korunur
+  test('T_VAL4 — TC detected + entity.taxNumber null → ENTITY_TC_UNVERIFIED_CONFIRM (regresyon)', () => {
+    const result = checkEntityIdentity(
+      { tcKimlik: '35356829180', sourceConfidence: 'MEDIUM' },
+      { name: 'Test Firması', taxNumber: null },
+      false,
+    )
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('ENTITY_TC_UNVERIFIED_CONFIRM')
+  })
+
+  // T_VAL5 — edge: entity 10 hane sermaye + detected TC 11 hane farklı → hard block
+  test('T_VAL5 — entity VKN 10 hane + detected TC 11 hane farklı → hard ENTITY_TAX_NUMBER_MISMATCH', () => {
+    const result = checkEntityIdentity(
+      { tcKimlik: '35356829180', sourceConfidence: 'HIGH' },
+      { name: 'Baska Sirket', taxNumber: '2731120400' },
+      false,
+    )
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+  })
+
+  // T_VAL6 — VKN mismatch regresyon
+  test('T_VAL6 — VKN mismatch regresyon korundu → ok:false, ENTITY_TAX_NUMBER_MISMATCH', () => {
+    const result = checkEntityIdentity(
+      { taxNumber: '1234567890', sourceConfidence: 'HIGH' },
+      { name: 'Test Firması', taxNumber: '2731120400' },
+      false,
+    )
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+  })
+
+  // T_VAL7 — defansif: detected.taxNumber + tcKimlik her ikisi de entity.taxNumber ile match → ok:true (CASE 0 yakalar)
+  test('T_VAL7 — defansif: taxNumber + tcKimlik her ikisi dolu, VKN match → ok:true', () => {
+    const result = checkEntityIdentity(
+      { taxNumber: '35356829180', tcKimlik: '35356829180', sourceConfidence: 'HIGH' },
+      { name: 'ATLI ENES', taxNumber: '35356829180' },
+      false,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.error).toBeUndefined()
+  })
 })
 
 // ─── fuzzyTitleMatch (Faz 7.3.50A.3) ─────────────────────────────────────────
