@@ -11,7 +11,7 @@
  */
 
 import { renderToStaticMarkup } from 'react-dom/server'
-import { sanitizeJargon, renderTargetFeasibilitySection, buildNotReachedBannerMessage } from './ScenarioPanelV3'
+import { sanitizeJargon, renderTargetFeasibilitySection, buildNotReachedBannerMessage, computeGrossMarginFromBalances, buildOperationalWarning } from './ScenarioPanelV3'
 
 // ─── T_SJ: sanitizeJargon ─────────────────────────────────────────────────────
 
@@ -228,6 +228,73 @@ describe('buildNotReachedBannerMessage (Faz 7.3.50A.4)', () => {
     // 'B+' → B (idx=4), 'B' → B (idx=4) → esit → kalinir
     const msg2 = buildNotReachedBannerMessage('B+', 'B')
     expect(msg2).toContain('B seviyesinde kalınmaktadır')
+  })
+
+})
+
+// ─── T_OW: Operasyonel Uyarı Kartı (Faz 7.3.50A.8) ──────────────────────────
+
+describe('computeGrossMarginFromBalances + buildOperationalWarning (Faz 7.3.50A.8)', () => {
+
+  // T_OW1 — DEKAM gerçek verisi: negatif brüt marj
+  test('T_OW1 — DEKAM gerçek veri: grossMargin ≈ -0.069, netSales > 0, grossProfit < 0', () => {
+    const result = computeGrossMarginFromBalances({
+      '600': 327862353.91,
+      '602': 195061.12,
+      '621': 350592677,
+    })
+    expect(result.grossMargin).not.toBeNull()
+    expect(result.netSales).toBeGreaterThan(0)
+    expect(result.grossProfit).toBeLessThan(0)
+    // -%6.9 civarı: -22535261.97 / 328057415.03 ≈ -0.0687
+    expect(result.grossMargin!).toBeCloseTo(-0.069, 2)
+  })
+
+  // T_OW2 — undefined input → grossMargin null
+  test('T_OW2 — undefined input → grossMargin null', () => {
+    const result = computeGrossMarginFromBalances(undefined)
+    expect(result.grossMargin).toBeNull()
+    expect(result.netSales).toBe(0)
+    expect(result.grossProfit).toBe(0)
+  })
+
+  // T_OW3 — boş balances → netSales 0 → grossMargin null
+  test('T_OW3 — boş balances → netSales 0 → grossMargin null', () => {
+    const result = computeGrossMarginFromBalances({})
+    expect(result.grossMargin).toBeNull()
+    expect(result.netSales).toBe(0)
+  })
+
+  // T_OW4 — DEKAM uyarı metni: 'negatif', '-%6.9', 'maliyet'
+  test('T_OW4 — DEKAM veri → uyarı metni içerir negatif + -%6.9 + maliyet', () => {
+    const warning = buildOperationalWarning({
+      '600': 327862353.91,
+      '602': 195061.12,
+      '621': 350592677,
+    })
+    expect(warning).not.toBeNull()
+    expect(warning).toContain('negatif')
+    expect(warning).toContain('-%6.9')
+    expect(warning).toContain('maliyet')
+  })
+
+  // T_OW5 — pozitif marj → null (uyarı yok)
+  test('T_OW5 — pozitif brüt marj → buildOperationalWarning null', () => {
+    const warning = buildOperationalWarning({
+      '600': 100_000_000,
+      '621':  50_000_000,
+    })
+    expect(warning).toBeNull()
+  })
+
+  // T_OW6 — undefined → null (uyarı yok)
+  test('T_OW6 — undefined balances → buildOperationalWarning null', () => {
+    expect(buildOperationalWarning(undefined)).toBeNull()
+  })
+
+  // T_OW7 — boş balances → null (netSales 0)
+  test('T_OW7 — boş balances → buildOperationalWarning null', () => {
+    expect(buildOperationalWarning({})).toBeNull()
   })
 
 })

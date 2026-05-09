@@ -146,6 +146,55 @@ export function buildNotReachedBannerMessage(
   return `Mevcut aksiyonlarla hedef rating'e tam ulaşılamıyor. En yakın gerçekçi seviye: ${achievable}.`
 }
 
+// ─── computeGrossMarginFromBalances (Faz 7.3.50A.8) ─────────────────────────
+
+/**
+ * result.currentAccountBalances'tan brüt marj türetir.
+ * Hesap kodları: 600/601/602 brüt satışlar, 610/611/612 indirimler,
+ * 620/621/622/623 satışların maliyeti.
+ * Saf fonksiyon — test edilebilir export.
+ */
+export function computeGrossMarginFromBalances(
+  balances: Record<string, number> | undefined | null,
+): { grossMargin: number | null; grossProfit: number; netSales: number } {
+  if (!balances) return { grossMargin: null, grossProfit: 0, netSales: 0 }
+
+  const get = (codes: string[]) =>
+    codes.reduce((sum, c) => sum + (balances[c] ?? 0), 0)
+
+  const grossRevenue      = get(['600', '601', '602'])
+  const revenueDeductions = get(['610', '611', '612'])
+  const cogs              = get(['620', '621', '622', '623'])
+
+  const netSales = grossRevenue - revenueDeductions
+
+  if (netSales <= 0) return { grossMargin: null, grossProfit: 0, netSales: 0 }
+
+  const grossProfit = netSales - cogs
+  const grossMargin = grossProfit / netSales
+
+  return { grossMargin, grossProfit, netSales }
+}
+
+/**
+ * Negatif brüt marj tespiti → operasyonel uyarı metni üretir.
+ * Türkçe finans formatı: -%6.9 (% işareti eksi sonrası).
+ * Saf fonksiyon — test edilebilir export.
+ */
+export function buildOperationalWarning(
+  balances: Record<string, number> | undefined | null,
+): string | null {
+  const { grossMargin, netSales } = computeGrossMarginFromBalances(balances)
+
+  if (grossMargin === null || netSales <= 0) return null
+  if (grossMargin >= 0) return null
+
+  const absPercent    = Math.abs(grossMargin * 100).toFixed(1)
+  const formattedMargin = `-%${absPercent}`
+
+  return `Bu yol haritası bilanço odaklıdır. Mevcut brüt marjınız ${formattedMargin} (negatif). Sermaye artışı ve bilanço aksiyonları kısa vadede finansal yapıyı güçlendirir, ancak kalıcı rating yükselişi için maliyet yönetimi, fiyat revizyonu veya marj iyileştirme stratejileri gereklidir.`
+}
+
 // ─── sanitizeJargon ──────────────────────────────────────────────────────────
 
 /**
@@ -550,6 +599,22 @@ function AksiyonPlaniTab({
           </div>
         </div>
       )}
+
+      {/* OPERASYONELuyarı KARTI (Faz 7.3.50A.8) — negatif brüt marj */}
+      {(() => {
+        const balances = result.currentAccountBalances
+        const warning  = buildOperationalWarning(balances)
+        if (!warning) return null
+        return (
+          <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 mb-4 flex items-start gap-3">
+            <AlertTriangle className="text-orange-600 shrink-0 mt-0.5" size={18} />
+            <div className="text-sm text-orange-900">
+              <strong className="block mb-1">Operasyonel Uyarı</strong>
+              {warning}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* A. ANA AKSIYON TABLOSU */}
       <div
