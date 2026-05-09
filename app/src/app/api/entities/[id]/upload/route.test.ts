@@ -767,6 +767,111 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
 
 })
 
+// ─── Faz 7.3.50A.7: PREFLIGHT 2 Q4/ANNUAL Dönem Toleransı ────────────────────
+
+describe('POST /api/entities/[id]/upload — PREFLIGHT 2 Q4/ANNUAL toleransı (Faz 7.3.50A.7)', () => {
+
+  beforeEach(() => {
+    jest.resetModules()
+    jest.clearAllMocks()
+  })
+
+  // T_PRE1: formPeriod=Q4, detectedPeriod=ANNUAL → bypass (mismatch YOK)
+  test('T_PRE1 — detectedPeriod=ANNUAL + formPeriod=Q4 → 200, PERIOD_MISMATCH yok', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'ANNUAL')], isExcel: false })
+    const req = createMockRequest({ fileName: 'mizan.pdf', year: 2025, period: 'Q4', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    const body = await res.json()
+    expect(body.error).not.toBe('PERIOD_MISMATCH')
+  })
+
+  // T_PRE2: formPeriod=ANNUAL, detectedPeriod=Q4 → bypass (ters yön)
+  test('T_PRE2 — detectedPeriod=Q4 + formPeriod=ANNUAL → 200, PERIOD_MISMATCH yok', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'Q4')], isExcel: false })
+    const req = createMockRequest({ fileName: 'mizan.pdf', year: 2025, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    const body = await res.json()
+    expect(body.error).not.toBe('PERIOD_MISMATCH')
+  })
+
+  // T_PRE3: REGRESYON — Q4 vs Q1 → 422 (tolerans sadece Q4/ANNUAL çifti için)
+  test('T_PRE3 — REGRESYON: detectedPeriod=Q1 + formPeriod=Q4 → 422 PERIOD_MISMATCH', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'Q1')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2025, period: 'Q4', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('PERIOD_MISMATCH')
+  })
+
+  // T_PRE4: REGRESYON — Q1 vs Q2 → 422
+  test('T_PRE4 — REGRESYON: detectedPeriod=Q2 + formPeriod=Q1 → 422 PERIOD_MISMATCH', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'Q2')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2025, period: 'Q1', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('PERIOD_MISMATCH')
+  })
+
+  // T_PRE5: REGRESYON — yıl mismatch hâlâ çalışıyor
+  test('T_PRE5 — REGRESYON: detectedYear=2024 + formYear=2025 → 422 YEAR_MISMATCH', async () => {
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    const req = createMockRequest({ fileName: 'b.pdf', year: 2025, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('YEAR_MISMATCH')
+  })
+
+  // T_PRE6: Q4 bypass → upsert'e Q4 yazıldı (formPeriod kazanır)
+  test('T_PRE6 — detectedPeriod=ANNUAL + formPeriod=Q4 → upsert where+create period=Q4', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'mizan.pdf', year: 2025, period: 'Q4', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    expect(upsertMock).toHaveBeenCalled()
+    const call = upsertMock.mock.calls[0][0]
+    expect(call.where.entityId_year_period.period).toBe('Q4')
+    expect(call.create.period).toBe('Q4')
+  })
+
+  // T_PRE7: ANNUAL bypass → upsert'e ANNUAL yazıldı (formPeriod kazanır)
+  test('T_PRE7 — detectedPeriod=Q4 + formPeriod=ANNUAL → upsert where+create period=ANNUAL', async () => {
+    const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'Q4')], isExcel: false })
+    jest.doMock('@/lib/db', () => ({
+      prisma: {
+        entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })) },
+        financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)) },
+        analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())) },
+        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        $executeRaw:      jest.fn(() => Promise.resolve(1)),
+      },
+    }))
+    const req = createMockRequest({ fileName: 'mizan.pdf', year: 2025, period: 'ANNUAL', confirmEntityUnverified: true })
+    const res = await callPost(req)
+    expect(res.status).not.toBe(422)
+    expect(upsertMock).toHaveBeenCalled()
+    const call = upsertMock.mock.calls[0][0]
+    expect(call.where.entityId_year_period.period).toBe('ANNUAL')
+    expect(call.create.period).toBe('ANNUAL')
+  })
+
+})
+
 // ─── Faz 7.3.50A.1: PREFLIGHT 1.5 (detectedYear null soft warning) ────────────
 
 describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3.50A.1)', () => {

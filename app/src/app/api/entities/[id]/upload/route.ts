@@ -178,11 +178,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             form:     { year: formYear, period: formPeriod },
           }, { status: 422 })
         }
-        if (formPeriod && row.detectedPeriod && formPeriod !== row.detectedPeriod) {
+        const detectedPeriod = row.detectedPeriod as string | null
+
+        const isQ4AnnualPair = (
+          (detectedPeriod === 'Q4' && formPeriod === 'ANNUAL') ||
+          (detectedPeriod === 'ANNUAL' && formPeriod === 'Q4')
+        )
+
+        if (formPeriod && detectedPeriod && formPeriod !== detectedPeriod && !isQ4AnnualPair) {
           return jsonUtf8({
             error:    'PERIOD_MISMATCH',
-            message:  UPLOAD_ERRORS.PERIOD_MISMATCH(row.detectedPeriod as string, formPeriod),
-            detected: { year: row.detectedYear, period: row.detectedPeriod },
+            message:  UPLOAD_ERRORS.PERIOD_MISMATCH(detectedPeriod, formPeriod),
+            detected: { year: row.detectedYear, period: detectedPeriod },
             form:     { year: formYear, period: formPeriod },
           }, { status: 422 })
         }
