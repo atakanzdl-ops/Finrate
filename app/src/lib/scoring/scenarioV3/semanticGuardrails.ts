@@ -187,9 +187,11 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
   A10_CASH_EQUITY_INJECTION: {
     producesLiquidity: true,
     liquidityImpactRatio: 1.0,
+    mutuallyExclusiveWith: ['A10B_PROMISSORY_NOTE_EQUITY_INJECTION'],
   },
   A10B_PROMISSORY_NOTE_EQUITY_INJECTION: {
     liquidityImpactRatio: 0,  // Nakit yaratmaz; senet alacak olarak bilançoya girer
+    mutuallyExclusiveWith: ['A10_CASH_EQUITY_INJECTION'],
   },
   A11_RETAIN_EARNINGS: {
     sourceAccountRequirements: ['590'],

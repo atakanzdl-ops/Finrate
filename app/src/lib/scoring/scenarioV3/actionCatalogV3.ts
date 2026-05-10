@@ -765,7 +765,7 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
   qualityCoefficient: 1.00,
   sustainability: 'RECURRING',
 
-  repeatDecay: { first: 1.00, second: 0.65, third: 0.35, maxRepeats: 3 },
+  repeatDecay: { first: 1.00, second: 0.65, third: 0.35, maxRepeats: 1 },
 
   suggestedAmount: {
     basis: 'assets',
@@ -828,7 +828,7 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
   qualityCoefficient: 0.55,
   sustainability: 'SEMI_RECURRING',
 
-  repeatDecay: { first: 1.00, second: 0.50, third: 0.25, maxRepeats: 2 },
+  repeatDecay: { first: 1.00, second: 0.50, third: 0.25, maxRepeats: 1 },
 
   suggestedAmount: {
     basis: 'assets',

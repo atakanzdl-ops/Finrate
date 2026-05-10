@@ -371,3 +371,40 @@ describe('Faz 7.3.50A.13.1 — A18 baseline marj filtresi (paket sequence)', () 
   })
 
 })
+
+// ─── Faz 7.3.50A.13.2.1 — A10/A10B tek seferlik + mutual exclusion ───────────
+
+describe('Faz 7.3.50A.13.2.1 — A10/A10B tek seferlik + mutual exclusion', () => {
+
+  // T_A10_NO_REPEAT: maxRepeats: 1 → A10 pakette en fazla 1 kez
+  test('T_A10_NO_REPEAT: A10 tek seferlik', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION'] },
+    })
+    const a10Count = result.portfolio.filter(a => a.actionId === 'A10_CASH_EQUITY_INJECTION').length
+    expect(a10Count).toBeLessThanOrEqual(1)
+  })
+
+  // T_A10B_NO_REPEAT: maxRepeats: 1 → A10B pakette en fazla 1 kez
+  test('T_A10B_NO_REPEAT: A10B tek seferlik', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      options: { allowedActionIds: ['A10B_PROMISSORY_NOTE_EQUITY_INJECTION'] },
+    })
+    const a10bCount = result.portfolio.filter(a => a.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION').length
+    expect(a10bCount).toBeLessThanOrEqual(1)
+  })
+
+  // T_A10_A10B_MUTUAL_EXCLUSION: A10 ⟂ A10B — birlikte gelemez
+  test('T_A10_A10B_MUTUAL_EXCLUSION: A10 + A10B aynı pakette gelemez', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION', 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION'] },
+    })
+    const hasA10  = result.portfolio.some(a => a.actionId === 'A10_CASH_EQUITY_INJECTION')
+    const hasA10B = result.portfolio.some(a => a.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION')
+    expect(hasA10 && hasA10B).toBe(false)
+  })
+
+})
