@@ -143,7 +143,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowUpload(!showUpload)}
+            onClick={() => setShowUpload(v => !v)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-80"
             style={{ background: '#0B3C5D' }}
           >
@@ -162,7 +162,10 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
           <p className="text-[11px] text-slate-400 mb-4">
             .xlsx, .xls, .csv ve .pdf — aynı anda birden fazla dosya seçilebilir
           </p>
-          <FileUpload entityId={id} onImported={() => { reload(); setShowUpload(false) }} />
+          <FileUpload entityId={id} onImported={() => {
+            reload()
+            // Panel açık kalır — mali müşavir başka dosya yükleyebilir veya hata kartlarını görebilir
+          }} />
         </div>
       )}
 

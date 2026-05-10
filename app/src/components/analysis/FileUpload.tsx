@@ -347,7 +347,10 @@ export function FileUpload({ entityId, onImported }: Props) {
           accept=".xlsx,.xls,.csv,.pdf"
           multiple
           className="hidden"
-          onChange={(e) => e.target.files && addFiles(e.target.files)}
+          onChange={(e) => {
+            if (e.target.files) { addFiles(e.target.files) }
+            e.currentTarget.value = ''
+          }}
         />
         <Upload size={24} className="text-slate-300 mx-auto mb-2" />
         <p className="text-sm text-slate-500">Dosyaları buraya sürükleyin veya tıklayın</p>
@@ -420,7 +423,7 @@ export function FileUpload({ entityId, onImported }: Props) {
               </div>
 
               {(entry.status === 'pending' || entry.status === 'error') && (
-                <button onClick={() => removeEntry(idx)} className="text-slate-300 hover:text-slate-500 transition-colors mt-0.5 shrink-0">
+                <button onClick={(e) => { e.stopPropagation(); removeEntry(idx) }} className="text-slate-300 hover:text-slate-500 transition-colors mt-0.5 shrink-0">
                   <X size={13} />
                 </button>
               )}
