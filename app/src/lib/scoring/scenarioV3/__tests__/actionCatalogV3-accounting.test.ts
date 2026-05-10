@@ -905,6 +905,84 @@ describe('Faz 7.3.50A.13 — A18_NET_SALES_GROWTH customCheck birim testleri', (
   })
 })
 
+// ─── A18 customCheck Baseline Testleri — Faz 7.3.50A.13.1 ───────────────────
+// İş kuralı: "Baseline marj sektör altı %50 ise paketin TAMAMINDA A18 önerilmesin."
+// baselineGrossProfit / baselineNetSales baseline marjı verir; bu kontrol current'tan önce gelir.
+
+describe('Faz 7.3.50A.13.1 — A18_NET_SALES_GROWTH customCheck baseline birim testleri', () => {
+  const a18 = ACTION_CATALOG_V3['A18_NET_SALES_GROWTH']
+  const check = (input: object) => a18.preconditions.customCheck!(input)
+
+  // T_A18_BASELINE_CUSTOM_1:
+  // baseline %1.46 + current %7.73 (A20 sonrası artmış marj)
+  // → baseline kontrolü engeller (current yüksek olsa dahi)
+  test('T_A18_BASELINE_CUSTOM_1: baseline %1.46 + current %7.73 → pass: false (baseline engeller)', () => {
+    const result = check({
+      sector:               'TRADE',
+      netSales:             268_700_000,
+      grossProfit:           20_780_000,  // current %7.73 — A20 sonrası artmış
+      baselineNetSales:     268_700_000,
+      baselineGrossProfit:    3_930_000,  // baseline %1.46 < %7
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Baseline marj/i)
+  })
+
+  // T_A18_BASELINE_CUSTOM_2:
+  // baseline yok (undefined) + current %1.46 → current kontrolü devreye girer
+  test('T_A18_BASELINE_CUSTOM_2: baseline undefined + current %1.46 → pass: false (current)', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    268_700_000,
+      grossProfit:   3_930_000,  // current %1.46 < %7
+      // baselineNetSales / baselineGrossProfit yok
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Sektör altı/i)
+  })
+
+  // T_A18_BASELINE_CUSTOM_3:
+  // baseline %8 + current %8 → her iki kontrol de geçer
+  test('T_A18_BASELINE_CUSTOM_3: baseline %8 + current %8 → pass: true', () => {
+    const result = check({
+      sector:               'TRADE',
+      netSales:             100_000_000,
+      grossProfit:            8_000_000,  // %8 > %7
+      baselineNetSales:     100_000_000,
+      baselineGrossProfit:    8_000_000,  // %8 > %7
+    })
+    expect(result.pass).toBe(true)
+  })
+
+  // T_A18_BASELINE_CUSTOM_4:
+  // baseline grossProfit = 0 → baseline marj = 0/100M = 0 < %7 → elenir
+  test('T_A18_BASELINE_CUSTOM_4: baseline grossProfit=0 → pass: false (Baseline marj)', () => {
+    const result = check({
+      sector:               'TRADE',
+      netSales:             100_000_000,
+      grossProfit:           10_000_000,  // current %10 (normal)
+      baselineNetSales:     100_000_000,
+      baselineGrossProfit:            0,  // %0 < %7 → elenir
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Baseline marj/i)
+  })
+
+  // T_A18_BASELINE_CUSTOM_5:
+  // baseline grossProfit negatif → baselineMargin = -2M/100M = -0.02 < %7 → elenir
+  test('T_A18_BASELINE_CUSTOM_5: baseline grossProfit negatif → pass: false (Baseline marj)', () => {
+    const result = check({
+      sector:               'TRADE',
+      netSales:             100_000_000,
+      grossProfit:           10_000_000,  // current %10 (normal)
+      baselineNetSales:     100_000_000,
+      baselineGrossProfit:   -2_000_000,  // negatif → %−2 < %7 → elenir
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Baseline marj/i)
+  })
+})
+
 // ─── A06 Dominant Stok Seçimi (Faz 7.3.8b-PRE) ──────────────────────────────
 
 describe('Faz 7.3.8b-PRE — A06 dominant stok buildTransactions', () => {

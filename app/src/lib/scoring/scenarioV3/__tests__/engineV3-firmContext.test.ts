@@ -294,3 +294,80 @@ describe('Faz 7.3.50A.13 — A18 sektör altı marj filtresi (engine selection)'
   })
 
 })
+
+// ─── Faz 7.3.50A.13.1 — A18 baseline marj filtresi (paket sequence) ──────────
+// İş kuralı: "Baseline marj sektör altı %50 ise paketin TAMAMINDA A18 önerilmesin."
+// A20 paket-içi marjı artırsa bile baselineContext değişmez → A18 elenir.
+
+describe('Faz 7.3.50A.13.1 — A18 baseline marj filtresi (paket sequence)', () => {
+
+  // T_A18_BASELINE_1: KUZEY paket — A20 seçilir, A18 baseline marj nedeniyle elenir
+  // baseline grossMargin %1.46 < TRADE %7 (0.14 × 0.5) → A18 eler
+  // A20 context'i güncelleyip marjı %7+ yapar ama baseline check bunu görmez
+  test('T_A18_BASELINE_1: KUZEY paket sequence — A20 seçilir, A18 baseline elenir', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      sector: 'TRADE',
+      accountBalances: { ...BASELINE_INPUT.accountBalances, '600': 268_700_000 },
+      incomeStatement: {
+        netSales:          268_700_000,
+        costOfGoodsSold:   264_770_000,
+        grossProfit:         3_930_000,  // baseline marj %1.46 < %7
+        operatingProfit:    -5_000_000,
+        netIncome:          -5_000_000,
+        interestExpense:     3_000_000,
+        operatingCashFlow:           0,
+      },
+      options: { allowedActionIds: ['A20_GROSS_MARGIN_REFORM', 'A18_NET_SALES_GROWTH'] },
+    })
+
+    // A20 maliyet azaltımı ile marj iyileştirme → seçilir
+    expect(result.portfolio.some(a => a.actionId === 'A20_GROSS_MARGIN_REFORM')).toBe(true)
+    // A18 baseline kontrolü: %1.46 < %7 → elenir (A20 sonrası context güncellenmiş olsa da)
+    expect(result.portfolio.some(a => a.actionId === 'A18_NET_SALES_GROWTH')).toBe(false)
+  })
+
+  // T_A18_BASELINE_2: Normal marj firma — baseline %10 > %7 → A18 geçer
+  test('T_A18_BASELINE_2: normal marj — baseline %10 > %7 → A18 baseline geçer', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      sector: 'TRADE',
+      accountBalances: { ...BASELINE_INPUT.accountBalances, '600': 100_000_000 },
+      incomeStatement: {
+        netSales:        100_000_000,
+        costOfGoodsSold:  90_000_000,
+        grossProfit:      10_000_000,  // baseline marj %10 > %7
+        operatingProfit:   5_000_000,
+        netIncome:         2_000_000,
+        interestExpense:   2_000_000,
+        operatingCashFlow: 3_000_000,
+      },
+      options: { allowedActionIds: ['A20_GROSS_MARGIN_REFORM', 'A18_NET_SALES_GROWTH'] },
+    })
+
+    // baseline %10 > %7 → A18 elenmez
+    expect(result.portfolio.some(a => a.actionId === 'A18_NET_SALES_GROWTH')).toBe(true)
+  })
+
+  // T_A18_BASELINE_3: Brüt zarar — grossProfit < 0 → A18 elenir (mevcut guard)
+  test('T_A18_BASELINE_3: brüt zarar baseline — A18 mevcut guard ile elenir', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      sector: 'TRADE',
+      accountBalances: { ...BASELINE_INPUT.accountBalances, '600': 100_000_000 },
+      incomeStatement: {
+        netSales:          100_000_000,
+        costOfGoodsSold:   105_000_000,
+        grossProfit:        -5_000_000,  // brüt zarar
+        operatingProfit:   -10_000_000,
+        netIncome:         -12_000_000,
+        interestExpense:     2_000_000,
+        operatingCashFlow:           0,
+      },
+      options: { allowedActionIds: ['A18_NET_SALES_GROWTH'] },
+    })
+
+    expect(result.portfolio.some(a => a.actionId === 'A18_NET_SALES_GROWTH')).toBe(false)
+  })
+
+})

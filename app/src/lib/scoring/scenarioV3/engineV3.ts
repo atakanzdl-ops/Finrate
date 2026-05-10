@@ -898,6 +898,7 @@ function isActionApplicable(
   context:              FirmContext,
   horizon:              HorizonKey,
   previouslySelected:   string[],
+  baselineContext?:     FirmContext,
 ): { applicable: boolean; reason?: string } {
   // 1. Horizon destegi
   if (!action.horizons.includes(horizon)) {
@@ -950,10 +951,12 @@ function isActionApplicable(
   // recordToAccountBalances() ile FirmContext.accountBalances adapt edilir.
   if (action.preconditions.customCheck) {
     const analysisProxy = {
-      accounts:    recordToAccountBalances(context.accountBalances),
-      sector:      context.sector,
-      netSales:    context.netSales,
-      grossProfit: context.grossProfit,
+      accounts:             recordToAccountBalances(context.accountBalances),
+      sector:               context.sector,
+      netSales:             context.netSales,
+      grossProfit:          context.grossProfit,
+      baselineNetSales:     baselineContext?.netSales,
+      baselineGrossProfit:  baselineContext?.grossProfit,
     }
     const checkResult   = action.preconditions.customCheck(analysisProxy)
     if (!checkResult.pass) {
@@ -1185,6 +1188,7 @@ function runGreedySelection(
   decisionTrace:    DecisionTraceNode[],
   allowedIds?:      string[],
   disallowedIds?:   string[],
+  baselineContext?: FirmContext,
 ): SelectedAction[] {
 
   const selected:      SelectedAction[] = []
@@ -1217,7 +1221,7 @@ function runGreedySelection(
       if (disallowedIds && disallowedIds.includes(action.id))  continue
 
       // Applicability
-      const applicability = isActionApplicable(action, currentContext, horizon, allSelectedIds)
+      const applicability = isActionApplicable(action, currentContext, horizon, allSelectedIds, baselineContext)
       if (!applicability.applicable) {
         rejectedLog.push({ actionId: action.id, reason: applicability.reason ?? 'not applicable' })
         continue
@@ -1411,6 +1415,7 @@ function runLocalRepair(
   missedOpportunities: unknown[],
   algorithmTrace:   string[],
   decisionTrace:    DecisionTraceNode[],
+  baselineContext?: FirmContext,
 ): SelectedAction[] {
   const repaired    = [...selected]
   let iterCount     = 0
@@ -1450,7 +1455,7 @@ function runLocalRepair(
     const allIds  = repaired.map(s => s.actionId)
 
     // Applicability
-    const applicability = isActionApplicable(action, repairContext, horizon, allIds)
+    const applicability = isActionApplicable(action, repairContext, horizon, allIds, baselineContext)
     if (!applicability.applicable) {
       algorithmTrace.push(`[local_repair] iter ${iterCount}: ${missed.actionId} NOT applicable - ${applicability.reason}`)
       decisionTrace.push({
@@ -1822,7 +1827,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   const shortActions = runGreedySelection(
     workingContext, 'short', [], shortMax, aggressiveness,
-    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds,
+    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds, baselineContext,
   )
   for (const a of shortActions) {
     workingContext = updateFirmContextFromTransactions(workingContext, a.transactions)
@@ -1830,7 +1835,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   const mediumActions = runGreedySelection(
     workingContext, 'medium', shortActions, mediumMax, aggressiveness,
-    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds,
+    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds, baselineContext,
   )
   for (const a of mediumActions) {
     workingContext = updateFirmContextFromTransactions(workingContext, a.transactions)
@@ -1838,7 +1843,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   const longActions = runGreedySelection(
     workingContext, 'long', [...shortActions, ...mediumActions], longMax, aggressiveness,
-    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds,
+    rejectedCandidates, algorithmTrace, decisionTrace, allowedIds, disallowedIds, baselineContext,
   )
   for (const a of longActions) {
     workingContext = updateFirmContextFromTransactions(workingContext, a.transactions)
@@ -1903,7 +1908,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
   // ── FAZ 4: LOCAL REPAIR ───────────────────────────────────────────────────
   const repaired = runLocalRepair(
     fullPortfolio, workingContext, reasoning.missedOpportunities,
-    algorithmTrace, decisionTrace,
+    algorithmTrace, decisionTrace, baselineContext,
   )
 
   if (repaired.length > fullPortfolio.length) {

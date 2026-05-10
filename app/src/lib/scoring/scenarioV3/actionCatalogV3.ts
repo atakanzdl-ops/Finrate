@@ -35,6 +35,8 @@ interface AnalysisInput {
   sector?: SectorCode
   netSales?: number
   grossProfit?: number
+  baselineNetSales?: number
+  baselineGrossProfit?: number
 }
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
@@ -1423,8 +1425,12 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
     minSourceAmountTRY: 1_000_000,
     // Mevcut revenue check'in yerine geçer: sumAccountsByPrefix → netSales > 0 eşdeğer
     // + sektör altı %50 marj filtresi eklendi (Faz 7.3.50A.13)
+    // + baseline öncelikli marj kontrolü eklendi (Faz 7.3.50A.13.1)
     customCheck: (analysis) => {
-      const { sector, netSales, grossProfit } = analysis as AnalysisInput
+      const {
+        sector, netSales, grossProfit,
+        baselineNetSales, baselineGrossProfit,
+      } = analysis as AnalysisInput
 
       if (!netSales || netSales <= 0) {
         return { pass: false, reason: 'Mevcut satış geliri yok — A18 net satış artışı için baz gerekli' }
@@ -1441,6 +1447,21 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
         return { pass: true }  // sektör eşiği yoksa mevcut davranış
       }
 
+      // YENİ: BASELINE öncelikli kontrol (Faz 7.3.50A.13.1)
+      // İş kuralı: "Baseline marj sektör altı %50 ise paketin TAMAMINDA A18 önerilmesin."
+      // Sıfır/negatif baseline marj da eler (0/x = 0 < threshold, -n/x < threshold).
+      // baselineContext proxy'den gelir; yoksa yedek olarak current marj kullanılır.
+      if (baselineGrossProfit !== undefined && baselineNetSales !== undefined && baselineNetSales > 0) {
+        const baselineMargin = baselineGrossProfit / baselineNetSales
+        if (baselineMargin < targetMargin * 0.5) {
+          return {
+            pass: false,
+            reason: 'Baseline marj sektör altı — önce maliyet yapısı düzeltilmeli, sonra satış artışı',
+          }
+        }
+      }
+
+      // CURRENT marj kontrolü KORUNDU (yedek — baselineContext yoksa devreye girer)
       const currentMargin = grossProfit / netSales
 
       if (currentMargin < targetMargin * 0.5) {
