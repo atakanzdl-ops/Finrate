@@ -26,6 +26,11 @@ export default function GirisSimplePage() {
 
       const data = await res.json()
       if (!res.ok) {
+        // Doğrulanmamış hesap → doğrulama sayfasına yönlendir
+        if (res.status === 403 && data.needsVerification) {
+          window.location.href = `/dogrulama?email=${encodeURIComponent(data.email ?? email)}`
+          return
+        }
         setError(String(data.error ?? 'Giriş başarısız.').normalize('NFC'))
         return
       }

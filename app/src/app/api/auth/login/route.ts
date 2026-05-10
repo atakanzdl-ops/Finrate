@@ -30,6 +30,14 @@ export async function POST(req: NextRequest) {
       return jsonUtf8({ error: 'E-posta veya şifre hatalı.' }, { status: 401 })
     }
 
+    // Mail doğrulama kontrolü (Faz 7.3.50C)
+    if (!user.isVerified) {
+      return jsonUtf8(
+        { error: 'Hesabınız henüz doğrulanmamış. Lütfen e-postanıza gelen kodu girin.', needsVerification: true, email: user.email },
+        { status: 403 },
+      )
+    }
+
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
     const response = jsonUtf8({

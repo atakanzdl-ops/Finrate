@@ -22,12 +22,13 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  subscription  Subscription?
-  entities      Entity[]
-  groups        Group[]
-  analyses      Analysis[]
-  tenzilatEntries TenzilatEntry[]
-  auditLogs     TenzilatAuditLog[]
+  subscription        Subscription?
+  entities            Entity[]
+  groups              Group[]
+  analyses            Analysis[]
+  tenzilatEntries     TenzilatEntry[]
+  auditLogs           TenzilatAuditLog[]
+  verificationTokens  VerificationToken[]
 
   @@map("users")
 }
@@ -439,6 +440,25 @@ model SubjectiveInput {
   entity     Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
 
   @@map("subjective_inputs")
+}
+
+// ─────────────────────────────────────────────
+// MAIL DOĞRULAMA TOKEN
+// ─────────────────────────────────────────────
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  code      String   // 6 haneli düz metin (TTL 10 dk — hash gerekmez)
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("verification_tokens")
 }
 
 // ─────────────────────────────────────────────

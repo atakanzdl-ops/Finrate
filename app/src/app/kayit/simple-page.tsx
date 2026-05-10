@@ -54,6 +54,11 @@ export default function KayitSimplePage() {
         setError(String(data.error ?? 'Kayıt başarısız.').normalize('NFC'))
         return
       }
+      // Mail doğrulama gerekli — /dogrulama sayfasına yönlendir
+      if (data.needsVerification) {
+        window.location.href = `/dogrulama?email=${encodeURIComponent(data.email ?? form.email)}`
+        return
+      }
       window.location.href = '/dashboard'
     } catch {
       setError('Bağlantı hatası oluştu. Lütfen tekrar deneyin.')

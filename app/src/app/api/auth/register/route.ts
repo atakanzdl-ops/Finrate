@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
-import { hashPassword, signToken } from '@/lib/auth'
+import { hashPassword } from '@/lib/auth'
+import { createVerificationToken } from '@/lib/verification'
+import { sendMail } from '@/lib/email'
+import { buildVerifyEmail } from '@/lib/email-templates/verify-email'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,56 +19,70 @@ export async function POST(req: NextRequest) {
     }
 
     const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) {
+
+    // Zaten kayıtlı ve doğrulanmış → 409
+    if (existing && existing.isVerified) {
       return jsonUtf8({ error: 'Bu e-posta adresi zaten kayıtlı.' }, { status: 409 })
     }
 
     const passwordHash = await hashPassword(password)
+    const now          = new Date()
+    const periodEnd    = new Date(now)
+    periodEnd.setDate(periodEnd.getDate() + 14)
 
-    const now = new Date()
-    const periodEnd = new Date(now)
-    periodEnd.setDate(periodEnd.getDate() + 14) // 14 günlük deneme
+    let user: { id: string; email: string; fullName: string; role: string }
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        fullName,
-        companyName: companyName ?? null,
-        subscription: {
-          create: {
-            plan: plan === 'STANDART' ? 'STANDART' : plan === 'PRO' ? 'PRO' : 'DEMO',
-            billingCycle: 'MONTHLY',
-            status: plan === 'DEMO' ? 'ACTIVE' : 'TRIALING',
-            currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
+    if (existing && !existing.isVerified) {
+      // Kayıtlı ama doğrulanmamış — şifreyi güncelle, yeni kod gönder
+      user = await prisma.user.update({
+        where: { id: existing.id },
+        data:  { passwordHash },
+        select: { id: true, email: true, fullName: true, role: true },
+      })
+    } else {
+      // Yeni kayıt
+      user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          fullName,
+          companyName: companyName ?? null,
+          isVerified:  false,
+          subscription: {
+            create: {
+              plan:               plan === 'STANDART' ? 'STANDART' : plan === 'PRO' ? 'PRO' : 'DEMO',
+              billingCycle:       'MONTHLY',
+              status:             plan === 'DEMO' ? 'ACTIVE' : 'TRIALING',
+              currentPeriodStart: now,
+              currentPeriodEnd:   periodEnd,
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        subscription: { select: { plan: true, status: true } },
-      },
-    })
+        select: { id: true, email: true, fullName: true, role: true },
+      })
+    }
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role })
+    // Doğrulama kodu oluştur
+    const { code } = await createVerificationToken(user.id)
 
-    const response = jsonUtf8({ user }, { status: 201 })
-    response.cookies.set('finrate_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 gün
-      path: '/',
-    })
+    // Mail gönder
+    try {
+      const { subject, html, text } = buildVerifyEmail({ code, fullName: user.fullName })
+      await sendMail({ to: user.email, subject, html, text })
+    } catch (mailErr) {
+      console.error('[register] mail gönderilemedi:', mailErr)
+      // Kullanıcı kayıtlı kalır — yeniden gönder akışı var
+      return jsonUtf8(
+        { error: 'Hesabınız oluşturuldu ancak doğrulama maili gönderilemedi. Lütfen giriş yapıp yeniden kod talep edin.' },
+        { status: 500 },
+      )
+    }
 
-    return response
+    // JWT cookie YOK — önce doğrulama gerekli
+    return jsonUtf8({ email: user.email, needsVerification: true }, { status: 200 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('[register] error:', msg)
+    console.error('[register] hata:', msg)
     return jsonUtf8({ error: 'Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.' }, { status: 500 })
   }
 }
