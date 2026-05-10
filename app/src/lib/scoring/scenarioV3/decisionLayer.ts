@@ -1449,7 +1449,7 @@ function buildDataQualityWarning(
     const missingLabels = missingGroups
       .map(g => `${g}X ${TDHP_GROUP_NAMES[g] ?? 'grubu'}`)
       .join(', ')
-    message = `Şu hesap grupları eksik: ${missingLabels}. Bu gruplarla ilgili aksiyonlar önerilemedi.`
+    message = `Şu hesap gruplarında dönem sonu bakiyesi görünmüyor: ${missingLabels}. Yıl sonu virmanlı/kapatılmış hesaplarda bu durum normal olabilir; hareket varsa hesap fiilen kullanılmıştır. Bu gruplarla ilgili bazı aksiyonlar bu analizde sınırlı önerilmiş olabilir.`
   } else {
     message = 'Portföy boyutu küçük, analiz kapsamı sınırlı.'
   }
@@ -1461,7 +1461,7 @@ function buildDataQualityWarning(
     portfolioSize,
     message,
     recommendation: missingGroups.length > 0
-      ? `Eksik grupları mizana ekleyin (${missingGroups.slice(0, 4).map(g => `${g}X`).join(', ')}) ve analizi tekrarlayın.`
+      ? `Kapatılmış/virmanlı değilse ilgili grupları mizana ekleyip analizi tekrarlayın (${missingGroups.slice(0, 4).map(g => `${g}X`).join(', ')}). Virmanlı mizanda asıl çözüm hareket toplamlarının ayrıca değerlendirilmesidir.`
       : 'Daha kapsamlı bir mizan ile analiz tekrarlanırsa öneri seti genişleyebilir.',
   }
 }
