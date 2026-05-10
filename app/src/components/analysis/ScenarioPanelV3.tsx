@@ -324,12 +324,25 @@ export function buildHeroMessage(
   isReachable: boolean,
   current: string,
   requested: string,
+  achievable?: string | null,
 ): string {
   if (isReachable) {
     return requested
       ? `Önerilen aksiyon planı uygulanırsa ${requested} seviyesine ulaşılabilir.`
       : 'Önerilen aksiyon planı uygulanırsa hedeflenen seviyeye ulaşılabilir.'
   }
+
+  const currentRating   = parseKnownRating(current)
+  const achievableRating = parseKnownRating(achievable)
+
+  if (
+    currentRating &&
+    achievableRating &&
+    ratingToIndex(achievableRating) > ratingToIndex(currentRating)
+  ) {
+    return `Mevcut yapısal kısıtlar nedeniyle ${requested} hedefine ulaşılamamaktadır. ${currentRating} → ${achievableRating} seviyesine çıkılabilir.`
+  }
+
   return current
     ? `Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır. ${current} seviyesinde kalınmaktadır.`
     : 'Mevcut yapısal kısıtlar nedeniyle bu hedefe ulaşılamamaktadır.'
@@ -358,7 +371,7 @@ function OzetTab({ result }: { result: any }) {
         const isReachable = (da.canonicalOutcome?.isFeasible ?? exec.targetMatchesRequest ?? exec.isTargetFeasible) === true
         const current     = exec.currentRating as string | undefined
         const requested   = exec.requestedTarget as string | undefined
-        const heroMsg     = buildHeroMessage(isReachable, current ?? '', requested ?? '')
+        const heroMsg     = buildHeroMessage(isReachable, current ?? '', requested ?? '', da.canonicalOutcome?.achievableRating)
         return (
           <div
             className="rounded-[12px] p-8 text-white"

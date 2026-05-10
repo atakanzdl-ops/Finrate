@@ -11,7 +11,7 @@
  */
 
 import { renderToStaticMarkup } from 'react-dom/server'
-import { sanitizeJargon, renderTargetFeasibilitySection, buildNotReachedBannerMessage, computeGrossMarginFromBalances, buildOperationalWarning } from './ScenarioPanelV3'
+import { sanitizeJargon, renderTargetFeasibilitySection, buildNotReachedBannerMessage, computeGrossMarginFromBalances, buildOperationalWarning, buildHeroMessage } from './ScenarioPanelV3'
 
 // ─── T_SJ: sanitizeJargon ─────────────────────────────────────────────────────
 
@@ -310,6 +310,33 @@ describe('computeGrossMarginFromBalances + buildOperationalWarning (Faz 7.3.50A.
     expect(warning).toBeTruthy()
     expect(warning).toContain('hesap detayı hesaplanamamıştır')
     expect(warning).toContain('pozitife döndüğünde')
+  })
+
+})
+
+// ─── buildHeroMessage — Faz 7.3.50A.12 ──────────────────────────────────────
+
+describe('buildHeroMessage — achievableRating senkronizasyonu (Faz 7.3.50A.12)', () => {
+
+  test('T_HERO_NEW1: infeasible + achievable > current → B → BB mesajı', () => {
+    const msg = buildHeroMessage(false, 'B', 'BBB', 'BB')
+    expect(msg).toContain('B → BB')
+    expect(msg).toContain('BBB hedefine ulaşılamamaktadır')
+  })
+
+  test('T_HERO_NEW2: infeasible + achievable === current → eski mesaj kalınmaktadır', () => {
+    const msg = buildHeroMessage(false, 'B', 'BBB', 'B')
+    expect(msg).toContain('B seviyesinde kalınmaktadır')
+  })
+
+  test('T_HERO_NEW3: infeasible + achievable null → fallback eski mesaj', () => {
+    const msg = buildHeroMessage(false, 'B', 'BBB', null)
+    expect(msg).toContain('B seviyesinde kalınmaktadır')
+  })
+
+  test('T_HERO_NEW4: feasible → mevcut davranış korunur (regresyon)', () => {
+    const msg = buildHeroMessage(true, 'B', 'BBB', 'BBB')
+    expect(msg).toContain('BBB seviyesine ulaşılabilir')
   })
 
 })
