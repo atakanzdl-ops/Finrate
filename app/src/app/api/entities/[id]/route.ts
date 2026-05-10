@@ -6,11 +6,7 @@ import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
-
-const VALID_SECTORS = new Set([
-  'Üretim', 'Ticaret', 'Hizmet', 'İnşaat', 'Turizm', 'Tarım',
-  'Enerji', 'Sağlık', 'Eğitim', 'Finans', 'Teknoloji', 'Diğer',
-])
+import { SECTOR_VALUES } from '@/lib/sectorOptions'
 
 const VALID_ENTITY_TYPES = new Set(['STANDALONE', 'PARENT', 'SUBSIDIARY', 'JV'])
 
@@ -53,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return jsonUtf8({ error: 'VKN/TCKN 10 veya 11 haneli rakam olmalıdır.' }, { status: 400 })
     }
     if (sector !== undefined && sector !== null && sector !== '') {
-      if (!VALID_SECTORS.has(sector)) {
+      if (!SECTOR_VALUES.has(sector)) {
         return jsonUtf8({ error: 'Geçersiz sektör.' }, { status: 400 })
       }
     }

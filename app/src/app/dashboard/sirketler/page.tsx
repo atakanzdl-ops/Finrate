@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Building2, Plus, Search, ChevronRight, Loader2, Trash2, X, Pencil } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
+import { SECTOR_OPTIONS } from '@/lib/sectorOptions'
 
 interface Entity {
   id: string; name: string; taxNumber: string | null; sector: string | null
@@ -30,10 +31,6 @@ const ENTITY_TYPES = [
   { value: 'JV',         label: 'Grup Şirketi' },
 ]
 
-const SECTORS = [
-  'Üretim', 'Ticaret', 'Hizmet', 'İnşaat', 'Turizm', 'Tarım',
-  'Enerji', 'Sağlık', 'Eğitim', 'Finans', 'Teknoloji', 'Diğer',
-]
 
 export default function SirketlerPage() {
   const router = useRouter()
@@ -354,8 +351,15 @@ export default function SirketlerPage() {
                   className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">— Seçiniz —</option>
-                  {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {SECTOR_OPTIONS.map(s => (
+                    <option key={s.value} value={s.value}>{s.label} — {s.hint}</option>
+                  ))}
                 </select>
+                {editForm.sector && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Seçili sektör örnekleri: {SECTOR_OPTIONS.find(s => s.value === editForm.sector)?.hint}
+                  </p>
+                )}
               </div>
 
               {/* Şirket Tipi */}
@@ -459,8 +463,15 @@ export default function SirketlerPage() {
                   className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">— Seçiniz —</option>
-                  {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {SECTOR_OPTIONS.map(s => (
+                    <option key={s.value} value={s.value}>{s.label} — {s.hint}</option>
+                  ))}
                 </select>
+                {form.sector && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Seçili sektör örnekleri: {SECTOR_OPTIONS.find(s => s.value === form.sector)?.hint}
+                  </p>
+                )}
               </div>
 
               {/* Şirket Tipi */}

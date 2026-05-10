@@ -4,17 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { SECTOR_OPTIONS } from '@/lib/sectorOptions'
 
 const ENTITY_TYPES = [
   { value: 'STANDALONE', label: 'Bağımsız Şirket' },
   { value: 'PARENT',     label: 'Ana Şirket' },
   { value: 'SUBSIDIARY', label: 'Bağlı Ortaklık' },
   { value: 'JV',         label: 'Grup Şirketi' },
-]
-
-const SECTORS = [
-  'Üretim', 'Ticaret', 'Hizmet', 'İnşaat', 'Turizm', 'Tarım',
-  'Enerji', 'Sağlık', 'Eğitim', 'Finans', 'Teknoloji', 'Diğer',
 ]
 
 export default function YeniSirketPage() {
@@ -103,8 +99,15 @@ export default function YeniSirketPage() {
             className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
           >
             <option value="">— Seçiniz —</option>
-            {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+            {SECTOR_OPTIONS.map(s => (
+              <option key={s.value} value={s.value}>{s.label} — {s.hint}</option>
+            ))}
           </select>
+          {form.sector && (
+            <p className="text-xs text-gray-500 mt-1">
+              Seçili sektör örnekleri: {SECTOR_OPTIONS.find(s => s.value === form.sector)?.hint}
+            </p>
+          )}
         </div>
 
         {/* Şirket Tipi */}
