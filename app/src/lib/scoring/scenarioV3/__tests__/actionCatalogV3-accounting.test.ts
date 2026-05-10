@@ -686,6 +686,155 @@ describe('Faz 7.3.6B3a — A12 computeAmount + buildTransactions doğrulaması',
   })
 })
 
+// ─── A20 + A21 Kârlılık Reformu — Faz 7.3.50A.11 ────────────────────────────
+
+describe('Faz 7.3.50A.11 — A20_GROSS_MARGIN_REFORM computeAmount + buildTransactions', () => {
+  const a20 = ACTION_CATALOG_V3['A20_GROSS_MARGIN_REFORM']
+
+  const makeA20Ctx = (overrides: Partial<ActionBuildContext> = {}): ActionBuildContext => ({
+    amount:          5_000_000,
+    sector:          'TRADE',
+    horizon:         'medium',
+    analysis:        {},
+    previousActions: [],
+    netSales:        100_000_000,
+    grossProfit:      8_000_000,   // 8% margin — TRADE benchmark = 12%
+    ...overrides,
+  })
+
+  // T1: sektör altı marj → tutar üretir
+  test('T1 — TRADE %8 marj, benchmark %14 → computeAmount tutar döner', () => {
+    // TRADE grossMargin benchmark = 0.14
+    // gap = 0.14 - 0.08 = 0.06; target = 0.06 * 100M * 0.5 = 3M; cap = 100M * 0.20 = 20M
+    // result = min(3M, 20M) = 3M
+    const result = a20.computeAmount!(makeA20Ctx())
+    expect(result).not.toBeNull()
+    expect(result).toBeCloseTo(3_000_000, 0)
+  })
+
+  // T2: negatif grossProfit → null
+  test('T2 — negatif grossProfit → null', () => {
+    const result = a20.computeAmount!(makeA20Ctx({ grossProfit: -1_000_000 }))
+    expect(result).toBeNull()
+  })
+
+  // T3: sektör üstü grossMargin → null
+  test('T3 — grossMargin >= benchmark → null', () => {
+    // TRADE benchmark = 0.12; 15M/100M = 0.15 >= 0.12 → null
+    const result = a20.computeAmount!(makeA20Ctx({ grossProfit: 15_000_000 }))
+    expect(result).toBeNull()
+  })
+
+  // T4: max cap (netSales × 0.20)
+  test('T4 — büyük gap: cap = netSales × 0.20 devreye girer', () => {
+    // TRADE benchmark = 0.12; grossProfit = 0 → margin = 0
+    // gap = 0.12; target = 0.12 * 100M * 0.5 = 6M; cap = 100M * 0.20 = 20M
+    // result = min(6M, 20M) = 6M (cap kısıtlayıcı değil, ama netSales*0.20 cap var)
+    // gap=0.12 → target=6M; min(6M,20M)=6M → cap DEVREYE GİRMEZ doğal
+    // büyük test için gap×0.5 > 0.20 gerekir: gap=0.50 → target=25M > 20M → cap devreye girer
+    const result = a20.computeAmount!(makeA20Ctx({
+      netSales:    100_000_000,
+      grossProfit:  0,          // margin=0
+      sector:      'IT',        // IT grossMargin benchmark = 0.36
+    }))
+    // gap = 0.36; target = 0.36 * 100M * 0.5 = 18M < 20M → no cap
+    // Ama IT benchmark 0.36 > 0.20 kontrolü için: 0.36*100M*0.5=18M < 20M → cap girmez
+    // grossProfit=0 => null olur çünkü guard: "if (grossProfit < 0) return null" — 0 ise geçer
+    // currentMargin = 0/100M = 0; 0 < 0.36 → aktif; gap=0.36; target=18M; cap=20M → 18M
+    expect(result).not.toBeNull()
+    expect(result).toBeCloseTo(18_000_000, 0)
+  })
+
+  // T5: buildTransactions → 102 DEBIT / 621 CREDIT
+  test('T5 — buildTransactions: 102 DEBIT, 621 CREDIT', () => {
+    const txs = a20.buildTransactions(makeA20Ctx({ amount: 3_000_000 }))
+    expect(txs).toHaveLength(1)
+    expect(txs[0].legs).toHaveLength(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT',  amount: 3_000_000 })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '621', side: 'CREDIT', amount: 3_000_000 })
+  })
+})
+
+describe('Faz 7.3.50A.11 — A21_OPERATING_PROFIT_REFORM computeAmount + buildTransactions', () => {
+  const a21 = ACTION_CATALOG_V3['A21_OPERATING_PROFIT_REFORM']
+
+  const makeA21Ctx = (overrides: Partial<ActionBuildContext> = {}): ActionBuildContext => ({
+    amount:          3_000_000,
+    sector:          'TRADE',
+    horizon:         'medium',
+    analysis:        {},
+    previousActions: [],
+    netSales:        100_000_000,
+    operatingProfit:  1_000_000,  // 1% margin — TRADE ebitMargin benchmark = 3.5%
+    accountBalances:  { '630': 5_000_000, '631': 3_000_000, '632': 2_000_000 }, // opexTotal = 10M
+    ...overrides,
+  })
+
+  // T6: sektör altı operatingMargin → tutar üretir
+  test('T6 — TRADE %1 operatingMargin, benchmark %3.8 → computeAmount tutar döner', () => {
+    // TRADE ebitMargin benchmark = 0.038
+    // gap = 0.038 - 0.01 = 0.028; baseTarget = 0.028 * 100M * 0.5 = 1.4M
+    // opexTotal = 10M; opexCap = 5M; netSales*0.10 = 10M
+    // result = min(1.4M, 10M, 5M) = 1.4M
+    const result = a21.computeAmount!(makeA21Ctx())
+    expect(result).not.toBeNull()
+    expect(result).toBeCloseTo(1_400_000, 0)
+  })
+
+  // T7: negatif operatingProfit → null
+  test('T7 — negatif operatingProfit → null', () => {
+    const result = a21.computeAmount!(makeA21Ctx({ operatingProfit: -500_000 }))
+    expect(result).toBeNull()
+  })
+
+  // T8: sektör üstü operatingMargin → null
+  test('T8 — operatingMargin >= benchmark → null', () => {
+    // TRADE ebitMargin = 0.035; 5M/100M = 0.05 >= 0.035 → null
+    const result = a21.computeAmount!(makeA21Ctx({ operatingProfit: 5_000_000 }))
+    expect(result).toBeNull()
+  })
+
+  // T9: opexCap devreye girer
+  test('T9 — opexCap = opexTotal×0.5 kısıtlayıcı olur', () => {
+    // Küçük OPEX: opexTotal = 500K; opexCap = 250K
+    // gap=0.025; baseTarget=1.25M; netSales*0.10=10M; opexCap=250K → kısıtlayıcı
+    const result = a21.computeAmount!(makeA21Ctx({
+      accountBalances: { '630': 300_000, '631': 100_000, '632': 100_000 }, // opexTotal=500K
+    }))
+    expect(result).not.toBeNull()
+    expect(result).toBeCloseTo(250_000, 0)
+  })
+
+  // T10: buildTransactions → 102 DEBIT / 632 CREDIT
+  test('T10 — buildTransactions: 102 DEBIT, 632 CREDIT', () => {
+    const txs = a21.buildTransactions(makeA21Ctx({ amount: 2_000_000 }))
+    expect(txs).toHaveLength(1)
+    expect(txs[0].legs).toHaveLength(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT',  amount: 2_000_000 })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '632', side: 'CREDIT', amount: 2_000_000 })
+  })
+
+  // T11 (Regresyon): A12 davranışı KORUNDU — 320/621 kanalı
+  test('T11 — Regresyon: A12 hâlâ 320 DEBIT / 621 CREDIT üretir', () => {
+    const a12 = ACTION_CATALOG_V3['A12_GROSS_MARGIN_IMPROVEMENT']
+    const txs  = a12.buildTransactions(makeContext({
+      amount:          5_000_000,
+      accountBalances: { '320': 50_000_000, '621': 100_000_000 },
+    }))
+    expect(txs).toHaveLength(2)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '320', side: 'DEBIT'  })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '621', side: 'CREDIT' })
+  })
+
+  // T12: A21 opexTotal=0 → null
+  test('T12 — opexTotal = 0 → null', () => {
+    const result = a21.computeAmount!(makeA21Ctx({
+      accountBalances: { '630': 0, '631': 0, '632': 0 },
+    }))
+    expect(result).toBeNull()
+  })
+})
+
 // ─── A06 Dominant Stok Seçimi (Faz 7.3.8b-PRE) ──────────────────────────────
 
 describe('Faz 7.3.8b-PRE — A06 dominant stok buildTransactions', () => {

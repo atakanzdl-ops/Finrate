@@ -469,6 +469,11 @@ export function buildActionRatioTransparency(
     return buildEquityRatioTransparency(action, ctx, amount)
   }
 
+  // ── Faz 7.3.50A.11: A20 — GROSS_MARGIN nakit kanal (102/621, 320 gerektirmez) ──
+  if (action.id === 'A20_GROSS_MARGIN_REFORM') {
+    return buildMarginRatioTransparency(action, ctx, amount)
+  }
+
   switch (action.targetRatio?.metric) {
     case 'DIO':
       return buildDIORatioTransparency(action, ctx, amount)

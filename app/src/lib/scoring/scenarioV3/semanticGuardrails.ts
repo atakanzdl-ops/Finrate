@@ -234,6 +234,16 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     minSourceBalance: 1_000_000,
     liquidityImpactRatio: 0,  // Avansı zaten nakit girmişti, sadece hasılata tanınıyor
   },
+  A20_GROSS_MARGIN_REFORM: {
+    sourceAccountRequirements: ['600', '621'],
+    producesLiquidity: true,
+    liquidityImpactRatio: 0.30,
+  },
+  A21_OPERATING_PROFIT_REFORM: {
+    sourceAccountRequirements: ['630', '631', '632'],
+    producesLiquidity: true,
+    liquidityImpactRatio: 0.50,
+  },
 }
 
 // ─── GİRDİ TİPLERİ ───────────────────────────────────────────────────────────

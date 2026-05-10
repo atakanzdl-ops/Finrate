@@ -1617,6 +1617,190 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
 }
 
+// ── A20 ──────────────────────────────────────────────────────────────────────
+const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
+  id: 'A20_GROSS_MARGIN_REFORM',
+  name: 'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
+  family: 'EQUITY_PNL',
+  semanticType: 'OPERATIONAL_MARGIN',
+  horizons: ['medium'],
+
+  useRatioBasedAmount: true,
+
+  targetRatio: {
+    metric:         'GROSS_MARGIN',
+    benchmarkField: 'grossMargin',
+    basis:          'netSales',
+    fallback:       0.30,
+    reliability:    'TCMB_DIRECT',
+  },
+
+  computeAmount: (ctx) => {
+    const netSales    = ctx.netSales    ?? 0
+    const grossProfit = ctx.grossProfit ?? 0
+    if (!ctx.netSales || netSales <= 0) return null
+    if (grossProfit < 0) return null
+
+    const currentMargin = grossProfit / netSales
+
+    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
+    const targetMargin = bm?.value
+    if (!targetMargin || currentMargin >= targetMargin) return null
+
+    const gap    = targetMargin - currentMargin
+    const target = gap * netSales * 0.5
+
+    return Math.min(target, netSales * 0.20)
+  },
+
+  buildTransactions: (context) => {
+    const amount = context.amount ?? 0
+    if (amount <= 0) return []
+    return [
+      makeBalancedTransaction(
+        'A20_GROSS_MARGIN_REFORM',
+        'Brüt marj iyileştirme — maliyet düşüşü ve nakit tasarruf',
+        'OPERATIONAL_MARGIN',
+        [
+          { accountCode: '102', accountName: 'Bankalar',              side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
+          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',  side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
+        ]
+      ),
+    ]
+  },
+
+  preconditions: {
+    minSourceAmountTRY: 500_000,
+  },
+
+  qualityCoefficient: 0.85,
+  sustainability: 'RECURRING',
+
+  repeatDecay: { first: 1.00, second: 0.75, third: 0.55, maxRepeats: 3 },
+
+  suggestedAmount: {
+    basis: 'revenue',
+    minPctOfBasis: 0.01,
+    typicalPctOfBasis: 0.03,
+    maxPctOfBasis: 0.08,
+    absoluteMinTRY: 500_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'applicable',
+    MANUFACTURING: 'primary',
+    TRADE:         'primary',
+    RETAIL:        'primary',
+    SERVICES:      'applicable',
+    IT:            'applicable',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        true,
+    strengthensOperations:  true,
+    realBalanceSheetGrowth: true,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Tedarikçi dışı maliyet optimizasyonu ile satılan mal maliyeti (621) düşürülür, tasarruf bankada nakit (102) olarak tutulur. A12\'den farkı: 320 Satıcılar hesabı gerekmez — nakit tasarruf kanalı.',
+  cfoRationale:
+    'Maliyet yapısı iyileştirildiğinde her 1 puanlık brüt marj artışı net kâra doğrudan yansır. Nakit kanalı tedarikçi borç müzakeresi gerektirmez; operasyonel verimlilik, proses iyileştirme veya alternatif tedarik kanalı ile sağlanabilir.',
+  bankerPerspective:
+    'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. A20, A12\'nin tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı versiyonudur.',
+}
+
+// ── A21 ──────────────────────────────────────────────────────────────────────
+const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
+  id: 'A21_OPERATING_PROFIT_REFORM',
+  name: 'Faaliyet Kârı Reformu — Gider Optimizasyonu (Nakit Kanal)',
+  family: 'EQUITY_PNL',
+  semanticType: 'OPEX_REDUCTION',
+  horizons: ['medium', 'long'],
+
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    const netSales       = ctx.netSales       ?? 0
+    const operatingProfit = ctx.operatingProfit ?? 0
+    if (!ctx.netSales || netSales <= 0) return null
+    if (operatingProfit < 0) return null
+
+    const currentMargin = operatingProfit / netSales
+
+    const bm = getBenchmarkValue(ctx.sector, 'ebitMargin')
+    const targetMargin = bm?.value
+    if (!targetMargin || currentMargin >= targetMargin) return null
+
+    const gap        = targetMargin - currentMargin
+    const baseTarget = gap * netSales * 0.5
+
+    // OPEX kaynak guard
+    const balances  = ctx.accountBalances ?? {}
+    const opexTotal = (balances['630'] ?? 0) + (balances['631'] ?? 0) + (balances['632'] ?? 0)
+    if (opexTotal <= 0) return null
+    const opexCap = opexTotal * 0.5
+
+    return Math.min(baseTarget, netSales * 0.10, opexCap)
+  },
+
+  buildTransactions: (context) => {
+    const amount = context.amount ?? 0
+    if (amount <= 0) return []
+    return [
+      makeBalancedTransaction(
+        'A21_OPERATING_PROFIT_REFORM',
+        'Faaliyet kârı iyileştirme — gider optimizasyonu',
+        'OPEX_REDUCTION',
+        [
+          { accountCode: '102', accountName: 'Bankalar',                   side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
+          { accountCode: '632', accountName: 'Genel Yönetim Giderleri',    side: 'CREDIT', amount, description: 'Faaliyet gideri azalışı'      },
+        ]
+      ),
+    ]
+  },
+
+  preconditions: {
+    minSourceAmountTRY: 300_000,
+  },
+
+  qualityCoefficient: 0.80,
+  sustainability: 'RECURRING',
+
+  repeatDecay: { first: 1.00, second: 0.70, third: 0.45, maxRepeats: 3 },
+
+  suggestedAmount: {
+    basis: 'revenue',
+    minPctOfBasis: 0.005,
+    typicalPctOfBasis: 0.02,
+    maxPctOfBasis: 0.05,
+    absoluteMinTRY: 300_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'applicable',
+    MANUFACTURING: 'applicable',
+    TRADE:         'applicable',
+    RETAIL:        'applicable',
+    SERVICES:      'primary',
+    IT:            'primary',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        true,
+    strengthensOperations:  true,
+    realBalanceSheetGrowth: true,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Genel yönetim giderleri (632) optimize edilerek faaliyet kârı ve FAVÖK marjı iyileştirilir. Tasarruf nakit (102) olarak tutulur. A13\'ten farkı: projeksiyon değil, gerçek yevmiye kaydı.',
+  cfoRationale:
+    'Faaliyet giderlerindeki yapısal azalma FAVÖK marjını kalıcı olarak güçlendirir. Nakit kanalı tasarrufu anında bilanço güçlenmesi olarak yansıtır.',
+  bankerPerspective:
+    'Operasyonel gider disiplini FAVÖK kalitesini artırır. A21, A13\'ün projeksiyon modeli yerine gerçek muhasebe kaydı ile somutlaştırılmış versiyonudur.',
+}
+
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────
 
 export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
@@ -1638,6 +1822,8 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A15B_SHAREHOLDER_DEBT_TO_LT,
   A18_NET_SALES_GROWTH,
   A19_ADVANCE_TO_REVENUE,
+  A20_GROSS_MARGIN_REFORM,
+  A21_OPERATING_PROFIT_REFORM,
 }
 
 export const ACTION_IDS_V3 = Object.keys(ACTION_CATALOG_V3)

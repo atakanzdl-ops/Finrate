@@ -325,6 +325,8 @@ export const ACTION_CATEGORY_MAP: Record<string, DriverCategory> = {
   A15B_SHAREHOLDER_DEBT_TO_LT:  'COSMETIC',
   A18_NET_SALES_GROWTH:         'STRUCTURAL',
   A19_ADVANCE_TO_REVENUE:       'STRUCTURAL',
+  A20_GROSS_MARGIN_REFORM:      'STRUCTURAL',
+  A21_OPERATING_PROFIT_REFORM:  'STRUCTURAL',
 }
 
 export interface PortfolioComposition {

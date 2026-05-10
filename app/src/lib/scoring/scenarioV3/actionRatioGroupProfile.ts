@@ -82,6 +82,12 @@ export const ACTION_RATIO_GROUP_PROFILE: Record<string, ActionRatioGroupProfile>
   'A18_NET_SALES_GROWTH':                  { primary: 'PROFITABILITY', secondary: 'ACTIVITY' },
   // Avans → hasılat: kârlılık ↑ (PROFITABILITY), likit pasif ↓ (LIQUIDITY secondary)
   'A19_ADVANCE_TO_REVENUE':                { primary: 'PROFITABILITY', secondary: 'LIQUIDITY' },
+
+  // ── Kârlılık Reformu (Nakit Kanal) ────────────────────────────────────────
+  // Brüt marj ↑ → kârlılık ↑ (PROFITABILITY); tedarikçisiz maliyet optimizasyonu
+  'A20_GROSS_MARGIN_REFORM':               { primary: 'PROFITABILITY' },
+  // Faaliyet kârı ↑ → kârlılık ↑ (PROFITABILITY); gider optimizasyonu nakit kanal
+  'A21_OPERATING_PROFIT_REFORM':           { primary: 'PROFITABILITY' },
 }
 
 /**

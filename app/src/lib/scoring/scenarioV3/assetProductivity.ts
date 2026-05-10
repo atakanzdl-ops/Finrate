@@ -601,6 +601,21 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     affectedComponents: ['salesEfficiency'],
     productivityNote: 'Avansın hasılata dönüşmesi satış/aktif oranını iyileştirir',
   },
+  A20_GROSS_MARGIN_REFORM: {
+    repairs: {
+      OPERATING_YIELD_GAP: 'PRIMARY',
+      CASH_GENERATION_GAP: 'STRONG',
+    },
+    affectedComponents: ['operatingYield', 'cashSupport'],
+    productivityNote: 'Brüt marj iyileşmesi aktif verimini doğrudan artırır (nakit kanal)',
+  },
+  A21_OPERATING_PROFIT_REFORM: {
+    repairs: {
+      OPERATING_YIELD_GAP: 'STRONG',
+    },
+    affectedComponents: ['operatingYield'],
+    productivityNote: 'Faaliyet gideri azalması faaliyet kârını ve aktif verimini artırır',
+  },
 }
 
 export interface ActionRepairAssessment {
