@@ -949,7 +949,12 @@ function isActionApplicable(
   // Katalog customCheck'leri analysis.accounts[] array'i bekler;
   // recordToAccountBalances() ile FirmContext.accountBalances adapt edilir.
   if (action.preconditions.customCheck) {
-    const analysisProxy = { accounts: recordToAccountBalances(context.accountBalances) }
+    const analysisProxy = {
+      accounts:    recordToAccountBalances(context.accountBalances),
+      sector:      context.sector,
+      netSales:    context.netSales,
+      grossProfit: context.grossProfit,
+    }
     const checkResult   = action.preconditions.customCheck(analysisProxy)
     if (!checkResult.pass) {
       return {

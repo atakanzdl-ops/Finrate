@@ -835,6 +835,76 @@ describe('Faz 7.3.50A.11 — A21_OPERATING_PROFIT_REFORM computeAmount + buildTr
   })
 })
 
+// ─── A18 customCheck Birim Testleri — Faz 7.3.50A.13 ─────────────────────────
+
+describe('Faz 7.3.50A.13 — A18_NET_SALES_GROWTH customCheck birim testleri', () => {
+  const a18 = ACTION_CATALOG_V3['A18_NET_SALES_GROWTH']
+  const check = (input: object) => a18.preconditions.customCheck!(input)
+
+  // T_A18_CUSTOM_1: KUZEY ÇAYIR profili — brüt marj %1.46 < TRADE %7 eşiği → elenir
+  test('T_A18_CUSTOM_1: KUZEY ÇAYIR profili — düşük marj → pass: false, reason sektör altı', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    268_700_000,
+      grossProfit:   3_930_000,  // %1.46 < TRADE 0.14 × 0.5 = 0.07
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Sektör altı/i)
+  })
+
+  // T_A18_CUSTOM_2: Normal marj firma — brüt marj %10 > TRADE %7 eşiği → geçer
+  test('T_A18_CUSTOM_2: normal marj — %10 > %7 eşiği → pass: true', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    100_000_000,
+      grossProfit:  10_000_000,  // %10 > 0.07
+    })
+    expect(result.pass).toBe(true)
+  })
+
+  // T_A18_CUSTOM_3: Tam eşik (%7) — currentMargin < 0.07 DEĞİL → geçer
+  test('T_A18_CUSTOM_3: tam eşik %7 — sınırda geçer (< değil, eşit) → pass: true', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    100_000_000,
+      grossProfit:   7_000_000,  // exactly %7 = threshold — not < threshold → pass
+    })
+    expect(result.pass).toBe(true)
+  })
+
+  // T_A18_CUSTOM_4: Brüt zarar (grossProfit < 0) → elenir
+  test('T_A18_CUSTOM_4: brüt zarar → pass: false, reason brüt zarar', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    100_000_000,
+      grossProfit:  -1_000_000,
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/Brüt zarar/i)
+  })
+
+  // T_A18_CUSTOM_5: netSales = 0 → elenir
+  test('T_A18_CUSTOM_5: netSales = 0 → pass: false, reason satış geliri', () => {
+    const result = check({
+      sector:      'TRADE',
+      netSales:    0,
+      grossProfit: 10_000_000,
+    })
+    expect(result.pass).toBe(false)
+    expect(result.reason).toMatch(/satış geliri/i)
+  })
+
+  // T_A18_CUSTOM_6: Bilinmeyen sektör → benchmark yok → pass: true (mevcut davranış)
+  test('T_A18_CUSTOM_6: bilinmeyen sektör — benchmark yok → pass: true', () => {
+    const result = check({
+      sector:      'ENERGY',     // SECTOR_CODE_TO_TR'de yok → getBenchmarkValue null döner
+      netSales:    100_000_000,
+      grossProfit:  15_000_000,
+    })
+    expect(result.pass).toBe(true)
+  })
+})
+
 // ─── A06 Dominant Stok Seçimi (Faz 7.3.8b-PRE) ──────────────────────────────
 
 describe('Faz 7.3.8b-PRE — A06 dominant stok buildTransactions', () => {

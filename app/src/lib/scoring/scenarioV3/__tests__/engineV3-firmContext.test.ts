@@ -245,3 +245,52 @@ describe('Faz 7.3.12-PRE — baseline transparency', () => {
     }
   })
 })
+
+// ─── Faz 7.3.50A.13 — A18 sektör altı marj filtresi ─────────────────────────
+
+describe('Faz 7.3.50A.13 — A18 sektör altı marj filtresi (engine selection)', () => {
+
+  // T_A18_FILTER_1: KUZEY ÇAYIR mock — brüt marj %1.46 (TRADE %7 eşiği altında) → A18 elenir
+  // NOT: Local repair loop allowedActionIds'i yoksayabilir; bu yüzden A18'in
+  // portfolio'da OLMADIĞINI doğrularız (portfolio.length === 0 değil).
+  test('T_A18_FILTER_1: KUZEY ÇAYIR mock — düşük marj A18 elenir', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      sector: 'TRADE',
+      accountBalances: { ...BASELINE_INPUT.accountBalances, '600': 268_700_000 },
+      incomeStatement: {
+        netSales:          268_700_000,
+        costOfGoodsSold:   264_770_000,
+        grossProfit:         3_930_000,  // marj %1.46 < %7 (TRADE %14 × 0.5)
+        operatingProfit:    -5_000_000,
+        netIncome:          -5_000_000,
+        interestExpense:     3_000_000,
+        operatingCashFlow:           0,
+      },
+      options: { allowedActionIds: ['A18_NET_SALES_GROWTH'] },
+    })
+    // A18 customCheck sektör altı marj nedeniyle pass: false döner → A18 portfolio'da olmamalı
+    expect(result.portfolio.some(a => a.actionId === 'A18_NET_SALES_GROWTH')).toBe(false)
+  })
+
+  // T_A18_FILTER_2: Normal marj firma — brüt marj %10 (TRADE %7 eşiği üstünde) → A18 seçilir
+  test('T_A18_FILTER_2: normal marj firma — A18 seçilir', () => {
+    const result = runEngineV3({
+      ...BASELINE_INPUT,
+      sector: 'TRADE',
+      accountBalances: { ...BASELINE_INPUT.accountBalances, '600': 100_000_000 },
+      incomeStatement: {
+        netSales:        100_000_000,
+        costOfGoodsSold:  90_000_000,
+        grossProfit:      10_000_000,  // marj %10 > %7 (TRADE %14 × 0.5)
+        operatingProfit:   5_000_000,
+        netIncome:         2_000_000,
+        interestExpense:   2_000_000,
+        operatingCashFlow: 3_000_000,
+      },
+      options: { allowedActionIds: ['A18_NET_SALES_GROWTH'] },
+    })
+    expect(result.portfolio.some(a => a.actionId === 'A18_NET_SALES_GROWTH')).toBe(true)
+  })
+
+})

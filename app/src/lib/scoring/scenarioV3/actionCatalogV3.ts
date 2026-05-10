@@ -32,6 +32,9 @@ interface RawAccount {
 
 interface AnalysisInput {
   accounts?: RawAccount[]
+  sector?: SectorCode
+  netSales?: number
+  grossProfit?: number
 }
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
@@ -1418,9 +1421,32 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
 
   preconditions: {
     minSourceAmountTRY: 1_000_000,
+    // Mevcut revenue check'in yerine geçer: sumAccountsByPrefix → netSales > 0 eşdeğer
+    // + sektör altı %50 marj filtresi eklendi (Faz 7.3.50A.13)
     customCheck: (analysis) => {
-      const revenue = sumAccountsByPrefix(analysis, ['600', '601'])
-      if (revenue <= 0) return { pass: false, reason: 'Mevcut satış geliri yok — büyüme modeli uygulanamaz' }
+      const { sector, netSales, grossProfit } = analysis as AnalysisInput
+
+      if (!netSales || netSales <= 0) {
+        return { pass: false, reason: 'Mevcut satış geliri yok — A18 net satış artışı için baz gerekli' }
+      }
+
+      if (grossProfit === undefined || grossProfit <= 0) {
+        return { pass: false, reason: 'Brüt zarar — düşük marjda satış artışı zarar büyütür' }
+      }
+
+      const bm = getBenchmarkValue(sector, 'grossMargin')
+      const targetMargin = bm?.value
+
+      if (!targetMargin) {
+        return { pass: true }  // sektör eşiği yoksa mevcut davranış
+      }
+
+      const currentMargin = grossProfit / netSales
+
+      if (currentMargin < targetMargin * 0.5) {
+        return { pass: false, reason: 'Sektör altı marj — mevcut maliyet yapısıyla satış artışı zarar büyütür' }
+      }
+
       return { pass: true }
     },
   },
