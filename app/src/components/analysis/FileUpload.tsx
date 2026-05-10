@@ -153,10 +153,11 @@ export function FileUpload({ entityId, onImported }: Props) {
           updateEntry(idx, { status: 'error', error: d.message })
           return false
         }
-        // 409 — ENTITY soft senaryolar (CASE 2-5)
+        // 409 — ENTITY soft senaryolar (CASE 1-5; Faz 7.3.50B.2: VKN mismatch da soft)
         if (
           res.status === 409 &&
           (
+            d.error === 'ENTITY_TAX_NUMBER_MISMATCH'    ||
             d.error === 'ENTITY_TAX_UNVERIFIED_CONFIRM' ||
             d.error === 'ENTITY_TC_UNVERIFIED_CONFIRM'  ||
             d.error === 'ENTITY_TITLE_MISMATCH_CONFIRM' ||

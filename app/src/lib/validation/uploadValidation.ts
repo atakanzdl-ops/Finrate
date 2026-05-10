@@ -264,7 +264,10 @@ export function checkEntityIdentity(
     return { ok: true }
   }
 
-  // CASE 1 HARD — VKN mismatch
+  // Faz 7.3.50B.2: Mali müşavir bilinçli onaylayabilir — soft bypass önce kontrol edilir
+  if (confirmed) return { ok: true }
+
+  // CASE 1 SOFT-WARN — VKN mismatch (mali müşavir onaylamadıysa uyar)
   if (detected.taxNumber && entity.taxNumber && detected.taxNumber !== entity.taxNumber) {
     return {
       ok:       false,
@@ -278,9 +281,8 @@ export function checkEntityIdentity(
     }
   }
 
-  // CASE 1b HARD — TC mismatch (Faz 7.3.50A.3.4)
-  // detected.tcKimlik var + entity.taxNumber dolu + farklı → yanlış firma sayfasına
-  // şahıs dosyası yüklenmiş; confirmed bypass-resistant (CASE 1 ile aynı grup)
+  // CASE 1b SOFT-WARN — TC mismatch (Faz 7.3.50A.3.4; mali müşavir onaylamadıysa uyar)
+  // detected.tcKimlik var + entity.taxNumber dolu + farklı → yanlış firma uyarısı
   if (detected.tcKimlik && entity.taxNumber && detected.tcKimlik !== entity.taxNumber) {
     return {
       ok:       false,
@@ -293,8 +295,6 @@ export function checkEntityIdentity(
       entity:   { name: entity.name, taxNumber: entity.taxNumber },
     }
   }
-
-  if (confirmed) return { ok: true }
 
   // CASE 2 SOFT — VKN var, entity VKN yok
   if (detected.taxNumber && !entity.taxNumber) {

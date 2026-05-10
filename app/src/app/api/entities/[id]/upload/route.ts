@@ -196,17 +196,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    // PREFLIGHT 4 — ENTITY IDENTITY CHECK (Faz 7.3.50A.3)
+    // PREFLIGHT 4 — ENTITY IDENTITY CHECK (Faz 7.3.50A.3 + 7.3.50B.2)
     // Dosyada bulunan VKN/TC/unvan ile sisteme kayıtlı entity karşılaştırılır.
     // ÖNCELİK 0: VKN match → tüm soft kontroller atlanır.
-    // CASE 1 HARD (422): VKN var + entity VKN var + farklı → ret (bypass YOK).
-    // CASE 2-5 SOFT (409): confirmEntityUnverified=true ile bypass edilir.
+    // CASE 1-5 SOFT (409): confirmEntityUnverified=true ile bypass edilir.
+    // Faz 7.3.50B.2: VKN mismatch da soft — mali müşavir bilinçli onaylayabilir.
     {
       const confirmEntityUnverified = formData.get('confirmEntityUnverified') === 'true'
       const detectedIdentity        = parsedRows[0]?.identity ?? { sourceConfidence: 'LOW' as const }
       const identityResult          = checkEntityIdentity(detectedIdentity, entity, confirmEntityUnverified)
       if (!identityResult.ok) {
-        const status = identityResult.error === 'ENTITY_TAX_NUMBER_MISMATCH' ? 422 : 409
+        const status = 409
         return jsonUtf8({
           error:    identityResult.error,
           message:  identityResult.message,

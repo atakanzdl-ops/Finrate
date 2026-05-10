@@ -146,10 +146,11 @@ export default function MultiYearUploadPage() {
           setYearUpload(year, { status: 'error', error: data.message })
           return
         }
-        // 409 — ENTITY soft senaryolar (CASE 2-5)
+        // 409 — ENTITY soft senaryolar (CASE 1-5; Faz 7.3.50B.2: VKN mismatch da soft)
         if (
           res.status === 409 &&
           (
+            data.error === 'ENTITY_TAX_NUMBER_MISMATCH'    ||
             data.error === 'ENTITY_TAX_UNVERIFIED_CONFIRM' ||
             data.error === 'ENTITY_TC_UNVERIFIED_CONFIRM'  ||
             data.error === 'ENTITY_TITLE_MISMATCH_CONFIRM' ||

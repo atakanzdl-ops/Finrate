@@ -1002,12 +1002,12 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
     jest.clearAllMocks()
   })
 
-  // ── T7 HARD: VKN mismatch → 422 ────────────────────────────────────────────
-  test('T7 — VKN mismatch → 422 ENTITY_TAX_NUMBER_MISMATCH', async () => {
+  // ── T7: VKN mismatch → 409 soft warning (Faz 7.3.50B.2) ───────────────────
+  test('T7 — VKN mismatch → 409 ENTITY_TAX_NUMBER_MISMATCH (soft warning, bypass mümkün)', async () => {
     setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
     const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
     const res = await callPost(req)
-    expect(res.status).toBe(422)
+    expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
   })
@@ -1130,22 +1130,21 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
     expect(upsertMock).toHaveBeenCalled()
   })
 
-  // ── T15 HARD bypass impossible: VKN mismatch + confirmed=true → still 422 ───
-  test('T15 — VKN mismatch + confirmEntityUnverified=true → still 422 (HARD, no bypass)', async () => {
+  // ── T15: VKN mismatch + confirmed=true → bypass çalışır, analiz devam (Faz 7.3.50B.2) ──
+  test('T15 — VKN mismatch + confirmEntityUnverified=true → 200 bypass (mali müşavir onaylı)', async () => {
     setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', sourceConfidence: 'HIGH' })
     const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL', confirmEntityUnverified: true })
     const res = await callPost(req)
-    expect(res.status).toBe(422)
-    const body = await res.json()
-    expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+    expect(res.status).not.toBe(422)
+    expect(res.status).not.toBe(409)
   })
 
-  // ── T16: 422 response contract for ENTITY_TAX_NUMBER_MISMATCH ───────────────
-  test('T16 — 422 ENTITY_TAX_NUMBER_MISMATCH response contract: { error, message, detected, entity }', async () => {
+  // ── T16: 409 response contract for ENTITY_TAX_NUMBER_MISMATCH (Faz 7.3.50B.2) ──
+  test('T16 — 409 ENTITY_TAX_NUMBER_MISMATCH response contract: { error, message, detected, entity }', async () => {
     setupWithEntity({ name: 'Test Firması', taxNumber: '9999999999' }, { taxNumber: '1234567890', title: 'Farklı Firma', sourceConfidence: 'HIGH' })
     const req = createMockRequest({ fileName: 'b.pdf', year: 2024, period: 'ANNUAL' })
     const res = await callPost(req)
-    expect(res.status).toBe(422)
+    expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
     expect(typeof body.message).toBe('string')

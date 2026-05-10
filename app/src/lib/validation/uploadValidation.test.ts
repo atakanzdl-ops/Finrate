@@ -261,15 +261,14 @@ describe('checkEntityIdentity (Faz 7.3.50A.3)', () => {
     expect(resultMismatch.message!.length).toBeGreaterThan(0)
   })
 
-  // T20b — CASE 1 HARD bypass impossible: confirmed=true hala 422
-  test('T20b — VKN mismatch + confirmed=true → still ok:false (HARD, no bypass)', () => {
+  // T20b — Faz 7.3.50B.2: confirmed bypass VKN mismatch'ı da geçer (soft warning)
+  test('T20b — VKN mismatch + confirmed=true → ok:true (bypass çalışır, soft warning)', () => {
     const result = checkEntityIdentity(
       { taxNumber: '9999999999', sourceConfidence: 'HIGH' },
       entityWithVkn,
       true,
     )
-    expect(result.ok).toBe(false)
-    expect(result.error).toBe('ENTITY_TAX_NUMBER_MISMATCH')
+    expect(result.ok).toBe(true)
   })
 
   // T21 — CASE 2 SOFT: VKN var + entity VKN yok → ENTITY_TAX_UNVERIFIED_CONFIRM
