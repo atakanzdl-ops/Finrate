@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/db'
 
 const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => {
   throw new Error('JWT_SECRET environment variable is not set. Set it before starting the server.')
@@ -26,6 +27,37 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash)
+}
+
+/**
+ * JWT + DB doğrulaması.
+ * - isActive=false → null (soft-deleted hesap)
+ * - passwordChangedAt > token.iat → null (eski şifre dönemi tokeni)
+ * Sadece hassas endpoint'lerde kullan (/api/auth/me gibi).
+ * Middleware'de kullanılmaz (Edge Runtime DB sorgusu yapamaz).
+ */
+export async function verifyTokenWithDb(token: string): Promise<JwtPayload | null> {
+  try {
+    const payload = verifyToken(token)
+
+    const user = await prisma.user.findUnique({
+      where:  { id: payload.userId },
+      select: { isActive: true, passwordChangedAt: true },
+    })
+
+    if (!user)            return null
+    if (!user.isActive)   return null
+
+    if (user.passwordChangedAt) {
+      // JWT iat saniye cinsinden
+      const iatMs = ((payload as unknown as { iat: number }).iat ?? 0) * 1000
+      if (iatMs < user.passwordChangedAt.getTime()) return null
+    }
+
+    return payload
+  } catch {
+    return null
+  }
 }
 
 export function getUserIdFromRequest(req: import('next/server').NextRequest): string | null {

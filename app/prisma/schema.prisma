@@ -18,17 +18,19 @@ model User {
   companyName   String?
   role          String   @default("USER")
   isVerified    Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive           Boolean   @default(true)
+  passwordChangedAt  DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  subscription        Subscription?
-  entities            Entity[]
-  groups              Group[]
-  analyses            Analysis[]
-  tenzilatEntries     TenzilatEntry[]
-  auditLogs           TenzilatAuditLog[]
-  verificationTokens  VerificationToken[]
+  subscription          Subscription?
+  entities              Entity[]
+  groups                Group[]
+  analyses              Analysis[]
+  tenzilatEntries       TenzilatEntry[]
+  auditLogs             TenzilatAuditLog[]
+  verificationTokens    VerificationToken[]
+  accountDeletionToken  AccountDeletionToken?
 
   @@map("users")
 }
@@ -459,6 +461,24 @@ model VerificationToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────
+// HESAP SİLME TOKEN
+// ─────────────────────────────────────────────
+
+model AccountDeletionToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  code      String   // 6 haneli düz metin (TTL 10 dk)
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("account_deletion_tokens")
 }
 
 // ─────────────────────────────────────────────
