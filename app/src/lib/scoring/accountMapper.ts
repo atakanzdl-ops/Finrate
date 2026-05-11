@@ -290,3 +290,33 @@ export function checkBalance(
     balanced:    Math.abs(totalAssets - totalLiabilitiesAndEquity) < 1,   // 1 TL tolerans
   }
 }
+
+// ─── SCORING ADAPTER ─────────────────────────────────────────────────────────
+
+/**
+ * rebuildAggregateFromAccounts() çıktısına ebit ve grossProfit fallback ekler.
+ *
+ * rebuildAggregateFromAccounts() hesap kodlarından bilanço + gelir tablosu
+ * alt kalemlerini üretir ama türetilmiş kalemleri (grossProfit, ebit) hesaplamaz.
+ * calculateRatios() grossProfit için kendi fallback'ine sahip, ama aggregateFinancials()
+ * içindeki toplama adımı bu alanları sıfır alır.
+ *
+ * Bu adapter account-level path sonrasında çağrılarak eksik alanları tamamlar:
+ *   grossProfit = revenue − cogs
+ *   ebit        = revenue − cogs − operatingExpenses
+ *
+ * Mevcut değer varsa (sıfırdan farklı) korunur — override yapmaz.
+ */
+export function adaptAggregateForScoring(
+  agg: Record<string, number>,
+): Record<string, number> {
+  const revenue           = agg.revenue           ?? 0
+  const cogs              = agg.cogs              ?? 0
+  const operatingExpenses = agg.operatingExpenses ?? 0
+
+  return {
+    ...agg,
+    grossProfit: agg.grossProfit || (revenue - cogs),
+    ebit:        agg.ebit        || (revenue - cogs - operatingExpenses),
+  }
+}
