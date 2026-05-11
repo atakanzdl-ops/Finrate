@@ -433,6 +433,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
         amount: '', description: '',
       })
       await loadEntries()
+      await loadData()
     }
   }
 
@@ -446,12 +447,14 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     setSaving(false)
     setEditingEntry(null)
     await loadEntries()
+    await loadData()
   }
 
   async function deleteEntry(entryId: string) {
     if (!confirm('Bu eliminasyon kaydı silinsin mi?')) return
     await fetch(`/api/groups/${id}/elimination-entries/${entryId}`, { method: 'DELETE' })
     await loadEntries()
+    await loadData()
   }
 
   const entityName  = (eid: string) => entities.find(e => e.id === eid)?.name ?? eid
