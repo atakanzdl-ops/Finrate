@@ -704,7 +704,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 const renderTable = (rows: TableRow[], sectionColor: string, sectionLabel: string) => (
                   <div className="card overflow-hidden" style={{ marginBottom: 0 }}>
                     <div className="card-head" style={{ background: '#F8FAFC' }}>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col items-start gap-0.5">
                         <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: sectionColor }}>
                           KONSOLİDE BİLANÇO — {sectionLabel}
                         </h2>
