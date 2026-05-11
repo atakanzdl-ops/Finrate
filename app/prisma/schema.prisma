@@ -96,6 +96,8 @@ model Entity {
   icTransactionsSell  IcTransaction[] @relation("SellerEntity")
   icTransactionsBuy   IcTransaction[] @relation("BuyerEntity")
   subjectiveInput     SubjectiveInput?
+  eliminationsFrom    GroupEliminationEntry[] @relation("EliminationFrom")
+  eliminationsTo      GroupEliminationEntry[] @relation("EliminationTo")
 
   @@map("entities")
 }
@@ -114,7 +116,8 @@ model Group {
   icTransactions   IcTransaction[]
   eliminationLogs  EliminationLog[]
   tenzilatEntries  TenzilatEntry[]
-  groupElimination GroupElimination?
+  groupElimination   GroupElimination?
+  eliminationEntries GroupEliminationEntry[]
 
   @@map("groups")
 }
@@ -133,6 +136,35 @@ model GroupElimination {
   updatedAt                    DateTime @updatedAt
 
   @@map("group_eliminations")
+}
+
+// ─────────────────────────────────────────────
+// YENİ: GRUP İÇİ ELİMİNASYON KAYITLARI
+// Faz 7.4.1 — Yıl + firma çifti + hesap kodu bazlı
+// GroupElimination (üstteki) soft-deprecated — Faz 7.4.1-E'de migrate edilecek
+// ─────────────────────────────────────────────
+
+model GroupEliminationEntry {
+  id              String   @id @default(uuid())
+  groupId         String
+  year            Int
+  period          String   // ANNUAL | Q1 | Q2 | Q3 | Q4 | H1 | H2
+  fromEntityId    String
+  fromAccountCode String   // TDHP hesap kodu — ör. "131" (Ortaklardan Alacaklar)
+  toEntityId      String
+  toAccountCode   String   // TDHP hesap kodu — ör. "331" (Ortaklara Borçlar)
+  amount          Decimal  @db.Decimal(20, 2)
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  group      Group  @relation(fields: [groupId],      references: [id], onDelete: Cascade)
+  fromEntity Entity @relation("EliminationFrom",      fields: [fromEntityId], references: [id])
+  toEntity   Entity @relation("EliminationTo",        fields: [toEntityId],   references: [id])
+
+  @@unique([groupId, year, period, fromEntityId, fromAccountCode, toEntityId, toAccountCode])
+  @@index([groupId, year, period])
+  @@map("group_elimination_entries")
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
