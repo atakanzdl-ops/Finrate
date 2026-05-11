@@ -266,7 +266,7 @@ const PASIF_ROWS: TableRow[] = [
     compute: (f) => (f.retainedEarnings ?? 0) - (f.retainedLosses ?? 0) },
   { label: 'Dönem Net Kâr/Zarar',       key: 'netProfitCurrentYear',        indent: true,  total: false, allowNeg: true },
   { label: 'ÖZKAYNAK TOPLAMI',          key: 'totalEquity',                 indent: false, total: true,  allowNeg: true },
-  { label: 'PASİF + ÖZKAYNAK TOPLAMI',  key: 'totalLiabilitiesAndEquity',   indent: false, total: true,  grand: true },
+  { label: 'PASİF TOPLAMI',             key: 'totalLiabilitiesAndEquity',   indent: false, total: true,  grand: true },
 ]
 
 const IS_TABLE_ROWS: TableRow[] = [
@@ -708,7 +708,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                         <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: sectionColor }}>
                           KONSOLİDE BİLANÇO — {sectionLabel}
                         </h2>
-                        <span style={{ fontSize: 10, color: '#94A3B8' }}>{group.sector || 'Konsolide'} · Eliminasyon sonrası</span>
+                        <span style={{ fontSize: 10, color: '#94A3B8' }}>{group.sector || 'Konsolide'} · Tenzilat sonrası</span>
                       </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
@@ -768,7 +768,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                 return (
                   <div className="space-y-3">
                     {renderTable(AKTIF_ROWS, '#2EC4B6', 'AKTİF')}
-                    {renderTable(PASIF_ROWS, '#D97706', 'PASİF + ÖZKAYNAK')}
+                    {renderTable(PASIF_ROWS, '#D97706', 'PASİF')}
                   </div>
                 )
               })()}
@@ -1029,7 +1029,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 16px', borderRadius: 12, background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)' }}>
             <GitBranch size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
             <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
-              Grup içi işlem eliminasyonları yıl ve dönem bazında, kaynak firma/hesap ile hedef firma/hesap çifti olarak kaydedilir.
+              Grup içi işlem tenzilat kayıtları yıl ve dönem bazında, kaynak firma/hesap ile hedef firma/hesap çifti olarak kaydedilir.
             </p>
           </div>
 
@@ -1057,7 +1057,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
             {entries.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center' }}>
                 <GitBranch size={28} style={{ color: '#CBD5E1', margin: '0 auto 8px' }} />
-                <p style={{ fontSize: 13, color: '#94A3B8' }}>Henüz eliminasyon kaydı yok.</p>
+                <p style={{ fontSize: 13, color: '#94A3B8' }}>Henüz tenzilat kaydı yok.</p>
               </div>
             ) : (
               <>
@@ -1126,7 +1126,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               onClick={e => { if (e.target === e.currentTarget) setShowCreateModal(false) }}>
               <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(11,60,93,0.18)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Yeni Eliminasyon Kaydı</h3>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Yeni Tenzilat Kaydı</h3>
                   <button onClick={() => setShowCreateModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}><X size={18} /></button>
                 </div>
                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1223,7 +1223,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               onClick={e => { if (e.target === e.currentTarget) setEditingEntry(null) }}>
               <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(11,60,93,0.18)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Eliminasyon Düzenle</h3>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Tenzilat Düzenle</h3>
                   <button onClick={() => setEditingEntry(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}><X size={18} /></button>
                 </div>
                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
