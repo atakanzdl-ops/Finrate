@@ -153,13 +153,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         e => e.consolidationInclude && (e.ownershipPct ?? 1) * 100 >= 50,
       )
 
-      // Hesap kodu yolu mu? — bu dönem için her entity'nin financialAccounts verisi var mı?
-      const allHaveAccounts =
-        consolidationEntities.length > 0 &&
-        consolidationEntities.every(entity => {
-          const accounts = entityData.get(entity.id)?.financialAccounts
-          return (accounts?.length ?? 0) > 0
-        })
+      // TEMPORARY (Faz 7.4.1-B-2.1): Account-level path disabled, B-2 V2 bekleniyor.
+      // rebuildAggregateFromAccounts çıktısı aggregateFinancials ile %100 uyumlu değil:
+      // Stok/Verilen Avans ayrımı farklı, Pasif Toplam boş, Net Kar bazı dönemlerde boş.
+      // Adapter genişletme tamamlanınca (B-2 V2) bu satır kaldırılacak.
+      const allHaveAccounts = false
 
       const agg: Record<string, number> = {}
 
