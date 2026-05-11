@@ -227,6 +227,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         agg.totalCurrentLiabilities  = Math.max(0, (agg.totalCurrentLiabilities  ?? 0) - e.intercompanyPayables - e.intercompanyAdvancesReceived)
         agg.totalEquity              = (agg.totalEquity ?? 0) - e.intercompanyProfit  // negatife düşebilir
         agg.totalLiabilitiesAndEquity = agg.totalCurrentLiabilities + (agg.totalNonCurrentLiabilities ?? 0) + agg.totalEquity
+
+        // Faz 7.4.3 — detay kalem eliminasyonları (toplam tutarlılığı için)
+        // Hesap kodu → granüler field eşlemesi (IS kalemleri hariç — yukarıda halledildi)
+        const ACCOUNT_TO_GRANULAR: Record<string, string> = {
+          '120': 'tradeReceivables',       '121': 'tradeReceivables',
+          '131': 'otherReceivables',       '132': 'otherReceivables',       '133': 'otherReceivables',
+          '159': 'prepaidSuppliers',
+          '320': 'tradePayables',          '321': 'tradePayables',
+          '331': 'otherShortTermPayables', '332': 'otherShortTermPayables', '333': 'otherShortTermPayables',
+          '340': 'advancesReceived',
+        }
+        const normalizedPeriod = period.trim().toUpperCase()
+        const periodEntries = group.eliminationEntries.filter(
+          en => en.year === year && en.period.trim().toUpperCase() === normalizedPeriod
+        )
+        for (const en of periodEntries) {
+          const amt     = Number(en.amount)
+          if (!Number.isFinite(amt)) continue
+          const fromFld = ACCOUNT_TO_GRANULAR[en.fromAccountCode]
+          const toFld   = ACCOUNT_TO_GRANULAR[en.toAccountCode]
+          if (fromFld) agg[fromFld] = Math.max(0, (agg[fromFld] ?? 0) - amt)
+          if (toFld)   agg[toFld]   = Math.max(0, (agg[toFld]   ?? 0) - amt)
+        }
       }
 
       return {
