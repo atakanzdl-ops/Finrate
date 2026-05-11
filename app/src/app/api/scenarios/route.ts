@@ -22,6 +22,7 @@ import { calculateScore, scoreToRating } from '@/lib/scoring/score'
 import type { RatioResult }              from '@/lib/scoring/ratios'
 import { accountsToBalanceSheet, applyAccountMutation } from '@/lib/scoring/simulator'
 import { ACCOUNT_ACTIONS }                from '@/lib/scoring/actions'
+import { entriesToAggregateEliminations } from '@/lib/scoring/consolidationAccountLevel'
 
 // ─── Yardımcılar ─────────────────────────────────────────────────────────────
 
@@ -226,7 +227,8 @@ export async function POST(req: NextRequest) {
             consolidationInclude: true,
           },
         },
-        groupElimination: true,
+        groupElimination:  true,
+        eliminationEntries: true,
       },
     })
 
@@ -289,13 +291,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Eliminasyonlar uygula
-    const e = group.groupElimination ?? {
+    // Eliminasyonlar uygula — Faz 7.4.1-E.1 bridge
+    // Yeni GroupEliminationEntry tablosundan dönem bazlı elim üret; yoksa eski singleton fallback
+    const _zeros = {
       intercompanySales: 0, intercompanyPurchases: 0,
       intercompanyReceivables: 0, intercompanyPayables: 0,
       intercompanyAdvancesGiven: 0, intercompanyAdvancesReceived: 0,
       intercompanyProfit: 0,
     }
+    const newElim    = entriesToAggregateEliminations(
+      group.eliminationEntries ?? [], latestYear, latestPeriod
+    )
+    const hasNewElim = Object.values(newElim).some(v => v > 0)
+    const e          = hasNewElim ? newElim : (group.groupElimination ?? _zeros)
     agg.revenue              = Math.max(0, (agg.revenue ?? 0) - e.intercompanySales)
     agg.cogs                 = Math.max(0, (agg.cogs ?? 0) - e.intercompanyPurchases)
     agg.tradeReceivables     = Math.max(0, (agg.tradeReceivables ?? 0) - e.intercompanyReceivables)
