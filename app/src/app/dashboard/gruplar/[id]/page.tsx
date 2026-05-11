@@ -1061,14 +1061,14 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 64px', gap: 8, padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 96px', gap: 8, padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
                   {['YIL', 'DÖNEM', 'KAYNAK', 'HEDEF', 'TUTAR', ''].map((h, i) => (
                     <span key={i} style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textAlign: i >= 4 ? 'right' : 'left' }}>{h}</span>
                   ))}
                 </div>
                 <div className="divide-y divide-[#F1F5F9]">
                   {entries.map((entry: any) => (
-                    <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 64px', gap: 8, padding: '10px 20px', alignItems: 'center' }}>
+                    <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 96px', gap: 8, padding: '10px 20px', alignItems: 'center' }}>
                       <span style={{ fontSize: 12, color: '#1E293B', fontVariantNumeric: 'tabular-nums' }}>{entry.year}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96' }}>{periodLabel(entry.period)}</span>
                       <div>
@@ -1083,18 +1083,35 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                         {fmtAsset(entry.amount)} TL
                       </span>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button onClick={() => setEditingEntry(entry)}
-                          style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#0B3C5D')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
-                          <Pencil size={13} />
-                        </button>
-                        <button onClick={() => deleteEntry(entry.id)}
-                          style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#DC2626')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
-                          <Trash2 size={13} />
-                        </button>
+                        {confirmDeleteId === entry.id ? (
+                          <>
+                            <button
+                              onClick={confirmDeleteAndExecute}
+                              className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold bg-red-50 border border-red-200 text-red-500 hover:bg-red-100 transition-colors">
+                              Sil
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold bg-slate-50 border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors">
+                              İptal
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => setEditingEntry(entry)}
+                              style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = '#0B3C5D')}
+                              onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
+                              <Pencil size={13} />
+                            </button>
+                            <button onClick={() => deleteEntry(entry.id)}
+                              style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = '#DC2626')}
+                              onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1194,50 +1211,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                     disabled={saving || !newForm.fromEntityId || !newForm.fromAccountCode || !newForm.toEntityId || !newForm.toAccountCode || !newForm.amount}
                     className="btn btn-primary flex items-center gap-2 disabled:opacity-50">
                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Kaydet
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── DELETE CONFIRM MODAL ─────────────────────────────────────────── */}
-          {confirmDeleteId && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(11,60,93,0.35)' }}
-              onClick={e => { if (e.target === e.currentTarget) setConfirmDeleteId(null) }}>
-              <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(11,60,93,0.18)', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Kaydı Sil</h3>
-                  <button onClick={() => setConfirmDeleteId(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}><X size={18} /></button>
-                </div>
-                <div style={{ padding: '20px 20px 16px' }}>
-                  {(() => {
-                    const entry = entries.find((e: any) => e.id === confirmDeleteId)
-                    return entry ? (
-                      <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                        <p style={{ fontSize: 12, color: '#991B1B', margin: 0, fontWeight: 600 }}>
-                          {entry.year} / {periodLabel(entry.period)} — {fmtAsset(entry.amount)} TL
-                        </p>
-                        <p style={{ fontSize: 11, color: '#B91C1C', margin: '3px 0 0' }}>
-                          {entityName(entry.fromEntityId)} ({entry.fromAccountCode}) → {entityName(entry.toEntityId)} ({entry.toAccountCode})
-                        </p>
-                      </div>
-                    ) : null
-                  })()}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: 1 }} />
-                    <p style={{ fontSize: 13, color: '#1E293B', margin: 0 }}>
-                      Bu eliminasyon kaydı kalıcı olarak silinecektir. Bu işlem geri alınamaz.
-                    </p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid #F1F5F9' }}>
-                  <button onClick={() => setConfirmDeleteId(null)}
-                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #E5E9F0', background: '#fff', fontSize: 13, color: '#5A7A96', cursor: 'pointer' }}>
-                    İptal
-                  </button>
-                  <button onClick={confirmDeleteAndExecute}
-                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#DC2626', fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Trash2 size={14} /> Sil
                   </button>
                 </div>
               </div>
