@@ -306,8 +306,8 @@ export function applyEliminations(
   const revenue    = safeElim('revenue', aggregated.revenue, e.intercompanySales)
   const cogs       = safeElim('cogs',    aggregated.cogs,    e.intercompanyPurchases)
 
-  // grossProfit = revenue − cogs (türetilmiş, yeniden hesapla)
-  const grossProfit = Math.max(0, revenue - cogs)
+  // grossProfit = revenue − cogs (türetilmiş, yeniden hesapla — negatif korunur)
+  const grossProfit = revenue - cogs
 
   // ── Aktif eliminasyonları ─────────────────────────────────────────────────
   const assetReduction = e.intercompanyReceivables + e.intercompanyAdvancesGiven + e.intercompanyProfit

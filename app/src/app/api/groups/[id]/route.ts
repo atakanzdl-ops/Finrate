@@ -220,7 +220,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         agg.revenue               = Math.max(0, (agg.revenue               ?? 0) - e.intercompanySales)
         agg.cogs                  = Math.max(0, (agg.cogs                  ?? 0) - e.intercompanyPurchases)
-        agg.grossProfit           = Math.max(0, agg.revenue - agg.cogs)
+        agg.grossProfit           = agg.revenue - agg.cogs
         agg.totalCurrentAssets    = Math.max(0, (agg.totalCurrentAssets    ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven)
         agg.totalNonCurrentAssets = Math.max(0, (agg.totalNonCurrentAssets ?? 0) - e.intercompanyProfit)
         agg.totalAssets           = Math.max(0, (agg.totalAssets           ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven - e.intercompanyProfit)
