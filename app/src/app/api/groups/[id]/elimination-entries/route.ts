@@ -38,7 +38,7 @@ export async function GET(
     orderBy: [{ year: 'desc' }, { period: 'desc' }, { createdAt: 'asc' }],
   })
 
-  return jsonUtf8({ entries })
+  return jsonUtf8({ entries: entries.map(e => ({ ...e, amount: Number(e.amount) })) })
 }
 
 // POST /api/groups/[id]/elimination-entries
@@ -119,7 +119,7 @@ export async function POST(
         description:     typeof description === 'string' ? description : null,
       },
     })
-    return jsonUtf8({ entry }, { status: 201 })
+    return jsonUtf8({ entry: { ...entry, amount: Number(entry.amount) } }, { status: 201 })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       return jsonUtf8({ error: 'Bu kombinasyon zaten mevcut.' }, { status: 409 })

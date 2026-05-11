@@ -53,7 +53,7 @@ export async function PUT(
     data,
   })
 
-  return jsonUtf8({ entry })
+  return jsonUtf8({ entry: { ...entry, amount: Number(entry.amount) } })
 }
 
 // DELETE /api/groups/[id]/elimination-entries/[entryId]

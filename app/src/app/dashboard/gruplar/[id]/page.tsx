@@ -109,7 +109,6 @@ const ELIM_PERIODS = [
   { v: 'ANNUAL', label: 'Yıllık' },
   { v: 'Q1', label: 'Q1' }, { v: 'Q2', label: 'Q2' },
   { v: 'Q3', label: 'Q3' }, { v: 'Q4', label: 'Q4' },
-  { v: 'H1', label: 'H1' }, { v: 'H2', label: 'H2' },
 ]
 
 const YEAR_LIST = Array.from({ length: 6 }, (_, i) => 2020 + i)
