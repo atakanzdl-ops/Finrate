@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, Building2, Plus, X, Loader2,
   AlertTriangle, BarChart3, Save, GitBranch, Sliders, TrendingDown,
+  Pencil, Trash2,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
 import ScenarioPanel from '@/components/analysis/ScenarioPanel'
@@ -83,15 +84,35 @@ const RATING_LABEL: Record<string, string> = {
   BB: 'Spekülatif', B: 'Riskli', CCC: 'Çok Riskli', CC: 'Kritik', C: 'Kritik', D: 'Temerrüt',
 }
 
-const ELIM_FIELDS: { key: keyof EliminationsData; label: string; hint: string }[] = [
-  { key: 'intercompanySales',            label: 'Grup İçi Satışlar',             hint: 'Gelir tablosundan düşülür' },
-  { key: 'intercompanyPurchases',        label: 'Grup İçi Alışlar',              hint: 'Satışların maliyetinden düşülür' },
-  { key: 'intercompanyReceivables',      label: 'Grup İçi Ticari Alacaklar',     hint: 'Aktiften düşülür' },
-  { key: 'intercompanyPayables',         label: 'Grup İçi Ticari Borçlar',       hint: 'Pasiften düşülür' },
-  { key: 'intercompanyAdvancesGiven',    label: 'Verilen Grup İçi Avanslar',     hint: 'Aktiften düşülür' },
-  { key: 'intercompanyAdvancesReceived', label: 'Alınan Grup İçi Avanslar',      hint: 'Pasiften düşülür' },
-  { key: 'intercompanyProfit',           label: 'Grup İçi Gerçekleşmemiş Kâr',  hint: 'Stok/aktif ve özkaynak düşülür' },
+// ── Tenzilat sekmesi sabitleri ────────────────────────────────────────────────
+const IC_ACCOUNT_CODES = [
+  { code: '120', name: '120 – Alıcılar' },
+  { code: '121', name: '121 – Alacak Senetleri' },
+  { code: '131', name: '131 – Ortaklardan Alacaklar' },
+  { code: '132', name: '132 – İştiraklerden Alacaklar' },
+  { code: '133', name: '133 – Bağlı Ortaklıklardan Alacaklar' },
+  { code: '159', name: '159 – Verilen Sipariş Avansları' },
+  { code: '320', name: '320 – Satıcılar' },
+  { code: '321', name: '321 – Borç Senetleri' },
+  { code: '331', name: '331 – Ortaklara Borçlar' },
+  { code: '332', name: '332 – İştiraklere Borçlar' },
+  { code: '333', name: '333 – Bağlı Ortaklıklara Borçlar' },
+  { code: '340', name: '340 – Alınan Sipariş Avansları' },
+  { code: '600', name: '600 – Yurtiçi Satışlar' },
+  { code: '601', name: '601 – Yurtdışı Satışlar' },
+  { code: '602', name: '602 – Diğer Gelirler' },
+  { code: '621', name: '621 – Satılan Ticari Mallar Maliyeti' },
+  { code: '622', name: '622 – Satılan Mamul Maliyeti' },
 ]
+
+const ELIM_PERIODS = [
+  { v: 'ANNUAL', label: 'Yıllık' },
+  { v: 'Q1', label: 'Q1' }, { v: 'Q2', label: 'Q2' },
+  { v: 'Q3', label: 'Q3' }, { v: 'Q4', label: 'Q4' },
+  { v: 'H1', label: 'H1' }, { v: 'H2', label: 'H2' },
+]
+
+const YEAR_LIST = Array.from({ length: 6 }, (_, i) => 2020 + i)
 
 // ── 25-rasyo meta verisi — benchmark eşleştirmesi, yön ve ağırlık ──────────────
 // direction: 'higher' → büyük olmalı | 'lower' → küçük olmalı | 'none' → karşılaştırma yok
@@ -316,10 +337,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   const [addOwn,  setAddOwn]  = useState('100')
   const [adding,  setAdding]  = useState(false)
 
-  const [elimForm,   setElimForm]   = useState<EliminationsData>(ZERO_ELIM)
-  const [savingElim, setSavingElim] = useState(false)
-  const [elimSaved,  setElimSaved]  = useState(false)
-
   const loadData = useCallback(async () => {
     const [groupRes, allRes] = await Promise.all([
       fetch(`/api/groups/${id}`).then(r => r.json()),
@@ -332,7 +349,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       setConsolidatedPeriods(groupRes.consolidatedPeriods ?? [])
       const elim: EliminationsData = groupRes.eliminations ?? ZERO_ELIM
       setEliminations(elim)
-      setElimForm(elim)
     }
     setAll(allRes.entities ?? [])
     setLoading(false)
@@ -366,20 +382,81 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     await loadData()
   }
 
-  async function saveEliminations() {
-    setSavingElim(true)
-    const res = await fetch(`/api/groups/${id}/eliminations`, {
-      method: 'PATCH',
+  // ── Tenzilat — entry-based CRUD ──────────────────────────────────────────────
+  const [entries,         setEntries]         = useState<any[]>([])
+  const [filterYear,      setFilterYear]      = useState<number | null>(null)
+  const [filterPeriod,    setFilterPeriod]    = useState<string>('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingEntry,    setEditingEntry]    = useState<any | null>(null)
+  const [saving,          setSaving]          = useState(false)
+  const [newForm,         setNewForm]         = useState({
+    year:            new Date().getFullYear(),
+    period:          'ANNUAL',
+    fromEntityId:    '',
+    fromAccountCode: '',
+    toEntityId:      '',
+    toAccountCode:   '',
+    amount:          '',
+    description:     '',
+  })
+
+  const loadEntries = useCallback(async () => {
+    const p = new URLSearchParams()
+    if (filterYear)   p.set('year',   String(filterYear))
+    if (filterPeriod) p.set('period', filterPeriod)
+    const res  = await fetch(`/api/groups/${id}/elimination-entries?${p}`)
+    const data = await res.json()
+    setEntries(data.entries ?? [])
+  }, [id, filterYear, filterPeriod])
+
+  useEffect(() => {
+    if (activeTab === 'eliminasyonlar') loadEntries()
+  }, [activeTab, loadEntries])
+
+  async function createEntry() {
+    setSaving(true)
+    const res = await fetch(`/api/groups/${id}/elimination-entries`, {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(elimForm),
+      body:    JSON.stringify({
+        ...newForm,
+        year:   Number(newForm.year),
+        amount: Number(newForm.amount),
+      }),
     })
+    setSaving(false)
     if (res.ok) {
-      setElimSaved(true)
-      await loadData()
-      setTimeout(() => setElimSaved(false), 3000)
+      setShowCreateModal(false)
+      setNewForm({
+        year: new Date().getFullYear(), period: 'ANNUAL',
+        fromEntityId: '', fromAccountCode: '',
+        toEntityId:   '', toAccountCode:   '',
+        amount: '', description: '',
+      })
+      await loadEntries()
     }
-    setSavingElim(false)
   }
+
+  async function updateEntry(entryId: string, amount: number, description: string) {
+    setSaving(true)
+    await fetch(`/api/groups/${id}/elimination-entries/${entryId}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ amount, description: description || null }),
+    })
+    setSaving(false)
+    setEditingEntry(null)
+    await loadEntries()
+  }
+
+  async function deleteEntry(entryId: string) {
+    if (!confirm('Bu eliminasyon kaydı silinsin mi?')) return
+    await fetch(`/api/groups/${id}/elimination-entries/${entryId}`, { method: 'DELETE' })
+    await loadEntries()
+  }
+
+  const entityName  = (eid: string) => entities.find(e => e.id === eid)?.name ?? eid
+  const periodLabel = (p: string)   => ELIM_PERIODS.find(x => x.v === p)?.label ?? p
 
   // ── Benchmark & skoru düşüren faktörler (rating sekmesi için) ─────────────
   const sectorBenchmark = useMemo(
@@ -935,63 +1012,251 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════
-          SEKME 3 — ELİMİNASYONLAR
+          SEKME 3 — TENZİLAT (ELİMİNASYON KAYITLARI)
       ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'eliminasyonlar' && (
-        <div className="max-w-xl space-y-4">
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 8,
-            padding: '10px 16px', borderRadius: 12,
-            background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)',
-          }}>
+        <div className="space-y-4">
+
+          {/* Info banner */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 16px', borderRadius: 12, background: '#EDF4F8', border: '1px solid rgba(11,60,93,0.12)' }}>
             <GitBranch size={14} style={{ color: '#0B3C5D', flexShrink: 0, marginTop: 1 }} />
             <p style={{ fontSize: 12, color: '#0B3C5D', margin: 0 }}>
-              Grup içi işlem eliminasyonları konsolide finansal tablolardan düşülür.
-              Kaydedildiğinde konsolide skor otomatik olarak yeniden hesaplanır.
+              Grup içi işlem eliminasyonları yıl ve dönem bazında, kaynak firma/hesap ile hedef firma/hesap çifti olarak kaydedilir.
             </p>
           </div>
-          <div className="card overflow-hidden">
-            <div className="card-head"><h2 className="card-title text-sm">Grup İçi Eliminasyonlar</h2></div>
-            <div className="card-body space-y-4">
-              {ELIM_FIELDS.map(({ key, label, hint }) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 12, alignItems: 'center' }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1E293B', margin: 0 }}>{label}</p>
-                    <p style={{ fontSize: 11, color: '#94A3B8', margin: '2px 0 0' }}>{hint}</p>
-                  </div>
-                  <input type="number" min={0} value={elimForm[key]}
-                    onChange={ev => setElimForm(prev => ({ ...prev, [key]: Number(ev.target.value) || 0 }))}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-right text-[#1E293B] tabular-nums focus:outline-none focus:border-cyan-500" />
-                </div>
-              ))}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
-                {elimSaved
-                  ? <p style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>✓ Kaydedildi — konsolide skor yeniden hesaplandı</p>
-                  : <p style={{ fontSize: 12, color: '#94A3B8' }}>Tüm alanlar TL cinsinden girilmelidir.</p>}
-                <button onClick={saveEliminations} disabled={savingElim}
-                  className="btn btn-primary flex items-center gap-2 disabled:opacity-50">
-                  {savingElim ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
-                </button>
-              </div>
-            </div>
+
+          {/* Filter bar + Yeni Kayıt */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={filterYear ?? ''} onChange={e => setFilterYear(e.target.value ? Number(e.target.value) : null)}
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+              <option value="">Tüm yıllar</option>
+              {YEAR_LIST.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+              <option value="">Tüm dönemler</option>
+              {ELIM_PERIODS.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}
+            </select>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary flex items-center gap-2">
+              <Plus size={14} /> Yeni Kayıt
+            </button>
           </div>
-          {Object.values(eliminations).some(v => v > 0) && (
-            <div className="card overflow-hidden">
-              <div className="card-head" style={{ background: '#F8FAFC' }}>
-                <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>KAYITLI ELİMİNASYONLAR</h2>
+
+          {/* Entry list */}
+          <div className="card overflow-hidden">
+            {entries.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <GitBranch size={28} style={{ color: '#CBD5E1', margin: '0 auto 8px' }} />
+                <p style={{ fontSize: 13, color: '#94A3B8' }}>Henüz eliminasyon kaydı yok.</p>
               </div>
-              <div className="divide-y divide-[#F1F5F9]">
-                {ELIM_FIELDS.filter(f => eliminations[f.key] > 0).map(({ key, label }) => (
-                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px' }}>
-                    <span style={{ fontSize: 12, color: '#1E293B' }}>{label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#DC2626', fontVariantNumeric: 'tabular-nums' }}>
-                      -{fmtAsset(eliminations[key])} TL
-                    </span>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 64px', gap: 8, padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                  {['YIL', 'DÖNEM', 'KAYNAK', 'HEDEF', 'TUTAR', ''].map((h, i) => (
+                    <span key={i} style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textAlign: i >= 4 ? 'right' : 'left' }}>{h}</span>
+                  ))}
+                </div>
+                <div className="divide-y divide-[#F1F5F9]">
+                  {entries.map((entry: any) => (
+                    <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 64px', gap: 8, padding: '10px 20px', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: '#1E293B', fontVariantNumeric: 'tabular-nums' }}>{entry.year}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96' }}>{periodLabel(entry.period)}</span>
+                      <div>
+                        <p style={{ fontSize: 12, color: '#1E293B', margin: 0 }}>{entityName(entry.fromEntityId)}</p>
+                        <p style={{ fontSize: 10, color: '#94A3B8', margin: 0 }}>{entry.fromAccountCode}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 12, color: '#1E293B', margin: 0 }}>{entityName(entry.toEntityId)}</p>
+                        <p style={{ fontSize: 10, color: '#94A3B8', margin: 0 }}>{entry.toAccountCode}</p>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#DC2626', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {fmtAsset(entry.amount)} TL
+                      </span>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingEntry(entry)}
+                          style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#0B3C5D')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => deleteEntry(entry.id)}
+                          style={{ padding: 4, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#DC2626')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ── CREATE MODAL ──────────────────────────────────────────────────── */}
+          {showCreateModal && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(11,60,93,0.35)' }}
+              onClick={e => { if (e.target === e.currentTarget) setShowCreateModal(false) }}>
+              <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 20px 60px rgba(11,60,93,0.18)', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Yeni Eliminasyon Kaydı</h3>
+                  <button onClick={() => setShowCreateModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}><X size={18} /></button>
+                </div>
+                <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Yıl + Dönem */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>YIL</label>
+                      <select value={newForm.year} onChange={e => setNewForm(p => ({ ...p, year: Number(e.target.value) }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        {YEAR_LIST.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>DÖNEM</label>
+                      <select value={newForm.period} onChange={e => setNewForm(p => ({ ...p, period: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        {ELIM_PERIODS.map(({ v, label }) => <option key={v} value={v}>{label}</option>)}
+                      </select>
+                    </div>
                   </div>
-                ))}
+                  {/* Kaynak firma + hesap */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>KAYNAK FİRMA</label>
+                      <select value={newForm.fromEntityId} onChange={e => setNewForm(p => ({ ...p, fromEntityId: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        <option value="">— Seçin —</option>
+                        {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>KAYNAK HESAP</label>
+                      <select value={newForm.fromAccountCode} onChange={e => setNewForm(p => ({ ...p, fromAccountCode: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        <option value="">— Seçin —</option>
+                        {IC_ACCOUNT_CODES.map(ac => <option key={ac.code} value={ac.code}>{ac.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {/* Hedef firma + hesap */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>HEDEF FİRMA</label>
+                      <select value={newForm.toEntityId} onChange={e => setNewForm(p => ({ ...p, toEntityId: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        <option value="">— Seçin —</option>
+                        {entities.filter(e => e.id !== newForm.fromEntityId).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>HEDEF HESAP</label>
+                      <select value={newForm.toAccountCode} onChange={e => setNewForm(p => ({ ...p, toAccountCode: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500">
+                        <option value="">— Seçin —</option>
+                        {IC_ACCOUNT_CODES.map(ac => <option key={ac.code} value={ac.code}>{ac.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {/* Tutar */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>TUTAR (TL)</label>
+                    <input type="number" min={0} value={newForm.amount}
+                      onChange={e => setNewForm(p => ({ ...p, amount: e.target.value }))}
+                      placeholder="0"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
+                  </div>
+                  {/* Açıklama */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>AÇIKLAMA (isteğe bağlı)</label>
+                    <input type="text" value={newForm.description}
+                      onChange={e => setNewForm(p => ({ ...p, description: e.target.value }))}
+                      placeholder="Opsiyonel not..."
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid #F1F5F9' }}>
+                  <button onClick={() => setShowCreateModal(false)}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #E5E9F0', background: '#fff', fontSize: 13, color: '#5A7A96', cursor: 'pointer' }}>
+                    İptal
+                  </button>
+                  <button onClick={createEntry}
+                    disabled={saving || !newForm.fromEntityId || !newForm.fromAccountCode || !newForm.toEntityId || !newForm.toAccountCode || !newForm.amount}
+                    className="btn btn-primary flex items-center gap-2 disabled:opacity-50">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Kaydet
+                  </button>
+                </div>
               </div>
             </div>
           )}
+
+          {/* ── EDIT MODAL ────────────────────────────────────────────────────── */}
+          {editingEntry && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(11,60,93,0.35)' }}
+              onClick={e => { if (e.target === e.currentTarget) setEditingEntry(null) }}>
+              <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(11,60,93,0.18)', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0B3C5D', margin: 0 }}>Eliminasyon Düzenle</h3>
+                  <button onClick={() => setEditingEntry(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8' }}><X size={18} /></button>
+                </div>
+                <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Kimlik alanları — salt okunur */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>YIL / DÖNEM</label>
+                      <input disabled value={`${editingEntry.year} / ${periodLabel(editingEntry.period)}`}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-400 cursor-not-allowed" />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>KAYNAK HESAP</label>
+                      <input disabled value={`${entityName(editingEntry.fromEntityId)} · ${editingEntry.fromAccountCode}`}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-400 cursor-not-allowed" />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>HEDEF HESAP</label>
+                    <input disabled value={`${entityName(editingEntry.toEntityId)} · ${editingEntry.toAccountCode}`}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-400 cursor-not-allowed" />
+                  </div>
+                  {/* Düzenlenebilir alanlar */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>TUTAR (TL)</label>
+                    <input type="number" min={0}
+                      value={editingEntry.editAmount ?? String(editingEntry.amount)}
+                      onChange={e => setEditingEntry((prev: any) => ({ ...prev, editAmount: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>AÇIKLAMA</label>
+                    <input type="text"
+                      value={editingEntry.editDescription ?? (editingEntry.description ?? '')}
+                      onChange={e => setEditingEntry((prev: any) => ({ ...prev, editDescription: e.target.value }))}
+                      placeholder="Opsiyonel not..."
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid #F1F5F9' }}>
+                  <button onClick={() => setEditingEntry(null)}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #E5E9F0', background: '#fff', fontSize: 13, color: '#5A7A96', cursor: 'pointer' }}>
+                    İptal
+                  </button>
+                  <button
+                    onClick={() => updateEntry(
+                      editingEntry.id,
+                      Number(editingEntry.editAmount ?? editingEntry.amount),
+                      editingEntry.editDescription ?? (editingEntry.description ?? ''),
+                    )}
+                    disabled={saving}
+                    className="btn btn-primary flex items-center gap-2 disabled:opacity-50">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Güncelle
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
