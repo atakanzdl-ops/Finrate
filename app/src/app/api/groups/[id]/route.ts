@@ -9,6 +9,8 @@ import {
 } from '@/lib/scoring/consolidation'
 import type { RatioResult } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
+import { applyEliminationsAtAccountLevel, entriesToAggregateEliminations } from '@/lib/scoring/consolidationAccountLevel'
+import { rebuildAggregateFromAccounts, adaptAggregateForScoring } from '@/lib/scoring/accountMapper'
 
 // GET /api/groups/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           consolidationInclude: true,
         },
       },
-      groupElimination: true,
+      groupElimination:  true,
+      eliminationEntries: true,
     },
   })
 
@@ -43,7 +46,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const allAnalyses = await prisma.analysis.findMany({
     where: { entityId: { in: entityIds } },
-    include: { financialData: true },
+    include: {
+      financialData:     true,
+      financialAccounts: { select: { accountCode: true, amount: true } },
+    },
     orderBy: [{ year: 'desc' }, { period: 'desc' }],
   })
 
@@ -141,33 +147,100 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .sort((a, b) => periodOrderNum(a.year, a.period) - periodOrderNum(b.year, b.period))
     .slice(-5)  // En fazla 5 dönem
     .map(({ year, period, entityData }) => {
+
+      // Konsolidasyon entity'leri (>%50 sahiplik)
+      const consolidationEntities = group.entities.filter(
+        e => e.consolidationInclude && (e.ownershipPct ?? 1) * 100 >= 50,
+      )
+
+      // Hesap kodu yolu mu? — bu dönem için her entity'nin financialAccounts verisi var mı?
+      const allHaveAccounts =
+        consolidationEntities.length > 0 &&
+        consolidationEntities.every(entity => {
+          const accounts = entityData.get(entity.id)?.financialAccounts
+          return (accounts?.length ?? 0) > 0
+        })
+
       const agg: Record<string, number> = {}
-      for (const entity of group.entities.filter(e => e.consolidationInclude)) {
-        const ownershipPct100 = (entity.ownershipPct ?? 1) * 100
-        if (ownershipPct100 < 50) continue
-        const fd = entityData.get(entity.id)?.financialData
-        if (!fd) continue
-        for (const f of GRANULAR_FIELDS) {
-          agg[f] = (agg[f] ?? 0) + (((fd as unknown) as Record<string, number | null>)[f] ?? 0)
+
+      if (allHaveAccounts) {
+        // ── A) Hesap kodu bazlı yol ─────────────────────────────────────────────
+
+        // 1. Bakiye haritası: entityId → Map<accountCode, number>
+        const balances = new Map<string, Map<string, number>>()
+        for (const entity of consolidationEntities) {
+          const accounts = entityData.get(entity.id)?.financialAccounts ?? []
+          const codeMap = new Map<string, number>()
+          for (const acct of accounts) {
+            codeMap.set(acct.accountCode, (codeMap.get(acct.accountCode) ?? 0) + Number(acct.amount))
+          }
+          balances.set(entity.id, codeMap)
         }
+
+        // 2. Hesap kodu bazlı eliminasyonları uygula (deep copy, input değişmez)
+        const eliminated = applyEliminationsAtAccountLevel(
+          balances,
+          group.eliminationEntries,
+          year,
+          period,
+        )
+
+        // 3. Her entity için aggregate yeniden kur → adapt et → topla
+        for (const entity of consolidationEntities) {
+          const codeMap = eliminated.get(entity.id)
+          if (!codeMap) continue
+          const flatAccounts = [...codeMap.entries()].map(([accountCode, amount]) => ({ accountCode, amount }))
+          const rebuilt = adaptAggregateForScoring(rebuildAggregateFromAccounts(flatAccounts))
+          for (const f of GRANULAR_FIELDS) {
+            agg[f] = (agg[f] ?? 0) + (rebuilt[f] ?? 0)
+          }
+        }
+
+      } else {
+        // ── B) Legacy aggregate yolu ────────────────────────────────────────────
+
+        for (const entity of consolidationEntities) {
+          const fd = entityData.get(entity.id)?.financialData
+          if (!fd) continue
+          for (const f of GRANULAR_FIELDS) {
+            agg[f] = (agg[f] ?? 0) + (((fd as unknown) as Record<string, number | null>)[f] ?? 0)
+          }
+        }
+
+        // Dönem bazlı eliminasyon — yeni entry varsa kullan, yoksa eski singleton
+        const _zeros: InterCompanyEliminations = {
+          intercompanySales: 0, intercompanyPurchases: 0,
+          intercompanyReceivables: 0, intercompanyPayables: 0,
+          intercompanyAdvancesGiven: 0, intercompanyAdvancesReceived: 0,
+          intercompanyProfit: 0,
+        }
+        const periodNewElim = entriesToAggregateEliminations(group.eliminationEntries, year, period)
+        const hasPeriodElim = Object.values(periodNewElim).some(v => v > 0)
+        const e: InterCompanyEliminations = hasPeriodElim
+          ? periodNewElim
+          : (group.groupElimination ?? _zeros)
+
+        agg.revenue               = Math.max(0, (agg.revenue               ?? 0) - e.intercompanySales)
+        agg.cogs                  = Math.max(0, (agg.cogs                  ?? 0) - e.intercompanyPurchases)
+        agg.grossProfit           = Math.max(0, agg.revenue - agg.cogs)
+        agg.totalCurrentAssets    = Math.max(0, (agg.totalCurrentAssets    ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven)
+        agg.totalNonCurrentAssets = Math.max(0, (agg.totalNonCurrentAssets ?? 0) - e.intercompanyProfit)
+        agg.totalAssets           = Math.max(0, (agg.totalAssets           ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven - e.intercompanyProfit)
+        agg.totalCurrentLiabilities  = Math.max(0, (agg.totalCurrentLiabilities  ?? 0) - e.intercompanyPayables - e.intercompanyAdvancesReceived)
+        agg.totalEquity              = (agg.totalEquity ?? 0) - e.intercompanyProfit  // negatife düşebilir
+        agg.totalLiabilitiesAndEquity = agg.totalCurrentLiabilities + (agg.totalNonCurrentLiabilities ?? 0) + agg.totalEquity
       }
-      // Eliminasyonları uygula (tüm dönemler için aynı eliminasyonlar)
-      const e = eliminations
-      agg.revenue               = Math.max(0, (agg.revenue               ?? 0) - e.intercompanySales)
-      agg.cogs                  = Math.max(0, (agg.cogs                  ?? 0) - e.intercompanyPurchases)
-      agg.grossProfit           = Math.max(0, agg.revenue - agg.cogs)
-      agg.totalCurrentAssets    = Math.max(0, (agg.totalCurrentAssets    ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven)
-      agg.totalNonCurrentAssets = Math.max(0, (agg.totalNonCurrentAssets ?? 0) - e.intercompanyProfit)
-      agg.totalAssets           = Math.max(0, (agg.totalAssets           ?? 0) - e.intercompanyReceivables - e.intercompanyAdvancesGiven - e.intercompanyProfit)
-      agg.totalCurrentLiabilities = Math.max(0, (agg.totalCurrentLiabilities ?? 0) - e.intercompanyPayables - e.intercompanyAdvancesReceived)
-      agg.totalEquity             = (agg.totalEquity ?? 0) - e.intercompanyProfit  // negatife düşebilir
-      agg.totalLiabilitiesAndEquity = agg.totalCurrentLiabilities + (agg.totalNonCurrentLiabilities ?? 0) + agg.totalEquity
+
       return {
         year, period,
         label: period === 'ANNUAL' ? String(year) : `${year}/${period}`,
         financials: agg,
       }
     })
+
+  // En son dönem — scoring bridge için
+  const latestYear   = consolidatedPeriods.at(-1)?.year   ?? new Date().getFullYear()
+  const latestPeriod = consolidatedPeriods.at(-1)?.period ?? 'ANNUAL'
 
   // 8. Konsolide skor + kategori skorları
   let consolidated = null
@@ -176,7 +249,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const individualScores = entitiesOut
       .filter(e => e.latestAnalysis !== null)
       .map(e => ({ finalScore: e.latestAnalysis!.finalScore, totalAssets: e.totalAssets }))
-    const result = calculateConsolidatedScore(aggregated, eliminations, sector, individualScores)
+
+    // Scoring bridge: yeni GroupEliminationEntry varsa kullan, yoksa eski singleton
+    const newElimForScore    = entriesToAggregateEliminations(group.eliminationEntries, latestYear, latestPeriod)
+    const hasNewElimForScore = Object.values(newElimForScore).some(v => v > 0)
+    const eliminationsForScore: InterCompanyEliminations = hasNewElimForScore
+      ? newElimForScore
+      : eliminations  // eliminations = group.groupElimination ?? zeros (satır 101)
+
+    const result = calculateConsolidatedScore(aggregated, eliminationsForScore, sector, individualScores)
 
     // Kategori skorlarını consolidatedRatios'dan hesapla
     const catScores = calculateScore(result.consolidatedRatios, sector)
