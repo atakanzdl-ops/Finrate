@@ -88,7 +88,7 @@ export default async function middleware(req: NextRequest) {
   // ─── Rate limit kontrolü ───────────────────────────────────────────────────
   const rl = getRateLimitKey(pathname, req)
   if (rl) {
-    const { allowed, retryAfterMs } = checkRateLimit(rl.key, rl.config)
+    const { allowed, retryAfterMs } = await checkRateLimit(rl.key, rl.config)
     if (!allowed) {
       return new NextResponse(
         JSON.stringify({ error: 'Çok fazla istek. Lütfen bekleyin.' }),

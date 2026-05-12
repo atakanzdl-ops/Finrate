@@ -1,61 +1,87 @@
 /**
- * rateLimit.ts — In-memory rate limiter (Faz 7.3.49)
+ * rateLimit.ts — Upstash Redis rate limiter (Faz 7.5.3)
  *
- * Sliding-window sayaç. Key başına windowMs penceresi içinde
- * max isteğe kadar geçişe izin verir.
+ * Sliding-window sayaç. Upstash Redis REST API üzerinden shared store.
+ * Tüm Vercel serverless instance'ları aynı sayaçları görür.
  *
- * NOT: Vercel serverless/edge'de her instance bağımsız sayaç tutar.
- *      Kapalı beta (5 kullanıcı) için bu yeterli.
- *      Açık lansman öncesi Vercel KV / Upstash migration gerekli — Faz 7.3.50+
+ * ENV VARS (Vercel'de tanımlı):
+ *   UPSTASH_REDIS_REST_URL
+ *   UPSTASH_REDIS_REST_TOKEN
  *
- * Pure helper — test edilebilir export.
+ * Fail-open: Upstash erişilemezse site çalışmaya devam eder,
+ * rate limit sessizce pas geçer.
  */
 
-interface RateLimitEntry {
-  count:       number
-  windowStart: number
-}
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis }     from '@upstash/redis'
 
-const store = new Map<string, RateLimitEntry>()
+const redis = Redis.fromEnv()
+
+// ─── Named limiter'lar ────────────────────────────────────────────────────────
+
+/** Login: 5 istek / dakika */
+export const loginRateLimit = new Ratelimit({
+  redis,
+  limiter:   Ratelimit.slidingWindow(5, '1 m'),
+  analytics: true,
+  prefix:    'finrate:rl:login',
+})
+
+/** Upload: 10 istek / dakika */
+export const uploadRateLimit = new Ratelimit({
+  redis,
+  limiter:   Ratelimit.slidingWindow(10, '1 m'),
+  analytics: true,
+  prefix:    'finrate:rl:upload',
+})
+
+/** Genel (scenario vb.): 60 istek / dakika */
+export const generalRateLimit = new Ratelimit({
+  redis,
+  limiter:   Ratelimit.slidingWindow(60, '1 m'),
+  analytics: true,
+  prefix:    'finrate:rl:general',
+})
+
+// ─── Geriye uyumlu tip (middleware.ts RATE_CONFIGS ile uyum) ─────────────────
 
 export interface RateLimitConfig {
-  /** Pencere süresi (ms) — genellikle 60_000 (1 dk) */
+  /** Pencere süresi (ms) */
   windowMs: number
-  /** İzin verilen maksimum istek sayısı pencere içinde */
-  max:      number
+  /** İzin verilen maksimum istek sayısı */
+  max: number
 }
+
+// ─── Wrapper (middleware.ts imzasını bozmaz) ──────────────────────────────────
 
 /**
  * Verilen key için rate limit kontrolü.
  *
+ * config.max ≤ 5  → loginRateLimit
+ * config.max ≤ 10 → uploadRateLimit
+ * diğer           → generalRateLimit
+ *
  * @returns `{ allowed: true  }` — geçebilir, retryAfterMs = 0
  *          `{ allowed: false }` — limit aşıldı, retryAfterMs ms bekle
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key:    string,
   config: RateLimitConfig,
-): { allowed: boolean; retryAfterMs: number } {
-  const now   = Date.now()
-  const entry = store.get(key)
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const limiter =
+    config.max <= 5  ? loginRateLimit  :
+    config.max <= 10 ? uploadRateLimit :
+                       generalRateLimit
 
-  // Yeni pencere veya ilk istek
-  if (!entry || now - entry.windowStart >= config.windowMs) {
-    store.set(key, { count: 1, windowStart: now })
+  try {
+    const result = await limiter.limit(key)
+    return {
+      allowed:      result.success,
+      retryAfterMs: result.success ? 0 : Math.max(0, result.reset - Date.now()),
+    }
+  } catch (e) {
+    // Fail-open: Upstash erişilemezse site çalışmaya devam etsin
+    console.error('[rateLimit] Upstash error:', e instanceof Error ? e.message : e)
     return { allowed: true, retryAfterMs: 0 }
   }
-
-  // Pencere dolmamış, limit altında
-  if (entry.count < config.max) {
-    entry.count++
-    return { allowed: true, retryAfterMs: 0 }
-  }
-
-  // Limit aşıldı
-  const retryAfterMs = config.windowMs - (now - entry.windowStart)
-  return { allowed: false, retryAfterMs }
-}
-
-/** Test ortamında store'u sıfırla */
-export function resetRateLimitStore(): void {
-  store.clear()
 }
