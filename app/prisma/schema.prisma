@@ -119,6 +119,7 @@ model Group {
   groupElimination   GroupElimination?
   eliminationEntries GroupEliminationEntry[]
 
+  @@index([userId, createdAt])
   @@map("groups")
 }
 
@@ -333,6 +334,7 @@ model Analysis {
   @@unique([entityId, year, period])
   @@index([userId])
   @@index([entityId])
+  @@index([userId, mode, reportedAt])
   @@map("analyses")
 }
 
@@ -404,6 +406,8 @@ model TenzilatEntry {
   analysis         Analysis? @relation(fields: [analysisId], references: [id])
   auditLogs        TenzilatAuditLog[]
 
+  @@index([groupId, year, period, isActive])
+  @@index([userId, deletedAt, createdAt])
   @@map("tenzilat_entries")
 }
 
