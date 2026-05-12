@@ -331,6 +331,8 @@ model Analysis {
   financialAccounts   FinancialAccount[]
 
   @@unique([entityId, year, period])
+  @@index([userId])
+  @@index([entityId])
   @@map("analyses")
 }
 

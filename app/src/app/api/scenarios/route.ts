@@ -130,12 +130,6 @@ export async function POST(req: NextRequest) {
         select: { accountCode: true, amount: true },
       })
 
-      console.log('[scenarios] analysisId:', analysisId)
-      console.log('[scenarios] accounts count:', financialAccounts.length)
-      console.log('[scenarios] engine:', financialAccounts.length > 0 ? 'account' : 'aggregate')
-      console.log('[scenarios] sector:', sector, '| currentScore:', currentScore, '| targetGrade:', targetGrade)
-      console.log('[scenarios] subjectiveBonus:', subjectiveBonus)
-
       if (financialAccounts.length > 0) {
         // YENİ MOTOR — hesap kodu bazlı
         const accountList = financialAccounts.map(a => ({ accountCode: a.accountCode, amount: Number(a.amount) }))

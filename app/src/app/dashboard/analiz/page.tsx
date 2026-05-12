@@ -524,23 +524,7 @@ function AnalizPageContent() {
         })
         .finally(() => setLoading(false))
     }
-    // Recalculate en fazla 3 dakikada bir (sayfa geçişlerini yavaşlatmamak için)
-    // Race condition önlemi: timestamp'i fetch ÖNCE yaz, böylece paralel sekme de tetiklemez
-    const RECALC_KEY    = 'finrate_recalc_ts'
-    const RECALC_VER    = 'finrate_recalc_ver'
-    const CURRENT_VER   = '2'  // Rasyo motoru değiştiğinde artır → önbellek temizlenir
-    const lastTs        = sessionStorage.getItem(RECALC_KEY)
-    const lastVer       = sessionStorage.getItem(RECALC_VER)
-    const stale         = !lastTs || Date.now() - parseInt(lastTs) > 3 * 60 * 1000 || lastVer !== CURRENT_VER
-    if (stale) {
-      sessionStorage.setItem(RECALC_KEY, Date.now().toString())
-      sessionStorage.setItem(RECALC_VER, CURRENT_VER)
-      fetch('/api/analyses/recalculate', { method: 'POST' })
-        .catch(() => { sessionStorage.removeItem(RECALC_KEY) }) // Hata olursa kilit kaldır
-        .finally(() => doLoad())
-    } else {
-      doLoad()
-    }
+    doLoad()
   }, [entityId])
 
   function combinedScore(a: Analysis) {
