@@ -47,6 +47,26 @@ export async function POST(req: NextRequest) {
       return jsonUtf8({ error: 'Açıklama en az 10 karakter olmalıdır.' }, { status: 400 })
     }
 
+    // Ownership check — yabancı entity/group/analysis'e tenzilat enjekte edilemesin
+    if (entityId) {
+      const ownedEntity = await prisma.entity.findFirst({ where: { id: entityId, userId } })
+      if (!ownedEntity) {
+        return jsonUtf8({ error: 'Şirket bulunamadı veya erişim yetkiniz yok.' }, { status: 403 })
+      }
+    }
+    if (groupId) {
+      const ownedGroup = await prisma.group.findFirst({ where: { id: groupId, userId } })
+      if (!ownedGroup) {
+        return jsonUtf8({ error: 'Grup bulunamadı veya erişim yetkiniz yok.' }, { status: 403 })
+      }
+    }
+    if (analysisId) {
+      const ownedAnalysis = await prisma.analysis.findFirst({ where: { id: analysisId, userId } })
+      if (!ownedAnalysis) {
+        return jsonUtf8({ error: 'Analiz bulunamadı veya erişim yetkiniz yok.' }, { status: 403 })
+      }
+    }
+
     const entry = await prisma.tenzilatEntry.create({
       data: {
         userId,

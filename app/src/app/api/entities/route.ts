@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
 
     const normalizedTaxNumber = normalizeTaxNumber(taxNumber)
 
+    // Ownership check — saldırgan kendi entity'sini yabancı gruba bağlayamaz
+    if (groupId) {
+      const ownedGroup = await prisma.group.findFirst({ where: { id: groupId, userId } })
+      if (!ownedGroup) {
+        return jsonUtf8({ error: 'Grup bulunamadı veya erişim yetkiniz yok.' }, { status: 403 })
+      }
+    }
+
     const entity = await prisma.entity.create({
       data: {
         userId,

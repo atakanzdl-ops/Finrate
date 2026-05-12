@@ -59,6 +59,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    // Ownership check — yeni groupId bu kullanıcıya ait mi?
+    if (groupId !== undefined && groupId !== null) {
+      const ownedGroup = await prisma.group.findFirst({ where: { id: groupId, userId } })
+      if (!ownedGroup) {
+        return jsonUtf8({ error: 'Grup bulunamadı veya erişim yetkiniz yok.' }, { status: 403 })
+      }
+    }
+
     // Sektör değişti mi? (boş string → null normalleştirmesi dahil)
     const sectorChanged = sector !== undefined && (sector || null) !== existing.sector
 

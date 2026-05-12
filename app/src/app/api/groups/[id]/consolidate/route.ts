@@ -130,7 +130,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // Tenzilat uygula
   const tenzilatEntries = await prisma.tenzilatEntry.findMany({
-    where: { groupId: id, year, period, isActive: true },
+    where: { groupId: id, userId, year, period, isActive: true },   // userId — defense in depth
     orderBy: { createdAt: 'asc' },
   })
 
