@@ -197,8 +197,9 @@ export async function POST(req: NextRequest) {
         engine: 'aggregate',
       })
     } catch (error) {
-      console.error('[scenarios] ERROR:', String(error))
-      return jsonUtf8({ error: String(error) }, { status: 400 })
+      const correlationId = crypto.randomUUID()
+      console.error('[scenarios] error:', { correlationId, error: error instanceof Error ? error.message : String(error) })
+      return jsonUtf8({ error: 'Senaryo oluşturulamadı.', correlationId }, { status: 400 })
     }
   }
 
@@ -319,7 +320,9 @@ export async function POST(req: NextRequest) {
       const scenarios = runScenarios(sheet, sector, currentScore, targetGrade)
       return jsonUtf8({ scenarios, currentScore, currentGrade: scoreToRating(currentScore), sector })
     } catch (error) {
-      return jsonUtf8({ error: String(error) }, { status: 400 })
+      const correlationId = crypto.randomUUID()
+      console.error('[scenarios] group error:', { correlationId, error: error instanceof Error ? error.message : String(error) })
+      return jsonUtf8({ error: 'Senaryo oluşturulamadı.', correlationId }, { status: 400 })
     }
   }
 

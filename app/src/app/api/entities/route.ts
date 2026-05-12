@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
     return jsonUtf8({ entity }, { status: 201 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('[POST /api/entities]', msg)
-    return jsonUtf8({ error: 'Sunucu hatası.', detail: msg }, { status: 500 })
+    const correlationId = crypto.randomUUID()
+    console.error('[POST /api/entities] error:', { correlationId, error: msg })
+    return jsonUtf8({ error: 'Şirket kaydedilemedi.', correlationId }, { status: 500 })
   }
 }

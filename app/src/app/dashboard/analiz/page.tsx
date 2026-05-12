@@ -509,18 +509,30 @@ function AnalizPageContent() {
           setSelected(initial)
           if (initial?.entity?.id) sessionStorage.setItem('finrate_last_entity', initial.entity.id)
           const eids = [...new Set(list.map(a => a.entity?.id).filter(Boolean))] as string[]
-          eids.forEach(eid => {
-            fetch(`/api/entities/${eid}/subjective`)
+          if (eids.length > 0) {
+            fetch(`/api/subjective?entityIds=${eids.join(',')}`)
               .then(r => r.ok ? r.json() : null)
               .then(d => {
-                if (d?.score?.total != null) {
-                  setSubjectiveScores(prev => ({ ...prev, [eid]: d.score.total }))
-                  setSubjectiveMissing(prev => ({ ...prev, [eid]: false }))
-                } else {
-                  setSubjectiveMissing(prev => ({ ...prev, [eid]: true }))
+                if (!d?.results) {
+                  eids.forEach(eid => setSubjectiveMissing(prev => ({ ...prev, [eid]: true })))
+                  return
                 }
+                eids.forEach(eid => {
+                  const entry = d.results[eid]
+                  const total = entry?.score?.total
+                  if (total != null) {
+                    setSubjectiveScores(prev => ({ ...prev, [eid]: total }))
+                    setSubjectiveMissing(prev => ({ ...prev, [eid]: false }))
+                  } else {
+                    setSubjectiveMissing(prev => ({ ...prev, [eid]: true }))
+                  }
+                })
               })
-          })
+              .catch(e => {
+                console.error('[analiz] subjective batch error:', e)
+                eids.forEach(eid => setSubjectiveMissing(prev => ({ ...prev, [eid]: true })))
+              })
+          }
         })
         .finally(() => setLoading(false))
     }

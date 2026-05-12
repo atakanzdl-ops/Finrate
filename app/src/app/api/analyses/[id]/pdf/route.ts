@@ -69,7 +69,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     })
   } catch (err: any) {
-    console.error('Puppeteer PDF Generation Error:', err)
-    return jsonUtf8({ error: 'PDF oluşturulamadı. Sunucu konsolunu kontrol edin.', details: err.message }, { status: 500 })
+    const correlationId = crypto.randomUUID()
+    console.error('[pdf] error:', { correlationId, error: err?.message ?? String(err) })
+    return jsonUtf8({ error: 'PDF oluşturulamadı.', correlationId }, { status: 500 })
   }
 }
