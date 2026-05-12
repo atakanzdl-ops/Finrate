@@ -48,13 +48,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const file     = formData.get('file') as File | null
     if (!file) return jsonUtf8({ error: 'Dosya bulunamadı.' }, { status: 400 })
 
-    // Faz 7.3.49 A: Boyut limiti — arrayBuffer() ÖNCE kontrol et
-    const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10 MB
-    if (file.size > MAX_UPLOAD_BYTES) {
+    // Faz 7.3.49 A / 7.5.4a: Boyut limiti — env bazlı, arrayBuffer() ÖNCE kontrol et
+    const maxMB    = Number(process.env.MAX_FILE_SIZE_MB ?? 10)
+    const maxBytes = maxMB * 1024 * 1024
+    if (file.size > maxBytes) {
       return jsonUtf8(
-        { error: 'Dosya çok büyük. Maksimum 10 MB boyutunda dosya yükleyebilirsiniz.' },
+        { error: `Dosya çok büyük. Maksimum ${maxMB} MB boyutunda dosya yükleyebilirsiniz.` },
         { status: 413 },
       )
+    }
+
+    // Faz 7.5.4a: MIME header allowlist (bazı tarayıcılar boş döndürür → truthy guard)
+    const ALLOWED_MIME = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+      'application/vnd.ms-excel',                                           // xls
+      'text/csv',
+      'text/plain',
+      'application/pdf',
+    ]
+    if (file.type && !ALLOWED_MIME.includes(file.type)) {
+      return jsonUtf8({ error: 'Geçersiz dosya türü.' }, { status: 400 })
     }
 
     // Yıl / dönem override (form'dan gelen)
@@ -72,6 +85,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer      = Buffer.from(arrayBuffer)
+
+    // Faz 7.5.4a: Magic byte check — CSV hariç (CSV'de magic byte yok)
+    // detected null ise (tanımsız format) → extension + MIME zaten doğrulamış, geç
+    if (!isCsv) {
+      const { fileTypeFromBuffer } = await import('file-type')
+      const detected = await fileTypeFromBuffer(buffer)
+      if (detected) {
+        const VALID_MAGIC_MIMES = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/pdf',
+        ]
+        if (!VALID_MAGIC_MIMES.includes(detected.mime)) {
+          return jsonUtf8(
+            { error: `Dosya içeriği uzantıyla uyumsuz (${detected.mime}).` },
+            { status: 400 },
+          )
+        }
+      }
+    }
 
     let parsedRows
     if (isExcel) {
