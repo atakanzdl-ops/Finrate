@@ -1,19 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import Link from 'next/link'
 import { FaqSection } from '@/components/FaqSection'
 import { Logo } from '@/components/ui/Logo'
-
-function loadInlineStyle() {
-  try {
-    const htmlPath = join(process.cwd(), 'src', 'app', 'finrate_landing.html')
-    const raw = readFileSync(htmlPath, 'utf-8')
-    const m = raw.match(/<style>([\s\S]*?)<\/style>/i)
-    return m?.[1] ?? ''
-  } catch {
-    return ''
-  }
-}
+import './finrate-landing.css'
 
 const pricingItems = [
   {
@@ -59,12 +47,8 @@ const pricingItems = [
 ]
 
 export default function Page() {
-  const styleText = loadInlineStyle()
-
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: styleText }} />
-
       <nav>
         <Link href="/" aria-label="Finrate ana sayfa">
           <Logo />

@@ -22,3 +22,8 @@ npm-debug.log*
 Thumbs.db
 
 .vercel
+
+# Local SQLite development DB
+prisma/dev.db
+prisma/*.db
+prisma/*.db-journal
