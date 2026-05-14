@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Finrate — Kurumsal Analiz Raporu | ATLAS MAKİNA SANAYİ A.Ş.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#94a3b8;display:flex;flex-direction:column;align-items:center;gap:60px;padding:60px 40px;font-family:'Inter',sans-serif;}
+.pdf-page{width:794px;height:1123px;background:#fff;box-shadow:0 32px 64px -8px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.1);position:relative;overflow:hidden;flex-shrink:0;font-family:'Inter',sans-serif;}
+.outfit{font-family:'Outfit',sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.glow{position:absolute;border-radius:50%;filter:blur(70px);z-index:0;pointer-events:none;}
+
+/* ── STANDARD HEADER ── */
+.ph{display:flex;justify-content:space-between;align-items:flex-end;padding:30px 50px 14px;border-bottom:1px solid #e2e8f0;position:relative;z-index:20;background:white;}
+.ph-sec{font-size:9px;color:#0284c7;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:5px;}
+.ph-title{font-size:23px;font-weight:800;color:#0a192f;letter-spacing:-.5px;font-family:'Outfit',sans-serif;}
+.ph-right{text-align:right;}
+.ph-ent{font-size:10px;font-weight:600;color:#0a192f;}
+.ph-pg{font-size:10px;color:#64748b;margin-top:3px;}
+
+/* ── WATERMARK ── */
+.wm{position:absolute;bottom:3%;right:-2%;font-size:115px;font-weight:900;color:#f1f5f9;z-index:1;font-family:'Outfit',sans-serif;line-height:1;text-transform:uppercase;transform:rotate(-8deg);pointer-events:none;user-select:none;}
+
+/* ── FOOTER ── */
+.pf{position:absolute;bottom:0;left:0;right:0;height:30px;display:flex;justify-content:space-between;align-items:center;padding:0 50px;border-top:1px solid #f1f5f9;font-size:7.5px;color:#94a3b8;background:white;z-index:20;}
+
+/* ── CONTENT ── */
+.pc{padding:20px 50px 36px;position:relative;z-index:10;height:calc(1123px - 75px - 30px);overflow:hidden;}
+
+/* ── PREMIUM TABLE ── */
+.pt{width:100%;border-collapse:separate;border-spacing:0;}
+.pt th{font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;padding:9px 12px;text-align:right;border-bottom:1.5px solid #cbd5e1;}
+.pt th:first-child{text-align:left;}
+.pt td{padding:8px 12px;border-bottom:1px solid #f1f5f9;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#334155;text-align:right;}
+.pt td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:500;font-size:10px;}
+.pt .tr td{background:#f8fafc;font-weight:700;color:#0a192f;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;}
+.pt .mr{background:#0a192f !important;}
+.pt .mr td{background:#0a192f !important;color:white !important;font-weight:800;border-bottom:none;}
+
+/* ── PROGRESS BAR ── */
+.prt{height:10px;background:#e2e8f0;border-radius:999px;position:relative;overflow:visible;}
+.prf{height:100%;border-radius:999px;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);}
+.prm{position:absolute;top:-6px;width:3px;height:22px;background:#0a192f;border-radius:3px;z-index:10;}
+
+/* ── BADGES ── */
+.b{display:inline-flex;align-items:center;justify-content:center;padding:3px 9px;border-radius:5px;font-size:7.5px;font-weight:800;letter-spacing:.5px;white-space:nowrap;}
+.b-g{background:#dcfce7;color:#166534;}
+.b-w{background:#fef9c3;color:#854d0e;}
+.b-r{background:#fee2e2;color:#991b1b;}
+
+/* ── RATIO ROWS ── */
+.rth{background:#0a192f;color:white;display:grid;grid-template-columns:185px 76px 76px 1fr 64px;padding:9px 14px;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;border-radius:10px 10px 0 0;}
+.rth span{text-align:center;}
+.rth span:first-child{text-align:left;}
+.rsh{background:#f1f5f9;padding:7px 14px;font-size:8.5px;font-weight:700;color:#475569;letter-spacing:2px;text-transform:uppercase;border-bottom:1px solid #e2e8f0;}
+.rr{display:grid;grid-template-columns:185px 76px 76px 1fr 64px;align-items:center;padding:7px 14px;border-bottom:1px solid #f1f5f9;min-height:34px;}
+.rr:last-child{border-bottom:none;}
+.rr:nth-child(odd){background:#fafcff;}
+.rr:nth-child(even){background:white;}
+.rn{font-size:9px;font-weight:500;color:#334155;}
+.rv{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#0a192f;text-align:center;}
+.rbm{font-family:'JetBrains Mono',monospace;font-size:9px;color:#94a3b8;text-align:center;}
+.rbar{padding:0 8px;}
+.rst{display:flex;align-items:center;justify-content:center;}
+
+/* ── CATEGORY BARS ── */
+.cb{margin-bottom:16px;}
+.cb-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;}
+.cb-lbl{font-size:10px;font-weight:600;color:#334155;}
+.cb-sc{font-family:'Outfit',sans-serif;font-size:17px;font-weight:800;color:#0a192f;}
+.cb-bm{font-size:8.5px;color:#94a3b8;font-family:'JetBrains Mono',monospace;}
+.cb-trk{height:11px;background:#e2e8f0;border-radius:999px;position:relative;overflow:visible;}
+.cb-fil{height:100%;border-radius:999px;}
+.cb-mrk{position:absolute;top:-6px;width:3px;height:23px;background:#0a192f;border-radius:3px;z-index:5;}
+
+/* ── SCORE CARD ── */
+.sc{border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;}
+.sc-bar{position:absolute;top:0;left:0;width:5px;height:100%;}
+.sc-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:9px;}
+.sc-val{font-family:'Outfit',sans-serif;font-size:32px;font-weight:800;color:#0a192f;line-height:1;}
+.sc-sub{font-size:8.5px;color:#94a3b8;margin-top:5px;}
+
+/* ── KPI CARD ── */
+.kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:15px;}
+.kpi-l{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:7px;}
+.kpi-v{font-family:'Outfit',sans-serif;font-size:20px;font-weight:800;color:#0a192f;line-height:1;}
+.kpi-s{font-size:8.5px;color:#94a3b8;margin-top:4px;font-family:'JetBrains Mono',monospace;}
+
+/* ── INFO TABLE ── */
+.it{width:100%;border-collapse:collapse;}
+.it tr:nth-child(even) td{background:#f8fafc;}
+.it td{padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#334155;}
+.it td:first-child{font-weight:600;color:#0a192f;width:200px;}
+.it td:last-child{font-family:'JetBrains Mono',monospace;}
+
+/* ── SECTION TITLE ── */
+.st{font-size:12px;font-weight:700;color:#0a192f;border-left:3px solid #2dd4bf;padding-left:10px;margin-bottom:11px;}
+.st-sub{font-size:8.5px;color:#94a3b8;margin-top:2px;font-weight:400;}
+
+/* ── STRENGTHS / RISKS ── */
+.str{background:#f0fdf4;border:1px solid #86efac;border-radius:11px;padding:14px;}
+.str-i{font-size:9px;color:#166534;padding:3px 0;display:flex;gap:6px;align-items:flex-start;}
+.str-i::before{content:'✓';font-weight:700;flex-shrink:0;}
+.rsk{background:#fef2f2;border:1px solid #fca5a5;border-radius:11px;padding:14px;}
+.rsk-i{font-size:9px;color:#991b1b;padding:3px 0;display:flex;gap:6px;align-items:flex-start;}
+.rsk-i::before{content:'⚠';flex-shrink:0;}
+
+/* ── EVAL BOX ── */
+.ev{background:#0a192f;border-radius:13px;padding:20px 22px;color:white;}
+.ev-t{font-size:10px;font-weight:700;color:#2dd4bf;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;font-family:'Outfit',sans-serif;}
+.ev-tx{font-size:9.5px;color:#cbd5e1;line-height:1.7;}
+
+/* ── SECTOR TABLE ── */
+.stb{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;}
+.stb th{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:white;background:#0a192f;padding:9px 14px;text-align:left;}
+.stb th:last-child{text-align:right;}
+.stb td{padding:7px 14px;border-bottom:1px solid #f1f5f9;font-size:9.5px;color:#334155;}
+.stb td:last-child{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:#0a192f;}
+.stb tr:nth-child(even) td{background:#f8fafc;}
+.stb tr:last-child td{border-bottom:none;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 1 — KAPAK (Gemini Stili, Dark Navy)
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div style="background:#0a192f;height:100%;position:relative;overflow:hidden;">
+    <div class="glow" style="width:700px;height:700px;background:radial-gradient(circle,rgba(45,212,191,.14) 0%,transparent 70%);top:-200px;left:-200px;"></div>
+    <div class="glow" style="width:900px;height:900px;background:radial-gradient(circle,rgba(14,165,233,.14) 0%,transparent 70%);bottom:-300px;right:-300px;"></div>
+    <div style="position:absolute;top:0;left:64px;width:1px;height:100%;background:rgba(255,255,255,.04);"></div>
+    <div style="position:absolute;top:64px;left:0;width:100%;height:1px;background:rgba(255,255,255,.04);"></div>
+    <div style="position:absolute;inset:0;z-index:10;padding:52px 58px;display:flex;flex-direction:column;justify-content:space-between;">
+
+      <!-- Logo & Rapor Türü -->
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div class="outfit" style="width:46px;height:46px;background:linear-gradient(135deg,#2dd4bf,#0284c7);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:white;box-shadow:0 10px 24px rgba(45,212,191,.25);">F</div>
+          <div class="outfit" style="font-size:24px;font-weight:700;letter-spacing:2px;color:white;">FINRATE<span style="color:#2dd4bf;">.</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="outfit" style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:3px;">Kurumsal Premium Analiz Raporu</div>
+          <div style="font-size:9.5px;color:#475569;margin-top:5px;">Erişim: Yönetim Kurulu · Kredi Komitesi</div>
+        </div>
+      </div>
+
+      <!-- Firma Adı & Skor Paneli -->
+      <div style="margin-top:-50px;">
+        <div class="outfit" style="font-size:10px;color:#2dd4bf;text-transform:uppercase;letter-spacing:4px;font-weight:600;margin-bottom:26px;">Gizli &amp; Özel Resmi Döküman</div>
+        <h1 style="font-size:58px;font-weight:300;line-height:1.1;color:white;letter-spacing:-1px;margin-bottom:44px;font-family:'Outfit',sans-serif;">ATLAS MAKİNA<br><strong style="font-weight:900;">SANAYİ A.Ş.</strong></h1>
+
+        <!-- Skor paneli -->
+        <div style="display:inline-flex;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(20px);border-radius:26px;padding:32px 38px;gap:44px;box-shadow:0 24px 48px rgba(0,0,0,.4);">
+
+          <!-- SVG Gauge -->
+          <div style="position:relative;width:145px;height:145px;">
+            <div style="position:absolute;inset:0;border-radius:50%;background:#2dd4bf;filter:blur(26px);opacity:.11;"></div>
+            <svg viewBox="0 0 100 100" style="width:100%;height:100%;position:relative;z-index:5;transform:rotate(-90deg);">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="8"/>
+              <circle cx="50" cy="50" r="45" fill="none" stroke="url(#cg1)" stroke-width="8" stroke-dasharray="282.7" stroke-dashoffset="73.5" stroke-linecap="round"/>
+              <defs><linearGradient id="cg1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0284c7"/><stop offset="100%" stop-color="#2dd4bf"/></linearGradient></defs>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;">
+              <div class="outfit" style="font-size:38px;font-weight:800;line-height:1;color:white;">74</div>
+              <div style="font-size:9.5px;color:#64748b;letter-spacing:1px;">/100</div>
+            </div>
+          </div>
+
+          <!-- Rating -->
+          <div style="display:flex;flex-direction:column;justify-content:center;">
+            <div style="font-size:9.5px;color:#64748b;text-transform:uppercase;letter-spacing:3px;margin-bottom:7px;">Derecelendirme Notu</div>
+            <div class="outfit" style="font-size:64px;font-weight:900;line-height:1;color:#2dd4bf;text-shadow:0 0 38px rgba(45,212,191,.4);">BBB<span style="font-size:44px;">+</span></div>
+            <div style="margin-top:12px;padding:5px 13px;background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.25);border-radius:999px;font-size:9px;color:#2dd4bf;display:inline-flex;align-items:center;gap:7px;font-weight:600;">
+              <div style="width:6px;height:6px;background:#2dd4bf;border-radius:50%;box-shadow:0 0 7px #2dd4bf;"></div>Yatırım Yapılabilir Segment
+            </div>
+          </div>
+
+          <!-- Meta bilgi -->
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:11px;border-left:1px solid rgba(255,255,255,.08);padding-left:36px;">
+            <div>
+              <div style="font-size:8px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">Analiz Dönemi</div>
+              <div class="mono" style="font-size:13px;font-weight:700;color:white;">2024 · Yıllık</div>
+            </div>
+            <div>
+              <div style="font-size:8px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">Fin. / Subjektif</div>
+              <div class="mono" style="font-size:12px;font-weight:700;color:white;">52/70 · 22/30</div>
+            </div>
+            <div>
+              <div style="font-size:8px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:3px;">Teminat</div>
+              <div style="font-size:9px;color:#94a3b8;line-height:1.5;max-width:135px;">Kefalet veya müşteri çeki karşılığı</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alt bilgi -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+        <div style="font-size:9px;color:#475569;line-height:1.7;max-width:360px;">Bu rapor TCMB 2024 sektör kıyaslama verileri kullanılarak bankacılık metodolojisi ile üretilmiştir. Gizlidir; yetkisiz kişilerle paylaşılamaz. KVKK kapsamında kişisel veri içermektedir.</div>
+        <div style="text-align:right;">
+          <div class="outfit" style="font-size:11px;color:#475569;letter-spacing:2px;font-weight:700;">FINRATE.COM</div>
+          <div style="font-size:8.5px;color:#334155;margin-top:3px;">Rapor No: FNR-2024-08841</div>
+          <div style="font-size:8.5px;color:#334155;margin-top:2px;">Geçerlilik: 31.03.2025</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 2 — YÖNETİCİ ÖZETİ (Gemini Stili)
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">ÖZET</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 01</div><div class="ph-title">Yönetici Özeti</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 2</div></div>
+  </div>
+  <div class="pc">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
+      <!-- Sol: skor kartları + kategori barlar -->
+      <div>
+        <!-- 3 skor kartı -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div class="sc"><div class="sc-bar" style="background:#0284c7;"></div><div class="sc-lbl">Finansal Skor</div><div class="sc-val">52<span style="font-size:16px;color:#94a3b8;font-weight:400;">/70</span></div><div class="sc-sub">70 puan üzerinden</div></div>
+          <div class="sc"><div class="sc-bar" style="background:#2dd4bf;"></div><div class="sc-lbl">Subjektif Skor</div><div class="sc-val">22<span style="font-size:16px;color:#94a3b8;font-weight:400;">/30</span></div><div class="sc-sub">30 puan üzerinden</div></div>
+          <div class="sc" style="background:#0a192f;border-color:#0a192f;"><div class="sc-bar" style="background:#2dd4bf;"></div><div class="sc-lbl" style="color:#64748b;">Toplam Skor</div><div class="sc-val" style="color:white;">74<span style="font-size:16px;color:#475569;font-weight:400;">/100</span></div><div class="sc-sub" style="color:#64748b;">Rating: BBB+</div></div>
+        </div>
+
+        <!-- Kategori barlar -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;">
+          <div class="st" style="margin-bottom:14px;">Kategori Skorları <span class="st-sub">Firma vs TCMB Sektör Ortalaması</span></div>
+
+          <div class="cb">
+            <div class="cb-hd"><span class="cb-lbl">Likidite <span style="color:#94a3b8;font-size:8.5px;">(Ağırlık %35)</span></span><div style="text-align:right;"><span class="cb-sc">71</span><span class="cb-bm"> / Sektör: 58</span></div></div>
+            <div class="cb-trk"><div class="cb-fil" style="width:71%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:58%;"></div></div>
+          </div>
+          <div class="cb">
+            <div class="cb-hd"><span class="cb-lbl">Kârlılık <span style="color:#94a3b8;font-size:8.5px;">(Ağırlık %20)</span></span><div style="text-align:right;"><span class="cb-sc">62</span><span class="cb-bm"> / Sektör: 55</span></div></div>
+            <div class="cb-trk"><div class="cb-fil" style="width:62%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div><div class="cb-mrk" style="left:55%;"></div></div>
+          </div>
+          <div class="cb">
+            <div class="cb-hd"><span class="cb-lbl">Kaldıraç <span style="color:#94a3b8;font-size:8.5px;">(Ağırlık %30)</span></span><div style="text-align:right;"><span class="cb-sc">68</span><span class="cb-bm"> / Sektör: 62</span></div></div>
+            <div class="cb-trk"><div class="cb-fil" style="width:68%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:62%;"></div></div>
+          </div>
+          <div class="cb" style="margin-bottom:0;">
+            <div class="cb-hd"><span class="cb-lbl">Faaliyet <span style="color:#94a3b8;font-size:8.5px;">(Ağırlık %15)</span></span><div style="text-align:right;"><span class="cb-sc">74</span><span class="cb-bm"> / Sektör: 60</span></div></div>
+            <div class="cb-trk"><div class="cb-fil" style="width:74%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:60%;"></div></div>
+          </div>
+          <!-- Legend -->
+          <div style="display:flex;gap:18px;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;">
+            <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#64748b;"><div style="width:16px;height:5px;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);border-radius:3px;"></div>Firma Skoru</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#64748b;"><div style="width:3px;height:14px;background:#0a192f;border-radius:2px;"></div>Sektör Ortalaması</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sağ: KPI grid + değerlendirme -->
+      <div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="kpi" style="border-top:2px solid #0284c7;"><div class="kpi-l">Net Satışlar (2024)</div><div class="kpi-v" style="color:#0284c7;">₺52.3M</div><div class="kpi-s">+25.7% YoY büyüme</div></div>
+          <div class="kpi" style="border-top:2px solid #2dd4bf;"><div class="kpi-l">FAVÖK (2024)</div><div class="kpi-v" style="color:#0f766e;">₺7.22M</div><div class="kpi-s">Marj: %13.8</div></div>
+          <div class="kpi"><div class="kpi-l">Cari Oran</div><div class="kpi-v">1.82x</div><div class="kpi-s">Sektör: 1.73x</div></div>
+          <div class="kpi"><div class="kpi-l">Borç / Özkaynak</div><div class="kpi-v">0.78x</div><div class="kpi-s">Sektör: 0.93x</div></div>
+          <div class="kpi"><div class="kpi-l">Faiz Karşılama</div><div class="kpi-v">5.8x</div><div class="kpi-s">Sektör: 3.91x</div></div>
+          <div class="kpi"><div class="kpi-l">Özkaynak (2024)</div><div class="kpi-v">₺39M</div><div class="kpi-s">+30% YoY artış</div></div>
+        </div>
+
+        <!-- Genel Değerlendirme -->
+        <div class="ev">
+          <div class="ev-t">Genel Değerlendirme</div>
+          <div class="ev-tx">ATLAS MAKİNA SANAYİ A.Ş. 2024 yılı analizinde toplam <strong style="color:white;">74/100</strong> skor ve <strong style="color:white;">BBB+</strong> rating elde etmiştir. Firm güçlü likidite yapısı, sektör üstü kârlılık marjları ve düşük kaldıraç profiliyle olumlu bir kredi görünümü sergilemektedir. Alacak tahsil süresinin kısaltılması ve kısa vadeli borç yapısının iyileştirilmesi öncelikli aksiyon alanları olarak öne çıkmaktadır.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alt: Güçlü & Risk -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="str">
+        <div style="font-size:9.5px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Güçlü Alanlar</div>
+        <div class="str-i">Kısa vadeli yükümlülük karşılama kapasitesi sektör üstünde</div>
+        <div class="str-i">FAVÖK ve net kâr marjı sektör ortalamasının belirgin üzerinde</div>
+        <div class="str-i">Borç/Özkaynak oranı sektörden daha iyi konumda (0.78x vs 0.93x)</div>
+        <div class="str-i">4 yıllık sürekli büyüme; özkaynak %77 artış</div>
+      </div>
+      <div class="rsk">
+        <div style="font-size:9.5px;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">İzleme Alanları</div>
+        <div class="rsk-i">Alacak tahsil süresi (58 gün) sektör ortalamasının (53 gün) üzerinde</div>
+        <div class="rsk-i">KV borç oranı (%58) likidite üzerinde baskı oluşturabilir</div>
+        <div class="rsk-i">Aktif devir hızı (0.74x) sektör ortalamasının (0.87x) altında</div>
+        <div class="rsk-i">Kârlılık kategorisi için iyileştirme payı mevcut</div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 3 — FİRMA & SEKTÖR BİLGİSİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">FİRMA</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 02</div><div class="ph-title">Firma &amp; Sektör Bilgisi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 3</div></div>
+  </div>
+  <div class="pc">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <!-- Sol: Firma Bilgileri -->
+      <div>
+        <div class="st" style="margin-bottom:10px;">Firma Genel Bilgileri</div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;overflow:hidden;">
+          <table class="it">
+            <tr><td>Firma Ünvanı</td><td>ATLAS MAKİNA SANAYİ A.Ş.</td></tr>
+            <tr><td>VKN</td><td>1234567890</td></tr>
+            <tr><td>Sektör</td><td>İmalat Sanayi</td></tr>
+            <tr><td>NACE Kodu</td><td>C.28 — Makine İmalatı</td></tr>
+            <tr><td>Şirket Türü</td><td>Anonim Şirket</td></tr>
+            <tr><td>Kuruluş Yılı</td><td>2009</td></tr>
+            <tr><td>Faaliyet Süresi</td><td>15 Yıl</td></tr>
+            <tr><td>Analiz Dönemi</td><td>2024 · Yıllık Kesin Beyan</td></tr>
+            <tr><td>Rapor Numarası</td><td>FNR-2024-08841</td></tr>
+            <tr><td>Rapor Geçerliliği</td><td>31.03.2025</td></tr>
+            <tr><td>Analizi Yapan</td><td>Finrate Sistem Otomasyonu</td></tr>
+          </table>
+        </div>
+
+        <!-- Ölçek değerlendirmesi -->
+        <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:11px;padding:16px;margin-top:14px;">
+          <div style="font-size:9.5px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Firma Ölçeği Değerlendirmesi</div>
+          <div class="outfit" style="font-size:18px;font-weight:800;color:#0a192f;">Orta Ölçekli KOBİ</div>
+          <div style="font-size:9px;color:#0369a1;margin-top:5px;">2024 Net Satış: <span class="mono" style="font-weight:700;">₺52.3M</span> · KOBİ TFRS Tabi · YMM Denetimi</div>
+        </div>
+      </div>
+
+      <!-- Sağ: Sektör Risk Profili -->
+      <div>
+        <div class="st" style="margin-bottom:10px;">Sektör Risk Profili <span class="st-sub">C.28 İmalat Sanayi — TCMB 2024</span></div>
+        <div style="border:1px solid #e2e8f0;border-radius:11px;overflow:hidden;margin-bottom:14px;">
+          <table class="stb">
+            <thead><tr><th>Sektör Benchmark Metriği</th><th>TCMB 2024 Ort.</th></tr></thead>
+            <tbody>
+              <tr><td>Cari Oran</td><td>1.73x</td></tr>
+              <tr><td>Hızlı Oran</td><td>1.00x</td></tr>
+              <tr><td>Borç / Özkaynak</td><td>0.93x</td></tr>
+              <tr><td>Borç / Aktif</td><td>%48.0</td></tr>
+              <tr><td>FAVÖK Marjı</td><td>%9.0</td></tr>
+              <tr><td>Net Kâr Marjı</td><td>%2.5</td></tr>
+              <tr><td>Brüt Kâr Marjı</td><td>%20.0</td></tr>
+              <tr><td>ROA</td><td>%2.3</td></tr>
+              <tr><td>ROE</td><td>%4.4</td></tr>
+              <tr><td>Faiz Karşılama</td><td>3.91x</td></tr>
+              <tr><td>Aktif Devir Hızı</td><td>0.87x</td></tr>
+              <tr><td>Alacak Tahsil Süresi (DSO)</td><td>53 gün</td></tr>
+              <tr><td>Stok Devir Süresi (DIO)</td><td>70 gün</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Sektörel ağırlık profili -->
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:11px;padding:15px;">
+          <div style="font-size:9.5px;font-weight:700;color:#166534;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">İmalat Sektörü Ağırlık Profili</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="font-size:9px;color:#334155;"><span class="mono" style="font-weight:700;color:#0a192f;">%35</span> — Likidite</div>
+            <div style="font-size:9px;color:#334155;"><span class="mono" style="font-weight:700;color:#0a192f;">%20</span> — Kârlılık</div>
+            <div style="font-size:9px;color:#334155;"><span class="mono" style="font-weight:700;color:#0a192f;">%30</span> — Kaldıraç</div>
+            <div style="font-size:9px;color:#334155;"><span class="mono" style="font-weight:700;color:#0a192f;">%15</span> — Faaliyet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 4 — FİNANSAL SKOR DETAYI
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">FİNANSAL</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 03</div><div class="ph-title">Finansal Skor Detayı</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 4</div></div>
+  </div>
+  <div class="pc">
+
+    <!-- Üst: 6 KPI -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:16px;">
+      <div class="kpi"><div class="kpi-l">Satışlar</div><div class="kpi-v" style="font-size:16px;">₺52.3M</div><div class="kpi-s">+25.7% YoY</div></div>
+      <div class="kpi"><div class="kpi-l">Net Kâr</div><div class="kpi-v" style="font-size:16px;">₺3.56M</div><div class="kpi-s">Marj %6.8</div></div>
+      <div class="kpi"><div class="kpi-l">FAVÖK</div><div class="kpi-v" style="font-size:16px;">₺7.22M</div><div class="kpi-s">Marj %13.8</div></div>
+      <div class="kpi"><div class="kpi-l">Cari Oran</div><div class="kpi-v" style="font-size:16px;">1.82x</div><div class="kpi-s">Sektör 1.73x</div></div>
+      <div class="kpi"><div class="kpi-l">Borç/ÖzK</div><div class="kpi-v" style="font-size:16px;">0.78x</div><div class="kpi-s">Sektör 0.93x</div></div>
+      <div class="kpi"><div class="kpi-l">Subjektif</div><div class="kpi-v" style="font-size:16px;">22/30</div><div class="kpi-s">KKB: 8/10</div></div>
+    </div>
+
+    <!-- Detaylı kategori skorları -->
+    <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;">
+      <div class="st" style="margin-bottom:14px;">Kategori Analizi <span class="st-sub">Firma skoru ve sektör kıyaslaması</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+        <div>
+          <!-- Likidite -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <div style="font-size:10px;font-weight:700;color:#0a192f;">Likidite</div>
+              <div><span class="mono" style="font-size:15px;font-weight:800;color:#0a192f;">71</span><span style="font-size:8.5px;color:#94a3b8;"> / 100</span><span style="font-size:8.5px;color:#94a3b8;margin-left:8px;">Sektör: 58</span></div>
+            </div>
+            <div class="cb-trk"><div class="cb-fil" style="width:71%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:58%;"></div></div>
+            <div style="font-size:8px;color:#64748b;margin-top:5px;">Cari, Hızlı, Nakit Oranı · NÇS/Aktif · CCC</div>
+          </div>
+
+          <!-- Kârlılık -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <div style="font-size:10px;font-weight:700;color:#0a192f;">Kârlılık</div>
+              <div><span class="mono" style="font-size:15px;font-weight:800;color:#0a192f;">62</span><span style="font-size:8.5px;color:#94a3b8;"> / 100</span><span style="font-size:8.5px;color:#94a3b8;margin-left:8px;">Sektör: 55</span></div>
+            </div>
+            <div class="cb-trk"><div class="cb-fil" style="width:62%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div><div class="cb-mrk" style="left:55%;"></div></div>
+            <div style="font-size:8px;color:#64748b;margin-top:5px;">FAVÖK, Net Kâr, Brüt Kâr Marjı · ROA · ROE</div>
+          </div>
+        </div>
+
+        <div>
+          <!-- Kaldıraç -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <div style="font-size:10px;font-weight:700;color:#0a192f;">Kaldıraç</div>
+              <div><span class="mono" style="font-size:15px;font-weight:800;color:#0a192f;">68</span><span style="font-size:8.5px;color:#94a3b8;"> / 100</span><span style="font-size:8.5px;color:#94a3b8;margin-left:8px;">Sektör: 62</span></div>
+            </div>
+            <div class="cb-trk"><div class="cb-fil" style="width:68%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:62%;"></div></div>
+            <div style="font-size:8px;color:#64748b;margin-top:5px;">D/E · D/A · Faiz Karşılama · Net Borç/FAVÖK</div>
+          </div>
+
+          <!-- Faaliyet -->
+          <div style="margin-bottom:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <div style="font-size:10px;font-weight:700;color:#0a192f;">Faaliyet</div>
+              <div><span class="mono" style="font-size:15px;font-weight:800;color:#0a192f;">74</span><span style="font-size:8.5px;color:#94a3b8;"> / 100</span><span style="font-size:8.5px;color:#94a3b8;margin-left:8px;">Sektör: 60</span></div>
+            </div>
+            <div class="cb-trk"><div class="cb-fil" style="width:74%;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);"></div><div class="cb-mrk" style="left:60%;"></div></div>
+            <div style="font-size:8px;color:#64748b;margin-top:5px;">DSO · DIO · DPO · Aktif Devir · Sabit Varlık Devir</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alt: Güçlü & Risk + Değerlendirme -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:12px;">
+      <div class="str">
+        <div style="font-size:9px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Güçlü Alanlar</div>
+        <div class="str-i">Likidite yapısı sektör üstü</div>
+        <div class="str-i">Kârlılık marjları sektörün 2-3 katı</div>
+        <div class="str-i">Borç/Özkaynak yönetilebilir (0.78x)</div>
+        <div class="str-i">Faiz karşılama güçlü (5.8x)</div>
+      </div>
+      <div class="rsk">
+        <div style="font-size:9px;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">İzleme Alanları</div>
+        <div class="rsk-i">DSO sektörün 5 gün üzerinde</div>
+        <div class="rsk-i">KV borç oranı %58 (yüksek)</div>
+        <div class="rsk-i">Aktif devir hızı sektör altında</div>
+        <div class="rsk-i">Kârlılık marjı iyileştirme payı var</div>
+      </div>
+      <div class="ev">
+        <div class="ev-t">Sonuç</div>
+        <div class="ev-tx">Firma, İmalat sektörü normlarının üzerinde bir kredi profili sergilemektedir. Alacak tahsilat sürecinin ve kısa vadeli borç yapısının optimize edilmesiyle rating bir üst kademeye (A) taşınabilir.</div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 5 — LİKİDİTE & BORÇLANMA ORANLARI
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">LİKİDİTE</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 04</div><div class="ph-title">Likidite &amp; Borçlanma Oranları</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 5</div></div>
+  </div>
+  <div class="pc">
+    <!-- Filtre şeridi -->
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:700;color:#0a192f;">Detaylı Oran Analizi — 2024 Yılı</div>
+      <div style="font-size:9px;background:rgba(2,132,199,.1);color:#0284c7;padding:5px 12px;border-radius:999px;font-weight:700;">SEKTÖR: C.28 İMALAT · TCMB 2024</div>
+    </div>
+
+    <!-- Tablo -->
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+      <div class="rth">
+        <span>Oran Adı</span><span>Firma Değeri</span><span>Sektör Ort.</span><span style="padding-left:8px;">Görsel Karşılaştırma</span><span>Durum</span>
+      </div>
+
+      <!-- LİKİDİTE -->
+      <div class="rsh">LİKİDİTE GÖSTERGELERİ</div>
+      <div class="rr"><span class="rn">Cari Oran</span><span class="rv">1.82x</span><span class="rbm">1.73x</span><span class="rbar"><div class="prt"><div class="prf" style="width:61%;"></div><div class="prm" style="left:58%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Asit-Test (Hızlı) Oran</span><span class="rv">1.14x</span><span class="rbm">1.00x</span><span class="rbar"><div class="prt"><div class="prf" style="width:57%;"></div><div class="prm" style="left:50%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Nakit Oranı</span><span class="rv">0.28x</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:35%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">NÇS / Aktif Oranı</span><span class="rv">%22.0</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:44%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Nakit Dönüşüm Döngüsü (CCC)</span><span class="rv">48 gün</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:76%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+
+      <!-- BORÇLANMA -->
+      <div class="rsh">BORÇLANMA &amp; FİNANSAL YAPI</div>
+      <div class="rr"><span class="rn">Borç / Özkaynak</span><span class="rv">0.78x</span><span class="rbm">0.93x</span><span class="rbar"><div class="prt"><div class="prf" style="width:74%;"></div><div class="prm" style="left:69%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Borç / Aktif</span><span class="rv">%44.0</span><span class="rbm">%48.0</span><span class="rbar"><div class="prt"><div class="prf" style="width:56%;"></div><div class="prm" style="left:52%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Özkaynak Oranı</span><span class="rv">%56.0</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:56%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">KV Borç / Toplam Borç</span><span class="rv">%58.0</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:42%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div></div></span><span class="rst"><span class="b b-w">UYARI</span></span></div>
+      <div class="rr"><span class="rn">Net Borç / FAVÖK</span><span class="rv">2.40x</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:76%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Faiz Karşılama Oranı</span><span class="rv">5.80x</span><span class="rbm">3.91x</span><span class="rbar"><div class="prt"><div class="prf" style="width:73%;"></div><div class="prm" style="left:49%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+    </div>
+
+    <!-- Legend + Not -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+      <div style="display:flex;gap:20px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:20px;height:6px;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);border-radius:3px;"></div>Firma değeri (bar)</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:3px;height:16px;background:#0a192f;border-radius:2px;"></div>Sektör ortalaması (çizgi)</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:20px;height:6px;background:linear-gradient(90deg,#f59e0b,#fcd34d);border-radius:3px;"></div>Dikkat gerektiren</div>
+      </div>
+      <div style="font-size:8px;color:#94a3b8;">Kaynak: TCMB 2024 Sektör İstatistikleri</div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 6 — KÂRLILIK & FAALİYET ORANLARI
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">KÂRLILIK</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 05</div><div class="ph-title">Kârlılık &amp; Faaliyet Oranları</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 6</div></div>
+  </div>
+  <div class="pc">
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:700;color:#0a192f;">Detaylı Oran Analizi — 2024 Yılı</div>
+      <div style="font-size:9px;background:rgba(2,132,199,.1);color:#0284c7;padding:5px 12px;border-radius:999px;font-weight:700;">SEKTÖR: C.28 İMALAT · TCMB 2024</div>
+    </div>
+
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+      <div class="rth">
+        <span>Oran Adı</span><span>Firma Değeri</span><span>Sektör Ort.</span><span style="padding-left:8px;">Görsel Karşılaştırma</span><span>Durum</span>
+      </div>
+
+      <!-- KÂRLILIK -->
+      <div class="rsh">KÂRLILIK ORANLARI</div>
+      <div class="rr"><span class="rn">Brüt Kâr Marjı</span><span class="rv">%24.8</span><span class="rbm">%20.0</span><span class="rbar"><div class="prt"><div class="prf" style="width:50%;"></div><div class="prm" style="left:40%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">FAVÖK (EBITDA) Marjı</span><span class="rv">%13.8</span><span class="rbm">%9.0</span><span class="rbar"><div class="prt"><div class="prf" style="width:46%;"></div><div class="prm" style="left:30%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Faaliyet Kâr Marjı (FVÖK)</span><span class="rv">%11.2</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:45%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Net Kâr Marjı</span><span class="rv">%6.8</span><span class="rbm">%2.5</span><span class="rbar"><div class="prt"><div class="prf" style="width:45%;"></div><div class="prm" style="left:17%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Aktif Kârlılığı (ROA)</span><span class="rv">%5.1</span><span class="rbm">%2.3</span><span class="rbar"><div class="prt"><div class="prf" style="width:34%;"></div><div class="prm" style="left:15%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Özkaynak Kârlılığı (ROE)</span><span class="rv">%11.2</span><span class="rbm">%4.4</span><span class="rbar"><div class="prt"><div class="prf" style="width:45%;"></div><div class="prm" style="left:18%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+
+      <!-- FAALİYET -->
+      <div class="rsh">FAALİYET &amp; VERİMLİLİK ORANLARI</div>
+      <div class="rr"><span class="rn">Aktif Devir Hızı</span><span class="rv">0.74x</span><span class="rbm">0.87x</span><span class="rbar"><div class="prt"><div class="prf" style="width:37%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div><div class="prm" style="left:44%;"></div></div></span><span class="rst"><span class="b b-w">UYARI</span></span></div>
+      <div class="rr"><span class="rn">Alacak Tahsil Süresi (DSO)</span><span class="rv">58 gün</span><span class="rbm">53 gün</span><span class="rbar"><div class="prt"><div class="prf" style="width:61%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div><div class="prm" style="left:65%;"></div></div></span><span class="rst"><span class="b b-w">UYARI</span></span></div>
+      <div class="rr"><span class="rn">Stok Devir Süresi (DIO)</span><span class="rv">62 gün</span><span class="rbm">70 gün</span><span class="rbar"><div class="prt"><div class="prf" style="width:59%;"></div><div class="prm" style="left:53%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Borç Ödeme Süresi (DPO)</span><span class="rv">72 gün</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:60%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+      <div class="rr"><span class="rn">Sabit Varlık Devir Hızı</span><span class="rv">1.38x</span><span class="rbm">—</span><span class="rbar"><div class="prt"><div class="prf" style="width:46%;"></div></div></span><span class="rst"><span class="b b-g">İYİ</span></span></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+      <div style="display:flex;gap:20px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:20px;height:6px;background:linear-gradient(90deg,#0ea5e9,#2dd4bf);border-radius:3px;"></div>Firma değeri (bar)</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:3px;height:16px;background:#0a192f;border-radius:2px;"></div>Sektör ortalaması (çizgi)</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:8.5px;color:#64748b;"><div style="width:20px;height:6px;background:linear-gradient(90deg,#f59e0b,#fcd34d);border-radius:3px;"></div>Dikkat gerektiren</div>
+      </div>
+      <div style="font-size:8px;color:#94a3b8;">DSO için düşük bar = daha iyi (az gün = hızlı tahsilat)</div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 7 — TREND ANALİZİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">TREND</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 06</div><div class="ph-title">Trend Analizi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 7</div></div>
+  </div>
+  <div class="pc">
+
+    <!-- 4 mini bar chart 2x2 grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+      <!-- Cari Oran Trendi -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+        <div style="font-size:11px;font-weight:700;color:#0a192f;margin-bottom:2px;">Cari Oran Trendi</div>
+        <div style="font-size:8.5px;color:#94a3b8;margin-bottom:12px;">Firma vs Sektör · 2021–2024</div>
+        <div style="height:105px;display:flex;align-items:flex-end;gap:16px;border-bottom:1.5px solid #e2e8f0;padding-bottom:6px;">
+          <!-- 2021 -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.71/2.5*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">1.71</span></div>
+              <div style="position:relative;width:14px;height:calc(1.65/2.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.65</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2021</span>
+          </div>
+          <!-- 2022 -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.65/2.5*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">1.65</span></div>
+              <div style="position:relative;width:14px;height:calc(1.68/2.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.68</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2022</span>
+          </div>
+          <!-- 2023 -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.72/2.5*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">1.72</span></div>
+              <div style="position:relative;width:14px;height:calc(1.70/2.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.70</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2023</span>
+          </div>
+          <!-- 2024 -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.82/2.5*85px);background:#0284c7;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0284c7;white-space:nowrap;">1.82</span></div>
+              <div style="position:relative;width:14px;height:calc(1.73/2.5*85px);background:#64748b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.73</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:800;color:#0a192f;margin-top:4px;">2024</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#2dd4bf;border-radius:2px;"></div>Firma</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#94a3b8;border-radius:2px;"></div>Sektör</div>
+        </div>
+      </div>
+
+      <!-- Net Kâr Marjı Trendi -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+        <div style="font-size:11px;font-weight:700;color:#0a192f;margin-bottom:2px;">Net Kâr Marjı Trendi</div>
+        <div style="font-size:8.5px;color:#94a3b8;margin-bottom:12px;">Firma vs Sektör · 2021–2024</div>
+        <div style="height:105px;display:flex;align-items:flex-end;gap:16px;border-bottom:1.5px solid #e2e8f0;padding-bottom:6px;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(5.6/12*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">5.6%</span></div>
+              <div style="position:relative;width:14px;height:calc(2.2/12*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">2.2%</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2021</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(5.9/12*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">5.9%</span></div>
+              <div style="position:relative;width:14px;height:calc(2.4/12*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">2.4%</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2022</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(5.9/12*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0a192f;white-space:nowrap;">5.9%</span></div>
+              <div style="position:relative;width:14px;height:calc(2.4/12*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">2.4%</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2023</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(6.8/12*85px);background:#0284c7;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0284c7;white-space:nowrap;">6.8%</span></div>
+              <div style="position:relative;width:14px;height:calc(2.5/12*85px);background:#64748b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">2.5%</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:800;color:#0a192f;margin-top:4px;">2024</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#2dd4bf;border-radius:2px;"></div>Firma</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#94a3b8;border-radius:2px;"></div>Sektör</div>
+        </div>
+      </div>
+
+      <!-- Borç/Özkaynak Trendi -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+        <div style="font-size:11px;font-weight:700;color:#0a192f;margin-bottom:2px;">Borç / Özkaynak Trendi</div>
+        <div style="font-size:8.5px;color:#94a3b8;margin-bottom:12px;">Düşük = Daha İyi · 2021–2024</div>
+        <div style="height:105px;display:flex;align-items:flex-end;gap:16px;border-bottom:1.5px solid #e2e8f0;padding-bottom:6px;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.18/1.5*85px);background:#f59e0b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#92400e;white-space:nowrap;">1.18</span></div>
+              <div style="position:relative;width:14px;height:calc(1.05/1.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.05</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2021</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.23/1.5*85px);background:#f59e0b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#92400e;white-space:nowrap;">1.23</span></div>
+              <div style="position:relative;width:14px;height:calc(1.00/1.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">1.00</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2022</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(1.10/1.5*85px);background:#f59e0b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#92400e;white-space:nowrap;">1.10</span></div>
+              <div style="position:relative;width:14px;height:calc(0.96/1.5*85px);background:#94a3b8;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">0.96</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2023</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(0.78/1.5*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0f766e;white-space:nowrap;">0.78</span></div>
+              <div style="position:relative;width:14px;height:calc(0.93/1.5*85px);background:#64748b;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#64748b;white-space:nowrap;">0.93</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:800;color:#0a192f;margin-top:4px;">2024</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#2dd4bf;border-radius:2px;"></div>Firma</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#94a3b8;border-radius:2px;"></div>Sektör</div>
+        </div>
+      </div>
+
+      <!-- Satış Büyümesi -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+        <div style="font-size:11px;font-weight:700;color:#0a192f;margin-bottom:2px;">Satış Büyümesi</div>
+        <div style="font-size:8.5px;color:#94a3b8;margin-bottom:12px;">Nominal vs Reel Büyüme · 2022–2024</div>
+        <div style="height:105px;display:flex;align-items:flex-end;gap:16px;border-bottom:1.5px solid #e2e8f0;padding-bottom:6px;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(56/80*85px);background:#0284c7;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0284c7;white-space:nowrap;">%56</span></div>
+              <div style="position:relative;width:14px;height:calc(12/80*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#0f766e;white-space:nowrap;">%12</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2022</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(46/80*85px);background:#0284c7;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0284c7;white-space:nowrap;">%46</span></div>
+              <div style="position:relative;width:14px;height:calc(8/80*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#0f766e;white-space:nowrap;">%8</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:600;color:#64748b;margin-top:4px;">2023</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div style="display:flex;align-items:flex-end;gap:3px;height:85px;">
+              <div style="position:relative;width:18px;height:calc(26/80*85px);background:#0284c7;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;font-weight:700;color:#0284c7;white-space:nowrap;">%26</span></div>
+              <div style="position:relative;width:14px;height:calc(5/80*85px);background:#2dd4bf;border-radius:3px 3px 0 0;"><span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6.5px;color:#0f766e;white-space:nowrap;">%5</span></div>
+            </div>
+            <span style="font-size:8px;font-weight:800;color:#0a192f;margin-top:4px;">2024</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#0284c7;border-radius:2px;"></div>Nominal</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#64748b;"><div style="width:12px;height:5px;background:#2dd4bf;border-radius:2px;"></div>Reel</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Finansal büyüme tablosu -->
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+      <div style="background:#0a192f;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:11px;font-weight:700;color:white;font-family:'Outfit',sans-serif;">Finansal Büyüme Özeti</div>
+        <div style="font-size:8.5px;color:#64748b;">₺ Bazında · 4 Yıl Karşılaştırmalı</div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>Kalemler</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>4Y Büyüme</th></tr></thead>
+        <tbody>
+          <tr><td>Net Satışlar</td><td>₺18.2M</td><td>₺28.4M</td><td>₺41.6M</td><td>₺52.3M</td><td style="color:#2dd4bf;font-weight:700;">+187%</td></tr>
+          <tr><td>Brüt Kâr</td><td>₺3.64M</td><td>₺5.11M</td><td>₺8.32M</td><td>₺12.97M</td><td style="color:#2dd4bf;font-weight:700;">+256%</td></tr>
+          <tr><td>FAVÖK</td><td>₺2.55M</td><td>₺4.26M</td><td>₺5.82M</td><td>₺7.22M</td><td style="color:#2dd4bf;font-weight:700;">+183%</td></tr>
+          <tr class="tr"><td>Net Kâr</td><td>₺1.02M</td><td>₺1.68M</td><td>₺2.46M</td><td>₺3.56M</td><td>+249%</td></tr>
+          <tr><td>Özkaynak</td><td>₺22.0M</td><td>₺26.0M</td><td>₺30.0M</td><td>₺39.0M</td><td style="color:#2dd4bf;font-weight:700;">+77%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 8 — BİLANÇO ANALİZİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">BİLANÇO</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 07</div><div class="ph-title">Bilanço Analizi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 8</div></div>
+  </div>
+  <div class="pc">
+    <div style="font-size:9px;color:#64748b;margin-bottom:12px;">Son 4 yıl karşılaştırmalı özet bilanço · Tüm değerler TL cinsinden</div>
+
+    <!-- Bilanço tablosu -->
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+      <div style="background:#0a192f;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="outfit" style="font-size:13px;font-weight:700;color:white;">Çok Yıllık Özet Bilanço</div>
+        <div style="font-size:9px;background:rgba(255,255,255,.1);color:#94a3b8;padding:5px 12px;border-radius:999px;">TL · UFRS / KOBİ TFRS</div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>Bilanço Kalemleri</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th></tr></thead>
+        <tbody>
+          <tr><td>Hazır Değerler (Nakit & Banka)</td><td>1,240,000</td><td>1,850,000</td><td>3,500,000</td><td>4,100,000</td></tr>
+          <tr><td>Ticari Alacaklar</td><td>15,400,000</td><td>18,000,000</td><td>19,500,000</td><td>21,800,000</td></tr>
+          <tr><td>Stoklar</td><td>7,360,000</td><td>8,150,000</td><td>8,000,000</td><td>9,100,000</td></tr>
+          <tr><td>Diğer Dönen Varlıklar</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr class="tr"><td>TOPLAM DÖNEN VARLIKLAR</td><td>24,000,000</td><td>28,000,000</td><td>31,000,000</td><td>35,000,000</td></tr>
+          <tr><td>Maddi Duran Varlıklar (net)</td><td>20,000,000</td><td>25,000,000</td><td>27,000,000</td><td>29,000,000</td></tr>
+          <tr><td>Maddi Olmayan Duran Varlıklar</td><td>4,000,000</td><td>5,000,000</td><td>5,000,000</td><td>5,700,000</td></tr>
+          <tr class="tr"><td>TOPLAM DURAN VARLIKLAR</td><td>24,000,000</td><td>30,000,000</td><td>32,000,000</td><td>34,700,000</td></tr>
+          <tr class="mr"><td>AKTİF TOPLAMI</td><td>48,000,000</td><td>58,000,000</td><td>63,000,000</td><td>69,700,000</td></tr>
+          <tr><td>Finansal Borçlar (KV)</td><td>5,000,000</td><td>6,000,000</td><td>7,000,000</td><td>8,000,000</td></tr>
+          <tr><td>Ticari Borçlar</td><td>9,000,000</td><td>11,000,000</td><td>11,000,000</td><td>10,300,000</td></tr>
+          <tr class="tr"><td>TOPLAM KISA VADELİ YÜK.</td><td>14,000,000</td><td>17,000,000</td><td>18,000,000</td><td>18,300,000</td></tr>
+          <tr><td>Uzun Vadeli Finansal Borçlar</td><td>12,000,000</td><td>15,000,000</td><td>15,000,000</td><td>12,368,000</td></tr>
+          <tr class="tr"><td>TOPLAM UZUN VADELİ YÜK.</td><td>12,000,000</td><td>15,000,000</td><td>15,000,000</td><td>12,368,000</td></tr>
+          <tr><td>Ödenmiş Sermaye</td><td>10,000,000</td><td>10,000,000</td><td>10,000,000</td><td>10,000,000</td></tr>
+          <tr><td>Geçmiş Yıllar K/Z & Yedekler</td><td>7,500,000</td><td>10,920,000</td><td>15,580,000</td><td>19,654,000</td></tr>
+          <tr><td>Dönem Net Kârı</td><td>1,020,000</td><td>1,680,000</td><td>2,460,000</td><td>3,556,000</td></tr>
+          <tr class="tr"><td>TOPLAM ÖZKAYNAK</td><td>22,000,000</td><td>26,000,000</td><td>30,000,000</td><td>39,032,000</td></tr>
+          <tr class="mr"><td>PASİF TOPLAMI</td><td>48,000,000</td><td>58,000,000</td><td>63,000,000</td><td>69,700,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bilanço yorumu -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:11px;padding:14px 16px;">
+      <div class="st" style="margin-bottom:8px;">Bilanço Yapısı Yorumu</div>
+      <div style="font-size:9.5px;color:#475569;line-height:1.7;">Toplam aktifin <strong>%50.2</strong>'si dönen varlıklardan oluşmaktadır. Özkaynak oranı <strong>%56.0</strong> ile güçlü bir özkaynak tabanına işaret etmektedir. Son 4 yılda özkaynaklar <strong>₺22M</strong>'den <strong>₺39M</strong>'e yükselerek %77 büyüme kaydetmiştir. Uzun vadeli borçlar 2022–2023 dönemine kıyasla 2024'te <strong>₺12.4M</strong>'ye gerileyerek finansal esneklik artmıştır.</div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 9 — GELİR TABLOSU ANALİZİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">GELİR</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 08</div><div class="ph-title">Gelir Tablosu Analizi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 9</div></div>
+  </div>
+  <div class="pc">
+    <div style="font-size:9px;color:#64748b;margin-bottom:12px;">Son 4 yıl karşılaştırmalı özet gelir tablosu · Tüm değerler TL cinsinden</div>
+
+    <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+      <div style="background:#0a192f;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="outfit" style="font-size:13px;font-weight:700;color:white;">Kapsamlı Gelir Tablosu</div>
+        <div style="font-size:9px;background:rgba(255,255,255,.1);color:#94a3b8;padding:5px 12px;border-radius:999px;">TL · UFRS / KOBİ TFRS</div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>Gelir Tablosu Kalemleri</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>Marj 2024</th></tr></thead>
+        <tbody>
+          <tr class="tr"><td>Net Satışlar</td><td>18,200,000</td><td>28,400,000</td><td>41,600,000</td><td>52,300,000</td><td>%100</td></tr>
+          <tr><td>Satışların Maliyeti (–)</td><td>13,720,000</td><td>23,288,000</td><td>33,282,000</td><td>39,329,000</td><td>%75.2</td></tr>
+          <tr class="tr"><td>BRÜT KÂR</td><td>4,480,000</td><td>5,112,000</td><td>8,318,000</td><td>12,971,000</td><td>%24.8</td></tr>
+          <tr><td>Faaliyet Giderleri (–)</td><td>1,932,000</td><td>852,000</td><td>2,494,000</td><td>7,113,000</td><td>%13.6</td></tr>
+          <tr class="tr"><td>FAALİYET KÂRI (FVÖK/EBIT)</td><td>2,548,000</td><td>4,260,000</td><td>5,824,000</td><td>5,858,000</td><td>%11.2</td></tr>
+          <tr><td>Amortisman (EBIT→EBITDA)</td><td>650,000</td><td>900,000</td><td>1,100,000</td><td>1,360,000</td><td>%2.6</td></tr>
+          <tr class="tr"><td>FAVÖK (EBITDA)</td><td>3,198,000</td><td>5,160,000</td><td>6,924,000</td><td>7,218,000</td><td>%13.8</td></tr>
+          <tr><td>Finansman Giderleri (–)</td><td>580,000</td><td>900,000</td><td>1,200,000</td><td>1,010,000</td><td>%1.9</td></tr>
+          <tr><td>Diğer Gelir / Gider (net)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr><td>Vergi Öncesi Kâr</td><td>1,968,000</td><td>3,360,000</td><td>4,624,000</td><td>4,848,000</td><td>%9.3</td></tr>
+          <tr><td>Kurumlar Vergisi (–)</td><td>948,000</td><td>1,680,000</td><td>2,164,000</td><td>1,292,000</td><td>%2.5</td></tr>
+          <tr class="mr"><td>DÖNEM NET KÂRI</td><td>1,020,000</td><td>1,680,000</td><td>2,460,000</td><td>3,556,000</td><td>%6.8</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Marj trendi görsel -->
+    <div style="border:1px solid #e2e8f0;border-radius:11px;padding:16px;">
+      <div class="st" style="margin-bottom:12px;">Kâr Marjı Trendi <span class="st-sub">2021–2024 · Yüzde bazında</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        <div style="text-align:center;background:#f8fafc;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">2021</div>
+          <div style="height:60px;display:flex;justify-content:center;align-items:flex-end;gap:4px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
+            <div style="width:14px;background:#2dd4bf;border-radius:2px 2px 0 0;" title="Brüt %24.6" style="height:calc(24.6/30*60px)"></div>
+            <div style="width:14px;background:#0284c7;border-radius:2px 2px 0 0;height:calc(17.6/30*60px)"></div>
+            <div style="width:14px;background:#0a192f;border-radius:2px 2px 0 0;height:calc(5.6/30*60px)"></div>
+          </div>
+          <div style="font-size:7px;color:#94a3b8;margin-top:4px;">Brüt / FAVÖK / Net</div>
+        </div>
+        <div style="text-align:center;background:#f8fafc;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">2022</div>
+          <div style="height:60px;display:flex;justify-content:center;align-items:flex-end;gap:4px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
+            <div style="width:14px;background:#2dd4bf;border-radius:2px 2px 0 0;height:calc(18.0/30*60px)"></div>
+            <div style="width:14px;background:#0284c7;border-radius:2px 2px 0 0;height:calc(18.2/30*60px)"></div>
+            <div style="width:14px;background:#0a192f;border-radius:2px 2px 0 0;height:calc(5.9/30*60px)"></div>
+          </div>
+          <div style="font-size:7px;color:#94a3b8;margin-top:4px;">Brüt / FAVÖK / Net</div>
+        </div>
+        <div style="text-align:center;background:#f8fafc;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">2023</div>
+          <div style="height:60px;display:flex;justify-content:center;align-items:flex-end;gap:4px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
+            <div style="width:14px;background:#2dd4bf;border-radius:2px 2px 0 0;height:calc(20.0/30*60px)"></div>
+            <div style="width:14px;background:#0284c7;border-radius:2px 2px 0 0;height:calc(16.6/30*60px)"></div>
+            <div style="width:14px;background:#0a192f;border-radius:2px 2px 0 0;height:calc(5.9/30*60px)"></div>
+          </div>
+          <div style="font-size:7px;color:#94a3b8;margin-top:4px;">Brüt / FAVÖK / Net</div>
+        </div>
+        <div style="text-align:center;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;color:#0369a1;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">2024 ★</div>
+          <div style="height:60px;display:flex;justify-content:center;align-items:flex-end;gap:4px;border-bottom:1px solid #bae6fd;padding-bottom:4px;">
+            <div style="width:14px;background:#2dd4bf;border-radius:2px 2px 0 0;height:calc(24.8/30*60px)"></div>
+            <div style="width:14px;background:#0284c7;border-radius:2px 2px 0 0;height:calc(13.8/30*60px)"></div>
+            <div style="width:14px;background:#0a192f;border-radius:2px 2px 0 0;height:calc(6.8/30*60px)"></div>
+          </div>
+          <div style="font-size:7px;color:#0369a1;margin-top:4px;font-weight:600;">%24.8 / %13.8 / %6.8</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#64748b;"><div style="width:12px;height:5px;background:#2dd4bf;border-radius:2px;"></div>Brüt Kâr Marjı</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#64748b;"><div style="width:12px;height:5px;background:#0284c7;border-radius:2px;"></div>FAVÖK Marjı</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#64748b;"><div style="width:12px;height:5px;background:#0a192f;border-radius:2px;"></div>Net Kâr Marjı</div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 10 — NAKİT AKIŞ & ÇALIŞMA SERMAYESİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">NAKİT</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 09</div><div class="ph-title">Nakit Akış &amp; Çalışma Sermayesi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 10</div></div>
+  </div>
+  <div class="pc">
+
+    <!-- CCC Metrikleri -->
+    <div class="st" style="margin-bottom:11px;">Nakit Dönüşüm Döngüsü <span class="st-sub">DSO + DIO − DPO = CCC</span></div>
+
+    <!-- CCC görsel şeması -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:1fr 16px 1fr 16px 1fr 16px 1fr;align-items:center;gap:0;margin-bottom:16px;">
+        <div style="text-align:center;background:#dbeafe;border:1px solid #93c5fd;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px;">DSO</div>
+          <div class="mono" style="font-size:22px;font-weight:800;color:#1e40af;">58</div>
+          <div style="font-size:8px;color:#1d4ed8;margin-top:3px;">gün</div>
+          <div style="font-size:7.5px;color:#64748b;margin-top:5px;">Alacak Tahsil<br>Sektör: 53 gün</div>
+        </div>
+        <div style="text-align:center;font-size:18px;font-weight:700;color:#94a3b8;">+</div>
+        <div style="text-align:center;background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:6px;">DIO</div>
+          <div class="mono" style="font-size:22px;font-weight:800;color:#15803d;">62</div>
+          <div style="font-size:8px;color:#166534;margin-top:3px;">gün</div>
+          <div style="font-size:7.5px;color:#64748b;margin-top:5px;">Stok Devir<br>Sektör: 70 gün</div>
+        </div>
+        <div style="text-align:center;font-size:18px;font-weight:700;color:#94a3b8;">−</div>
+        <div style="text-align:center;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:6px;">DPO</div>
+          <div class="mono" style="font-size:22px;font-weight:800;color:#15803d;">72</div>
+          <div style="font-size:8px;color:#166534;margin-top:3px;">gün</div>
+          <div style="font-size:7.5px;color:#64748b;margin-top:5px;">Borç Ödeme<br>Sektör: —</div>
+        </div>
+        <div style="text-align:center;font-size:18px;font-weight:700;color:#94a3b8;">=</div>
+        <div style="text-align:center;background:#0a192f;border-radius:10px;padding:14px;">
+          <div style="font-size:8.5px;font-weight:700;color:#2dd4bf;text-transform:uppercase;margin-bottom:6px;">CCC</div>
+          <div class="mono" style="font-size:22px;font-weight:800;color:white;">48</div>
+          <div style="font-size:8px;color:#2dd4bf;margin-top:3px;">gün</div>
+          <div style="font-size:7.5px;color:#64748b;margin-top:5px;">Nakit Döngüsü<br>Sektör: —</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:#64748b;padding-top:12px;border-top:1px solid #e2e8f0;line-height:1.7;">
+        CCC = 58 + 62 − 72 = <strong style="color:#0a192f;">48 gün</strong> · DSO'nun sektör ortalamasının 5 gün üzerinde olması en kritik iyileştirme alanıdır. Stok devir süresi sektörden iyi (62 vs 70 gün), borç ödeme vadesi ise nakit akışı tampon etkisi yaratmaktadır.
+      </div>
+    </div>
+
+    <!-- Çalışma Sermayesi Analizi -->
+    <div class="st" style="margin-bottom:11px;">Çalışma Sermayesi Analizi</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+      <div style="border:1px solid #e2e8f0;border-radius:11px;overflow:hidden;">
+        <table class="pt">
+          <thead><tr><th>Kalemler</th><th>2023</th><th>2024</th></tr></thead>
+          <tbody>
+            <tr><td>Toplam Dönen Varlıklar</td><td>31,000,000</td><td>35,000,000</td></tr>
+            <tr><td>Toplam KV Yükümlülükler</td><td>18,000,000</td><td>18,300,000</td></tr>
+            <tr class="tr"><td>Net Çalışma Sermayesi</td><td>13,000,000</td><td>16,700,000</td></tr>
+            <tr><td>NÇS / Net Satışlar</td><td>%31.3</td><td>%31.9</td></tr>
+            <tr><td>NÇS / Toplam Aktif</td><td>%20.6</td><td>%23.9</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:11px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:9.5px;font-weight:700;color:#166534;margin-bottom:8px;">Olumlu Göstergeler</div>
+          <div style="font-size:9px;color:#166534;line-height:1.7;">✓ Net çalışma sermayesi ₺16.7M ile güçlü<br>✓ Stok devir süresi sektör ortalamasının altında<br>✓ Yüksek DPO tedarikçi finansmanını destekliyor</div>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:11px;padding:16px;">
+          <div style="font-size:9.5px;font-weight:700;color:#92400e;margin-bottom:8px;">İyileştirme Alanları</div>
+          <div style="font-size:9px;color:#92400e;line-height:1.7;">⚠ DSO 58 gün → hedef 45 gün (tahsilat hızı)<br>⚠ KV borç oranı %58 likidite riski yaratıyor<br>⚠ Nakit dönüşüm 48 gün → 35 güne indirme hedefi</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Genel yorum -->
+    <div class="ev">
+      <div class="ev-t">Çalışma Sermayesi Genel Değerlendirmesi</div>
+      <div class="ev-tx">Net çalışma sermayesi ₺16.7M (satışların %31.9'u) seviyesinde olup kısa vadeli yükümlülükler karşısında yeterli tampon oluşturmaktadır. Nakit dönüşüm döngüsü 48 gün ile sektör geneline kıyasla makul düzeyde olmakla birlikte, DSO'nun 5 gün iyileştirilmesi yıllık ek ₺2.6M nakit serbest bırakabilecektir.</div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 11 — SENARYO ANALİZİ
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">SENARYO</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 10</div><div class="ph-title">Senaryo Analizi</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 11</div></div>
+  </div>
+  <div class="pc">
+    <div style="font-size:9px;color:#64748b;margin-bottom:14px;">Mevcut durum ve hedef rating senaryoları · Puan katkıları tahminidir</div>
+
+    <!-- Waterfall bar chart -->
+    <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+      <div class="st" style="margin-bottom:14px;">Rating İyileştirme Yol Haritası <span class="st-sub">Mevcut BBB+ → Hedef AA</span></div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:150px;padding-bottom:28px;position:relative;border-bottom:2px solid #e2e8f0;">
+        <!-- Y-axis labels -->
+        <div style="position:absolute;left:0;top:0;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding-bottom:28px;">
+          <span style="font-size:7px;color:#94a3b8;font-family:'JetBrains Mono',monospace;">90</span>
+          <span style="font-size:7px;color:#94a3b8;font-family:'JetBrains Mono',monospace;">84</span>
+          <span style="font-size:7px;color:#94a3b8;font-family:'JetBrains Mono',monospace;">76</span>
+          <span style="font-size:7px;color:#94a3b8;font-family:'JetBrains Mono',monospace;">68</span>
+        </div>
+        <!-- Bars -->
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding-left:22px;">
+          <div style="font-size:7.5px;font-weight:700;color:#0a192f;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">74</div>
+          <div style="width:100%;height:calc((74-60)/(90-60)*100px);background:#0a192f;border-radius:4px 4px 0 0;margin-top:auto;"></div>
+          <div style="font-size:7.5px;color:#64748b;text-align:center;margin-top:4px;line-height:1.3;">Mevcut<br>BBB+</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#2dd4bf;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">+3.2</div>
+          <div style="width:100%;height:calc(3.2/(90-60)*100px);background:linear-gradient(180deg,#2dd4bf,#0ea5e9);border-radius:4px 4px 0 0;margin-top:calc((90-77.2)/(90-60)*100px);"></div>
+          <div style="font-size:7.5px;color:#64748b;text-align:center;margin-top:4px;line-height:1.3;">+Alacak<br>Tahsilat</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#2dd4bf;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">+4.1</div>
+          <div style="width:100%;height:calc(4.1/(90-60)*100px);background:linear-gradient(180deg,#2dd4bf,#0ea5e9);border-radius:4px 4px 0 0;margin-top:calc((90-81.3)/(90-60)*100px);"></div>
+          <div style="font-size:7.5px;color:#64748b;text-align:center;margin-top:4px;line-height:1.3;">+KV→UV<br>Dönüşüm</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#22c55e;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">77</div>
+          <div style="width:100%;height:calc((77-60)/(90-60)*100px);background:#22c55e;border-radius:4px 4px 0 0;margin-top:auto;"></div>
+          <div style="font-size:7.5px;color:#22c55e;font-weight:700;text-align:center;margin-top:4px;line-height:1.3;">1. Hedef<br>A</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#2dd4bf;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">+3.8</div>
+          <div style="width:100%;height:calc(3.8/(90-60)*100px);background:linear-gradient(180deg,#2dd4bf,#0ea5e9);border-radius:4px 4px 0 0;margin-top:calc((90-85.1)/(90-60)*100px);"></div>
+          <div style="font-size:7.5px;color:#64748b;text-align:center;margin-top:4px;line-height:1.3;">+Kârlılık<br>İyileştirme</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#2dd4bf;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">+Borç</div>
+          <div style="width:100%;height:calc(2/(90-60)*100px);background:linear-gradient(180deg,#2dd4bf,#0ea5e9);border-radius:4px 4px 0 0;margin-top:calc((90-87.1)/(90-60)*100px);"></div>
+          <div style="font-size:7.5px;color:#64748b;text-align:center;margin-top:4px;line-height:1.3;">+Borç<br>Yapısı</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7.5px;font-weight:700;color:#f59e0b;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">84</div>
+          <div style="width:100%;height:calc((84-60)/(90-60)*100px);background:#f59e0b;border-radius:4px 4px 0 0;margin-top:auto;"></div>
+          <div style="font-size:7.5px;color:#f59e0b;font-weight:700;text-align:center;margin-top:4px;line-height:1.3;">2. Hedef<br>AA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 senaryo kartı -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <!-- Mevcut -->
+      <div style="background:#0a192f;border-radius:12px;padding:20px;">
+        <div style="font-size:8.5px;font-weight:700;color:#2dd4bf;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Mevcut Durum</div>
+        <div class="outfit" style="font-size:40px;font-weight:900;color:#2dd4bf;line-height:1;">BBB<span style="font-size:28px;">+</span></div>
+        <div class="mono" style="font-size:14px;font-weight:700;color:white;margin:8px 0;">74 / 100</div>
+        <div style="font-size:8.5px;color:#64748b;line-height:1.6;">Yatırım yapılabilir segment. Kefalet veya müşteri çeki teminatı yeterli.</div>
+      </div>
+      <!-- 1. Hedef -->
+      <div style="border:1px solid #22c55e;border-radius:12px;padding:20px;background:#f0fdf4;">
+        <div style="font-size:8.5px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">1. Kademe Hedef · 3-12 Ay</div>
+        <div class="outfit" style="font-size:40px;font-weight:900;color:#16a34a;line-height:1;">A</div>
+        <div class="mono" style="font-size:14px;font-weight:700;color:#0a192f;margin:8px 0;">77 / 100 (+3 puan)</div>
+        <div style="font-size:8.5px;color:#166534;line-height:1.6;">• DSO 58→45 gün (tahsilat)<br>• KV borç oranı %58→%45<br>Maddi teminatsız kefalet yeterli</div>
+      </div>
+      <!-- 2. Hedef -->
+      <div style="border:1px solid #f59e0b;border-radius:12px;padding:20px;background:#fffbeb;">
+        <div style="font-size:8.5px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">2. Kademe Hedef · 12-24 Ay</div>
+        <div class="outfit" style="font-size:40px;font-weight:900;color:#d97706;line-height:1;">AA</div>
+        <div class="mono" style="font-size:14px;font-weight:700;color:#0a192f;margin:8px 0;">84 / 100 (+10 puan)</div>
+        <div style="font-size:8.5px;color:#92400e;line-height:1.6;">• Net kâr marjı %6.8→%8.5<br>• Borç yapısı optimizasyonu<br>Maddi teminatsız kefalet yeterli</div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SAYFA 12 — DETAYLI AKSİYON PLANI
+══════════════════════════════════════════════════════ -->
+<div class="pdf-page">
+  <div class="wm">AKSİYON</div>
+  <div class="ph">
+    <div><div class="ph-sec">Bölüm 11</div><div class="ph-title">Detaylı Aksiyon Planı</div></div>
+    <div class="ph-right"><div class="ph-ent">ATLAS MAKİNA SANAYİ A.Ş.</div><div class="ph-pg">Sayfa 12</div></div>
+  </div>
+  <div class="pc">
+    <div style="font-size:9px;color:#64748b;margin-bottom:14px;">Öncelik sırasına göre — kredi notu iyileştirme yol haritası</div>
+
+    <!-- AKSİYON 1 -->
+    <div style="display:flex;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:11px;">
+      <div style="width:42px;background:#0a192f;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:#2dd4bf;">01</div>
+      <div style="flex:1;padding:14px 16px;">
+        <div style="font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:4px;">Alacak Tahsil Süresinin Kısaltılması</div>
+        <div style="display:inline-flex;font-size:8px;font-weight:700;color:#0284c7;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;margin-bottom:8px;">Faaliyet</div>
+        <div style="font-size:8.5px;color:#64748b;line-height:1.55;">Alacak tahsil politikasının güncellenmesi ve tahsilat takibinin sistematize edilmesiyle DSO 45 güne indirilebilir. Erken ödeme indirimi müşteri bazında uygulanabilir; sistematik hatırlatma ve hukuki takip süreci kısaltılmalıdır.</div>
+        <div style="font-size:8px;color:#94a3b8;margin-top:6px;font-style:italic;">Banka Etkisi: DSO iyileşmesi nakit akışı güvenilirliğini artırır, limit kararlarında pozitif etki yaratır.</div>
+      </div>
+      <div style="width:165px;background:#f8fafc;padding:14px 15px;border-left:1px solid #e2e8f0;flex-shrink:0;">
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Mevcut → Hedef</div>
+        <div class="mono" style="font-size:11px;font-weight:600;color:#0a192f;margin-bottom:10px;">58 gün → 45 gün</div>
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Puan Katkısı</div>
+        <div class="outfit" style="font-size:18px;font-weight:800;color:#2dd4bf;margin-bottom:10px;">+3.2</div>
+        <div style="font-size:7.5px;color:#94a3b8;">Süre: 3–6 ay · Zorluk: Orta</div>
+      </div>
+    </div>
+
+    <!-- AKSİYON 2 -->
+    <div style="display:flex;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:11px;">
+      <div style="width:42px;background:#0a192f;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:#2dd4bf;">02</div>
+      <div style="flex:1;padding:14px 16px;">
+        <div style="font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:4px;">Kısa Vadeyi Uzun Vadeye Dönüştürme</div>
+        <div style="display:inline-flex;font-size:8px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:4px;padding:2px 8px;margin-bottom:8px;">Kaldıraç</div>
+        <div style="font-size:8.5px;color:#64748b;line-height:1.55;">Mevcut kısa vadeli finansal borçların %70'inin 3–5 yıl vadeli yatırım kredisine çevrilmesi önerilmektedir. KGF kefalet desteği ile uygun faiz oranı sağlanabilir; bu hamle cari oranı anlamlı ölçüde artıracaktır.</div>
+        <div style="font-size:8px;color:#94a3b8;margin-top:6px;font-style:italic;">Banka Etkisi: KV borç oranının düşürülmesi likidite baskısını azaltır; yeniden yapılandırma isteğini artırır.</div>
+      </div>
+      <div style="width:165px;background:#f8fafc;padding:14px 15px;border-left:1px solid #e2e8f0;flex-shrink:0;">
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Mevcut → Hedef</div>
+        <div class="mono" style="font-size:11px;font-weight:600;color:#0a192f;margin-bottom:10px;">KV %58 → KV %45</div>
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Puan Katkısı</div>
+        <div class="outfit" style="font-size:18px;font-weight:800;color:#2dd4bf;margin-bottom:10px;">+4.1</div>
+        <div style="font-size:7.5px;color:#94a3b8;">Süre: 6–12 ay · Zorluk: Orta</div>
+      </div>
+    </div>
+
+    <!-- AKSİYON 3 -->
+    <div style="display:flex;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:11px;">
+      <div style="width:42px;background:#0a192f;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:#2dd4bf;">03</div>
+      <div style="flex:1;padding:14px 16px;">
+        <div style="font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:4px;">Net Kâr Marjı İyileştirmesi</div>
+        <div style="display:inline-flex;font-size:8px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;border-radius:4px;padding:2px 8px;margin-bottom:8px;">Kârlılık</div>
+        <div style="font-size:8.5px;color:#64748b;line-height:1.55;">Ürün bazlı maliyet analizi ile düşük marjlı ürün gamını daraltmak ve fiyatlama stratejisini güçlendirmek. Faaliyet giderlerinde %5–8 tasarruf hedeflenmeli; tedarik zinciri optimizasyonu brüt marjı 1–2 puan artırabilir.</div>
+        <div style="font-size:8px;color:#94a3b8;margin-top:6px;font-style:italic;">Banka Etkisi: Marj artışı FAVÖK üretimini güçlendirir, Net Borç/FAVÖK oranını iyileştirir.</div>
+      </div>
+      <div style="width:165px;background:#f8fafc;padding:14px 15px;border-left:1px solid #e2e8f0;flex-shrink:0;">
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Mevcut → Hedef</div>
+        <div class="mono" style="font-size:11px;font-weight:600;color:#0a192f;margin-bottom:10px;">%6.8 → %8.5</div>
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Puan Katkısı</div>
+        <div class="outfit" style="font-size:18px;font-weight:800;color:#2dd4bf;margin-bottom:10px;">+3.8</div>
+        <div style="font-size:7.5px;color:#94a3b8;">Süre: 12–18 ay · Zorluk: Yüksek</div>
+      </div>
+    </div>
+
+    <!-- AKSİYON 4 -->
+    <div style="display:flex;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+      <div style="width:42px;background:#0a192f;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:#2dd4bf;">04</div>
+      <div style="flex:1;padding:14px 16px;">
+        <div style="font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:4px;">Stok Devir Hızının Artırılması</div>
+        <div style="display:inline-flex;font-size:8px;font-weight:700;color:#0284c7;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;margin-bottom:8px;">Faaliyet</div>
+        <div style="font-size:8.5px;color:#64748b;line-height:1.55;">Minimum stok seviyelerinin belirlenmesi, talep tahmin sisteminin güçlendirilmesi ve hızlı ergitme (kampanya) yöntemleriyle DIO 50 güne indirilebilir. Bu hamle nakit dönüşüm döngüsünü 48'den 36 güne getirecektir.</div>
+        <div style="font-size:8px;color:#94a3b8;margin-top:6px;font-style:italic;">Banka Etkisi: Çalışma sermayesi verimliliği nakit pozisyonunu ve cari oranı güçlendirir.</div>
+      </div>
+      <div style="width:165px;background:#f8fafc;padding:14px 15px;border-left:1px solid #e2e8f0;flex-shrink:0;">
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Mevcut → Hedef</div>
+        <div class="mono" style="font-size:11px;font-weight:600;color:#0a192f;margin-bottom:10px;">62 gün → 50 gün</div>
+        <div style="font-size:7.5px;color:#94a3b8;display:block;margin-bottom:2px;">Puan Katkısı</div>
+        <div class="outfit" style="font-size:18px;font-weight:800;color:#2dd4bf;margin-bottom:10px;">+2.1</div>
+        <div style="font-size:7.5px;color:#94a3b8;">Süre: 3–6 ay · Zorluk: Orta</div>
+      </div>
+    </div>
+  </div>
+  <div class="pf"><span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span><span>finrate.com · FNR-2024-08841</span></div>
+</div>
+
+<!-- PAGE 13: MAKROEKONOMİK VİZYON & SEKTÖREL YORUM -->
+<div class="pdf-page" style="padding:0;">
+  <div class="ph" style="padding:28px 40px 0;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:linear-gradient(135deg,#2dd4bf,#0891b2);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:#0a192f;letter-spacing:-0.3px;">Makroekonomik Vizyon &amp; Sektörel Yorum</span>
+    </div>
+    <div class="wm">FINRATE</div>
+  </div>
+  <div class="pc" style="padding:18px 40px 0;">
+
+    <!-- Makro Banner -->
+    <div style="background:linear-gradient(135deg,#0a192f 0%,#0f2444 60%,#0c2340 100%);border-radius:14px;padding:22px 28px;margin-bottom:16px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(45,212,191,0.08);border-radius:50%;"></div>
+      <div style="position:absolute;bottom:-20px;left:60px;width:80px;height:80px;background:rgba(14,165,233,0.07);border-radius:50%;"></div>
+      <div style="position:relative;z-index:1;">
+        <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;color:#2dd4bf;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">Değerlendirme Dönem Ortamı</div>
+        <div style="font-family:'Inter',sans-serif;font-size:12.5px;color:rgba(255,255,255,0.88);line-height:1.65;">
+          2023 yıl sonu itibarıyla yürütülen bu analiz döneminde Türkiye ekonomisi çift haneli enflasyon ortamından çıkış sürecinde, faiz normalizasyonu politikasının etkin biçimde uygulandığı bir geçiş dönemini yönetmektedir. TL bazlı finansal tablolar reel değer analizine olanak tanımakla birlikte, dönem karşılaştırmalarında enflasyon etkisinin gözetilmesi analitik doğruluk açısından kritik önem taşımaktadır.
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-col macro indicators -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;">
+        <div style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">GSYİH Büyümesi (2023)</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#0a192f;">%4,5</div>
+        <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:#22c55e;font-weight:500;margin-top:2px;">↑ Beklentilerin üzerinde</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;">
+        <div style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">TÜFE (Yıl sonu)</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#0a192f;">%64,8</div>
+        <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:#f59e0b;font-weight:500;margin-top:2px;">↓ Düşüş trendinde</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;">
+        <div style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px;">Politika Faizi</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#0a192f;">%42,5</div>
+        <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:#f59e0b;font-weight:500;margin-top:2px;">↑ Normalizasyon süreci</div>
+      </div>
+    </div>
+
+    <!-- Sektör Analizi 2-col -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <!-- Sol: İmalat Sektörü Görünüm -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#0a192f;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #2dd4bf;">İmalat Sektörü Görünümü</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#475569;">Kapasite Kullanım Oranı</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:60px;height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                <div style="width:76%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#0a192f;">%76,2</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#475569;">Sanayi Üretim Endeksi</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:60px;height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                <div style="width:58%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">+%5,8</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#475569;">İhracat Değişimi</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:60px;height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                <div style="width:42%;height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);border-radius:3px;"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#f59e0b;">−%2,1</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#475569;">İstihdam Büyümesi</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:60px;height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                <div style="width:34%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">+%3,4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Sağ: Şirket Pozisyonlanması -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#0a192f;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #2dd4bf;">Atlas Makina — Sektör Konumu</div>
+        <div style="display:flex;flex-direction:column;gap:9px;">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <div style="width:20px;height:20px;min-width:20px;background:#dcfce7;border-radius:5px;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#334155;line-height:1.5;">Net satışlar sektör ortalamasının %12 üzerinde seyrediyor; organik büyüme ivmesi güçlü.</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <div style="width:20px;height:20px;min-width:20px;background:#dcfce7;border-radius:5px;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#334155;line-height:1.5;">FAVÖK marjı sektör medyanı olan %10,2'nin belirgin biçimde üzerinde (%13,4).</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <div style="width:20px;height:20px;min-width:20px;background:#fef9c3;border-radius:5px;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </div>
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#334155;line-height:1.5;">Kaldıraç oranı sektör üst çeyreğine yakın; finansal borç yönetimi izleme gerektiriyor.</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <div style="width:20px;height:20px;min-width:20px;background:#fef9c3;border-radius:5px;display:flex;align-items:center;justify-content:center;margin-top:1px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </div>
+            <span style="font-family:'Inter',sans-serif;font-size:10.5px;color:#334155;line-height:1.5;">Nakit dönüşüm döngüsü (48 gün) sektör ortalamasının (42 gün) üzerinde; optimize edilebilir.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sektörel Risk & Fırsat -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;">
+      <div style="font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:10px;">Öne Çıkan Sektörel Dinamikler</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="padding:10px 12px;background:#ffffff;border-left:3px solid #22c55e;border-radius:6px;">
+          <div style="font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;color:#22c55e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Fırsat</div>
+          <div style="font-family:'Inter',sans-serif;font-size:10px;color:#334155;line-height:1.55;">Enerji yatırım programlarının yarattığı makine talebi artışı şirketin ürün gamıyla doğrudan örtüşmektedir.</div>
+        </div>
+        <div style="padding:10px 12px;background:#ffffff;border-left:3px solid #f59e0b;border-radius:6px;">
+          <div style="font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">İzleme</div>
+          <div style="font-family:'Inter',sans-serif;font-size:10px;color:#334155;line-height:1.55;">Girdi maliyetlerindeki (çelik, alüminyum) oynaklık hammadde marjlarını baskı altında tutmaktadır.</div>
+        </div>
+        <div style="padding:10px 12px;background:#ffffff;border-left:3px solid #ef4444;border-radius:6px;">
+          <div style="font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Risk</div>
+          <div style="font-family:'Inter',sans-serif;font-size:10px;color:#334155;line-height:1.55;">Yüksek faiz ortamı vadeli finansman maliyetlerini artırarak yatırım döngüsünü geciktirme riski taşımaktadır.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="pf"><span>Atlas Makina Sanayii A.Ş. — Kredi Derecelendirme Raporu</span><span>13 / 16</span></div>
+</div>
+
+<!-- PAGE 14: SUBJEKTİF FAKTÖRLER DETAYI -->
+<div class="pdf-page" style="padding:0;">
+  <div class="ph" style="padding:28px 40px 0;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:linear-gradient(135deg,#2dd4bf,#0891b2);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="7" r="4" stroke="white" stroke-width="2"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:#0a192f;letter-spacing:-0.3px;">Subjektif Faktörler — Ayrıntılı Değerlendirme</span>
+    </div>
+    <div class="wm">FINRATE</div>
+  </div>
+  <div class="pc" style="padding:18px 40px 0;">
+
+    <!-- Header info box -->
+    <div style="background:linear-gradient(90deg,#f0fdf4,#ecfdf5);border:1px solid #bbf7d0;border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;color:#16a34a;letter-spacing:0.8px;text-transform:uppercase;">Toplam Subjektif Puan</div>
+        <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:#334155;margin-top:2px;">4 ana başlık · 30 puan üzerinden değerlendirme · Sektör ağırlıklı</div>
+      </div>
+      <div style="text-align:right;">
+        <span style="font-family:'Outfit',sans-serif;font-size:28px;font-weight:700;color:#0a192f;">22</span>
+        <span style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:400;color:#64748b;">/30</span>
+        <div style="font-family:'Inter',sans-serif;font-size:10px;color:#22c55e;font-weight:600;">%73,3 başarı oranı</div>
+      </div>
+    </div>
+
+    <!-- 4 subjective factor cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+
+      <!-- KKB -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#0a192f,#0f2444);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#ffffff;">Kredi Sicili (KKB)</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:rgba(255,255,255,0.65);margin-top:2px;">Kredi Kayıt Bürosu verisi</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;color:#2dd4bf;">8</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:12px;color:rgba(255,255,255,0.5);">/10</span>
+          </div>
+        </div>
+        <div style="padding:14px 16px;">
+          <!-- mini progress -->
+          <div style="margin-bottom:10px;">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="width:80%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:3px;">
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">0</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#22c55e;font-weight:600;">80% · İyi</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">10</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Gecikme/Takip kaydı</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">Yok</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Geri ödenmiş krediler</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#0a192f;">Düzenli</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Çek/senet protestosu</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">Temiz</span>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px;">
+            <span style="font-family:'Inter',sans-serif;font-size:10px;color:#16a34a;">Son 36 ayda herhangi bir olumsuz kayıt bulunmamaktadır. Kredi sicili güçlü ve temizdir.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Banka -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#0a192f,#0f2444);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#ffffff;">Banka İlişkileri</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:rgba(255,255,255,0.65);margin-top:2px;">Banka referans ve hareket analizi</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;color:#2dd4bf;">7</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:12px;color:rgba(255,255,255,0.5);">/10</span>
+          </div>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:10px;">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="width:70%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:3px;">
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">0</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#2dd4bf;font-weight:600;">70% · Orta-İyi</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">10</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Çalışılan banka sayısı</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#0a192f;">4 banka</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Teminat mektubu limiti</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#0a192f;">18M TL</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Aktif kullanım oranı</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#f59e0b;">%68</span>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:#fefce8;border-radius:6px;">
+            <span style="font-family:'Inter',sans-serif;font-size:10px;color:#92400e;">Çoklu banka ilişkisi olumlu; ancak yüksek limit kullanım oranı yakından izlenmeli.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kurumsal -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#0a192f,#0f2444);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#ffffff;">Kurumsal Yapı</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:rgba(255,255,255,0.65);margin-top:2px;">Yönetim kalitesi ve şeffaflık</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;color:#2dd4bf;">3</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:12px;color:rgba(255,255,255,0.5);">/5</span>
+          </div>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:10px;">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="width:60%;height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:3px;">
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">0</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#f59e0b;font-weight:600;">60% · Orta</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">5</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Bağımsız denetim</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">Evet</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Yönetim kurulu yapısı</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#f59e0b;">Aile kontrolü</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Sürdürülebilirlik raporu</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#ef4444;">Yok</span>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:#fefce8;border-radius:6px;">
+            <span style="font-family:'Inter',sans-serif;font-size:10px;color:#92400e;">Bağımsız denetim olumlu; kurumsal çeşitlilik ve şeffaflık alanlarında gelişim beklenmektedir.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uyum -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#0a192f,#0f2444);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#ffffff;">Uyum &amp; Mevzuat</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:rgba(255,255,255,0.65);margin-top:2px;">Yasal ve düzenleyici uyumluluk</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;color:#2dd4bf;">4</span>
+            <span style="font-family:'Outfit',sans-serif;font-size:12px;color:rgba(255,255,255,0.5);">/5</span>
+          </div>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:10px;">
+            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="width:80%;height:100%;background:linear-gradient(90deg,#2dd4bf,#0891b2);border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:3px;">
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">0</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#22c55e;font-weight:600;">80% · İyi</span>
+              <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">5</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">Vergi uyumu (son 3 yıl)</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">Tam</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">SGK prim düzenliliği</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#22c55e;">Düzenli</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-family:'Inter',sans-serif;font-size:10px;color:#64748b;">MASAK uyumu</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#f59e0b;">Kısmi</span>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px;">
+            <span style="font-family:'Inter',sans-serif;font-size:10px;color:#16a34a;">Vergisel ve sosyal güvenlik uyumu güçlü; MASAK kapsamında ek süreç oluşturulması tavsiye edilir.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Özet satırı -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 16px;display:flex;justify-content:space-around;align-items:center;">
+      <div style="text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#2dd4bf;">8/10</div>
+        <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:#64748b;margin-top:2px;">KKB</div>
+      </div>
+      <div style="width:1px;height:30px;background:#e2e8f0;"></div>
+      <div style="text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#2dd4bf;">7/10</div>
+        <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:#64748b;margin-top:2px;">Banka</div>
+      </div>
+      <div style="width:1px;height:30px;background:#e2e8f0;"></div>
+      <div style="text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#f59e0b;">3/5</div>
+        <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:#64748b;margin-top:2px;">Kurumsal</div>
+      </div>
+      <div style="width:1px;height:30px;background:#e2e8f0;"></div>
+      <div style="text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#22c55e;">4/5</div>
+        <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:#64748b;margin-top:2px;">Uyum</div>
+      </div>
+      <div style="width:1px;height:30px;background:#e2e8f0;"></div>
+      <div style="text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#0a192f;">22/30</div>
+        <div style="font-family:'Inter',sans-serif;font-size:9.5px;color:#64748b;margin-top:2px;">Toplam</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="pf"><span>Atlas Makina Sanayii A.Ş. — Kredi Derecelendirme Raporu</span><span>14 / 16</span></div>
+</div>
+
+<!-- PAGE 15: METODOLOJİ & NOT SKALASI -->
+<div class="pdf-page" style="padding:0;">
+  <div class="ph" style="padding:28px 40px 0;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:linear-gradient(135deg,#2dd4bf,#0891b2);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:#0a192f;letter-spacing:-0.3px;">Metodoloji &amp; Not Skalası</span>
+    </div>
+    <div class="wm">FINRATE</div>
+  </div>
+  <div class="pc" style="padding:16px 40px 0;">
+
+    <!-- 70/30 Methodology Box -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div style="background:linear-gradient(135deg,#0a192f,#0f2444);border-radius:12px;padding:18px 20px;color:white;">
+        <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;color:#2dd4bf;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Puanlama Mimarisi</div>
+        <div style="display:flex;gap:12px;margin-bottom:12px;">
+          <div style="flex:70;background:rgba(45,212,191,0.2);border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#2dd4bf;">70</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9px;color:rgba(255,255,255,0.7);margin-top:2px;">Finansal Analiz</div>
+          </div>
+          <div style="flex:30;background:rgba(255,255,255,0.08);border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,0.8);">30</div>
+            <div style="font-family:'Inter',sans-serif;font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px;">Subjektif</div>
+          </div>
+        </div>
+        <div style="font-family:'Inter',sans-serif;font-size:10px;color:rgba(255,255,255,0.7);line-height:1.6;">
+          Finansal puan: 25 oran, 4 sektör ağırlıklı kategori. Subjektif puan: KKB (10p) + Banka (10p) + Kurumsal (5p) + Uyum (5p). Toplam 100 puan üzerinden Finrate derecelendirme skalasına dönüştürülür.
+        </div>
+      </div>
+      <!-- Sector weights grid -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+        <div style="font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:700;color:#0a192f;margin-bottom:10px;">Sektör Ağırlık Profilleri</div>
+        <table style="width:100%;border-collapse:collapse;font-size:9.5px;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="font-family:'Inter',sans-serif;font-weight:600;color:#64748b;text-align:left;padding:5px 6px;border-bottom:1px solid #e2e8f0;">Sektör</th>
+              <th style="font-family:'Inter',sans-serif;font-weight:600;color:#2dd4bf;text-align:center;padding:5px 6px;border-bottom:1px solid #e2e8f0;">Lik</th>
+              <th style="font-family:'Inter',sans-serif;font-weight:600;color:#2dd4bf;text-align:center;padding:5px 6px;border-bottom:1px solid #e2e8f0;">Kâr</th>
+              <th style="font-family:'Inter',sans-serif;font-weight:600;color:#2dd4bf;text-align:center;padding:5px 6px;border-bottom:1px solid #e2e8f0;">Kald</th>
+              <th style="font-family:'Inter',sans-serif;font-weight:600;color:#2dd4bf;text-align:center;padding:5px 6px;border-bottom:1px solid #e2e8f0;">Faal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#fff0f0;">
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;font-weight:600;">İmalat ★</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#334155;text-align:center;padding:5px 6px;">35%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#334155;text-align:center;padding:5px 6px;">20%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#334155;text-align:center;padding:5px 6px;">30%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#334155;text-align:center;padding:5px 6px;">15%</td>
+            </tr>
+            <tr>
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;">Ticaret</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">30%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">25%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">25%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+            </tr>
+            <tr style="background:#f8fafc;">
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;">İnşaat</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">40%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">15%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">35%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">10%</td>
+            </tr>
+            <tr>
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;">Hizmet</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">25%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">35%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+            </tr>
+            <tr style="background:#f8fafc;">
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;">Tarım</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">30%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">25%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">25%</td>
+            </tr>
+            <tr>
+              <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 6px;">Teknoloji</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">40%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#475569;text-align:center;padding:5px 6px;">20%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;margin-top:6px;">★ Bu raporda kullanılan ağırlık profili · Lik=Likidite, Kâr=Kârlılık, Kald=Kaldıraç, Faal=Faaliyet</div>
+      </div>
+    </div>
+
+    <!-- Rating Scale Table -->
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#0a192f;padding:10px 16px;">
+        <span style="font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:700;color:#ffffff;">Finrate Derecelendirme Skalası</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:9.5px;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="font-family:'Inter',sans-serif;font-weight:600;color:#64748b;text-align:left;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Derece</th>
+            <th style="font-family:'Inter',sans-serif;font-weight:600;color:#64748b;text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;">Puan Aralığı</th>
+            <th style="font-family:'Inter',sans-serif;font-weight:600;color:#64748b;text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;">Kategori</th>
+            <th style="font-family:'Inter',sans-serif;font-weight:600;color:#64748b;text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;">Teminat Koşulu</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#f0fdf4;">
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#16a34a;font-size:10.5px;">AAA</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">95–100</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Mükemmel</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Teminatsız / Düşük teminat</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#16a34a;font-size:10.5px;">AA+/AA/AA−</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">85–94</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Çok Güçlü</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Sembolik teminat</td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#22c55e;font-size:10.5px;">A+/A/A−</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">75–84</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Güçlü</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Standart teminat</td>
+          </tr>
+          <tr style="background:#fefce8;border-left:3px solid #2dd4bf;">
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#2dd4bf;font-size:10.5px;">BBB+/BBB/BBB−</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">65–74</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;font-weight:600;">Yeterli ★</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Standart teminat / İzleme</td>
+          </tr>
+          <tr style="background:#f8fafc;">
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#f59e0b;font-size:10.5px;">BB+/BB/BB−</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">55–64</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Spekülatif</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Güçlendirilmiş teminat</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#ef4444;font-size:10.5px;">B / CCC / CC</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">35–54</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Zayıf</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Yüksek teminat / Özel koşul</td>
+          </tr>
+          <tr style="background:#fff5f5;">
+            <td style="padding:5px 12px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#ef4444;font-size:10.5px;">D</span></td>
+            <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:#334155;padding:5px 8px;">0–34</td>
+            <td style="font-family:'Inter',sans-serif;color:#334155;padding:5px 8px;">Temerrüt</td>
+            <td style="font-family:'Inter',sans-serif;color:#64748b;padding:5px 8px;">Kredi kullandırılmaz</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+        <span style="font-family:'Inter',sans-serif;font-size:9px;color:#94a3b8;">★ Atlas Makina Sanayii A.Ş. bu rapor kapsamında BBB+ (74/100) olarak derecelendirilmiştir.</span>
+      </div>
+    </div>
+
+    <!-- Legal disclaimer -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;">
+      <div style="font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;color:#0a192f;margin-bottom:5px;">Yasal Uyarı &amp; Kapsam Sınırları</div>
+      <p style="font-family:'Inter',sans-serif;font-size:9px;color:#64748b;line-height:1.6;margin:0;">
+        Bu rapor, Finrate platformu tarafından sunulan verilere dayanılarak analitik amaçlı hazırlanmıştır. Herhangi bir kredi kararı, yatırım tavsiyesi veya hukuki görüş niteliği taşımamaktadır. Derecelendirme notu, sunulan finansal veriler ile beyan edilen subjektif bilgilerin doğruluğu varsayımıyla hesaplanmıştır. Finrate, kullanıcı tarafından sağlanan verilerin hatalı veya eksik olması durumundan doğabilecek sonuçlardan sorumlu tutulamaz. Bu rapor üçüncü şahıslarla paylaşılmadan önce yetkili kurum onayı alınmalıdır. Raporun tamamı veya bir bölümü kaynak gösterilmeden kullanılamaz. © 2024 Finrate Teknoloji A.Ş. — Tüm hakları saklıdır.
+      </p>
+    </div>
+
+  </div>
+  <div class="pf"><span>Atlas Makina Sanayii A.Ş. — Kredi Derecelendirme Raporu</span><span>15 / 16</span></div>
+</div>
+
+<!-- PAGE 16: KAPANIŞ (dark navy) -->
+<div class="pdf-page" style="background:linear-gradient(160deg,#0a192f 0%,#0d2444 50%,#071428 100%);padding:0;position:relative;overflow:hidden;">
+  <!-- Glow blobs -->
+  <div class="glow" style="width:350px;height:350px;top:-80px;right:-80px;background:radial-gradient(circle,rgba(45,212,191,0.12) 0%,transparent 70%);"></div>
+  <div class="glow" style="width:280px;height:280px;bottom:-60px;left:-40px;background:radial-gradient(circle,rgba(14,165,233,0.10) 0%,transparent 70%);"></div>
+  <div class="glow" style="width:200px;height:200px;bottom:200px;right:150px;background:radial-gradient(circle,rgba(45,212,191,0.06) 0%,transparent 70%);"></div>
+
+  <!-- Decorative horizontal lines -->
+  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#2dd4bf,transparent);"></div>
+  <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#2dd4bf,transparent);"></div>
+
+  <!-- Content centered -->
+  <div style="position:relative;z-index:10;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 80px;">
+
+    <!-- Logo -->
+    <div style="margin-bottom:28px;">
+      <div style="display:inline-flex;align-items:center;gap:14px;margin-bottom:14px;">
+        <div class="outfit" style="width:52px;height:52px;background:linear-gradient(135deg,#2dd4bf,#0284c7);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:white;box-shadow:0 10px 24px rgba(45,212,191,.25);">F</div>
+        <span style="font-family:'Outfit',sans-serif;font-size:36px;font-weight:800;color:#ffffff;letter-spacing:-1px;">FINRATE<span style="color:#2dd4bf;">.</span></span>
+      </div>
+      <div style="width:80px;height:2px;background:linear-gradient(90deg,transparent,#2dd4bf,transparent);margin:0 auto;"></div>
+    </div>
+
+    <!-- Main heading -->
+    <div style="font-family:'Outfit',sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:16px;">Kredi Derecelendirme &amp; Finansal Analiz Platformu</div>
+
+    <!-- Company name -->
+    <div style="font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#ffffff;margin-bottom:6px;">Atlas Makina Sanayii A.Ş.</div>
+    <div style="font-family:'Inter',sans-serif;font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:40px;">Rapor Tarihi: 10 Nisan 2024 &nbsp;·&nbsp; Geçerlilik Süresi: 12 Ay</div>
+
+    <!-- Rating badge -->
+    <div style="background:rgba(45,212,191,0.12);border:1px solid rgba(45,212,191,0.3);border-radius:16px;padding:20px 40px;margin-bottom:40px;backdrop-filter:blur(10px);">
+      <div style="font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:#2dd4bf;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Final Derecelendirme</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:20px;">
+        <div>
+          <span style="font-family:'Outfit',sans-serif;font-size:42px;font-weight:800;color:#ffffff;">BBB+</span>
+        </div>
+        <div style="width:1px;height:40px;background:rgba(255,255,255,0.2);"></div>
+        <div>
+          <div style="font-family:'Outfit',sans-serif;font-size:32px;font-weight:700;color:#2dd4bf;">74</div>
+          <div style="font-family:'Inter',sans-serif;font-size:10px;color:rgba(255,255,255,0.5);">/ 100 puan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider line with dots -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;width:300px;">
+      <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15));"></div>
+      <div style="width:4px;height:4px;background:#2dd4bf;border-radius:50%;"></div>
+      <div style="width:4px;height:4px;background:rgba(255,255,255,0.2);border-radius:50%;"></div>
+      <div style="width:4px;height:4px;background:#2dd4bf;border-radius:50%;"></div>
+      <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.15),transparent);"></div>
+    </div>
+
+    <!-- Footer info -->
+    <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:rgba(255,255,255,0.35);line-height:1.7;max-width:480px;">
+      Bu rapor yalnızca analitik bilgi amaçlıdır. Kredi kararlarında tek başına dayanak teşkil etmez.<br>
+      <span style="color:#2dd4bf;font-weight:500;">finrate.com.tr</span> &nbsp;·&nbsp; destek@finrate.com.tr &nbsp;·&nbsp; © 2024 Finrate Teknoloji A.Ş.
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
