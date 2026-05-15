@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [],
   },
   // pdf-parse ve xlsx'i webpack'ten çıkar — Node.js native olarak yüklesin
-  serverExternalPackages: ['pdf-parse', 'xlsx'],
+  serverExternalPackages: ['pdf-parse', 'xlsx', '@sparticuz/chromium'],
   // Vercel standalone output yerine platform native kullanır — worker dosyaları için gerekli
   outputFileTracingIncludes: {
     '/api': ['./node_modules/pdf-parse/dist/**/*'],

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 
+export const runtime = 'nodejs'
 // Vercel serverless fonksiyon timeout (saniye) — PDF render ~20-40s sürer
 export const maxDuration = 60
 
@@ -34,16 +35,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     // ─── Chromium / puppeteer-core: Vercel-uyumlu ────────────────────────────
-    // Yerel geliştirme:  CHROME_EXECUTABLE_PATH env değişkenini set et
-    //   örn: CHROME_EXECUTABLE_PATH="C:/Program Files/Google/Chrome/Application/chrome.exe"
-    // Vercel'de: @sparticuz/chromium lambda binary'yi otomatik sağlar
-    const executablePath =
-      process.env.CHROME_EXECUTABLE_PATH ?? (await chromium.executablePath())
+    // Prod / Vercel: @sparticuz/chromium lambda binary + chromium.args kullanılır
+    // Lokal:  PUPPETEER_EXECUTABLE_PATH env değişkeni ile yerel Chrome gösterilir
+    const isProd = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
     const browser = await puppeteer.launch({
-      executablePath,
-      headless: chromium.headless,
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+      defaultViewport: { width: 1280, height: 1024 },
+      executablePath: isProd
+        ? await chromium.executablePath()
+        : process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      headless: 'shell',
     })
 
     const page = await browser.newPage()
