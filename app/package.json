@@ -34,7 +34,7 @@
     "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "prisma": "^7.6.0",
-    "puppeteer-core": "^22.15.0",
+    "puppeteer-core": "^24.43.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
