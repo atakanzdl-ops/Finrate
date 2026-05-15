@@ -753,24 +753,53 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
   const totalLiabilities = totalAssets - totalEquity
   const equityRatio      = totalAssets > 0 ? totalEquity / totalAssets : 0
 
-  // 3-part dynamic commentary (null-safe)
-  const currentAssets    = lastFd?.totalCurrentAssets ?? null
-  const nonCurrentAssets = lastFd?.totalNonCurrentAssets ?? null
-  const inventory        = lastFd?.inventory ?? null
+  // 3-part dynamic commentary (null-safe — boş parçalar filter ile atlanır)
 
-  const part1 = (currentAssets != null && nonCurrentAssets != null && nonCurrentAssets > 0)
-    ? `Dönen/Duran varlık oranı ${(currentAssets / nonCurrentAssets).toFixed(2)}x — ${currentAssets > nonCurrentAssets ? 'likit ağırlıklı aktif yapısı kısa vadeli esneklik sağlıyor.' : 'duran varlık ağırlıklı yapı uzun vadeli yatırım odağına işaret ediyor.'}`
-    : 'Aktif yapısı analiz edilemedi — veri eksik.'
+  // PARÇA 1 — Dönen/Duran Varlık
+  let part1 = ''
+  if (lastFd?.totalAssets != null && lastFd.totalAssets > 0 && lastFd?.totalCurrentAssets != null) {
+    const currentAssetRatio = (lastFd.totalCurrentAssets / lastFd.totalAssets) * 100
+    const pct = Math.round(currentAssetRatio)
+    if (currentAssetRatio > 70) {
+      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Yüksek likidite konumu nakit yönetimi için olumlu, ancak duran varlık yatırımının düşük olması uzun vadeli büyüme kapasitesini sorgulatır.`
+    } else if (currentAssetRatio > 40) {
+      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Dönen/duran varlık dengesi makul seviyede.`
+    } else {
+      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Duran varlık ağırlıklı yapı uzun vadeli yatırım kapasitesini gösteriyor ancak kısa vadeli ödeme gücünü sorgulatır.`
+    }
+  }
 
-  const part2 = totalAssets > 0
-    ? `Özkaynak oranı %${(equityRatio * 100).toFixed(1)} — ${equityRatio >= 0.30 ? 'güçlü özkaynak tabanı finansal sağlamlığı destekliyor.' : 'özkaynak güçlendirmesi orta vadeli öncelik olmalıdır.'}`
-    : 'Özkaynak oranı hesaplanamadı.'
+  // PARÇA 2 — Kaldıraç (Borç/Özkaynak)
+  let part2 = ''
+  if (lastFd?.totalEquity != null && lastFd.totalEquity > 0) {
+    const totalLiab = (lastFd.totalCurrentLiabilities ?? 0) + (lastFd.totalNonCurrentLiabilities ?? 0)
+    const debtEquityRatio = totalLiab / lastFd.totalEquity
+    const dr = debtEquityRatio.toFixed(2)
+    if (debtEquityRatio < 0.5) {
+      part2 = `Borç/Özkaynak oranı ${dr} ile düşük kaldıraç gösteriyor. Finansal sağlamlık yüksek.`
+    } else if (debtEquityRatio < 1.5) {
+      part2 = `Borç/Özkaynak oranı ${dr} ile sağlıklı kaldıraç seviyesinde.`
+    } else {
+      part2 = `Borç/Özkaynak oranı ${dr} ile yüksek kaldıraç. Borç yapısının vadelendirilmesi kritik öneme sahip.`
+    }
+  }
 
-  const part3 = (inventory != null && currentAssets != null && currentAssets > 0)
-    ? `Stok/Dönen varlık payı %${((inventory / currentAssets) * 100).toFixed(1)} — ${inventory / currentAssets > 0.40 ? 'yüksek stok yoğunluğu likidite riskini artırabilir.' : 'makul stok payı döngüsel işletme sermayesi yapısını koruyor.'}`
-    : 'Stok verisi mevcut değil.'
+  // PARÇA 3 — Stok Yoğunluğu
+  let part3 = ''
+  if (lastFd?.totalCurrentAssets != null && lastFd.totalCurrentAssets > 0 && lastFd?.inventory != null) {
+    const inventoryShare = (lastFd.inventory / lastFd.totalCurrentAssets) * 100
+    const pct = Math.round(inventoryShare)
+    if (inventoryShare > 60) {
+      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Yüksek stok yoğunluğu nakde dönüşüm hızını yavaşlatabilir.`
+    } else if (inventoryShare > 30) {
+      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Sektör için makul seviyede.`
+    } else if (inventoryShare > 0) {
+      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Düşük stok yoğunluğu hızlı nakit dönüşümü sağlıyor.`
+    }
+  }
 
-  const comment = `${part1} ${part2} ${part3}`
+  // Boş parçaları filtrele, boşlukla birleştir
+  const comment = [part1, part2, part3].filter(p => p.length > 0).join(' ')
 
   return {
     years,
