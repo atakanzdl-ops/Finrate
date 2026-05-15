@@ -56,12 +56,12 @@ export default function FinancialDetailPage({ data, sector }: Props) {
                     <div>
                       <span className="mono" style={{ fontSize: '15px', fontWeight: 800, color: '#0a192f' }}>{Math.round(cb.score)}</span>
                       <span style={{ fontSize: '8.5px', color: '#94a3b8' }}> / 100</span>
-                      <span style={{ fontSize: '8.5px', color: '#94a3b8', marginLeft: '8px' }}>Sektör: {Math.round(cb.sectorScore)}</span>
+                      <span style={{ fontSize: '8.5px', color: '#94a3b8', marginLeft: '8px' }}>Ref: {Math.round(cb.referenceScore)}</span>
                     </div>
                   </div>
                   <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '999px', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: getBarColor(cb.score), borderRadius: '999px', transition: 'width .3s' }} />
-                    <div style={{ position: 'absolute', top: '-3px', left: `${cb.sectorScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
+                    <div style={{ position: 'absolute', top: '-3px', left: `${cb.referenceScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
                   </div>
                   <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px' }}>{cb.subMetrics}</div>
                 </div>
@@ -76,12 +76,12 @@ export default function FinancialDetailPage({ data, sector }: Props) {
                     <div>
                       <span className="mono" style={{ fontSize: '15px', fontWeight: 800, color: '#0a192f' }}>{Math.round(cb.score)}</span>
                       <span style={{ fontSize: '8.5px', color: '#94a3b8' }}> / 100</span>
-                      <span style={{ fontSize: '8.5px', color: '#94a3b8', marginLeft: '8px' }}>Sektör: {Math.round(cb.sectorScore)}</span>
+                      <span style={{ fontSize: '8.5px', color: '#94a3b8', marginLeft: '8px' }}>Ref: {Math.round(cb.referenceScore)}</span>
                     </div>
                   </div>
                   <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '999px', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: getBarColor(cb.score), borderRadius: '999px', transition: 'width .3s' }} />
-                    <div style={{ position: 'absolute', top: '-3px', left: `${cb.sectorScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
+                    <div style={{ position: 'absolute', top: '-3px', left: `${cb.referenceScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
                   </div>
                   <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px' }}>{cb.subMetrics}</div>
                 </div>

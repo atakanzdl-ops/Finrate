@@ -61,7 +61,7 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
 
             {/* Kategori barlar */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px 20px' }}>
-              <div className="st" style={{ marginBottom: '14px' }}>Kategori Skorları <span className="st-sub">Firma vs TCMB Sektör Ortalaması</span></div>
+              <div className="st" style={{ marginBottom: '14px' }}>Kategori Skorları <span className="st-sub">Firma Skoru vs Performans Referansı</span></div>
 
               {catDefs.map((c, i) => (
                 <div className="cb" key={c.key} style={i === catDefs.length - 1 ? { marginBottom: 0 } : {}}>
@@ -69,12 +69,12 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
                     <span className="cb-lbl">{c.label} <span style={{ color: '#94a3b8', fontSize: '8.5px' }}>(Ağırlık %{Math.round(c.data.weight * 100)})</span></span>
                     <div style={{ textAlign: 'right' }}>
                       <span className="cb-sc">{Math.round(c.data.score)}</span>
-                      <span className="cb-bm"> / Sektör: {Math.round(c.data.sectorAverage)}</span>
+                      <span className="cb-bm"> / Ref: {Math.round(c.data.referenceScore)}</span>
                     </div>
                   </div>
                   <div className="cb-trk">
                     <div className="cb-fil" style={{ width: `${c.data.score}%`, background: CATEGORY_COLORS[c.key] }} />
-                    <div className="cb-mrk" style={{ left: `${c.data.sectorAverage}%` }} />
+                    <div className="cb-mrk" style={{ left: `${c.data.referenceScore}%` }} />
                   </div>
                 </div>
               ))}
@@ -87,7 +87,7 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '8px', color: '#64748b' }}>
                   <div style={{ width: '3px', height: '14px', background: '#0a192f', borderRadius: '2px' }} />
-                  Sektör Ortalaması
+                  Performans Referansı
                 </div>
               </div>
             </div>

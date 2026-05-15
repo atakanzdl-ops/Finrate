@@ -2,7 +2,7 @@
 // GET /api/analyses/[id] yanıtını ReportData tipine dönüştürür.
 // Saf fonksiyon — yan etki yok, DB çağrısı yok.
 
-import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark } from '@/lib/scoring/benchmarks'
+import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark, getSectorBenchmark, getSectorWeights } from '@/lib/scoring/benchmarks'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
 import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus } from '@/types/report'
 import { getNaceCode } from './naceMap'
@@ -167,8 +167,10 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const fd     = api.financialData
   const entity = api.entity
   const sector = entity?.sector ?? null
-  const bm     = SECTOR_BENCHMARKS[sector ?? ''] ?? SECTOR_BENCHMARKS['Genel'] ?? null
-  const weights = SECTOR_WEIGHTS[sector ?? ''] ?? SECTOR_WEIGHTS['Genel']
+  // M1: getSectorBenchmark fuzzy mapping — Üretim→İmalat, Ticaret→Toptan Ticaret (geçici),
+  //     Teknoloji→Bilişim vb. Eşleşme yoksa Genel döner (null asla dönmez).
+  const bm      = getSectorBenchmark(sector)
+  const weights = getSectorWeights(sector)
 
   // ── Temel skorlar ──────────────────────────────────────────────────────────
   const rawFinancialScore = (ratios.__financialScore as number | undefined) ?? api.finalScore ?? 0
@@ -379,10 +381,10 @@ function buildExecutiveSummary(
 
   return {
     categories: {
-      liquidity:     { score: liqScore,  sectorAverage: 50, weight: weights.liquidity },
-      profitability: { score: profScore, sectorAverage: 50, weight: weights.profitability },
-      leverage:      { score: levScore,  sectorAverage: 50, weight: weights.leverage },
-      activity:      { score: actScore,  sectorAverage: 50, weight: weights.activity },
+      liquidity:     { score: liqScore,  referenceScore: 50, weight: weights.liquidity },
+      profitability: { score: profScore, referenceScore: 50, weight: weights.profitability },
+      leverage:      { score: levScore,  referenceScore: 50, weight: weights.leverage },
+      activity:      { score: actScore,  referenceScore: 50, weight: weights.activity },
     },
     kpis: {
       netSales:               fd?.revenue ?? 0,
@@ -469,7 +471,7 @@ function buildFinancialDetail(
   const profScore = api.profitabilityScore ?? 50
   const levScore  = api.leverageScore     ?? 50
   const actScore  = api.activityScore     ?? 50
-  const weights   = SECTOR_WEIGHTS[sector ?? ''] ?? SECTOR_WEIGHTS['Genel']
+  const weights   = getSectorWeights(sector)   // M1: fuzzy mapping helper
 
   const prevFd = api.trendAnalyses.length > 0
     ? api.trendAnalyses[api.trendAnalyses.length - 1].financialData
@@ -490,7 +492,7 @@ function buildFinancialDetail(
       {
         name: 'Likidite',
         score: liqScore,
-        sectorScore: 50,
+        referenceScore: 50,
         weight: weights.liquidity,
         fillColor: 'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
         subMetrics: 'Cari · Hızlı · Nakit Oranı · NÇS/Aktif · CCC',
@@ -498,7 +500,7 @@ function buildFinancialDetail(
       {
         name: 'Kârlılık',
         score: profScore,
-        sectorScore: 50,
+        referenceScore: 50,
         weight: weights.profitability,
         fillColor: 'linear-gradient(90deg,#10b981,#2dd4bf)',
         subMetrics: 'Brüt · FAVÖK · FVÖK · Net Marj · ROA · ROE · ROIC · Büyüme',
@@ -506,7 +508,7 @@ function buildFinancialDetail(
       {
         name: 'Kaldıraç',
         score: levScore,
-        sectorScore: 50,
+        referenceScore: 50,
         weight: weights.leverage,
         fillColor: 'linear-gradient(90deg,#8b5cf6,#6366f1)',
         subMetrics: 'Borç/ÖzK · Borç/Aktif · Faiz Karşılama · Net Borç/FAVÖK',
@@ -514,7 +516,7 @@ function buildFinancialDetail(
       {
         name: 'Faaliyet',
         score: actScore,
-        sectorScore: 50,
+        referenceScore: 50,
         weight: weights.activity,
         fillColor: 'linear-gradient(90deg,#f59e0b,#fb923c)',
         subMetrics: 'Aktif Devir · DSO · DIO · DPO · Sabit Varlık Deviri',

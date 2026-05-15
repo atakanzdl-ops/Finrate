@@ -94,9 +94,9 @@ export interface ExecutiveSummary {
 }
 
 export interface CategoryScore {
-  score:         number   // 0–100
-  sectorAverage: number
-  weight:        number   // 0–1 (örn: 0.35 = %35)
+  score:          number   // 0–100
+  referenceScore: number   // performans referansı (50 = nötr)
+  weight:         number   // 0–1 (örn: 0.35 = %35)
 }
 
 // ─── RİSK KLASMANI (Ö9) ──────────────────────────────────────────────────────
@@ -157,12 +157,12 @@ export interface FinancialKpi {
 }
 
 export interface CategoryBar {
-  name:          string   // "Likidite"
-  score:         number   // 0–100
-  sectorScore:   number   // sektör ortalama
-  weight:        number   // 0–1
-  fillColor:     string   // "linear-gradient(90deg,#0ea5e9,#2dd4bf)"
-  subMetrics:    string   // "Cari, Hızlı, Nakit Oranı · NÇS/Aktif · CCC"
+  name:           string   // "Likidite"
+  score:          number   // 0–100
+  referenceScore: number   // performans referansı (50 = nötr)
+  weight:         number   // 0–1
+  fillColor:      string   // "linear-gradient(90deg,#0ea5e9,#2dd4bf)"
+  subMetrics:     string   // "Cari, Hızlı, Nakit Oranı · NÇS/Aktif · CCC"
 }
 
 // ─── ORAN SATIRI ─────────────────────────────────────────────────────────
