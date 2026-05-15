@@ -190,13 +190,13 @@ export function getScaleLabel(
 ): string {
   const rev = revenue ?? 0
   const assets = totalAssets ?? 0
-  const max = Math.max(rev, assets)
+  const metric = Math.max(rev, assets)
 
-  if (max <= 0)              return '—'
-  if (max >= 500_000_000)    return 'Büyük Ölçekli İşletme'
-  if (max >= 100_000_000)    return 'Orta Ölçekli İşletme'
-  if (max >= 10_000_000)     return 'Küçük Ölçekli İşletme'
-  return 'Mikro Ölçekli İşletme'
+  if (metric <= 0)                  return '—'
+  if (metric <= 10_000_000)         return 'Mikro Ölçekli İşletme'
+  if (metric <= 100_000_000)        return 'Küçük Ölçekli İşletme'
+  if (metric <= 500_000_000)        return 'Orta Ölçekli İşletme'
+  return 'Büyük Ölçekli İşletme'
 }
 
 // ─── RATING BAND ─────────────────────────────────────────────────────────────
