@@ -3,9 +3,10 @@ import type { ReportData } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo'>
+  sector?: string
 }
 
-export default function MethodologyPage({ data }: Props) {
+export default function MethodologyPage({ data, sector }: Props) {
   const { companyName, reportNo } = data
 
   return (
@@ -13,7 +14,7 @@ export default function MethodologyPage({ data }: Props) {
       <div className="wm">METODOLOJİ</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 13</div><div className="ph-title">Metodoloji &amp; Açıklamalar</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 14</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 14</div></div>
       </div>
       <div className="pc">
 

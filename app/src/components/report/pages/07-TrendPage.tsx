@@ -3,6 +3,7 @@ import type { ReportData, TrendChart, GrowthTableRow } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'trends'>
+  sector?: string
 }
 
 function MiniBarChart({ chart }: { chart: TrendChart }) {
@@ -74,7 +75,7 @@ function GrowthRow({ row }: { row: GrowthTableRow }) {
   )
 }
 
-export default function TrendPage({ data }: Props) {
+export default function TrendPage({ data, sector }: Props) {
   const { companyName, reportNo, trends } = data
   const { charts, growthTable } = trends
 
@@ -85,7 +86,7 @@ export default function TrendPage({ data }: Props) {
       <div className="wm">TREND</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 06</div><div className="ph-title">Trend Analizi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 7</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 7</div></div>
       </div>
       <div className="pc">
 

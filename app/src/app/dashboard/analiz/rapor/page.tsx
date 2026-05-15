@@ -82,30 +82,32 @@ function RaporContent() {
   if (error || !reportData) return <ErrorScreen message={error ?? 'Veri alınamadı.'} />
 
   return (
-    <div
-      style={{
-        background: '#e2e8f0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 40,
-        padding: 40,
-        minHeight: '100vh',
-      }}
-    >
-      {/* Yazdırma stili */}
-      <style>{`
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          #report-wrapper { background: white !important; padding: 0 !important; gap: 0 !important; }
-          .pdf-page { box-shadow: none !important; border-radius: 0 !important; }
-        }
-      `}</style>
+    <>
+      {/* PDF İndir butonu — sadece web'de görünür, print'te gizli */}
+      <div className="pdf-download-bar no-print">
+        <button
+          className="pdf-download-btn"
+          onClick={() => window.open(`/api/analyses/${id}/pdf?type=executive15`, '_blank')}
+        >
+          📄 PDF Olarak İndir
+        </button>
+      </div>
 
-      <div id="report-wrapper" style={{ width: '100%', display: 'contents' }}>
+      <div
+        className="report-page-wrapper"
+        style={{
+          background: '#e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 40,
+          padding: 40,
+          minHeight: '100vh',
+        }}
+      >
         <ReportV2 data={reportData} />
       </div>
-    </div>
+    </>
   )
 }
 

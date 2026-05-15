@@ -207,3 +207,12 @@ export function getEntityTypeLabel(entityType: string | null | undefined): strin
   }
   return map[entityType ?? ''] ?? 'Anonim/Limited Şirket'
 }
+
+// ─── İŞARETLİ SAYI FORMATI ───────────────────────────────────────────────────
+// "+5.2" veya "-3.1" — asla "+-5" olmaz
+
+export function fmtSigned(n: number): string {
+  if (n > 0) return `+${n}`
+  if (n < 0) return `${n}`   // zaten - işareti taşıyor
+  return '0'
+}

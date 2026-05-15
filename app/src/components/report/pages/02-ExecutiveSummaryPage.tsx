@@ -4,9 +4,10 @@ import { fmtCurrency, fmtRatio, fmtPct, fmtPctSigned } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'financialScore' | 'subjectiveScore' | 'reportNo' | 'executive'>
+  sector?: string
 }
 
-export default function ExecutiveSummaryPage({ data }: Props) {
+export default function ExecutiveSummaryPage({ data, sector }: Props) {
   const { companyName, rating, totalScore, financialScore, subjectiveScore, reportNo, executive: ex } = data
   const { categories: cat, kpis, strengths, watchAreas, conclusion } = ex
 
@@ -29,7 +30,7 @@ export default function ExecutiveSummaryPage({ data }: Props) {
       <div className="wm">ÖZET</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 01</div><div className="ph-title">Yönetici Özeti</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 2</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 2</div></div>
       </div>
       <div className="pc">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '18px' }}>

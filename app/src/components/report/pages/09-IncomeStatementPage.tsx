@@ -4,6 +4,7 @@ import { fmtCurrency, fmtPct } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'incomeStatement'>
+  sector?: string
 }
 
 function ISRow({ item, colCount, lastYear }: { item: IncomeStatementItem; colCount: number; lastYear: number }) {
@@ -29,7 +30,7 @@ function ISRow({ item, colCount, lastYear }: { item: IncomeStatementItem; colCou
   )
 }
 
-export default function IncomeStatementPage({ data }: Props) {
+export default function IncomeStatementPage({ data, sector }: Props) {
   const { companyName, reportNo, incomeStatement: is_ } = data
   const { years, items } = is_
   const lastYear = years[years.length - 1]?.year ?? 0
@@ -39,7 +40,7 @@ export default function IncomeStatementPage({ data }: Props) {
       <div className="wm">GELİR</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 08</div><div className="ph-title">Gelir Tablosu Analizi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 9</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 9</div></div>
       </div>
       <div className="pc">
 

@@ -3,9 +3,10 @@ import type { ReportData } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'subjectiveScore' | 'reportNo' | 'financialDetail'>
+  sector?: string
 }
 
-export default function FinancialDetailPage({ data }: Props) {
+export default function FinancialDetailPage({ data, sector }: Props) {
   const { companyName, subjectiveScore, reportNo, financialDetail: fd } = data
   const { kpis, categoryBars, strengths, watchAreas, conclusion } = fd
 
@@ -14,7 +15,7 @@ export default function FinancialDetailPage({ data }: Props) {
       <div className="wm">FİNANSAL</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 03</div><div className="ph-title">Finansal Skor Detayı</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 4</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 4</div></div>
       </div>
       <div className="pc">
 

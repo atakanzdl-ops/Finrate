@@ -4,6 +4,32 @@
    Sayfa 13 (Makroekonomik) kaldırıldı — 15 sayfa aktif
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── PDF İNDİR BUTONU ── */
+.pdf-download-bar {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  z-index: 100;
+}
+
+.pdf-download-btn {
+  background: #0a192f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  font-family: inherit;
+  transition: background .15s;
+}
+
+.pdf-download-btn:hover {
+  background: #1e293b;
+}
+
 /* ── WRAPPER (React root) ── */
 .report-v2-root {
   background: #94a3b8;
@@ -39,6 +65,21 @@
 .ph-title    { font-size: 23px; font-weight: 800; color: #0a192f; letter-spacing: -.5px; font-family: 'Outfit', sans-serif; }
 .ph-right    { text-align: right; }
 .ph-ent      { font-size: 10px; font-weight: 600; color: #0a192f; }
+.ph-sector   { font-size: 9px; color: #64748b; font-weight: 500; margin-top: 2px; }
+
+/* ── SEKTÖR KIYAS ROZETİ (Sayfa 5 & 6) ── */
+.sektor-kiyas-badge {
+  display: inline-block;
+  background: rgba(45,212,191,.10);
+  color: #2dd4bf;
+  border: 1px solid rgba(45,212,191,.30);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  margin-bottom: 10px;
+}
 .ph-pg       { font-size: 10px; color: #64748b; margin-top: 3px; }
 
 /* ── WATERMARK ── */
@@ -179,9 +220,65 @@
 
 /* ── PRINT / A4 ── */
 @media print {
-  body { background: white !important; padding: 0 !important; margin: 0 !important; }
-  .report-v2-root { background: white !important; gap: 0 !important; padding: 0 !important; }
-  .pdf-page { box-shadow: none !important; page-break-after: always; }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Outer wrapper (rapor/page.tsx'teki sarmalayıcı) */
+  .report-page-wrapper {
+    padding: 0 !important;
+    gap: 0 !important;
+    background: white !important;
+    margin: 0 !important;
+    align-items: unset !important;
+  }
+
+  /* React wrapper'ı da sıfırla */
+  .report-v2-root {
+    background: white !important;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* PDF sayfaları fiziksel A4 ölçüsüyle (794px/1123px → 210mm/297mm) */
+  .pdf-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  /* Son sayfada gereksiz boşluk önle */
+  .pdf-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Sayfa içeriği taşmasın */
+  .pc {
+    overflow: hidden;
+  }
+
+  /* Yazdırma sırasında buton gizle */
+  .no-print,
+  .pdf-download-bar {
+    display: none !important;
+  }
 }
 
 @page {

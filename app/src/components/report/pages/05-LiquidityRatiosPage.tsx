@@ -3,6 +3,7 @@ import type { ReportData, RatioRow } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'liquidityRatios'>
+  sector?: string
 }
 
 function RatioRowComponent({ row }: { row: RatioRow }) {
@@ -27,7 +28,7 @@ function RatioRowComponent({ row }: { row: RatioRow }) {
   )
 }
 
-export default function LiquidityRatiosPage({ data }: Props) {
+export default function LiquidityRatiosPage({ data, sector }: Props) {
   const { companyName, reportNo, liquidityRatios } = data
 
   const liquidityRows = liquidityRatios.filter(r => r.group === 'Likidite')
@@ -38,9 +39,16 @@ export default function LiquidityRatiosPage({ data }: Props) {
       <div className="wm">LİKİDİTE</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 04</div><div className="ph-title">Likidite &amp; Borçlanma Oranları</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 5</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 5</div></div>
       </div>
       <div className="pc">
+
+        {/* Sektör bazlı kıyas rozeti */}
+        {sector && (
+          <div className="sektor-kiyas-badge">
+            SEKTÖR BAZLI KIYAS: {sector.toUpperCase()}
+          </div>
+        )}
 
         {/* Tablo başlığı */}
         <div className="rth">

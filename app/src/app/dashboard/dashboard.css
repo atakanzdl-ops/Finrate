@@ -233,9 +233,16 @@
     color: var(--text-on-dark);
 }
 
-.nav-link.active {
+/* Topbar'a özgü alt çizgi — sidebar'da sızmasın */
+.topnav .nav-link.active {
     color: var(--cyan-500);
     border-bottom-color: var(--cyan-500);
+}
+
+/* Sidebar aktif link — ayrı stil, alt çizgi yok */
+.sidebar-nav .nav-link.active {
+    color: var(--cyan-500);
+    border-bottom-color: transparent;
 }
 
 .topbar-actions {

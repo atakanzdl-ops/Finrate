@@ -3,6 +3,7 @@ import type { ReportData, SubjectiveCard } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'subjective'>
+  sector?: string
 }
 
 function SubjCard({ card }: { card: SubjectiveCard }) {
@@ -48,7 +49,7 @@ function SubjCard({ card }: { card: SubjectiveCard }) {
   )
 }
 
-export default function SubjectivePage({ data }: Props) {
+export default function SubjectivePage({ data, sector }: Props) {
   const { companyName, reportNo, subjective: sub } = data
 
   return (
@@ -56,7 +57,7 @@ export default function SubjectivePage({ data }: Props) {
       <div className="wm">SUBJEKTİF</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 12</div><div className="ph-title">Subjektif Faktörler</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 13</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 13</div></div>
       </div>
       <div className="pc">
 

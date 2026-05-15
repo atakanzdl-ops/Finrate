@@ -1,8 +1,10 @@
 'use client'
 import type { ReportData, WaterfallBar } from '@/types/report'
+import { fmtSigned } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'scenario'>
+  sector?: string
 }
 
 function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
@@ -32,7 +34,7 @@ function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {/* Değer */}
             <div className="mono" style={{ fontSize: '8.5px', fontWeight: 800, color: '#0a192f', marginBottom: '3px' }}>
-              {b.isDelta ? `+${b.value}` : b.value}
+              {b.isDelta ? fmtSigned(b.value) : b.value}
             </div>
             {/* Bar */}
             <div style={{ position: 'relative', width: '100%', height: `${BASE_H}px` }}>
@@ -58,7 +60,7 @@ function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
   )
 }
 
-export default function ScenarioPage({ data }: Props) {
+export default function ScenarioPage({ data, sector }: Props) {
   const { companyName, reportNo, scenario: sc } = data
   const { current, target1, target2, waterfall } = sc
 
@@ -67,7 +69,7 @@ export default function ScenarioPage({ data }: Props) {
       <div className="wm">SENARYO</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 10</div><div className="ph-title">Senaryo Analizi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 11</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 11</div></div>
       </div>
       <div className="pc">
 
@@ -93,7 +95,7 @@ export default function ScenarioPage({ data }: Props) {
             <div style={{ fontSize: '8px', color: '#166534', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '8px', fontWeight: 700 }}>1. Hedef</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
               <div className="outfit" style={{ fontSize: '28px', fontWeight: 900, color: '#0a192f', lineHeight: 1 }}>{target1.rating}</div>
-              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#22c55e' }}>+{target1.delta}</div>
+              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#22c55e' }}>{fmtSigned(target1.delta)}</div>
             </div>
             <div style={{ fontSize: '8px', color: '#475569', marginBottom: '8px' }}>Süre: {target1.timeline}</div>
             <div style={{ borderTop: '1px solid #86efac', paddingTop: '8px' }}>
@@ -111,7 +113,7 @@ export default function ScenarioPage({ data }: Props) {
             <div style={{ fontSize: '8px', color: '#92400e', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '8px', fontWeight: 700 }}>2. Hedef</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
               <div className="outfit" style={{ fontSize: '28px', fontWeight: 900, color: '#0a192f', lineHeight: 1 }}>{target2.rating}</div>
-              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>+{target2.delta}</div>
+              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>{fmtSigned(target2.delta)}</div>
             </div>
             <div style={{ fontSize: '8px', color: '#475569', marginBottom: '8px' }}>Süre: {target2.timeline}</div>
             <div style={{ borderTop: '1px solid #fde68a', paddingTop: '8px' }}>

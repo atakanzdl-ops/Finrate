@@ -35,7 +35,7 @@ export interface AnalysisApiResponse {
   reportedAt: string | null
   ratios: Record<string, number | null> | null  // RatioResult + __financialScore + __subjectiveTotal
   optimizerSnapshot: OptimizerSnapshotRaw | null
-  entity: { id: string; name: string; sector: string | null; taxNumber: string | null } | null
+  entity: { id: string; name: string; sector: string | null; taxNumber: string | null; entityType: string | null } | null
   financialData: FinancialDataRaw | null
   subjectiveInput: SubjectiveInputRaw | null
   trendAnalyses: TrendAnalysisRaw[]
@@ -67,6 +67,10 @@ interface FinancialDataRaw {
   totalNonCurrentLiabilities: number | null
   totalEquity: number | null
   totalLiabilitiesAndEquity: number | null
+  intangibleAssets: number | null
+  paidInCapital: number | null
+  retainedEarnings: number | null
+  retainedLosses: number | null
 }
 
 interface SubjectiveInputRaw {
@@ -165,9 +169,10 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const rating            = api.finalRating ?? 'N/A'
 
   // ── Tarihler ──────────────────────────────────────────────────────────────
-  const today      = new Date()
-  const reportDate = fmtDate(today)
-  const validUntil = fmtDate(addYears(today, 1))
+  // api.reportedAt: Analysis kaydının oluşturulma tarihi — yoksa bugün fallback
+  const reportedAtDate = api.reportedAt ? new Date(api.reportedAt) : new Date()
+  const reportDate     = fmtDate(reportedAtDate)
+  const validUntil     = fmtDate(addYears(reportedAtDate, 1))
 
   // ── Rapor no ──────────────────────────────────────────────────────────────
   const reportNo = `FNR-${api.year}-${(api.id ?? '').slice(-5).toUpperCase()}`
@@ -283,11 +288,11 @@ function buildExecutiveSummary(
     ? api.trendAnalyses[api.trendAnalyses.length - 1].financialData
     : null
 
-  const netSalesYoY = fd?.revenue && prevFd?.revenue
+  const netSalesYoY = (fd?.revenue != null && prevFd?.revenue != null && prevFd.revenue !== 0)
     ? (fd.revenue - prevFd.revenue) / prevFd.revenue
     : null
 
-  const equityYoY = fd?.totalEquity && prevFd?.totalEquity
+  const equityYoY = (fd?.totalEquity != null && prevFd?.totalEquity != null && prevFd.totalEquity !== 0)
     ? (fd.totalEquity - prevFd.totalEquity) / prevFd.totalEquity
     : null
 
@@ -350,7 +355,7 @@ function buildCompanyInfo(
     vkn:         entity?.taxNumber ?? '—',
     sector:      sector ?? '—',
     naceCode:    getNaceCode(sector),
-    entityType:  'Bağımsız Şirket',   // SubjectiveInput'ta entityType yok; sabit fallback
+    entityType:  getEntityTypeLabel(entity?.entityType),
     foundedYear,
     activityYears: companyAgeYears,
     scale:       '—',   // revenue bilgisi burada yok; page component'i fd'dan hesaplar
@@ -386,7 +391,7 @@ function buildFinancialDetail(
     ? api.trendAnalyses[api.trendAnalyses.length - 1].financialData
     : null
 
-  const netSalesYoY = fd?.revenue && prevFd?.revenue
+  const netSalesYoY = (fd?.revenue != null && prevFd?.revenue != null && prevFd.revenue !== 0)
     ? (fd.revenue - prevFd.revenue) / prevFd.revenue
     : null
 
@@ -708,8 +713,9 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
     { label: 'Diğer Dönen Varlıklar',       values: valArr(f => null) },   // Yok — göster
 
     { label: 'DURAN VARLIKLAR', values: valArr(f => f.totalNonCurrentAssets), isMain: true },
-    { label: 'Maddi Duran Varlıklar',       values: valArr(f => f.tangibleAssets) },
-    { label: 'Diğer Duran Varlıklar',       values: valArr(f => null) },
+    { label: 'Maddi Duran Varlıklar',            values: valArr(f => f.tangibleAssets) },
+    { label: 'Maddi Olmayan Duran Varlıklar',    values: valArr(f => f.intangibleAssets ?? null) },
+    { label: 'Diğer Duran Varlıklar',            values: valArr(f => null) },
 
     { label: 'TOPLAM AKTİF', values: valArr(f => f.totalAssets), isTotal: true },
 
@@ -724,6 +730,8 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
     { label: 'Diğer UV Yükümlülükler',     values: valArr(f => null) },
 
     { label: 'ÖZKAYNAKLAR', values: valArr(f => f.totalEquity), isMain: true },
+    { label: 'Ödenmiş Sermaye',               values: valArr(f => f.paidInCapital ?? null) },
+    { label: 'Geçmiş Yıllar Kâr/Zararı',     values: valArr(f => (f.retainedEarnings ?? 0) - (f.retainedLosses ?? 0)) },
 
     { label: 'TOPLAM PASİF', values: valArr(f => f.totalLiabilitiesAndEquity ?? f.totalAssets), isTotal: true },
   ]
@@ -754,23 +762,23 @@ function buildIncomeStatement(tableYears: YearEntry[]) {
   const lastFd  = tableYears[tableYears.length - 1]?.fd
   const revenue = lastFd?.revenue
   const marginFn = (v: number | null) =>
-    (v != null && revenue && revenue > 0) ? v / revenue : null
+    (v != null && revenue != null && revenue > 0) ? v / revenue : null
 
   const items: IncomeStatementItem[] = [
     { label: 'Net Satışlar',             values: valArr(f => f.revenue),            isMain: true },
-    { label: 'Satışların Maliyeti (-)',  values: valArr(f => f.cogs ? -f.cogs : null) },
+    { label: 'Satışların Maliyeti (-)',  values: valArr(f => f.cogs != null ? -f.cogs : null) },
     { label: 'BRÜT KÂR',                values: valArr(f => f.grossProfit),         isTotal: true,
       margin2024: marginFn(lastFd?.grossProfit ?? null) },
 
-    { label: 'Faaliyet Giderleri (-)',   values: valArr(f => f.operatingExpenses ? -f.operatingExpenses : null) },
+    { label: 'Faaliyet Giderleri (-)',   values: valArr(f => f.operatingExpenses != null ? -f.operatingExpenses : null) },
     { label: 'FVÖK (EBIT)',              values: valArr(f => f.ebit),                isTotal: true,
       margin2024: marginFn(lastFd?.ebit ?? null) },
     { label: 'FAVÖK (EBITDA)',           values: valArr(f => f.ebitda),              isTotal: true,
       margin2024: marginFn(lastFd?.ebitda ?? null) },
 
-    { label: 'Faiz Gideri (-)',          values: valArr(f => f.interestExpense ? -f.interestExpense : null) },
+    { label: 'Faiz Gideri (-)',          values: valArr(f => f.interestExpense != null ? -f.interestExpense : null) },
     { label: 'VÖK (EBT)',                values: valArr(f => f.ebt),                 isTotal: true },
-    { label: 'Kurumlar Vergisi (-)',     values: valArr(f => f.taxExpense ? -f.taxExpense : null) },
+    { label: 'Kurumlar Vergisi (-)',     values: valArr(f => f.taxExpense != null ? -f.taxExpense : null) },
     { label: 'DÖNEM NET KÂRI',          values: valArr(f => f.netProfit),            isMain: true,
       margin2024: marginFn(lastFd?.netProfit ?? null) },
   ]

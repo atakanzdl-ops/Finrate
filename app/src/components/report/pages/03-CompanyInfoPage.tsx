@@ -6,9 +6,10 @@ interface Props {
     revenue?: string   // fmtCurrency(financialData.revenue) — page düzeyinde hesaplanır
     scaleLabel?: string
   }
+  sector?: string
 }
 
-export default function CompanyInfoPage({ data }: Props) {
+export default function CompanyInfoPage({ data, sector }: Props) {
   const { companyName, vkn, analysisPeriod, reportNo, validUntil, reportDate, companyInfo: ci } = data
   const { sectorBenchmarks, sectorWeightProfile: wp } = ci
 
@@ -17,7 +18,7 @@ export default function CompanyInfoPage({ data }: Props) {
       <div className="wm">FİRMA</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 02</div><div className="ph-title">Firma &amp; Sektör Bilgisi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 3</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 3</div></div>
       </div>
       <div className="pc">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>

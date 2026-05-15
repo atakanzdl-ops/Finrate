@@ -4,9 +4,10 @@ import { fmtCurrency } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'cashFlow'>
+  sector?: string
 }
 
-export default function CashFlowPage({ data }: Props) {
+export default function CashFlowPage({ data, sector }: Props) {
   const { companyName, reportNo, cashFlow: cf } = data
   const { ccc, workingCapitalTable, positives, improvements, conclusion } = cf
 
@@ -41,7 +42,7 @@ export default function CashFlowPage({ data }: Props) {
       <div className="wm">NAKİT</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 09</div><div className="ph-title">Nakit Akış &amp; Çalışma Sermayesi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 10</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 10</div></div>
       </div>
       <div className="pc">
 

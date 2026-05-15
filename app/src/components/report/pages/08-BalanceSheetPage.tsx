@@ -4,6 +4,7 @@ import { fmtCurrency, fmtPct } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'balanceSheet'>
+  sector?: string
 }
 
 function BsRow({ item, colCount }: { item: BalanceSheetItem; colCount: number }) {
@@ -21,7 +22,7 @@ function BsRow({ item, colCount }: { item: BalanceSheetItem; colCount: number })
   )
 }
 
-export default function BalanceSheetPage({ data }: Props) {
+export default function BalanceSheetPage({ data, sector }: Props) {
   const { companyName, reportNo, balanceSheet: bs } = data
   const { years, items, totalAssets, totalLiabilities, equityRatio, comment } = bs
 
@@ -30,7 +31,7 @@ export default function BalanceSheetPage({ data }: Props) {
       <div className="wm">BİLANÇO</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 07</div><div className="ph-title">Bilanço Analizi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 8</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 8</div></div>
       </div>
       <div className="pc">
 

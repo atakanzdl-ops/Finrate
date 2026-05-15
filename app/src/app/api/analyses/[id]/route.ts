@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ratios: true,
       optimizerSnapshot: true,
       reportedAt: true,   // Rapor oluşturulma tarihi
-      entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
+      entity: { select: { id: true, name: true, sector: true, taxNumber: true, entityType: true } },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,
@@ -38,6 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           totalCurrentLiabilities: true, longTermFinancialDebt: true,
           totalNonCurrentLiabilities: true,
           totalEquity: true, totalLiabilitiesAndEquity: true,
+          intangibleAssets: true,    // Maddi Olmayan Duran Varlıklar
+          paidInCapital: true,       // Ödenmiş Sermaye
+          retainedEarnings: true,    // Geçmiş Yıllar Kârı
+          retainedLosses: true,      // Geçmiş Yıllar Zararı
         },
       },
     },
@@ -90,6 +94,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               tradeReceivables: true,
               inventory: true,
               tradePayables: true,
+              intangibleAssets: true,
+              paidInCapital: true,
+              retainedEarnings: true,
+              retainedLosses: true,
             },
           },
         },

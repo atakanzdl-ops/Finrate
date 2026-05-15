@@ -3,6 +3,7 @@ import type { ReportData, ActionPlanItem } from '@/types/report'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'actionPlan'>
+  sector?: string
 }
 
 function ActionCard({ item }: { item: ActionPlanItem }) {
@@ -61,7 +62,7 @@ function ActionCard({ item }: { item: ActionPlanItem }) {
   )
 }
 
-export default function ActionPlanPage({ data }: Props) {
+export default function ActionPlanPage({ data, sector }: Props) {
   const { companyName, reportNo, actionPlan } = data
 
   const totalScore = actionPlan.reduce((s, a) => s + a.scoreContribution, 0)
@@ -71,7 +72,7 @@ export default function ActionPlanPage({ data }: Props) {
       <div className="wm">AKSİYON</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 11</div><div className="ph-title">Detaylı Aksiyon Planı</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div><div className="ph-pg">Sayfa 12</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 12</div></div>
       </div>
       <div className="pc">
 
