@@ -193,10 +193,10 @@ export function getScaleLabel(
   const max = Math.max(rev, assets)
 
   if (max <= 0)              return '—'
-  if (max >= 500_000_000)    return 'Büyük İşletme'
-  if (max >= 100_000_000)    return 'Orta Ölçekli KOBİ'
-  if (max >= 10_000_000)     return 'Küçük Ölçekli KOBİ'
-  return 'Mikro İşletme'
+  if (max >= 500_000_000)    return 'Büyük Ölçekli İşletme'
+  if (max >= 100_000_000)    return 'Orta Ölçekli İşletme'
+  if (max >= 10_000_000)     return 'Küçük Ölçekli İşletme'
+  return 'Mikro Ölçekli İşletme'
 }
 
 // ─── RATING BAND ─────────────────────────────────────────────────────────────
