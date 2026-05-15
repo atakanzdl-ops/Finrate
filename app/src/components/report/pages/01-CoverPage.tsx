@@ -55,8 +55,8 @@ export default function CoverPage({ data }: Props) {
             {/* Skor paneli */}
             <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(20px)', borderRadius: '26px', padding: '32px 38px', gap: '44px', boxShadow: '0 24px 48px rgba(0,0,0,.4)' }}>
 
-              {/* SVG Gauge */}
-              <div style={{ position: 'relative', width: '145px', height: '145px' }}>
+              {/* SVG Gauge — Ö4: 180px, skor 68px bold */}
+              <div style={{ position: 'relative', width: '180px', height: '180px' }}>
                 <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#2dd4bf', filter: 'blur(26px)', opacity: 0.11 }} />
                 <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 5, transform: 'rotate(-90deg)' }}>
                   <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="8" />
@@ -70,18 +70,18 @@ export default function CoverPage({ data }: Props) {
                   </defs>
                 </svg>
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                  <div className="outfit" style={{ fontSize: '38px', fontWeight: 800, lineHeight: 1, color: 'white' }}>{totalScore}</div>
-                  <div style={{ fontSize: '9.5px', color: '#64748b', letterSpacing: '1px' }}>/100</div>
+                  <div className="outfit" style={{ fontSize: '68px', fontWeight: 700, lineHeight: 1, color: 'white' }}>{totalScore}</div>
+                  <div style={{ fontSize: '10px', color: '#64748b', letterSpacing: '1px' }}>/100</div>
                 </div>
               </div>
 
-              {/* Rating */}
+              {/* Rating — Ö4: daha küçük (36px), skor gauge öne çıktı */}
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '7px' }}>Derecelendirme Notu</div>
-                <div className="outfit" style={{ fontSize: '64px', fontWeight: 900, lineHeight: 1, color: '#2dd4bf', textShadow: '0 0 38px rgba(45,212,191,.4)' }}>
+                <div className="outfit" style={{ fontSize: '36px', fontWeight: 900, lineHeight: 1, color: '#2dd4bf', textShadow: '0 0 28px rgba(45,212,191,.4)' }}>
                   {rating.replace(/[+-]$/, '')}
-                  {rating.endsWith('+') && <span style={{ fontSize: '44px' }}>+</span>}
-                  {rating.endsWith('-') && <span style={{ fontSize: '44px' }}>-</span>}
+                  {rating.endsWith('+') && <span style={{ fontSize: '24px' }}>+</span>}
+                  {rating.endsWith('-') && <span style={{ fontSize: '24px' }}>-</span>}
                 </div>
                 <div style={{ marginTop: '12px', padding: '5px 13px', background: band.bg, border: `1px solid ${band.border}`, borderRadius: '999px', fontSize: '9px', color: band.text, display: 'inline-flex', alignItems: 'center', gap: '7px', fontWeight: 600 }}>
                   <div style={{ width: '6px', height: '6px', background: band.text, borderRadius: '50%', boxShadow: `0 0 7px ${band.text}` }} />

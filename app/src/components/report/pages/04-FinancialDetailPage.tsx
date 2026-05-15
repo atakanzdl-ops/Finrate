@@ -6,6 +6,13 @@ interface Props {
   sector?: string
 }
 
+// Ö5-renk: Skora göre dinamik çubuk rengi (sabit gradient yerine)
+const getBarColor = (score: number): string => {
+  if (score >= 70) return '#16a34a'
+  if (score >= 40) return '#f97316'
+  return '#dc2626'
+}
+
 export default function FinancialDetailPage({ data, sector }: Props) {
   const { companyName, subjectiveScore, reportNo, financialDetail: fd } = data
   const { kpis, categoryBars, strengths, watchAreas, conclusion } = fd
@@ -53,7 +60,7 @@ export default function FinancialDetailPage({ data, sector }: Props) {
                     </div>
                   </div>
                   <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '999px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: cb.fillColor, borderRadius: '999px', transition: 'width .3s' }} />
+                    <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: getBarColor(cb.score), borderRadius: '999px', transition: 'width .3s' }} />
                     <div style={{ position: 'absolute', top: '-3px', left: `${cb.sectorScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
                   </div>
                   <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px' }}>{cb.subMetrics}</div>
@@ -73,7 +80,7 @@ export default function FinancialDetailPage({ data, sector }: Props) {
                     </div>
                   </div>
                   <div style={{ height: '10px', background: '#e2e8f0', borderRadius: '999px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: cb.fillColor, borderRadius: '999px', transition: 'width .3s' }} />
+                    <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${cb.score}%`, background: getBarColor(cb.score), borderRadius: '999px', transition: 'width .3s' }} />
                     <div style={{ position: 'absolute', top: '-3px', left: `${cb.sectorScore}%`, width: '2px', height: '16px', background: '#0a192f', borderRadius: '2px', zIndex: 10 }} />
                   </div>
                   <div style={{ fontSize: '8px', color: '#94a3b8', marginTop: '4px' }}>{cb.subMetrics}</div>

@@ -4,7 +4,7 @@
 
 import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark } from '@/lib/scoring/benchmarks'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
-import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow } from '@/types/report'
+import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus } from '@/types/report'
 import { getNaceCode } from './naceMap'
 import {
   fmtCurrency, fmtPct, fmtPctSigned, fmtRatio, fmtDays,
@@ -184,8 +184,8 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const reportDate     = fmtDate(reportedAtDate)
   const validUntil     = fmtDate(addYears(reportedAtDate, 1))
 
-  // ── Rapor no ──────────────────────────────────────────────────────────────
-  const reportNo = `FNR-${api.year}-${(api.id ?? '').slice(-5).toUpperCase()}`
+  // ── Rapor no — A3: FNR-YIL-FRM-XXXXXX (6 char hash, Türkçe transliterasyon)
+  const reportNo = generateReportNumber(entity?.name, api.id ?? '', api.year)
 
   // ── Tüm yıl serisi (trend + mevcut, asc) ──────────────────────────────────
   const allYears: Array<{ year: number; period: string; fd: FinancialDataRaw | null; ratios: Record<string, number | null> | null; score: number | null; rating: string | null }> = [
@@ -236,7 +236,7 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     validUntil,
 
     // ── Sayfa 2: Yönetici Özeti ───────────────────────────────────────────────
-    executive: buildExecutiveSummary(api, ratios, fd, bm, weights, rating, totalScore, sector),
+    executive: buildExecutiveSummary(api, ratios, fd, bm, weights, rating, totalScore, rawFinancialScore, sector),
 
     // ── Sayfa 3: Firma & Sektör ───────────────────────────────────────────────
     companyInfo: buildCompanyInfo(entity, sector, bm, weights, subj, api.year, api.financialData),  // A2: fd eklendi
@@ -273,6 +273,76 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   }
 }
 
+// ─── HELPER: RAPOR NUMARASI (A3) ─────────────────────────────────────────────
+// FNR-{YIL}-{FRM}-{XXXXXX} — Türkçe transliterasyon + 6 char hash
+
+function generateReportNumber(entityName: string | undefined, analysisId: string, year: number): string {
+  const tm: Record<string, string> = {
+    'ı': 'i', 'İ': 'I', 'ş': 's', 'Ş': 'S', 'ç': 'c', 'Ç': 'C',
+    'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ö': 'o', 'Ö': 'O',
+  }
+  const clean = (entityName || '').split('').map(ch => tm[ch] ?? ch).join('').replace(/[^A-Za-z\s]/g, '').trim()
+  let prefix = 'XXX'
+  if (clean) {
+    const words = clean.split(/\s+/).filter(w => w.length > 0)
+    if (words.length >= 3)      prefix = words.slice(0, 3).map(w => w.charAt(0)).join('').toUpperCase()
+    else if (words.length === 2) prefix = (words[0].substring(0, 2) + words[1].charAt(0)).toUpperCase()
+    else                         prefix = words[0].substring(0, 3).toUpperCase()
+  }
+  prefix = prefix.padEnd(3, 'X').substring(0, 3)
+  const hash = analysisId.replace(/-/g, '').substring(0, 6).toUpperCase()
+  return `FNR-${year}-${prefix}-${hash}`
+}
+
+// ─── HELPER: RİSK KLASMANI (Ö9) ──────────────────────────────────────────────
+
+function buildRiskClassification(
+  totalScore: number,
+  liquidityScore: number,
+  profitabilityScore: number,
+  leverageScore: number,
+  rawFinancialScore: number,
+): RiskClassification {
+  let overallLevel: RiskOverallLevel
+  let overallColor: string
+  if (totalScore >= 70)      { overallLevel = 'Düşük';      overallColor = '#16a34a' }
+  else if (totalScore >= 50) { overallLevel = 'Orta';       overallColor = '#f97316' }
+  else if (totalScore >= 30) { overallLevel = 'Yüksek';     overallColor = '#dc2626' }
+  else                       { overallLevel = 'Çok Yüksek'; overallColor = '#991b1b' }
+
+  const toStatus = (score: number): { status: RiskMetricStatus; color: string } => {
+    if (score >= 70) return { status: 'Güçlü', color: '#16a34a' }
+    if (score >= 40) return { status: 'Orta',  color: '#f97316' }
+    return { status: 'Zayıf', color: '#dc2626' }
+  }
+
+  return {
+    overallLevel,
+    overallColor,
+    metrics: [
+      { label: 'Finansal Sağlamlık', ...toStatus(rawFinancialScore)    },
+      { label: 'Nakit Yönetimi',     ...toStatus(liquidityScore)       },
+      { label: 'Borç Yapısı',        ...toStatus(leverageScore)        },
+      { label: 'Kârlılık Trendi',    ...toStatus(profitabilityScore)   },
+    ],
+  }
+}
+
+// ─── HELPER: EKSİK ALAN TESPİTİ (Ö8) ────────────────────────────────────────
+// Sadece null/undefined kontrolü — 0 geçerli finansal değer
+
+function getMissingFields(fd: FinancialDataRaw | null | undefined): string[] {
+  if (!fd) return ['Tüm finansal veriler']
+  const missing: string[] = []
+  if (fd.tradeReceivables == null)       missing.push('Ticari Alacaklar')
+  if (fd.inventory == null)              missing.push('Stoklar')
+  if (fd.shortTermFinancialDebt == null) missing.push('Kısa Vadeli Finansal Borçlar')
+  if (fd.longTermFinancialDebt == null)  missing.push('Uzun Vadeli Finansal Borçlar')
+  if (fd.interestExpense == null)        missing.push('Faiz Giderleri')
+  if (fd.depreciation == null)           missing.push('Amortisman')
+  return missing
+}
+
 // ─── SAYFA 2: YÖNETİCİ ÖZETİ ────────────────────────────────────────────────
 
 function buildExecutiveSummary(
@@ -283,6 +353,7 @@ function buildExecutiveSummary(
   weights: typeof SECTOR_WEIGHTS[string],
   rating: string,
   totalScore: number,
+  rawFinancialScore: number,   // Ö9: Risk Klasmanı için ham finansal skor
   sector: string | null,
 ) {
   const defaultBm: SectorBenchmark = bm ?? (SECTOR_BENCHMARKS['Genel'] as SectorBenchmark)
@@ -330,6 +401,8 @@ function buildExecutiveSummary(
     strengths:  buildStrengths(ratios, defaultBm, sector),
     watchAreas: buildWatchAreas(ratios, defaultBm),
     conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma'),
+    riskClassification: buildRiskClassification(totalScore, liqScore, profScore, levScore, rawFinancialScore),
+    missingFields: getMissingFields(fd),
   }
 }
 
@@ -408,7 +481,7 @@ function buildFinancialDetail(
 
   return {
     kpis: [
-      { label: 'Net Satışlar', value: fmtCurrency(fd?.revenue), sub: netSalesYoY != null ? `${fmtPctSigned(netSalesYoY)} YoY` : '—' },
+      { label: 'Net Satışlar', value: fmtCurrency(fd?.revenue), sub: netSalesYoY != null ? `${fmtPctSigned(netSalesYoY)} (Yıllık)` : '—' },
       { label: 'FAVÖK',        value: fmtCurrency(fd?.ebitda),  sub: fmtPct(ratios.ebitdaMargin as number | null) + ' marj' },
       { label: 'Net Kâr',      value: fmtCurrency(fd?.netProfit), sub: fmtPct(ratios.netProfitMargin as number | null) + ' marj' },
       { label: 'Toplam Aktif', value: fmtCurrency(fd?.totalAssets), sub: '—' },
@@ -559,7 +632,7 @@ function buildProfitabilityRatioRows(
       ratios.roa as number | null, b.roa ?? null, 0.2, 'up', fmtPct),
     ratioRow('Kârlılık', 'Özkaynak Kârlılığı (ROE)',
       ratios.roe as number | null, b.roe ?? null, 0.3, 'up', fmtPct),
-    ratioRow('Kârlılık', 'Gelir Büyümesi (YoY)',
+    ratioRow('Kârlılık', 'Gelir Büyümesi (Yıllık)',
       ratios.revenueGrowth as number | null, b.revenueGrowth ?? null, 1.0, 'up', fmtPct),
 
     // ── Faaliyet ──────────────────────────────────────────────────────────────

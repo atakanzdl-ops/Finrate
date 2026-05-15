@@ -9,7 +9,7 @@ interface Props {
 
 export default function ExecutiveSummaryPage({ data, sector }: Props) {
   const { companyName, rating, totalScore, financialScore, subjectiveScore, reportNo, executive: ex } = data
-  const { categories: cat, kpis, strengths, watchAreas, conclusion } = ex
+  const { categories: cat, kpis, strengths, watchAreas, conclusion, riskClassification, missingFields } = ex
 
   const CATEGORY_COLORS: Record<string, string> = {
     liquidity:     'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
@@ -99,7 +99,7 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
               <div className="kpi" style={{ borderTop: '2px solid #0284c7' }}>
                 <div className="kpi-l">Net Satışlar</div>
                 <div className="kpi-v" style={{ color: '#0284c7' }}>{fmtCurrency(kpis.netSales)}</div>
-                <div className="kpi-s">{kpis.netSalesYoY != null ? `${fmtPctSigned(kpis.netSalesYoY)} YoY büyüme` : '—'}</div>
+                <div className="kpi-s">{kpis.netSalesYoY != null ? `${fmtPctSigned(kpis.netSalesYoY)} (Yıllık)` : '—'}</div>
               </div>
               <div className="kpi" style={{ borderTop: '2px solid #2dd4bf' }}>
                 <div className="kpi-l">FAVÖK</div>
@@ -124,7 +124,7 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
               <div className="kpi">
                 <div className="kpi-l">Özkaynak</div>
                 <div className="kpi-v">{fmtCurrency(kpis.equity)}</div>
-                <div className="kpi-s">{kpis.equityYoY != null ? `${fmtPctSigned(kpis.equityYoY)} YoY artış` : '—'}</div>
+                <div className="kpi-s">{kpis.equityYoY != null ? `${fmtPctSigned(kpis.equityYoY)} (Yıllık)` : '—'}</div>
               </div>
             </div>
 
@@ -136,7 +136,15 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
           </div>
         </div>
 
-        {/* Alt: Güçlü & Risk */}
+        {/* Ö8: Eksik veri uyarısı */}
+        {missingFields && missingFields.length > 0 && (
+          <div className="missing-warning">
+            <strong>Uyarı:</strong>{' '}
+            Bu raporda {missingFields.join(', ')} kalemleri eksik girilmiş olduğundan ilgili analizler sınırlı yapılmıştır.
+          </div>
+        )}
+
+        {/* Alt: Güçlü & Risk + Ö9 Risk Klasmanı */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div className="str">
             <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Güçlü Alanlar</div>
@@ -144,11 +152,34 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
               ? strengths.map((s, i) => <div key={i} className="str-i">{s}</div>)
               : <div className="str-i">Sektör ortalamasına yakın finansal profil.</div>}
           </div>
-          <div className="rsk">
-            <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>İzleme Alanları</div>
-            {watchAreas.length > 0
-              ? watchAreas.map((w, i) => <div key={i} className="rsk-i">{w}</div>)
-              : <div className="rsk-i">Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
+          <div>
+            <div className="rsk">
+              <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>İzleme Alanları</div>
+              {watchAreas.length > 0
+                ? watchAreas.map((w, i) => <div key={i} className="rsk-i">{w}</div>)
+                : <div className="rsk-i">Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
+            </div>
+
+            {/* Ö9: Finrate Risk Klasmanı */}
+            {riskClassification && (
+              <div className="risk-classification">
+                <div className="rc-header">Finrate Risk Klasmanı</div>
+                <div className="rc-body">
+                  <div className="rc-circle" style={{ background: riskClassification.overallColor }}>
+                    <div className="rc-level">{riskClassification.overallLevel}</div>
+                    <div className="rc-sublabel">Risk</div>
+                  </div>
+                  <div className="rc-metrics">
+                    {riskClassification.metrics.map((m, i) => (
+                      <div key={i} className="rc-metric">
+                        <span className="rc-label">{m.label}</span>
+                        <span className="rc-status" style={{ color: m.color }}>{m.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

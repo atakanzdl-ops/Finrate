@@ -285,3 +285,86 @@
   size: A4;
   margin: 0;
 }
+
+/* ─── Ö9: FİNRATE RİSK KLASMANI ─────────────────────────────────────────── */
+
+.risk-classification {
+  border: 0.5px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  background: #ffffff;
+}
+
+.rc-header {
+  font-size: 8px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.rc-body {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.rc-circle {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.rc-level {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rc-sublabel {
+  font-size: 8px;
+  margin-top: 2px;
+}
+
+.rc-metrics {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rc-metric {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+}
+
+.rc-label {
+  color: #374151;
+}
+
+.rc-status {
+  font-weight: 700;
+}
+
+/* ─── Ö8: EKSİK VERİ UYARI KUTUSU ──────────────────────────────────────── */
+
+.missing-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 3px solid #f97316;
+  color: #7c2d12;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 9px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}

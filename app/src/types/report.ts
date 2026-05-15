@@ -86,15 +86,32 @@ export interface ExecutiveSummary {
     equity:                number
     equityYoY:             number | null
   }
-  strengths:   string[]   // dinamik üretilen template metinler
-  watchAreas:  string[]   // dinamik üretilen template metinler
-  conclusion:  string     // genel değerlendirme metni
+  strengths:            string[]          // dinamik üretilen template metinler
+  watchAreas:           string[]          // dinamik üretilen template metinler
+  conclusion:           string            // genel değerlendirme metni
+  riskClassification:   RiskClassification  // Ö9: Finrate Risk Klasmanı
+  missingFields:        string[]            // Ö8: eksik finansal kalemler
 }
 
 export interface CategoryScore {
   score:         number   // 0–100
   sectorAverage: number
   weight:        number   // 0–1 (örn: 0.35 = %35)
+}
+
+// ─── RİSK KLASMANI (Ö9) ──────────────────────────────────────────────────────
+
+export type RiskOverallLevel = 'Düşük' | 'Orta' | 'Yüksek' | 'Çok Yüksek'
+export type RiskMetricStatus = 'Güçlü' | 'Orta' | 'Zayıf'
+
+export interface RiskClassification {
+  overallLevel: RiskOverallLevel
+  overallColor: string
+  metrics: Array<{
+    label:  string
+    status: RiskMetricStatus
+    color:  string
+  }>
 }
 
 // ─── FİRMA & SEKTÖR BİLGİSİ ─────────────────────────────────────────────
