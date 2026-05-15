@@ -25,7 +25,7 @@ export default function MethodologyPage({ data, sector }: Props) {
             <div className="st" style={{ marginBottom: '12px' }}>Derecelendirme Metodolojisi</div>
 
             <div style={{ fontSize: '9px', color: '#334155', lineHeight: 1.7, marginBottom: '14px' }}>
-              Finrate derecelendirme sistemi, TCMB Sektör Bilançoları İstatistikleri (2024 yayını) ve bankacılık sektörü standartlarına dayalı 75 puanlık finansal skor ile 30 puanlık subjektif skoru birleştiren iki bileşenli bir modeldir.
+              Finrate derecelendirme sistemi, TCMB Sektör Bilançoları İstatistikleri (2024 yayını) ve bankacılık sektörü standartlarına dayalı 70 puanlık finansal skor ile 30 puanlık subjektif skoru birleştiren iki bileşenli bir modeldir.
             </div>
 
             {/* Kategori tablosu */}

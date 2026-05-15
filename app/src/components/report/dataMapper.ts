@@ -239,7 +239,7 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     executive: buildExecutiveSummary(api, ratios, fd, bm, weights, rating, totalScore, sector),
 
     // ── Sayfa 3: Firma & Sektör ───────────────────────────────────────────────
-    companyInfo: buildCompanyInfo(entity, sector, bm, weights, subj, api.year),
+    companyInfo: buildCompanyInfo(entity, sector, bm, weights, subj, api.year, api.financialData),  // A2: fd eklendi
 
     // ── Sayfa 4: Finansal Skor Detayı ────────────────────────────────────────
     financialDetail: buildFinancialDetail(api, ratios, fd, bm, sector, rating, totalScore),
@@ -342,6 +342,7 @@ function buildCompanyInfo(
   weights: typeof SECTOR_WEIGHTS[string],
   subj: SubjectiveInputRaw | null,
   analysisYear: number,
+  fd?: FinancialDataRaw | null,   // A2: firma ölçeği için gelir + aktif bilgisi
 ) {
   const defaultBm = bm ?? SECTOR_BENCHMARKS['Genel'] ?? {
     currentRatio: 1.6, debtToEquity: 1.2, interestCoverage: 3.5,
@@ -368,7 +369,7 @@ function buildCompanyInfo(
     entityType:  getEntityTypeLabel(entity?.entityType),
     foundedYear,
     activityYears: companyAgeYears,
-    scale:       '—',   // revenue bilgisi burada yok; page component'i fd'dan hesaplar
+    scale:       getScaleLabel(fd?.revenue, fd?.totalAssets),  // A2: KOSGEB KOBİ sınıflandırması
     sectorBenchmarks,
     sectorWeightProfile: {
       liquidity:     weights.liquidity,
@@ -752,13 +753,32 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
   const totalLiabilities = totalAssets - totalEquity
   const equityRatio      = totalAssets > 0 ? totalEquity / totalAssets : 0
 
+  // 3-part dynamic commentary (null-safe)
+  const currentAssets    = lastFd?.totalCurrentAssets ?? null
+  const nonCurrentAssets = lastFd?.totalNonCurrentAssets ?? null
+  const inventory        = lastFd?.inventory ?? null
+
+  const part1 = (currentAssets != null && nonCurrentAssets != null && nonCurrentAssets > 0)
+    ? `Dönen/Duran varlık oranı ${(currentAssets / nonCurrentAssets).toFixed(2)}x — ${currentAssets > nonCurrentAssets ? 'likit ağırlıklı aktif yapısı kısa vadeli esneklik sağlıyor.' : 'duran varlık ağırlıklı yapı uzun vadeli yatırım odağına işaret ediyor.'}`
+    : 'Aktif yapısı analiz edilemedi — veri eksik.'
+
+  const part2 = totalAssets > 0
+    ? `Özkaynak oranı %${(equityRatio * 100).toFixed(1)} — ${equityRatio >= 0.30 ? 'güçlü özkaynak tabanı finansal sağlamlığı destekliyor.' : 'özkaynak güçlendirmesi orta vadeli öncelik olmalıdır.'}`
+    : 'Özkaynak oranı hesaplanamadı.'
+
+  const part3 = (inventory != null && currentAssets != null && currentAssets > 0)
+    ? `Stok/Dönen varlık payı %${((inventory / currentAssets) * 100).toFixed(1)} — ${inventory / currentAssets > 0.40 ? 'yüksek stok yoğunluğu likidite riskini artırabilir.' : 'makul stok payı döngüsel işletme sermayesi yapısını koruyor.'}`
+    : 'Stok verisi mevcut değil.'
+
+  const comment = `${part1} ${part2} ${part3}`
+
   return {
     years,
     items,
     totalAssets,
     totalLiabilities,
     equityRatio,
-    comment: `Toplam özkaynak toplam aktifin %${(equityRatio * 100).toFixed(1)}'ini oluşturmaktadır. ${equityRatio >= 0.30 ? 'Güçlü özkaynak yapısı finansal sağlamlığı destekliyor.' : 'Özkaynak güçlendirmesi orta vadeli hedef olmalıdır.'}`,
+    comment,
   }
 }
 
@@ -876,7 +896,13 @@ function buildScenarioData(
     score:    Math.round(t1.idealPlan.projectedScore),
     delta:    Math.round(t1.totalGain),                                    // N2: totalGain (optimizer'ın hesapladığı net kazanç)
     timeline: t1.minimumPlan.suggestions[0]?.timeHorizon ?? '3-12 Ay',
-    actions:  t1.minimumPlan.suggestions.slice(0, 4).map(s => s.label || s.actionText),  // N3: label öncelikli
+    actions:  t1.minimumPlan.suggestions.slice(0, 4).map(s => {
+      if (s.label) return s.label
+      const txt = s.actionText || ''
+      const match = txt.match(/^(.+?[.!?])(?:\s|$)/)  // F3: ilk gerçek cümle sonu (sayıdaki nokta değil)
+      if (match) return match[1]
+      return txt.length > 60 ? txt.substring(0, 60) + '…' : txt
+    }),
     planNote: buildCollateralNote(t1.targetRating, Math.round(t1.idealPlan.projectedScore)),
   } : {
     rating: '—', score: totalScore + 3, delta: 3,
@@ -889,7 +915,13 @@ function buildScenarioData(
     score:    Math.round(t2.idealPlan.projectedScore),
     delta:    Math.round(t2.totalGain),                                    // N2: totalGain
     timeline: '6-18 Ay',
-    actions:  t2.minimumPlan.suggestions.slice(0, 4).map(s => s.label || s.actionText),  // N3: label öncelikli
+    actions:  t2.minimumPlan.suggestions.slice(0, 4).map(s => {
+      if (s.label) return s.label
+      const txt = s.actionText || ''
+      const match = txt.match(/^(.+?[.!?])(?:\s|$)/)
+      if (match) return match[1]
+      return txt.length > 60 ? txt.substring(0, 60) + '…' : txt
+    }),
     planNote: buildCollateralNote(t2.targetRating, Math.round(t2.idealPlan.projectedScore)),
   } : {
     rating: '—', score: totalScore + 6, delta: 6,
@@ -917,7 +949,7 @@ function buildScenarioData(
   }
 
   return {
-    current: { rating, score: snap?.currentScore ?? totalScore, note: currentNote },  // N2: snap.currentScore (optimizer base)
+    current: { rating, score: totalScore, note: currentNote },  // F2: tek kaynak = finalScore (kapak ile tutarlı)
     target1,
     target2,
     waterfall,

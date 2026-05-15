@@ -30,7 +30,7 @@ export default function BalanceSheetPage({ data, sector }: Props) {
     <div className="pdf-page">
       <div className="wm">BİLANÇO</div>
       <div className="ph">
-        <div><div className="ph-sec">Bölüm 07</div><div className="ph-title">Bilanço Analizi</div></div>
+        <div><div className="ph-sec">Bölüm 07</div><div className="ph-title">Aktif/Pasif Analizi</div></div>
         <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 8</div></div>
       </div>
       <div className="pc">

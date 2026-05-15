@@ -1,6 +1,7 @@
 'use client'
 import type { ReportData } from '@/types/report'
 import { Logo } from '@/components/ui/Logo'
+import { getRatingBand } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'financialScore' | 'subjectiveScore' | 'analysisPeriod' | 'reportDate' | 'validUntil' | 'reportNo'>
@@ -15,10 +16,9 @@ export default function CoverPage({ data }: Props) {
   const filled = (totalScore / 100) * circumference
   const offset = circumference - filled
 
-  // Rating bant
+  // Rating bant — F8: getRatingBand exact match (metodoloji tablosuyla uyumlu)
   const ratingUpper = rating.replace(/[+-]$/, '').toUpperCase()
-  const isInvestment = ['AAA', 'AA', 'A', 'BBB'].includes(ratingUpper)
-  const bandLabel = isInvestment ? 'Yatırım Yapılabilir Segment' : 'Spekülatif Segment'
+  const band = getRatingBand(ratingUpper)
 
   // Firma adını iki satıra böl (boşluk varsa)
   const nameParts = companyName.split(' ')
@@ -40,7 +40,7 @@ export default function CoverPage({ data }: Props) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Logo variant="light" size={46} showSubtext={false} />
             <div style={{ textAlign: 'right' }}>
-              <div className="outfit" style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px' }}>Kurumsal Premium Analiz Raporu</div>
+              <div className="outfit" style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px' }}>Finansal Analiz Raporu</div>
               <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '5px' }}>Erişim: Yönetim Kurulu · Kredi Komitesi</div>
             </div>
           </div>
@@ -83,9 +83,9 @@ export default function CoverPage({ data }: Props) {
                   {rating.endsWith('+') && <span style={{ fontSize: '44px' }}>+</span>}
                   {rating.endsWith('-') && <span style={{ fontSize: '44px' }}>-</span>}
                 </div>
-                <div style={{ marginTop: '12px', padding: '5px 13px', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.25)', borderRadius: '999px', fontSize: '9px', color: '#2dd4bf', display: 'inline-flex', alignItems: 'center', gap: '7px', fontWeight: 600 }}>
-                  <div style={{ width: '6px', height: '6px', background: '#2dd4bf', borderRadius: '50%', boxShadow: '0 0 7px #2dd4bf' }} />
-                  {bandLabel}
+                <div style={{ marginTop: '12px', padding: '5px 13px', background: band.bg, border: `1px solid ${band.border}`, borderRadius: '999px', fontSize: '9px', color: band.text, display: 'inline-flex', alignItems: 'center', gap: '7px', fontWeight: 600 }}>
+                  <div style={{ width: '6px', height: '6px', background: band.text, borderRadius: '50%', boxShadow: `0 0 7px ${band.text}` }} />
+                  {band.label}
                 </div>
               </div>
 

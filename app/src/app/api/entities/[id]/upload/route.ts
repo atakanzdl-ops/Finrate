@@ -247,6 +247,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           entity:   identityResult.entity,
         }, { status })
       }
+
+      // ─── A1: Tespit edilen kimlik numarasını entity'ye yaz (sadece taxNumber NULL ise) ───
+      // VKN (10 hane) veya TCKN (11 hane) — mevcut değeri EZME, idempotent
+      const detId = (detectedIdentity as { taxNumber?: string | null; tcKimlik?: string | null }).taxNumber
+                 ?? (detectedIdentity as { taxNumber?: string | null; tcKimlik?: string | null }).tcKimlik
+      if (detId && (detId.length === 10 || detId.length === 11) && !entity.taxNumber) {
+        await prisma.entity.update({
+          where: { id: entityId },
+          data:  { taxNumber: detId },
+        })
+      }
     }
 
     // PREFLIGHT 3 — DUPLICATE SOURCE CHECK

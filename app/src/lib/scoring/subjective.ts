@@ -1,7 +1,7 @@
 /**
  * Finrate — Subjektif Skor Motoru (max 30 puan)
  *
- * Finskor'un 75+30 sistemine benzer ancak daha kapsamlı:
+ * Finrate 70+30 modelinin subjektif bileşeni (max 30 puan):
  *  - KKB & Kredi Sicili    : 10 puan
  *  - Banka İlişkileri      : 10 puan
  *  - Kurumsal Yapı         :  5 puan

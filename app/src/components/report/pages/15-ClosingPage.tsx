@@ -1,6 +1,7 @@
 'use client'
 import type { ReportData } from '@/types/report'
 import { Logo } from '@/components/ui/Logo'
+import { getRatingBand } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'reportNo' | 'reportDate' | 'validUntil' | 'analysisPeriod'>
@@ -11,9 +12,8 @@ export default function ClosingPage({ data }: Props) {
 
   const ratingUpper = rating.replace(/[+-]$/, '').toUpperCase()
   const isInvestment = ['AAA', 'AA', 'A', 'BBB'].includes(ratingUpper)
-
-  // Rating rengi
-  const ratingColor = isInvestment ? '#2dd4bf' : '#f59e0b'
+  const ratingColor = isInvestment ? '#2dd4bf' : '#f59e0b'   // büyük rating rakamı rengi
+  const band = getRatingBand(ratingUpper)                     // F8: badge için dinamik bant
 
   return (
     <div className="pdf-page">
@@ -64,14 +64,11 @@ export default function ClosingPage({ data }: Props) {
                   <div className="mono" style={{ fontSize: '12px', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>{validUntil}</div>
                 </div>
               </div>
-            </div>
-
-            {/* Segment badge */}
-            <div style={{ marginTop: '22px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', background: `rgba(${isInvestment ? '45,212,191' : '245,158,11'},.1)`, border: `1px solid rgba(${isInvestment ? '45,212,191' : '245,158,11'},.25)`, borderRadius: '999px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: ratingColor, boxShadow: `0 0 7px ${ratingColor}` }} />
-              <span style={{ fontSize: '9px', color: ratingColor, fontWeight: 600 }}>
-                {isInvestment ? 'Yatırım Yapılabilir Segment' : 'Spekülatif Segment'}
-              </span>
+              {/* Segment rozeti — F8: kutu içinde, getRatingBand ile dinamik renk */}
+              <div style={{ marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', background: band.bg, border: `1px solid ${band.border}`, borderRadius: '999px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: band.text, boxShadow: `0 0 7px ${band.text}` }} />
+                <span style={{ fontSize: '9px', color: band.text, fontWeight: 600 }}>{band.label}</span>
+              </div>
             </div>
           </div>
 

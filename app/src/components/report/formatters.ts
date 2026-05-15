@@ -196,6 +196,28 @@ export function getScaleLabel(
   return 'Mikro İşletme'
 }
 
+// ─── RATING BAND ─────────────────────────────────────────────────────────────
+// 14-MethodologyPage.tsx rating tablosuna birebir hizalıdır.
+// Exact match — startsWith('A') gibi pattern kullanılmaz (AA/AAA çakışması önlenir).
+
+export function getRatingBand(
+  rating: string,
+): { label: string; bg: string; border: string; text: string } {
+  const r = (rating || '').toUpperCase().replace(/[+-]$/, '')
+
+  if (r === 'AAA' || r === 'AA' || r === 'A' || r === 'BBB') {
+    return { label: 'Yatırım Yapılabilir', bg: 'rgba(34,197,94,.10)', border: 'rgba(34,197,94,.30)', text: '#16a34a' }
+  }
+  if (r === 'BB') {
+    return { label: 'Yatırım Yapılabilir Alt', bg: 'rgba(59,130,246,.10)', border: 'rgba(59,130,246,.30)', text: '#3b82f6' }
+  }
+  if (r === 'B' || r === 'CCC' || r === 'CC') {
+    return { label: 'Spekülatif Segment', bg: 'rgba(249,115,22,.10)', border: 'rgba(249,115,22,.30)', text: '#f97316' }
+  }
+  // C, D ve diğer her şey
+  return { label: 'Risk Altında', bg: 'rgba(239,68,68,.10)', border: 'rgba(239,68,68,.30)', text: '#ef4444' }
+}
+
 // ─── ENTİTE TİPİ ETİKETİ ─────────────────────────────────────────────────────
 
 export function getEntityTypeLabel(entityType: string | null | undefined): string {

@@ -26,7 +26,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!owned) return jsonUtf8({ error: 'Analiz bulunamadı.' }, { status: 404 })
 
   const requestedType = req.nextUrl.searchParams.get('type')
-  const cookieToken = req.cookies.get('finrate_token')?.value
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
     select: { plan: true },
@@ -49,24 +48,36 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     })
 
     const page = await browser.newPage()
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const targetUrl = `${baseUrl}/dashboard/analiz/rapor?id=${id}&type=${type}&print=1`
 
-    // Auth bypass via cookie
-    if (cookieToken) {
-      const urlObj = new URL(baseUrl)
-      await page.setCookie({
-        name: 'finrate_token',
-        value: cookieToken,
-        domain: urlObj.hostname,
-        path: '/',
-      })
+    // req.nextUrl.origin → preview/prod URL ayrımı otomatik (NEXT_PUBLIC_APP_URL gerekmez)
+    const targetUrl = new URL(
+      `/dashboard/analiz/rapor?id=${id}&type=${type}&print=1`,
+      req.nextUrl.origin,
+    )
+
+    // TÜM cookie'leri taşı (url bazlı — domain hesabını Puppeteer yapar)
+    const allCookies = req.cookies.getAll()
+    if (allCookies.length > 0) {
+      await page.setCookie(
+        ...allCookies.map(c => ({
+          name:  c.name,
+          value: c.value,
+          url:   targetUrl.origin,
+          path:  '/',
+        }))
+      )
     }
 
     // A4 render genişliği için viewport (1200x1697, 2x scale)
     await page.setViewport({ width: 1200, height: 1697, deviceScaleFactor: 2 })
 
-    await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 30000 })
+    await page.goto(targetUrl.toString(), { waitUntil: 'networkidle0', timeout: 30000 })
+
+    // Auth redirect kontrolü — Puppeteer üye giriş sayfasını render etmemeli
+    if (page.url().includes('/giris')) {
+      await browser.close()
+      throw new Error('PDF render auth redirect: /giris')
+    }
 
     // Animasyon ve web font yüklenme bekleme süresi
     await new Promise(r => setTimeout(r, 1000))
