@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData } from '@/types/report'
+import { Logo } from '@/components/ui/Logo'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'financialScore' | 'subjectiveScore' | 'analysisPeriod' | 'reportDate' | 'validUntil' | 'reportNo'>
@@ -37,10 +38,7 @@ export default function CoverPage({ data }: Props) {
 
           {/* Logo & Rapor Türü */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div className="outfit" style={{ width: '46px', height: '46px', background: 'linear-gradient(135deg,#2dd4bf,#0284c7)', borderRadius: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 800, color: 'white', boxShadow: '0 10px 24px rgba(45,212,191,.25)' }}>F</div>
-              <div className="outfit" style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '2px', color: 'white' }}>FINRATE<span style={{ color: '#2dd4bf' }}>.</span></div>
-            </div>
+            <Logo variant="light" size={46} showSubtext={false} />
             <div style={{ textAlign: 'right' }}>
               <div className="outfit" style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px' }}>Kurumsal Premium Analiz Raporu</div>
               <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '5px' }}>Erişim: Yönetim Kurulu · Kredi Komitesi</div>
@@ -49,7 +47,7 @@ export default function CoverPage({ data }: Props) {
 
           {/* Firma Adı & Skor Paneli */}
           <div style={{ marginTop: '-50px' }}>
-            <div className="outfit" style={{ fontSize: '10px', color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '4px', fontWeight: 600, marginBottom: '26px' }}>Gizli &amp; Özel Resmi Döküman</div>
+            <div className="outfit" style={{ fontSize: '10px', color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '4px', fontWeight: 600, marginBottom: '26px' }}>Özel Döküman</div>
             <h1 style={{ fontSize: '58px', fontWeight: 300, lineHeight: 1.1, color: 'white', letterSpacing: '-1px', marginBottom: '44px', fontFamily: "'Outfit',sans-serif" }}>
               {firstLine}<br /><strong style={{ fontWeight: 900 }}>{secondLine || ''}</strong>
             </h1>
@@ -115,7 +113,7 @@ export default function CoverPage({ data }: Props) {
               Bu rapor TCMB 2024 sektör kıyaslama verileri kullanılarak bankacılık metodolojisi ile üretilmiştir. Gizlidir; yetkisiz kişilerle paylaşılamaz. KVKK kapsamında kişisel veri içermektedir.
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div className="outfit" style={{ fontSize: '11px', color: '#475569', letterSpacing: '2px', fontWeight: 700 }}>FINRATE.COM</div>
+              <div className="outfit" style={{ fontSize: '11px', color: '#475569', letterSpacing: '2px', fontWeight: 700 }}>FINRATE.COM.TR</div>
               <div style={{ fontSize: '8.5px', color: '#334155', marginTop: '3px' }}>Rapor No: {reportNo}</div>
               <div style={{ fontSize: '8.5px', color: '#334155', marginTop: '2px' }}>Geçerlilik: {data.validUntil}</div>
             </div>

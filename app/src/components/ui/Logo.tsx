@@ -7,9 +7,13 @@ interface LogoProps {
   className?: string
   showSubtext?: boolean
   size?: number
+  /** 'dark' (varsayılan): açık arka plan için koyu metin · 'light': koyu arka plan için beyaz metin */
+  variant?: 'dark' | 'light'
 }
 
-export const Logo: React.FC<LogoProps> = ({ className = '', showSubtext = true, size = 44 }) => {
+export const Logo: React.FC<LogoProps> = ({ className = '', showSubtext = true, size = 44, variant = 'dark' }) => {
+  const isLight = variant === 'light'
+
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <FinrateLogoCanvas size={size} />
@@ -22,7 +26,7 @@ export const Logo: React.FC<LogoProps> = ({ className = '', showSubtext = true, 
           letterSpacing: '0.5px',
           lineHeight: 1,
         }}>
-          <span style={{ color: '#0B1F3A' }}>FIN</span>
+          <span style={{ color: isLight ? '#ffffff' : '#0B1F3A' }}>FIN</span>
           <span style={{
             background: 'linear-gradient(90deg, #0284c7, #0DC4A0)',
             WebkitBackgroundClip: 'text',
@@ -34,7 +38,7 @@ export const Logo: React.FC<LogoProps> = ({ className = '', showSubtext = true, 
           <span style={{
             fontSize: 10,
             fontWeight: 600,
-            color: '#64748B',
+            color: isLight ? 'rgba(255,255,255,0.55)' : '#64748B',
             letterSpacing: '0.15em',
             marginTop: 4,
           }}>

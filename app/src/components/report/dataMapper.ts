@@ -153,6 +153,15 @@ interface TrendAnalysisRaw {
 
 // ─── ANA DÖNÜŞTÜRÜCÜ ──────────────────────────────────────────────────────────
 
+// ─── YARDIMCI: Güvenli tarih parse ───────────────────────────────────────────
+// jsonUtf8 Date guard'ından önce oluşturulan kayıtlarda reportedAt
+// API'den "{}" ya da bozuk string gelebilirdi. Bu helper ikinci bir bariyer sağlar.
+function safeParseDate(value: string | null | undefined): Date | null {
+  if (!value || typeof value !== 'string') return null
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const ratios = api.ratios ?? {}
   const fd     = api.financialData
@@ -170,7 +179,8 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
 
   // ── Tarihler ──────────────────────────────────────────────────────────────
   // api.reportedAt: Analysis kaydının oluşturulma tarihi — yoksa bugün fallback
-  const reportedAtDate = api.reportedAt ? new Date(api.reportedAt) : new Date()
+  // safeParseDate: JSON'dan "{}" ya da bozuk değer gelmesini engeller (N1 guard)
+  const reportedAtDate = safeParseDate(api.reportedAt) ?? new Date()
   const reportDate     = fmtDate(reportedAtDate)
   const validUntil     = fmtDate(addYears(reportedAtDate, 1))
 
@@ -864,9 +874,9 @@ function buildScenarioData(
   const target1 = t1 ? {
     rating:   t1.targetRating,
     score:    Math.round(t1.idealPlan.projectedScore),
-    delta:    Math.round(t1.idealPlan.projectedScore - totalScore),
+    delta:    Math.round(t1.totalGain),                                    // N2: totalGain (optimizer'ın hesapladığı net kazanç)
     timeline: t1.minimumPlan.suggestions[0]?.timeHorizon ?? '3-12 Ay',
-    actions:  t1.minimumPlan.suggestions.slice(0, 4).map(s => s.actionText),
+    actions:  t1.minimumPlan.suggestions.slice(0, 4).map(s => s.label || s.actionText),  // N3: label öncelikli
     planNote: buildCollateralNote(t1.targetRating, Math.round(t1.idealPlan.projectedScore)),
   } : {
     rating: '—', score: totalScore + 3, delta: 3,
@@ -877,9 +887,9 @@ function buildScenarioData(
   const target2 = t2 ? {
     rating:   t2.targetRating,
     score:    Math.round(t2.idealPlan.projectedScore),
-    delta:    Math.round(t2.idealPlan.projectedScore - totalScore),
+    delta:    Math.round(t2.totalGain),                                    // N2: totalGain
     timeline: '6-18 Ay',
-    actions:  t2.minimumPlan.suggestions.slice(0, 4).map(s => s.actionText),
+    actions:  t2.minimumPlan.suggestions.slice(0, 4).map(s => s.label || s.actionText),  // N3: label öncelikli
     planNote: buildCollateralNote(t2.targetRating, Math.round(t2.idealPlan.projectedScore)),
   } : {
     rating: '—', score: totalScore + 6, delta: 6,
@@ -907,7 +917,7 @@ function buildScenarioData(
   }
 
   return {
-    current: { rating, score: totalScore, note: currentNote },
+    current: { rating, score: snap?.currentScore ?? totalScore, note: currentNote },  // N2: snap.currentScore (optimizer base)
     target1,
     target2,
     waterfall,

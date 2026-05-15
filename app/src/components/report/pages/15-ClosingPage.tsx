@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData } from '@/types/report'
+import { Logo } from '@/components/ui/Logo'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'reportNo' | 'reportDate' | 'validUntil' | 'analysisPeriod'>
@@ -27,10 +28,7 @@ export default function ClosingPage({ data }: Props) {
 
           {/* Üst: Logo */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div className="outfit" style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg,#2dd4bf,#0284c7)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: 'white' }}>F</div>
-              <div className="outfit" style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '2px', color: 'white' }}>FINRATE<span style={{ color: '#2dd4bf' }}>.</span></div>
-            </div>
+            <Logo variant="light" size={42} showSubtext={false} />
             <div style={{ fontSize: '8.5px', color: '#475569' }}>Rapor No: {reportNo}</div>
           </div>
 

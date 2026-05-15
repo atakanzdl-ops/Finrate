@@ -241,7 +241,7 @@
 
 /* Sidebar aktif link — ayrı stil, alt çizgi yok */
 .sidebar-nav .nav-link.active {
-    color: var(--cyan-500);
+    color: var(--fr-primary);
     border-bottom-color: transparent;
 }
 

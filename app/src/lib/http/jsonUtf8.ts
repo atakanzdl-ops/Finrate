@@ -7,6 +7,7 @@ function normalizeStrings(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => normalizeStrings(item))
   }
+  if (value instanceof Date) return value
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value as Record<string, unknown>)) {

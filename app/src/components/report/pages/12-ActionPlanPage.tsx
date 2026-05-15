@@ -104,7 +104,7 @@ export default function ActionPlanPage({ data, sector }: Props) {
       </div>
       <div className="pf">
         <span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span>
-        <span>finrate.com · {reportNo}</span>
+        <span>finrate.com.tr · {reportNo}</span>
       </div>
     </div>
   )
