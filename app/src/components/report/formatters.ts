@@ -6,7 +6,9 @@
 
 /**
  * Milyon/Milyar kısaltmalı TL formatı.
- * Örn: 52_300_000 → "₺52.3M"  |  1_250_000_000 → "₺1.3Mr"
+ * Örn: 52_300_000 → "52.3M TL"  |  1_250_000_000 → "1.3Mr TL"
+ * NOT: ₺ (U+20BA) Headless Chromium PDF'inde render edilmiyor —
+ *      "TL" son eki garantili çalışır.
  */
 export function fmtCurrency(
   value: number | null | undefined,
@@ -16,12 +18,12 @@ export function fmtCurrency(
   const abs = Math.abs(value)
   const sign = value < 0 ? '-' : ''
   if (abs >= 1_000_000_000)
-    return `${sign}₺${(abs / 1_000_000_000).toFixed(decimals)}Mr`
+    return `${sign}${(abs / 1_000_000_000).toFixed(decimals)}Mr TL`
   if (abs >= 1_000_000)
-    return `${sign}₺${(abs / 1_000_000).toFixed(decimals)}M`
+    return `${sign}${(abs / 1_000_000).toFixed(decimals)}M TL`
   if (abs >= 1_000)
-    return `${sign}₺${(abs / 1_000).toFixed(decimals)}B`
-  return `${sign}₺${abs.toFixed(0)}`
+    return `${sign}${(abs / 1_000).toFixed(decimals)}B TL`
+  return `${sign}${abs.toFixed(0)} TL`
 }
 
 // ─── YÜZDE ────────────────────────────────────────────────────────────────────
@@ -174,12 +176,13 @@ export function fmtPeriod(year: number, period: string): string {
 
 /**
  * Ciro + aktif büyüklüğüne göre KOBİ/Büyük ölçek etiketi üretir.
- * KOSGEB sınıflandırmasına göre (2024):
- *   Mikro  < 25 çalışan + < ₺35M ciro
- *   Küçük  < 50 çalışan + < ₺175M ciro
- *   Orta   < 250 çalışan + < ₺1.75Mr ciro
- *   Büyük  ≥ 250 çalışan veya ≥ ₺1.75Mr ciro
- * (çalışan bilgisi yok → sadece ciro kullanılır)
+ * Türkiye KOBİ Yönetmeliği (2023 güncel) — 4 bant:
+ *   Mikro   ≤  10M TL net satış/aktif
+ *   Küçük   ≤ 100M TL
+ *   Orta    ≤ 500M TL
+ *   Büyük   >  500M TL (KOBİ dışı)
+ * (çalışan bilgisi yok → sadece ciro/aktif kullanılır;
+ *  ikisinden büyük olanı esas alınır)
  */
 export function getScaleLabel(
   revenue: number | null | undefined,
@@ -189,10 +192,10 @@ export function getScaleLabel(
   const assets = totalAssets ?? 0
   const max = Math.max(rev, assets)
 
-  if (max >= 1_750_000_000) return 'Büyük İşletme'
-  if (max >= 350_000_000)   return 'Büyük Ölçekli KOBİ'
-  if (max >= 70_000_000)    return 'Orta Ölçekli KOBİ'
-  if (max >= 14_000_000)    return 'Küçük Ölçekli KOBİ'
+  if (max <= 0)              return '—'
+  if (max >= 500_000_000)    return 'Büyük İşletme'
+  if (max >= 100_000_000)    return 'Orta Ölçekli KOBİ'
+  if (max >= 10_000_000)     return 'Küçük Ölçekli KOBİ'
   return 'Mikro İşletme'
 }
 

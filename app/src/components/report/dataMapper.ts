@@ -903,7 +903,19 @@ function buildCashFlow(
       comment: `CCC = ${Math.round(dso)} + ${Math.round(dio)} − ${Math.round(dpo)} = ${Math.round(ccc)} gün${b ? ` · Sektör CCC: ${Math.round(b.cashConversionCycle)} gün` : ''}`,
     },
     workingCapitalTable,
-    positives:    positives.length > 0 ? positives : ['Çalışma sermayesi verisi mevcut.'],
+    positives:    (() => {
+      // Eğer spesifik pozitif bulunamadıysa, net çalışma sermayesi durumuna bak
+      if (positives.length > 0) return positives
+      const lastY = tableYears[tableYears.length - 1]
+      const ca = lastY?.fd?.totalCurrentAssets ?? null
+      const cl = lastY?.fd?.totalCurrentLiabilities ?? null
+      const nwc = ca != null && cl != null ? ca - cl : null
+      if (nwc != null && nwc > 0) {
+        return [`Net çalışma sermayesi pozitif (${fmtCurrency(nwc)}), kısa vadeli yükümlülükler güvenle karşılanabiliyor.`]
+      }
+      // nwc negatif veya null ise bu olumlu değil — boş bırak (component map eder, sorun olmaz)
+      return []
+    })(),
     improvements: improvements.length > 0 ? improvements : ['Nakit dönüşüm döngüsü izlenmesi önerilir.'],
     conclusion: `Nakit dönüşüm çevrimi ${Math.round(ccc)} gün olarak hesaplanmıştır. ${ccc <= 45 ? 'Sektör ortalamasına göre verimli bir nakit döngüsü.' : 'Döngünün optimize edilmesi finansman maliyetini düşürür ve banka kredi değerlendirmesini olumlu etkiler.'}`,
   }
