@@ -26,6 +26,25 @@ interface RatiosLike {
   debtToAssets?:           number | null
 }
 
+// ─── SAPMA TONU YARDIMCISI ────────────────────────────────────────────────────
+
+/**
+ * Sapma büyüklüğüne (0–1+ oran) göre ton üretir.
+ * > 0.30 → "belirgin", > 0.10 → normal, ≤ 0.10 → "hafif"
+ */
+function getDeviationPhrase(deviation: number, direction: 'above' | 'below'): string {
+  const absDev = Math.abs(deviation)
+  if (direction === 'above') {
+    if (absDev > 0.30) return 'belirgin üzerinde'
+    if (absDev > 0.10) return 'üzerinde'
+    return 'hafif üzerinde'
+  } else {
+    if (absDev > 0.30) return 'belirgin altında'
+    if (absDev > 0.10) return 'altında'
+    return 'hafif altında'
+  }
+}
+
 // ─── GÜÇLÜ YÖNLER ─────────────────────────────────────────────────────────────
 
 /**
@@ -43,38 +62,38 @@ export function buildStrengths(
   // Likidite
   if (r.currentRatio != null && r.currentRatio > bm.currentRatio) {
     const dev = (r.currentRatio - bm.currentRatio) / bm.currentRatio
-    candidates.push({ deviation: dev, text: `Cari oran ${r.currentRatio.toFixed(2)}x ile sektör ortalaması (${bm.currentRatio.toFixed(2)}x) üzerinde — kısa vadeli likidite güçlü.` })
+    candidates.push({ deviation: dev, text: `Cari oran ${r.currentRatio.toFixed(2)}x ile sektör ortalaması (${bm.currentRatio.toFixed(2)}x) ${getDeviationPhrase(dev, 'above')} — kısa vadeli likidite güçlü.` })
   }
 
   if (r.cashRatio != null && r.cashRatio > bm.cashRatio) {
     const dev = (r.cashRatio - bm.cashRatio) / (bm.cashRatio || 0.01)
-    candidates.push({ deviation: dev, text: `Nakit oranı ${(r.cashRatio * 100).toFixed(1)}% ile sektör üzerinde — ani yükümlülük karşılama kapasitesi yüksek.` })
+    candidates.push({ deviation: dev, text: `Nakit oranı ${(r.cashRatio * 100).toFixed(1)}% ile sektör ${getDeviationPhrase(dev, 'above')} — ani yükümlülük karşılama kapasitesi güçlü.` })
   }
 
   // Kârlılık
   if (r.grossMargin != null && r.grossMargin > bm.grossMargin) {
     const dev = (r.grossMargin - bm.grossMargin) / (bm.grossMargin || 0.01)
-    candidates.push({ deviation: dev, text: `Brüt kâr marjı %${(r.grossMargin * 100).toFixed(1)} ile sektör (%${(bm.grossMargin * 100).toFixed(1)}) üzerinde — fiyatlama gücü korunuyor.` })
+    candidates.push({ deviation: dev, text: `Brüt kâr marjı %${(r.grossMargin * 100).toFixed(1)} ile sektör (%${(bm.grossMargin * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'above')} — fiyatlama gücü korunuyor.` })
   }
 
   if (r.ebitdaMargin != null && r.ebitdaMargin > bm.ebitdaMargin) {
     const dev = (r.ebitdaMargin - bm.ebitdaMargin) / (bm.ebitdaMargin || 0.01)
-    candidates.push({ deviation: dev, text: `FAVÖK marjı %${(r.ebitdaMargin * 100).toFixed(1)} ile sektör (%${(bm.ebitdaMargin * 100).toFixed(1)}) üzerinde — operasyonel verimlilik olumlu.` })
+    candidates.push({ deviation: dev, text: `FAVÖK marjı %${(r.ebitdaMargin * 100).toFixed(1)} ile sektör (%${(bm.ebitdaMargin * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'above')} — operasyonel verimlilik olumlu.` })
   }
 
   if (r.netProfitMargin != null && r.netProfitMargin > bm.netProfitMargin) {
     const dev = (r.netProfitMargin - bm.netProfitMargin) / (bm.netProfitMargin || 0.01)
-    candidates.push({ deviation: dev, text: `Net kâr marjı %${(r.netProfitMargin * 100).toFixed(1)} ile sektörün üzerinde — kârlılık sürekliliği destekleyici.` })
+    candidates.push({ deviation: dev, text: `Net kâr marjı %${(r.netProfitMargin * 100).toFixed(1)} ile sektörün ${getDeviationPhrase(dev, 'above')} — kârlılık sürekliliği destekleyici.` })
   }
 
   if (r.roe != null && r.roe > bm.roe) {
     const dev = (r.roe - bm.roe) / (bm.roe || 0.01)
-    candidates.push({ deviation: dev, text: `Özkaynak kârlılığı (ROE) %${(r.roe * 100).toFixed(1)} ile sektör (%${(bm.roe * 100).toFixed(1)}) üzerinde.` })
+    candidates.push({ deviation: dev, text: `Özkaynak kârlılığı (ROE) %${(r.roe * 100).toFixed(1)} ile sektör (%${(bm.roe * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'above')}.` })
   }
 
   if (r.revenueGrowth != null && r.revenueGrowth > bm.revenueGrowth) {
     const dev = (r.revenueGrowth - bm.revenueGrowth) / (bm.revenueGrowth || 0.01)
-    candidates.push({ deviation: dev, text: `Gelir büyümesi %${(r.revenueGrowth * 100).toFixed(1)} ile sektör büyümesinin (%${(bm.revenueGrowth * 100).toFixed(1)}) üzerinde.` })
+    candidates.push({ deviation: dev, text: `Gelir büyümesi %${(r.revenueGrowth * 100).toFixed(1)} ile sektör büyümesinin (%${(bm.revenueGrowth * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'above')}.` })
   }
 
   // Kaldıraç
@@ -85,18 +104,18 @@ export function buildStrengths(
 
   if (r.debtToEquity != null && r.debtToEquity < bm.debtToEquity) {
     const dev = (bm.debtToEquity - r.debtToEquity) / (bm.debtToEquity || 0.01)
-    candidates.push({ deviation: dev, text: `Borç/Özkaynak ${r.debtToEquity.toFixed(2)}x ile sektör (${bm.debtToEquity.toFixed(2)}x) altında — finansal kaldıraç dengeli.` })
+    candidates.push({ deviation: dev, text: `Borç/Özkaynak ${r.debtToEquity.toFixed(2)}x ile sektör (${bm.debtToEquity.toFixed(2)}x) ${getDeviationPhrase(dev, 'below')} — finansal kaldıraç dengeli.` })
   }
 
   // Faaliyet
   if (r.assetTurnover != null && r.assetTurnover > bm.assetTurnover) {
     const dev = (r.assetTurnover - bm.assetTurnover) / (bm.assetTurnover || 0.01)
-    candidates.push({ deviation: dev, text: `Aktif devir hızı ${r.assetTurnover.toFixed(2)}x — varlık kullanım etkinliği sektör üzerinde.` })
+    candidates.push({ deviation: dev, text: `Aktif devir hızı ${r.assetTurnover.toFixed(2)}x — varlık kullanım etkinliği sektör ${getDeviationPhrase(dev, 'above')}.` })
   }
 
   if (r.receivablesTurnoverDays != null && r.receivablesTurnoverDays < bm.receivablesDays) {
     const dev = (bm.receivablesDays - r.receivablesTurnoverDays) / (bm.receivablesDays || 0.01)
-    candidates.push({ deviation: dev, text: `Alacak tahsil süresi ${Math.round(r.receivablesTurnoverDays)} gün ile sektör (${Math.round(bm.receivablesDays)} gün) altında — nakit dönüşüm hızlı.` })
+    candidates.push({ deviation: dev, text: `Alacak tahsil süresi ${Math.round(r.receivablesTurnoverDays)} gün ile sektör (${Math.round(bm.receivablesDays)} gün) ${getDeviationPhrase(dev, 'below')} — nakit dönüşüm hızlı.` })
   }
 
   // Pozitif sapmaya göre büyükten küçüğe sırala, en güçlü 4'ü döndür
@@ -120,7 +139,7 @@ export function buildWatchAreas(
   // Likidite
   if (r.currentRatio != null && r.currentRatio < bm.currentRatio) {
     const dev = (bm.currentRatio - r.currentRatio) / (bm.currentRatio || 0.01)
-    candidates.push({ deviation: dev, text: `Cari oran ${r.currentRatio.toFixed(2)}x — sektör ortalaması (${bm.currentRatio.toFixed(2)}x) altında; kısa vadeli yükümlülük yönetimine dikkat.` })
+    candidates.push({ deviation: dev, text: `Cari oran ${r.currentRatio.toFixed(2)}x — sektör ortalaması (${bm.currentRatio.toFixed(2)}x) ${getDeviationPhrase(dev, 'below')}; kısa vadeli yükümlülük yönetimine dikkat.` })
   }
 
   if (r.quickRatio != null && r.quickRatio < 1.0) {
@@ -131,39 +150,39 @@ export function buildWatchAreas(
   // Kârlılık
   if (r.netProfitMargin != null && r.netProfitMargin < bm.netProfitMargin) {
     const dev = (bm.netProfitMargin - r.netProfitMargin) / (bm.netProfitMargin || 0.01)
-    candidates.push({ deviation: dev, text: `Net kâr marjı %${(r.netProfitMargin * 100).toFixed(1)} ile sektör (%${(bm.netProfitMargin * 100).toFixed(1)}) belirgin altında.` })
+    candidates.push({ deviation: dev, text: `Net kâr marjı %${(r.netProfitMargin * 100).toFixed(1)} ile sektör (%${(bm.netProfitMargin * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'below')}.` })
   }
 
   if (r.ebitdaMargin != null && r.ebitdaMargin < bm.ebitdaMargin) {
     const dev = (bm.ebitdaMargin - r.ebitdaMargin) / (bm.ebitdaMargin || 0.01)
-    candidates.push({ deviation: dev, text: `FAVÖK marjı %${(r.ebitdaMargin * 100).toFixed(1)} ile operasyonel verimlilik geliştirilebilir.` })
+    candidates.push({ deviation: dev, text: `FAVÖK marjı %${(r.ebitdaMargin * 100).toFixed(1)} ile sektör (%${(bm.ebitdaMargin * 100).toFixed(1)}) ${getDeviationPhrase(dev, 'below')} — operasyonel verimlilik geliştirilebilir.` })
   }
 
   // Kaldıraç
   if (r.debtToEquity != null && r.debtToEquity > bm.debtToEquity) {
     const dev = (r.debtToEquity - bm.debtToEquity) / (bm.debtToEquity || 0.01)
-    candidates.push({ deviation: dev, text: `Borç/Özkaynak ${r.debtToEquity.toFixed(2)}x ile sektörün (${bm.debtToEquity.toFixed(2)}x) üzerinde — kaldıraç riski izlenmeli.` })
+    candidates.push({ deviation: dev, text: `Borç/Özkaynak ${r.debtToEquity.toFixed(2)}x ile sektörün (${bm.debtToEquity.toFixed(2)}x) ${getDeviationPhrase(dev, 'above')} — kaldıraç riski izlenmeli.` })
   }
 
   if (r.interestCoverage != null && r.interestCoverage < bm.interestCoverage) {
     const dev = (bm.interestCoverage - r.interestCoverage) / (bm.interestCoverage || 0.01)
-    candidates.push({ deviation: dev, text: `Faiz karşılama ${r.interestCoverage.toFixed(1)}x — finansal yük sınırda; faiz riski yönetimi önemli.` })
+    candidates.push({ deviation: dev, text: `Faiz karşılama ${r.interestCoverage.toFixed(1)}x — sektör (${bm.interestCoverage.toFixed(1)}x) ${getDeviationPhrase(dev, 'below')}; faiz riski yönetimi önemli.` })
   }
 
   // Faaliyet
   if (r.receivablesTurnoverDays != null && r.receivablesTurnoverDays > bm.receivablesDays) {
     const dev = (r.receivablesTurnoverDays - bm.receivablesDays) / (bm.receivablesDays || 0.01)
-    candidates.push({ deviation: dev, text: `Alacak tahsil süresi ${Math.round(r.receivablesTurnoverDays)} gün — sektör (${Math.round(bm.receivablesDays)} gün) üzerinde; tahsilat hızlandırılmalı.` })
+    candidates.push({ deviation: dev, text: `Alacak tahsil süresi ${Math.round(r.receivablesTurnoverDays)} gün — sektör (${Math.round(bm.receivablesDays)} gün) ${getDeviationPhrase(dev, 'above')}; tahsilat hızlandırılmalı.` })
   }
 
   if (r.inventoryTurnoverDays != null && r.inventoryTurnoverDays > bm.inventoryDays) {
     const dev = (r.inventoryTurnoverDays - bm.inventoryDays) / (bm.inventoryDays || 0.01)
-    candidates.push({ deviation: dev, text: `Stok devir süresi ${Math.round(r.inventoryTurnoverDays)} gün — sektör (${Math.round(bm.inventoryDays)} gün) üzerinde; stok yönetimi iyileştirilebilir.` })
+    candidates.push({ deviation: dev, text: `Stok devir süresi ${Math.round(r.inventoryTurnoverDays)} gün — sektör (${Math.round(bm.inventoryDays)} gün) ${getDeviationPhrase(dev, 'above')}; stok yönetimi iyileştirilebilir.` })
   }
 
   if (r.cashConversionCycle != null && r.cashConversionCycle > bm.cashConversionCycle) {
     const dev = (r.cashConversionCycle - bm.cashConversionCycle) / (bm.cashConversionCycle || 0.01)
-    candidates.push({ deviation: dev, text: `Nakit dönüşüm çevrimi ${Math.round(r.cashConversionCycle)} gün — yüksek çalışma sermayesi ihtiyacı söz konusu.` })
+    candidates.push({ deviation: dev, text: `Nakit dönüşüm çevrimi ${Math.round(r.cashConversionCycle)} gün — sektör (${Math.round(bm.cashConversionCycle)} gün) ${getDeviationPhrase(dev, 'above')}; çalışma sermayesi yönetimi izlenmeli.` })
   }
 
   // En büyük negatif sapmadan küçüğe sırala, en zayıf 4'ü döndür
