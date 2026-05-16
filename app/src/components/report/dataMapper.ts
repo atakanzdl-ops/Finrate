@@ -438,14 +438,22 @@ function buildCompanyInfo(
   const companyAgeYears = subj?.companyAgeYears ?? null
   const foundedYear = companyAgeYears != null ? analysisYear - companyAgeYears : null
 
-  // Sektör kıyaslama satırları (6 adet)
+  // Sektör kıyaslama satırları (13 adet — Atlas sırası)
+  const _bm = defaultBm as typeof SECTOR_BENCHMARKS[string]
   const sectorBenchmarks: Array<{ label: string; companyValue: string; sectorValue: string }> = [
-    { label: 'Cari Oran',           companyValue: '—', sectorValue: `${(defaultBm as typeof SECTOR_BENCHMARKS[string]).currentRatio.toFixed(2)}x` },
-    { label: 'Borç/Özkaynak',       companyValue: '—', sectorValue: `${(defaultBm as typeof SECTOR_BENCHMARKS[string]).debtToEquity.toFixed(2)}x` },
-    { label: 'FAVÖK Marjı',         companyValue: '—', sectorValue: fmtPct((defaultBm as typeof SECTOR_BENCHMARKS[string]).ebitdaMargin) },
-    { label: 'Faiz Karşılama',      companyValue: '—', sectorValue: `${(defaultBm as typeof SECTOR_BENCHMARKS[string]).interestCoverage.toFixed(1)}x` },
-    { label: 'Alacak Tahsil (gün)', companyValue: '—', sectorValue: `${Math.round((defaultBm as typeof SECTOR_BENCHMARKS[string]).receivablesDays)} gün` },
-    { label: 'Aktif Devir Hızı',    companyValue: '—', sectorValue: `${(defaultBm as typeof SECTOR_BENCHMARKS[string]).assetTurnover.toFixed(2)}x` },
+    { label: 'Cari Oran',                  companyValue: '—', sectorValue: fmtRatio(_bm.currentRatio) },
+    { label: 'Hızlı Oran',                 companyValue: '—', sectorValue: fmtRatio(_bm.quickRatio) },
+    { label: 'Borç/Özkaynak',              companyValue: '—', sectorValue: fmtRatio(_bm.debtToEquity) },
+    { label: 'Borç/Aktif',                 companyValue: '—', sectorValue: fmtRatio(_bm.debtToAssets) },
+    { label: 'FAVÖK Marjı',                companyValue: '—', sectorValue: fmtPct(_bm.ebitdaMargin) },
+    { label: 'Net Kâr Marjı',              companyValue: '—', sectorValue: fmtPct(_bm.netProfitMargin) },
+    { label: 'Brüt Kâr Marjı',             companyValue: '—', sectorValue: fmtPct(_bm.grossMargin) },
+    { label: 'ROA',                         companyValue: '—', sectorValue: fmtPct(_bm.roa) },
+    { label: 'ROE',                         companyValue: '—', sectorValue: fmtPct(_bm.roe) },
+    { label: 'Faiz Karşılama',             companyValue: '—', sectorValue: fmtRatio(_bm.interestCoverage) },
+    { label: 'Aktif Devir',                companyValue: '—', sectorValue: fmtRatio(_bm.assetTurnover) },
+    { label: 'Alacak Tahsil Süresi (DSO)', companyValue: '—', sectorValue: fmtDays(_bm.receivablesDays) },
+    { label: 'Stok Devir Süresi (DIO)',    companyValue: '—', sectorValue: fmtDays(_bm.inventoryDays) },
   ]
 
   return {
@@ -495,10 +503,11 @@ function buildFinancialDetail(
 
   return {
     kpis: [
-      { label: 'Net Satışlar', value: fmtCurrency(fd?.revenue), sub: netSalesYoY != null ? `${fmtPctSigned(netSalesYoY)} (Yıllık)` : '—' },
-      { label: 'FAVÖK',        value: fmtCurrency(fd?.ebitda),  sub: fmtPct(ratios.ebitdaMargin as number | null) + ' marj' },
-      { label: 'Net Kâr',      value: fmtCurrency(fd?.netProfit), sub: fmtPct(ratios.netProfitMargin as number | null) + ' marj' },
-      { label: 'Toplam Aktif', value: fmtCurrency(fd?.totalAssets), sub: '—' },
+      { label: 'Net Satışlar',   value: fmtCurrency(fd?.revenue),    sub: netSalesYoY != null ? `${fmtPctSigned(netSalesYoY)} (Yıllık)` : '—' },
+      { label: 'Net Kâr',        value: fmtCurrency(fd?.netProfit),  sub: fmtPct(ratios.netProfitMargin as number | null) + ' marj' },
+      { label: 'FAVÖK',          value: fmtCurrency(fd?.ebitda),     sub: fmtPct(ratios.ebitdaMargin as number | null) + ' marj' },
+      { label: 'Cari Oran',      value: fmtRatio(ratios.currentRatio as number | null), sub: `Sektör: ${fmtRatio(defaultBm.currentRatio)}` },
+      { label: 'Borç/Özkaynak', value: fmtRatio(ratios.debtToEquity as number | null), sub: `Sektör: ${fmtRatio(defaultBm.debtToEquity)}` },
     ],
     categoryBars: [
       {
