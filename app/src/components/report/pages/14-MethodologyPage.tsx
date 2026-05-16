@@ -86,7 +86,7 @@ export default function MethodologyPage({ data, sector }: Props) {
               ))}
             </div>
 
-            <div className="st" style={{ marginBottom: '12px' }}>Sınırlamalar &amp; Uyarılar</div>
+            <div className="st" style={{ marginBottom: '12px' }}>Yasal Uyarı &amp; Sınırlar</div>
             <div className="rsk">
               <div className="rsk-i">Bu rapor yatırım tavsiyesi niteliği taşımaz; bilgilendirme amacıyla hazırlanmıştır.</div>
               <div className="rsk-i">Derecelendirme, sunulan verilerin doğruluğunu esas alır. Hatalı veya eksik veri sistemin sorumluluğunu ortadan kaldırır.</div>
@@ -96,7 +96,7 @@ export default function MethodologyPage({ data, sector }: Props) {
 
             <div className="ev" style={{ marginTop: '12px' }}>
               <div className="ev-t">Finrate Hakkında</div>
-              <div className="ev-tx">Finrate, KOBİ&apos;ler ve mali müşavirler için bankacılık kalitesinde finansal analiz ve kredi derecelendirme platformudur. TCMB verileri, 25 finansal oran ve sektörel ağırlık profilleriyle birleşik derecelendirme sunmaktadır. <strong style={{ color: '#2dd4bf' }}>finrate.com.tr</strong></div>
+              <div className="ev-tx">Finrate; KOBİ&apos;ler, mali müşavirler, sektör profesyonelleri ve kurumsal firmalar için bankacılık düzeyinde finansal analiz ve skorlama platformudur. TCMB verileri, 25+ finansal oran ve sektörel ağırlık profilleriyle birleşik derecelendirme sunmaktadır. <strong style={{ color: '#2dd4bf' }}>www.finrate.com.tr</strong></div>
             </div>
           </div>
         </div>
