@@ -429,8 +429,15 @@ function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<s
 }
 
 function extractMizanYear(rows: unknown[][]): { year: number | null; period: string } {
+  // Öncelik: "Tarih Aralığı" satırı > "Dönem" satırı > ilk bulunan > güvenli fallback
+  // norm() ile Türkçe karakter normalize edilir (excel.ts:49)
+  let tarihAraligiResult: { year: number; period: string } | null = null
+  let donemResult:        { year: number; period: string } | null = null
+  let fallbackResult:     { year: number; period: string } | null = null
+
   for (let i = 0; i < Math.min(6, rows.length); i++) {
-    for (const cell of rows[i] as (unknown)[]) {
+    const rowText = norm((rows[i] as unknown[]).join(' '))
+    for (const cell of rows[i] as unknown[]) {
       if (!cell) continue
       const m = String(cell).match(
         /(\d{2})[.\/-](\d{2})[.\/-](20\d{2})(?:\s*[-–—]\s*|\s+)(\d{2})[.\/-](\d{2})[.\/-](20\d{2})/
@@ -439,11 +446,20 @@ function extractMizanYear(rows: unknown[][]): { year: number | null; period: str
         const endMonth = parseInt(m[5])
         const endYear  = parseInt(m[6])
         const period   = endMonth <= 3 ? 'Q1' : endMonth <= 6 ? 'Q2' : endMonth <= 9 ? 'Q3' : 'ANNUAL'
-        return { year: endYear, period }
+        const result   = { year: endYear, period }
+        if (rowText.includes('tarih araligi') && !tarihAraligiResult) {
+          tarihAraligiResult = result
+        } else if (rowText.includes('donem') && !donemResult) {
+          donemResult = result
+        } else if (!fallbackResult) {
+          fallbackResult = result
+        }
+        break  // Bu satırdan sadece ilk tarih eşleşmesini al
       }
     }
   }
-  return { year: null, period: 'ANNUAL' }
+
+  return tarihAraligiResult ?? donemResult ?? fallbackResult ?? { year: null, period: 'ANNUAL' }
 }
 
 // ─── Mizan satır eşlemesi ─────────────────────────────────────────────────────

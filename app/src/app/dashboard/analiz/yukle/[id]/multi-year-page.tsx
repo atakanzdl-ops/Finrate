@@ -59,7 +59,8 @@ const PERIODS = [
   { value: 'Q4', label: '4. Geçici Vergi (Oca-Ara)' },
 ]
 
-const YEARS = [2021, 2022, 2023, 2024, 2025]
+const CURRENT_YEAR = new Date().getFullYear()
+const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 4 + i)
 
 export default function MultiYearUploadPage() {
   const router = useRouter()
@@ -318,7 +319,7 @@ export default function MultiYearUploadPage() {
           <section className="card p-6 sm:p-8">
             <h1 className="text-2xl font-bold text-[#0B3C5D]">Mali Veri Yükleme</h1>
             <p className="text-sm text-slate-500 mt-2">
-              2021–2025 yılları için dosya yükleyin. En az bir yıl yüklendiğinde analiz başlatabilirsiniz.
+              {YEARS[0]}–{YEARS[YEARS.length - 1]} yılları için dosya yükleyin. En az bir yıl yüklendiğinde analiz başlatabilirsiniz.
             </p>
 
             <div className="mt-6">
