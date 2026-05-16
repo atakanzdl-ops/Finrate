@@ -136,6 +136,11 @@
 .pt .mr               { background: #0a192f !important; }
 .pt .mr td            { background: #0a192f !important; color: white !important; font-weight: 800; border-bottom: none; }
 
+/* ── SAYFA 8 — BİLANÇO KOMPAKT MOD (Faz 7.3.55.4c-3 overflow düzeltmesi) ── */
+.balance-page .pt th              { padding-top: 6px; padding-bottom: 6px; }
+.balance-page .pt td              { padding-top: 5px; padding-bottom: 5px; font-size: 9.5px; }
+.balance-page .pt td:first-child  { font-size: 9.5px; }
+
 /* ── PROGRESS BAR ── */
 .prt { height: 10px; background: #e2e8f0; border-radius: 999px; position: relative; overflow: visible; }
 .prf { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #0ea5e9, #2dd4bf); }

@@ -27,7 +27,7 @@ export default function BalanceSheetPage({ data, sector }: Props) {
   const { years, items, totalAssets, totalLiabilities, equityRatio, comment } = bs
 
   return (
-    <div className="pdf-page">
+    <div className="pdf-page balance-page">
       <div className="wm">BİLANÇO</div>
       <div className="ph">
         <div><div className="ph-sec">Bölüm 07</div><div className="ph-title">Aktif/Pasif Analizi</div></div>
@@ -36,7 +36,7 @@ export default function BalanceSheetPage({ data, sector }: Props) {
       <div className="pc">
 
         {/* Özet Kartlar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
           <div className="kpi" style={{ borderTop: '2px solid #0284c7' }}>
             <div className="kpi-l">Toplam Aktif</div>
             <div className="kpi-v">{fmtCurrency(totalAssets)}</div>
