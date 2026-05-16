@@ -1,22 +1,22 @@
 'use client'
 import type { ReportData } from '@/types/report'
-import { fmtCurrency, fmtRatio, fmtPct, fmtPctSigned } from '../formatters'
+import { fmtCurrency, fmtRatio, fmtPct, fmtPctSigned, BAR_COLOR } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'rating' | 'totalScore' | 'financialScore' | 'subjectiveScore' | 'reportNo' | 'executive'>
   sector?: string
 }
 
+// Sayfa 4 ile aynı mantık — skor bazlı, kırmızı yok
+const getBarColor = (score: number): string => {
+  if (score >= 70) return BAR_COLOR.iyi
+  if (score >= 40) return BAR_COLOR.uyari
+  return BAR_COLOR.uyari
+}
+
 export default function ExecutiveSummaryPage({ data, sector }: Props) {
   const { companyName, rating, totalScore, financialScore, subjectiveScore, reportNo, executive: ex } = data
   const { categories: cat, kpis, strengths, watchAreas, conclusion, riskClassification, missingFields } = ex
-
-  const CATEGORY_COLORS: Record<string, string> = {
-    liquidity:     'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
-    profitability: 'linear-gradient(90deg,#f59e0b,#fcd34d)',
-    leverage:      'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
-    activity:      'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
-  }
 
   const catDefs = [
     { key: 'liquidity',     label: 'Likidite',  data: cat.liquidity },
@@ -73,7 +73,7 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
                     </div>
                   </div>
                   <div className="cb-trk">
-                    <div className="cb-fil" style={{ width: `${c.data.score}%`, background: CATEGORY_COLORS[c.key] }} />
+                    <div className="cb-fil" style={{ width: `${c.data.score}%`, background: getBarColor(c.data.score) }} />
                     <div className="cb-mrk" style={{ left: `${c.data.referenceScore}%` }} />
                   </div>
                 </div>
