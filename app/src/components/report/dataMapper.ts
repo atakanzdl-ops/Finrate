@@ -3,6 +3,7 @@
 // Saf fonksiyon — yan etki yok, DB çağrısı yok.
 
 import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark, getSectorBenchmark, getSectorWeights } from '@/lib/scoring/benchmarks'
+import { computeSectorCategoryScores } from '@/lib/scoring/score'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
 import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus } from '@/types/report'
 import { getNaceCode } from './naceMap'
@@ -172,6 +173,10 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const bm      = getSectorBenchmark(sector)
   const weights = getSectorWeights(sector)
 
+  // T8: Sektör kategori skorları — benchmark sanal firma gibi calculateScore'dan geçer.
+  //     Sayfa 2 ve 4'te "Ref:X" olarak gösterilir (50 sabit değil, gerçek hesaplama).
+  const sectorScores = computeSectorCategoryScores(bm, sector)
+
   // ── Temel skorlar ──────────────────────────────────────────────────────────
   const rawFinancialScore = (ratios.__financialScore as number | undefined) ?? api.finalScore ?? 0
   const subjectiveTotal   = (ratios.__subjectiveTotal as number | undefined) ?? 0
@@ -238,13 +243,13 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     validUntil,
 
     // ── Sayfa 2: Yönetici Özeti ───────────────────────────────────────────────
-    executive: buildExecutiveSummary(api, ratios, fd, bm, weights, rating, totalScore, rawFinancialScore, sector),
+    executive: buildExecutiveSummary(api, ratios, fd, bm, weights, rating, totalScore, rawFinancialScore, sector, sectorScores),
 
     // ── Sayfa 3: Firma & Sektör ───────────────────────────────────────────────
     companyInfo: buildCompanyInfo(entity, sector, bm, weights, subj, api.year, api.financialData),  // A2: fd eklendi
 
     // ── Sayfa 4: Finansal Skor Detayı ────────────────────────────────────────
-    financialDetail: buildFinancialDetail(api, ratios, fd, bm, sector, rating, totalScore),
+    financialDetail: buildFinancialDetail(api, ratios, fd, bm, sector, rating, totalScore, sectorScores),
 
     // ── Sayfa 5: Likidite & Borçlanma Oranları ────────────────────────────────
     liquidityRatios: buildLiquidityRatioRows(ratios, bm),
@@ -347,6 +352,11 @@ function getMissingFields(fd: FinancialDataRaw | null | undefined): string[] {
 
 // ─── SAYFA 2: YÖNETİCİ ÖZETİ ────────────────────────────────────────────────
 
+// T8: safeReference — Number.isFinite kontrolü, fallback 50
+function safeReference(value: number | null | undefined): number {
+  return Number.isFinite(value) ? (value as number) : 50
+}
+
 function buildExecutiveSummary(
   api: AnalysisApiResponse,
   ratios: Record<string, number | null>,
@@ -357,6 +367,7 @@ function buildExecutiveSummary(
   totalScore: number,
   rawFinancialScore: number,   // Ö9: Risk Klasmanı için ham finansal skor
   sector: string | null,
+  sectorScores: { liquidity: number; profitability: number; leverage: number; activity: number },
 ) {
   const defaultBm: SectorBenchmark = bm ?? (SECTOR_BENCHMARKS['Genel'] as SectorBenchmark)
 
@@ -381,10 +392,10 @@ function buildExecutiveSummary(
 
   return {
     categories: {
-      liquidity:     { score: liqScore,  referenceScore: 50, weight: weights.liquidity },
-      profitability: { score: profScore, referenceScore: 50, weight: weights.profitability },
-      leverage:      { score: levScore,  referenceScore: 50, weight: weights.leverage },
-      activity:      { score: actScore,  referenceScore: 50, weight: weights.activity },
+      liquidity:     { score: liqScore,  referenceScore: safeReference(sectorScores.liquidity),     weight: weights.liquidity },
+      profitability: { score: profScore, referenceScore: safeReference(sectorScores.profitability), weight: weights.profitability },
+      leverage:      { score: levScore,  referenceScore: safeReference(sectorScores.leverage),      weight: weights.leverage },
+      activity:      { score: actScore,  referenceScore: safeReference(sectorScores.activity),      weight: weights.activity },
     },
     kpis: {
       netSales:               fd?.revenue ?? 0,
@@ -465,6 +476,7 @@ function buildFinancialDetail(
   sector: string | null,
   rating: string,
   totalScore: number,
+  sectorScores: { liquidity: number; profitability: number; leverage: number; activity: number },
 ) {
   const defaultBm: SectorBenchmark = bm ?? (SECTOR_BENCHMARKS['Genel'] as SectorBenchmark)
   const liqScore  = api.liquidityScore    ?? 50
@@ -492,7 +504,7 @@ function buildFinancialDetail(
       {
         name: 'Likidite',
         score: liqScore,
-        referenceScore: 50,
+        referenceScore: safeReference(sectorScores.liquidity),
         weight: weights.liquidity,
         fillColor: 'linear-gradient(90deg,#0ea5e9,#2dd4bf)',
         subMetrics: 'Cari · Hızlı · Nakit Oranı · NÇS/Aktif · CCC',
@@ -500,7 +512,7 @@ function buildFinancialDetail(
       {
         name: 'Kârlılık',
         score: profScore,
-        referenceScore: 50,
+        referenceScore: safeReference(sectorScores.profitability),
         weight: weights.profitability,
         fillColor: 'linear-gradient(90deg,#10b981,#2dd4bf)',
         subMetrics: 'Brüt · FAVÖK · FVÖK · Net Marj · ROA · ROE · ROIC · Büyüme',
@@ -508,7 +520,7 @@ function buildFinancialDetail(
       {
         name: 'Kaldıraç',
         score: levScore,
-        referenceScore: 50,
+        referenceScore: safeReference(sectorScores.leverage),
         weight: weights.leverage,
         fillColor: 'linear-gradient(90deg,#8b5cf6,#6366f1)',
         subMetrics: 'Borç/ÖzK · Borç/Aktif · Faiz Karşılama · Net Borç/FAVÖK',
@@ -516,7 +528,7 @@ function buildFinancialDetail(
       {
         name: 'Faaliyet',
         score: actScore,
-        referenceScore: 50,
+        referenceScore: safeReference(sectorScores.activity),
         weight: weights.activity,
         fillColor: 'linear-gradient(90deg,#f59e0b,#fb923c)',
         subMetrics: 'Aktif Devir · DSO · DIO · DPO · Sabit Varlık Deviri',

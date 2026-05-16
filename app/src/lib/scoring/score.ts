@@ -552,3 +552,71 @@ export function calculateScore(ratios: RatioResult, sector?: string | null): Sco
     insufficientCategories,
   }
 }
+
+// ─── SEKTÖR KATEGORİ SKORU HESAPLAMA ─────────────────────────────────────────
+/**
+ * Sektör benchmark'ını "sanal firma" gibi aynı calculateScore pipeline'ından
+ * geçirir. Çıkan kategori skorları, sayfa 2 ve 4'teki "Ref:X" referans
+ * değerleri olarak kullanılır — artık 50 sabit değil, gerçek sektör skoru.
+ *
+ * Alan adı eşlemesi (SectorBenchmark → RatioResult):
+ *   benchmark.receivablesDays     → inventoryTurnoverDays YOK — receivablesTurnoverDays
+ *   benchmark.inventoryDays       → inventoryTurnoverDays
+ *   benchmark.receivablesDays     → receivablesTurnoverDays
+ *   equityRatio türetilir          → 1 - benchmark.debtToAssets
+ *   Benchmark'ta olmayan alanlar  → null
+ */
+export function computeSectorCategoryScores(
+  benchmark: SectorBenchmark,
+  sector?: string | null,
+): { liquidity: number; profitability: number; leverage: number; activity: number } {
+  const synthetic: RatioResult = {
+    // ── Likidite ──
+    currentRatio:           benchmark.currentRatio,
+    quickRatio:             benchmark.quickRatio,
+    cashRatio:              benchmark.cashRatio,
+    netWorkingCapital:      null,                         // benchmark'ta yok
+    netWorkingCapitalRatio: benchmark.netWorkingCapitalRatio,
+    cashConversionCycle:    benchmark.cashConversionCycle,
+
+    // ── Kârlılık ──
+    grossMargin:      benchmark.grossMargin,
+    ebitdaMargin:     benchmark.ebitdaMargin,
+    ebitMargin:       benchmark.ebitMargin,
+    netProfitMargin:  benchmark.netProfitMargin,
+    roa:              benchmark.roa,
+    roe:              benchmark.roe,
+    roic:             benchmark.roic,
+    revenueGrowth:    benchmark.revenueGrowth,
+    realGrowth:       null,                              // benchmark'ta yok
+
+    // ── Kaldıraç ──
+    debtToEquity:       benchmark.debtToEquity,
+    debtToAssets:       benchmark.debtToAssets,
+    debtToEbitda:       benchmark.debtToEbitda,
+    interestCoverage:   benchmark.interestCoverage,
+    equityRatio:        1 - benchmark.debtToAssets,      // türetilen
+    shortTermDebtRatio: benchmark.shortTermDebtRatio,
+
+    // ── Faaliyet ──
+    assetTurnover:           benchmark.assetTurnover,
+    inventoryTurnoverDays:   benchmark.inventoryDays,    // isim eşleme
+    receivablesTurnoverDays: benchmark.receivablesDays,  // isim eşleme
+    payablesTurnoverDays:    benchmark.payablesTurnoverDays,
+    fixedAssetTurnover:      benchmark.fixedAssetTurnover,
+    operatingExpenseRatio:   benchmark.operatingExpenseRatio,
+
+    // ── İnşaat ek (benchmark'ta yok) ──
+    customerAdvanceDays:           null,
+    adjustedCashConversionCycle:   null,
+  }
+
+  const result = calculateScore(synthetic, sector)
+
+  return {
+    liquidity:     result.liquidityScore,
+    profitability: result.profitabilityScore,
+    leverage:      result.leverageScore,
+    activity:      result.activityScore,
+  }
+}
