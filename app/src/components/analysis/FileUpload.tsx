@@ -58,7 +58,7 @@ interface UploadOneOptions {
 }
 
 const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i)
+const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
 
 const PERIODS = [
   { value: 'ANNUAL', label: 'Kesin Beyan (Tam Yıl)' },

@@ -111,7 +111,8 @@ const ELIM_PERIODS = [
   { v: 'Q3', label: 'Q3' }, { v: 'Q4', label: 'Q4' },
 ]
 
-const YEAR_LIST = Array.from({ length: 6 }, (_, i) => 2020 + i)
+const CURRENT_YEAR = new Date().getFullYear()
+const YEAR_LIST = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 4 + i)
 
 // ── 25-rasyo meta verisi — benchmark eşleştirmesi, yön ve ağırlık ──────────────
 // direction: 'higher' → büyük olmalı | 'lower' → küçük olmalı | 'none' → karşılaştırma yok

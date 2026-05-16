@@ -131,7 +131,7 @@ export default function Page() {
             <div className="feature-card"><h3>Senaryo Motoru</h3><p>“BB’den BBB’ye nasıl çıkarım?” sorusuna sayısal cevap.</p></div>
             <div className="feature-card"><h3>Bankaya Hazır PDF</h3><p>Yönetici özeti, skor breakdown, aksiyon planı.</p></div>
             <div className="feature-card"><h3>TCMB Benchmark</h3><p>TCMB sektör ortalamaları ile kıyaslama.</p></div>
-            <div className="feature-card"><h3>Çoklu Dönem</h3><p>2021-2025 trend takibi ve dönem karşılaştırması.</p></div>
+            <div className="feature-card"><h3>Çoklu Dönem</h3><p>Çok yıllı trend takibi ve dönem karşılaştırması.</p></div>
           </div>
         </div>
       </section>
