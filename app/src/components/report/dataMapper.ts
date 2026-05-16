@@ -818,11 +818,13 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
     { label: 'Ticari Alacaklar',            values: valArr(f => f.tradeReceivables) },
     { label: 'Stoklar',                     values: valArr(f => f.inventory) },
     { label: 'Diğer Dönen Varlıklar',       values: valArr(f => null) },   // Yok — göster
+    { label: 'TOPLAM DÖNEN VARLIKLAR',      values: valArr(f => f.totalCurrentAssets), isTotal: true },
 
     { label: 'DURAN VARLIKLAR', values: valArr(f => f.totalNonCurrentAssets), isMain: true },
     { label: 'Maddi Duran Varlıklar',            values: valArr(f => f.tangibleAssets) },
     { label: 'Maddi Olmayan Duran Varlıklar',    values: valArr(f => f.intangibleAssets ?? null) },
     { label: 'Diğer Duran Varlıklar',            values: valArr(f => null) },
+    { label: 'TOPLAM DURAN VARLIKLAR',           values: valArr(f => f.totalNonCurrentAssets), isTotal: true },
 
     { label: 'TOPLAM AKTİF', values: valArr(f => f.totalAssets), isTotal: true },
 
@@ -831,14 +833,17 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
     { label: 'Finansal Borçlar (KV)',       values: valArr(f => f.shortTermFinancialDebt) },
     { label: 'Ticari Borçlar',              values: valArr(f => f.tradePayables) },
     { label: 'Diğer KV Yükümlülükler',     values: valArr(f => null) },
+    { label: 'TOPLAM KISA VADELİ YÜK.',    values: valArr(f => f.totalCurrentLiabilities), isTotal: true },
 
     { label: 'UZUN VADELİ YÜKÜMLÜLÜKLER', values: valArr(f => f.totalNonCurrentLiabilities), isMain: true },
     { label: 'Finansal Borçlar (UV)',       values: valArr(f => f.longTermFinancialDebt) },
     { label: 'Diğer UV Yükümlülükler',     values: valArr(f => null) },
+    { label: 'TOPLAM UZUN VADELİ YÜK.',    values: valArr(f => f.totalNonCurrentLiabilities), isTotal: true },
 
     { label: 'ÖZKAYNAKLAR', values: valArr(f => f.totalEquity), isMain: true },
     { label: 'Ödenmiş Sermaye',               values: valArr(f => f.paidInCapital ?? null) },
     { label: 'Geçmiş Yıllar Kâr/Zararı',     values: valArr(f => (f.retainedEarnings ?? 0) - (f.retainedLosses ?? 0)) },
+    { label: 'TOPLAM ÖZKAYNAK',               values: valArr(f => f.totalEquity), isTotal: true },
 
     { label: 'TOPLAM PASİF', values: valArr(f => f.totalLiabilitiesAndEquity ?? f.totalAssets), isTotal: true },
   ]
