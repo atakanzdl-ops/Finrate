@@ -88,6 +88,18 @@ export default function FinancialDetailPage({ data, sector }: Props) {
               ))}
             </div>
           </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '18px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '8px', color: '#64748b' }}>
+              <div style={{ width: '16px', height: '5px', background: '#16a34a', borderRadius: '3px' }} />
+              Firma Skoru
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '8px', color: '#64748b' }}>
+              <div style={{ width: '3px', height: '14px', background: '#0a192f', borderRadius: '2px' }} />
+              Performans Referansı
+            </div>
+          </div>
         </div>
 
         {/* Alt: Güçlü & İzleme + Değerlendirme */}
