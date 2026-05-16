@@ -149,15 +149,25 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
           <div className="str">
             <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Güçlü Alanlar</div>
             {strengths.length > 0
-              ? strengths.map((s, i) => <div key={i} className="str-i">{s}</div>)
-              : <div className="str-i">Sektör ortalamasına yakın finansal profil.</div>}
+              ? strengths.map((s, i) => (
+                  <div key={i} className="str-i">
+                    <span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>
+                    {s}
+                  </div>
+                ))
+              : <div className="str-i"><span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>Sektör ortalamasına yakın finansal profil.</div>}
           </div>
           <div>
             <div className="rsk">
               <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>İzleme Alanları</div>
               {watchAreas.length > 0
-                ? watchAreas.map((w, i) => <div key={i} className="rsk-i">{w}</div>)
-                : <div className="rsk-i">Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
+                ? watchAreas.map((w, i) => (
+                    <div key={i} className="rsk-i">
+                      <span style={{ color: '#f97316', fontWeight: 700 }}>⚠</span>
+                      {w}
+                    </div>
+                  ))
+                : <div className="rsk-i"><span style={{ color: '#f97316', fontWeight: 700 }}>⚠</span>Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
             </div>
 
             {/* Ö9: Finrate Risk Klasmanı */}

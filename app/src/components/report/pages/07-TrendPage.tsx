@@ -14,19 +14,19 @@ function MiniBarChart({ chart }: { chart: TrendChart }) {
       <div style={{ fontSize: '10px', fontWeight: 700, color: '#0a192f', marginBottom: '2px' }}>{chart.title}</div>
       <div style={{ fontSize: '7.5px', color: '#94a3b8', marginBottom: '12px' }}>{chart.subtitle}</div>
 
-      {/* Çubuk grubu */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: `${maxH + 16}px` }}>
+      {/* Çubuk grubu — T14: sabit 14px bar genişliği (referans baz) */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: `${maxH + 16}px` }}>
         {chart.bars.map((bar, bi) => (
-          <div key={bi} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+          <div key={bi} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
             {/* Sütunlar yan yana */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', height: `${maxH}px` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: `${maxH}px` }}>
               {bar.columns.map((col, ci) => (
-                <div key={ci} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <div key={ci} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                   {/* Etiket */}
                   <div style={{ fontSize: '6.5px', color: '#64748b', marginBottom: '2px', textAlign: 'center', lineHeight: 1 }}>{col.label}</div>
-                  {/* Bar */}
+                  {/* Bar — 14px sabit genişlik */}
                   <div style={{
-                    width: '100%',
+                    width: '14px',
                     height: `${Math.max(3, col.value * maxH / 100)}px`,
                     background: col.color,
                     borderRadius: '3px 3px 0 0',
@@ -97,20 +97,25 @@ export default function TrendPage({ data, sector }: Props) {
           ))}
         </div>
 
-        {/* Büyüme Tablosu */}
-        <div className="st" style={{ marginBottom: '10px' }}>Finansal Büyüme Tablosu <span className="st-sub">Yıllık karşılaştırma</span></div>
-        <table className="pt">
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'left' }}>Metrik</th>
-              {years.map(y => <th key={y}>{y}</th>)}
-              <th>4Y Büyüme</th>
-            </tr>
-          </thead>
-          <tbody>
-            {growthTable.map((row, i) => <GrowthRow key={i} row={row} />)}
-          </tbody>
-        </table>
+        {/* Büyüme Tablosu — T15: lacivert üst bantlı wrapper */}
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ background: '#0a192f', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '14px' }}>Finansal Büyüme Özeti</div>
+            <div style={{ color: '#cbd5e1', fontSize: '11px' }}>Yıllık karşılaştırma</div>
+          </div>
+          <table className="pt" style={{ margin: 0 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left' }}>Metrik</th>
+                {years.map(y => <th key={y}>{y}</th>)}
+                <th>4Y Büyüme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {growthTable.map((row, i) => <GrowthRow key={i} row={row} />)}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div className="pf">
         <span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span>

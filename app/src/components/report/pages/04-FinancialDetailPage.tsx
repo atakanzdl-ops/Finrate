@@ -1,16 +1,17 @@
 'use client'
 import type { ReportData } from '@/types/report'
+import { BAR_COLOR } from '../formatters'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'subjectiveScore' | 'reportNo' | 'financialDetail'>
   sector?: string
 }
 
-// Ö5-renk: Skora göre dinamik çubuk rengi (sabit gradient yerine)
+// T13: BAR_COLOR gradient sistemiyle uyumlu — kırmızı yok
 const getBarColor = (score: number): string => {
-  if (score >= 70) return '#16a34a'
-  if (score >= 40) return '#f97316'
-  return '#dc2626'
+  if (score >= 70) return BAR_COLOR.iyi
+  if (score >= 40) return BAR_COLOR.uyari
+  return BAR_COLOR.uyari  // düşük skor da amber-sarı (kırmızı yok)
 }
 
 export default function FinancialDetailPage({ data, sector }: Props) {
@@ -106,11 +107,21 @@ export default function FinancialDetailPage({ data, sector }: Props) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
           <div className="str">
             <div style={{ fontSize: '9px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Güçlü Alanlar</div>
-            {strengths.slice(0, 4).map((s, i) => <div key={i} className="str-i">{s}</div>)}
+            {strengths.slice(0, 4).map((s, i) => (
+              <div key={i} className="str-i">
+                <span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>
+                {s}
+              </div>
+            ))}
           </div>
           <div className="rsk">
             <div style={{ fontSize: '9px', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>İzleme Alanları</div>
-            {watchAreas.slice(0, 4).map((w, i) => <div key={i} className="rsk-i">{w}</div>)}
+            {watchAreas.slice(0, 4).map((w, i) => (
+              <div key={i} className="rsk-i">
+                <span style={{ color: '#f97316', fontWeight: 700 }}>⚠</span>
+                {w}
+              </div>
+            ))}
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData, RatioRow } from '@/types/report'
+import { RatioTableLegend } from '../components/RatioTableLegend'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'profitabilityRatios'>
@@ -71,7 +72,10 @@ export default function ProfitabilityRatiosPage({ data, sector }: Props) {
           </>
         )}
 
-        <div style={{ marginTop: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '11px', padding: '14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        {/* Lejant */}
+        <RatioTableLegend />
+
+        <div style={{ marginTop: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '11px', padding: '14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#0a192f', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Kârlılık Göstergeleri Hakkında</div>
             <div style={{ fontSize: '8.5px', color: '#64748b', lineHeight: 1.6 }}>FAVÖK marjı faiz, amortisman ve vergi öncesi operasyonel kârlılığı gösterir. ROA ve ROE varlık ve özkaynak kullanım etkinliğini ölçer. Büyüme oranının ÜFE üzerinde kalması reel büyümeyi ifade eder.</div>
@@ -79,6 +83,9 @@ export default function ProfitabilityRatiosPage({ data, sector }: Props) {
           <div>
             <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#0a192f', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Faaliyet Göstergeleri Hakkında</div>
             <div style={{ fontSize: '8.5px', color: '#64748b', lineHeight: 1.6 }}>DSO, DIO, DPO ve CCC nakit dönüşüm verimliliğini ölçer. Aktif devir hızı yüksek olduğunda varlık kullanımı etkin; düşük olduğunda atıl kapasite riski söz konusu olabilir.</div>
+          </div>
+          <div style={{ gridColumn: '1 / -1', marginTop: '4px', fontSize: '8.5px', color: '#64748b', fontStyle: 'italic' }}>
+            <strong>Kısaltmalar:</strong> FAVÖK = Faiz, Amortisman ve Vergi Öncesi Kâr · FVÖK = Faiz ve Vergi Öncesi Kâr · ROA = Aktif Kârlılığı · ROE = Özkaynak Kârlılığı · DSO = Alacak Tahsil Süresi · DIO = Stok Devir Süresi · DPO = Ticari Borç Ödeme Süresi · CCC = Nakit Dönüşüm Çevrimi
           </div>
         </div>
       </div>

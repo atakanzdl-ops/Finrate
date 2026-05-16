@@ -199,10 +199,8 @@
 /* ── STRENGTHS / RISKS ── */
 .str    { background: #f0fdf4; border: 1px solid #86efac; border-radius: 11px; padding: 14px; }
 .str-i  { font-size: 9px; color: #166534; padding: 3px 0; display: flex; gap: 6px; align-items: flex-start; }
-.str-i::before { content: '✓'; font-weight: 700; flex-shrink: 0; }
 .rsk    { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 11px; padding: 14px; }
 .rsk-i  { font-size: 9px; color: #991b1b; padding: 3px 0; display: flex; gap: 6px; align-items: flex-start; }
-.rsk-i::before { content: '⚠'; flex-shrink: 0; }
 
 /* ── EVAL BOX ── */
 .ev    { background: #0a192f; border-radius: 13px; padding: 20px 22px; color: white; }

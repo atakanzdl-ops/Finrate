@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData, RatioRow } from '@/types/report'
+import { RatioTableLegend } from '../components/RatioTableLegend'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'liquidityRatios'>
@@ -75,8 +76,11 @@ export default function LiquidityRatiosPage({ data, sector }: Props) {
           </>
         )}
 
+        {/* Lejant */}
+        <RatioTableLegend />
+
         {/* Açıklama kutusu */}
-        <div style={{ marginTop: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '11px', padding: '14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ marginTop: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '11px', padding: '14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#0a192f', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Likidite Göstergeleri Hakkında</div>
             <div style={{ fontSize: '8.5px', color: '#64748b', lineHeight: 1.6 }}>Cari oran, kısa vadeli yükümlülükleri karşılama kapasitesini gösterir. 1.5x üzeri genel kabul görmüş eşik olmakla birlikte sektöre göre değişir. NÇS / Aktif sektöre kıyasla değerlendirilmelidir.</div>
@@ -84,6 +88,9 @@ export default function LiquidityRatiosPage({ data, sector }: Props) {
           <div>
             <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#0a192f', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Borçlanma Göstergeleri Hakkında</div>
             <div style={{ fontSize: '8.5px', color: '#64748b', lineHeight: 1.6 }}>Faiz karşılama oranı, borç servis kapasitesinin temel göstergesidir. 3x ve üzeri bankacılık sektöründe yeterli olarak değerlendirilir. Sektör kıyaslaması kritik öneme sahiptir.</div>
+          </div>
+          <div style={{ gridColumn: '1 / -1', marginTop: '4px', fontSize: '8.5px', color: '#64748b', fontStyle: 'italic' }}>
+            <strong>Kısaltmalar:</strong> NÇS = Net Çalışma Sermayesi · FAVÖK = Faiz, Amortisman ve Vergi Öncesi Kâr · CCC = Nakit Dönüşüm Çevrimi
           </div>
         </div>
       </div>

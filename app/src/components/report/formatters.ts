@@ -152,8 +152,8 @@ export function ratioStatus(
 
 export const BAR_COLOR: Record<'iyi' | 'uyari' | 'risk', string> = {
   iyi:   'linear-gradient(90deg,#2dd4bf,#0ea5e9)',
-  uyari: 'linear-gradient(90deg,#f59e0b,#fb923c)',
-  risk:  'linear-gradient(90deg,#ef4444,#dc2626)',
+  uyari: 'linear-gradient(90deg,#f59e0b,#fcd34d)',   // Atlas referans
+  risk:  'linear-gradient(90deg,#f59e0b,#fcd34d)',   // kırmızı yok — amber-sarı
 }
 
 // ─── DÖNEM ETİKETİ ────────────────────────────────────────────────────────────
