@@ -324,9 +324,9 @@ export function getSubjectiveStatus(
   }
   return {
     status: 'Zayıf',
-    statusColor: '#ef4444',
-    barColor: 'linear-gradient(90deg,#ef4444,#dc2626)',
-    summaryBg: '#fef2f2',
-    summaryColor: '#991b1b',
+    statusColor: '#f59e0b',
+    barColor: 'linear-gradient(90deg,#f59e0b,#fb923c)',
+    summaryBg: '#fefce8',
+    summaryColor: '#92400e',
   }
 }
