@@ -714,7 +714,7 @@ function buildTrendData(
         columns: [
           {
             value: val != null ? Math.min(val / maxVal * 100, 100) : 0,
-            color: isCurrent ? colorMain : colorMain + '99',
+            color: colorMain,
             label: val != null ? labelFn(val) : '—',
             isMain: true,
           },

@@ -30,7 +30,6 @@ function MiniBarChart({ chart }: { chart: TrendChart }) {
                     height: `${Math.max(3, col.value * maxH / 100)}px`,
                     background: col.color,
                     borderRadius: '3px 3px 0 0',
-                    opacity: bar.isCurrent ? 1 : 0.6,
                   }} />
                 </div>
               ))}
