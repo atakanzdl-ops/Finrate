@@ -14,6 +14,25 @@ const getBarColor = (score: number): string => {
   return BAR_COLOR.uyari
 }
 
+// PDF'te font glyph sorununu önlemek için inline SVG
+const CheckIcon = () => (
+  <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', color: '#16a34a', marginRight: 4, flexShrink: 0 }}>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  </span>
+)
+
+const WarnIcon = () => (
+  <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', color: '#f97316', marginRight: 4, flexShrink: 0 }}>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  </span>
+)
+
 export default function ExecutiveSummaryPage({ data, sector }: Props) {
   const { companyName, rating, totalScore, financialScore, subjectiveScore, reportNo, executive: ex } = data
   const { categories: cat, kpis, strengths, watchAreas, conclusion, riskClassification, missingFields } = ex
@@ -151,11 +170,11 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
             {strengths.length > 0
               ? strengths.map((s, i) => (
                   <div key={i} className="str-i">
-                    <span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>
+                    <CheckIcon />
                     {s}
                   </div>
                 ))
-              : <div className="str-i"><span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>Sektör ortalamasına yakın finansal profil.</div>}
+              : <div className="str-i"><CheckIcon />Sektör ortalamasına yakın finansal profil.</div>}
           </div>
           <div>
             <div className="rsk">
@@ -163,11 +182,11 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
               {watchAreas.length > 0
                 ? watchAreas.map((w, i) => (
                     <div key={i} className="rsk-i">
-                      <span style={{ color: '#f97316', fontWeight: 700 }}>⚠</span>
+                      <WarnIcon />
                       {w}
                     </div>
                   ))
-                : <div className="rsk-i"><span style={{ color: '#f97316', fontWeight: 700 }}>⚠</span>Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
+                : <div className="rsk-i"><WarnIcon />Senaryo analizine göre iyileştirme fırsatları mevcuttur.</div>}
             </div>
 
             {/* Ö9: Finrate Risk Klasmanı */}
