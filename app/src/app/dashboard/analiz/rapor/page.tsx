@@ -7,27 +7,13 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import ReportV2 from '@/components/report/ReportV2'
 import { mapToReportData, type AnalysisApiResponse } from '@/components/report/dataMapper'
 import type { ReportData } from '@/types/report'
+import { Logo } from '@/components/ui/Logo'
 
 // ─── Yükleme Ekranı ──────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <div className="min-h-screen bg-[#0a192f] flex flex-col items-center justify-center gap-4">
-      <div
-        style={{
-          width: 56,
-          height: 56,
-          background: 'linear-gradient(135deg,#2dd4bf,#0284c7)',
-          borderRadius: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 28,
-          fontWeight: 800,
-          color: 'white',
-        }}
-      >
-        F
-      </div>
+      <Logo variant="light" size={56} showSubtext={false} />
       <Loader2 className="w-6 h-6 text-[#2dd4bf] animate-spin" />
       <p className="text-sm text-[#64748b] tracking-widest uppercase">Rapor Hazırlanıyor</p>
     </div>

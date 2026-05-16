@@ -100,6 +100,10 @@ export default function FinancialDetailPage({ data, sector }: Props) {
               <div style={{ width: '3px', height: '14px', background: '#0a192f', borderRadius: '2px' }} />
               Performans Referansı
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '8px', color: '#64748b' }}>
+              <div style={{ width: '16px', height: '5px', background: BAR_COLOR.uyari, borderRadius: '3px' }} />
+              Dikkat gerektiren
+            </div>
           </div>
         </div>
 
