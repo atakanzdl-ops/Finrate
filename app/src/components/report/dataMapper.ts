@@ -195,8 +195,9 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   const reportNo = generateReportNumber(entity?.name, api.id ?? '', api.year)
 
   // ── Tüm yıl serisi (trend + mevcut, asc) ──────────────────────────────────
-  const allYears: Array<{ year: number; period: string; fd: FinancialDataRaw | null; ratios: Record<string, number | null> | null; score: number | null; rating: string | null }> = [
+  const allYears: YearEntry[] = [
     ...api.trendAnalyses.map(t => ({
+      id: t.id,
       year: t.year,
       period: t.period,
       fd: t.financialData as FinancialDataRaw | null,
@@ -205,6 +206,7 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
       rating: t.finalRating,
     })),
     {
+      id: api.id,
       year: api.year,
       period: api.period,
       fd,
@@ -214,8 +216,8 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     },
   ]
 
-  // Bilanço/Gelir tablosu için son 4 yıl (en fazla)
-  const tableYears = allYears.slice(-4)
+  // Bilanço/Gelir tablosu için son 6 yıl (en fazla)
+  const tableYears = allYears.slice(-6)
 
   // ── Senaryo + Aksiyon ──────────────────────────────────────────────────────
   const snap       = api.optimizerSnapshot
@@ -258,13 +260,13 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     profitabilityRatios: buildProfitabilityRatioRows(ratios, bm),
 
     // ── Sayfa 7: Trend Analizi ────────────────────────────────────────────────
-    trends: buildTrendData(allYears, api.year, sector, bm),
+    trends: buildTrendData(allYears, api.id, sector, bm),
 
     // ── Sayfa 8: Bilanço Analizi ──────────────────────────────────────────────
-    balanceSheet: buildBalanceSheet(tableYears),
+    balanceSheet: buildBalanceSheet(tableYears, api.id),
 
     // ── Sayfa 9: Gelir Tablosu ────────────────────────────────────────────────
-    incomeStatement: buildIncomeStatement(tableYears),
+    incomeStatement: buildIncomeStatement(tableYears, api.id),
 
     // ── Sayfa 10: Nakit Akış & Çalışma Sermayesi ─────────────────────────────
     cashFlow: buildCashFlow(ratios, fd, tableYears, bm),
@@ -675,6 +677,7 @@ function buildProfitabilityRatioRows(
 // ─── SAYFA 7: TREND ANALİZİ ──────────────────────────────────────────────────
 
 type YearEntry = {
+  id: string
   year: number
   period: string
   fd: FinancialDataRaw | null
@@ -685,7 +688,7 @@ type YearEntry = {
 
 function buildTrendData(
   allYears: YearEntry[],
-  currentYear: number,
+  currentId: string,
   sector: string | null,
   bm: typeof SECTOR_BENCHMARKS[string] | null,
 ) {
@@ -707,9 +710,10 @@ function buildTrendData(
     const bars: TrendBar[] = allYears.map(y => {
       const val = extractor(y)
       const secVal = sectorValue
-      const isCurrent = y.year === currentYear
+      const isCurrent = y.id === currentId
       return {
         year: y.year,
+        period: y.period,
         isCurrent,
         columns: [
           {
@@ -783,7 +787,9 @@ function buildTrendData(
   ]
 
   for (const { label, extractor, fmtFn } of metricDefs) {
-    const years   = allYears.map(y => y.year)
+    const years          = allYears.map(y => y.year)
+    const periods        = allYears.map(y => y.period)
+    const isCurrentFlags = allYears.map(y => y.id === currentId)
     const values  = allYears.map(y => extractor(y))
     const firstV  = values.find(v => v != null)
     const lastV   = values[values.length - 1]
@@ -795,6 +801,8 @@ function buildTrendData(
     growthTableRows.push({
       label,
       years,
+      periods,
+      isCurrentFlags,
       values: values.map(v => v != null ? fmtFn(v) : '—'),
       growth4y,
       growthColor,
@@ -806,8 +814,8 @@ function buildTrendData(
 
 // ─── SAYFA 8: BİLANÇO ANALİZİ ───────────────────────────────────────────────
 
-function buildBalanceSheet(tableYears: YearEntry[]) {
-  const years  = tableYears.map(y => ({ year: y.year, period: y.period }))
+function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
+  const years  = tableYears.map(y => ({ year: y.year, period: y.period, isCurrent: y.id === currentId }))
   const valArr = (fn: (fd: FinancialDataRaw) => number | null) =>
     tableYears.map(y => (y.fd ? fn(y.fd) : null))
 
@@ -914,8 +922,8 @@ function buildBalanceSheet(tableYears: YearEntry[]) {
 
 // ─── SAYFA 9: GELİR TABLOSU ──────────────────────────────────────────────────
 
-function buildIncomeStatement(tableYears: YearEntry[]) {
-  const years  = tableYears.map(y => ({ year: y.year, period: y.period }))
+function buildIncomeStatement(tableYears: YearEntry[], currentId: string) {
+  const years  = tableYears.map(y => ({ year: y.year, period: y.period, isCurrent: y.id === currentId }))
   const valArr = (fn: (fd: FinancialDataRaw) => number | null) =>
     tableYears.map(y => (y.fd ? fn(y.fd) : null))
 

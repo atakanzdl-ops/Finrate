@@ -2,12 +2,20 @@ import { NextRequest } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
+import { sortPeriods } from '@/lib/periods'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = getUserIdFromRequest(req)
   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
 
   const { id } = await params
+
+  // Manuel dönem seçimi: compareIds sorgu parametresi
+  // compareIdsParam !== null  →  manuel mod (boş string bile manuel)
+  // compareIdsParam === null  →  otomatik mod (eski davranış)
+  const url = new URL(req.url)
+  const compareIdsParam = url.searchParams.get('compareIds')
+  const hasManualSelection = compareIdsParam !== null
 
   const a = await prisma.analysis.findFirst({
     where: { id, userId },
@@ -56,61 +64,80 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     ? await prisma.subjectiveInput.findUnique({ where: { entityId } })
     : null
 
-  // ─── Trend verisi — aynı entity'nin önceki analizleri (maks 3 yıl) ──────
-  // Mevcut analizin yılından küçük, aynı dönem tipi, en yakın 3 yıl alınır
-  // → desc order + take 3 → sonra asc sıralanır (grafik için sol→sağ)
-  const trendRaw = entityId
-    ? await prisma.analysis.findMany({
-        where: {
-          entityId,
-          userId,
-          period: a.period,
-          year: { lt: a.year },
-        },
-        orderBy: { year: 'desc' },
-        take: 3,
-        select: {
-          id: true,
-          year: true,
-          period: true,
-          finalScore: true,
-          finalRating: true,
-          liquidityScore: true,
-          profitabilityScore: true,
-          leverageScore: true,
-          activityScore: true,
-          ratios: true,
-          financialData: {
-            select: {
-              revenue: true,
-              netProfit: true,
-              ebitda: true,
-              totalAssets: true,
-              totalEquity: true,
-              totalCurrentAssets: true,
-              totalCurrentLiabilities: true,
-              shortTermFinancialDebt: true,
-              longTermFinancialDebt: true,
-              tradeReceivables: true,
-              inventory: true,
-              tradePayables: true,
-              intangibleAssets: true,
-              paidInCapital: true,
-              retainedEarnings: true,
-              retainedLosses: true,
-            },
-          },
-        },
-      })
-    : []
+  // ─── Trend verisi ────────────────────────────────────────────────────────
+  // Manuel mod: compareIds'teki analizler (mevcut hariç) — max 5
+  // Otomatik mod: aynı dönem tipi, önceki 3 yıl (eski davranış)
+  const trendSelect = {
+    id: true,
+    year: true,
+    period: true,
+    finalScore: true,
+    finalRating: true,
+    liquidityScore: true,
+    profitabilityScore: true,
+    leverageScore: true,
+    activityScore: true,
+    ratios: true,
+    financialData: {
+      select: {
+        revenue: true,
+        netProfit: true,
+        ebitda: true,
+        totalAssets: true,
+        totalEquity: true,
+        totalCurrentAssets: true,
+        totalCurrentLiabilities: true,
+        shortTermFinancialDebt: true,
+        longTermFinancialDebt: true,
+        tradeReceivables: true,
+        inventory: true,
+        tradePayables: true,
+        intangibleAssets: true,
+        paidInCapital: true,
+        retainedEarnings: true,
+        retainedLosses: true,
+      },
+    },
+  } as const
 
-  // Kronolojik sıraya al (asc) — grafik için
-  const trendAnalyses = trendRaw
-    .sort((x, y) => x.year - y.year)
-    .map(ta => ({
-      ...ta,
-      ratios: ta.ratios ? JSON.parse(ta.ratios as string) : null,
-    }))
+  let trendRaw: Awaited<ReturnType<typeof prisma.analysis.findMany<{ select: typeof trendSelect }>>>
+
+  if (hasManualSelection && entityId) {
+    // Manuel mod: seçilen ID'ler (mevcut analiz ID'si hariç, max 5)
+    const manualIds = (compareIdsParam ?? '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && s !== id)
+      .slice(0, 5)
+
+    trendRaw = manualIds.length > 0
+      ? await prisma.analysis.findMany({
+          where: { id: { in: manualIds }, entityId, userId },
+          select: trendSelect,
+        })
+      : []
+  } else if (entityId) {
+    // Otomatik mod: aynı dönem tipi, önceki yıllar, maks 3
+    trendRaw = await prisma.analysis.findMany({
+      where: {
+        entityId,
+        userId,
+        period: a.period,
+        year: { lt: a.year },
+      },
+      orderBy: { year: 'desc' },
+      take: 3,
+      select: trendSelect,
+    })
+  } else {
+    trendRaw = []
+  }
+
+  // Kronolojik sıraya al — grafik için
+  const trendAnalyses = sortPeriods(trendRaw).map(ta => ({
+    ...ta,
+    ratios: ta.ratios ? JSON.parse(ta.ratios as string) : null,
+  }))
 
   // ─── Yanıt ───────────────────────────────────────────────────────────────
   return jsonUtf8({

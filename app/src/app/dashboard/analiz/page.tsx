@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
+import ReportPeriodPickerModal from '@/components/analysis/ReportPeriodPickerModal'
 import SubjectiveForm from '@/components/analysis/SubjectiveForm'
 import TrendChart from '@/components/analysis/TrendChart'
 import ScenarioPanel   from '@/components/analysis/ScenarioPanel'
@@ -489,6 +490,7 @@ function AnalizPageContent() {
   const [subjectiveScores,  setSubjectiveScores]  = useState<Record<string, number>>({})
   const [subjectiveMissing, setSubjectiveMissing] = useState<Record<string, boolean>>({})
   const [yearOpen,        setYearOpen]        = useState(false)
+  const [periodModalOpen, setPeriodModalOpen] = useState(false)
   const searchParams = useSearchParams()
   const entityId     = searchParams.get('entityId')
   const router       = useRouter()
@@ -704,10 +706,9 @@ function AnalizPageContent() {
             />
           </div>
           <button
-            onClick={async () => {
+            onClick={() => {
               if (!selected) return
-              await fetch(`/api/analyses/${selected.id}/report`, { method: 'POST' })
-              router.push(`/dashboard/analiz/rapor?id=${selected.id}`)
+              setPeriodModalOpen(true)
             }}
             disabled={!selected}
             className="btn btn-primary disabled:opacity-40"
@@ -1344,6 +1345,20 @@ function AnalizPageContent() {
         )}
       </div>
     </div>
+
+    {/* Manuel Dönem Seçim Modalı */}
+    {periodModalOpen && selected && (
+      <ReportPeriodPickerModal
+        analysisId={selected.id}
+        onConfirm={async (selectedIds) => {
+          setPeriodModalOpen(false)
+          await fetch(`/api/analyses/${selected.id}/report`, { method: 'POST' })
+          const compareIds = encodeURIComponent(selectedIds.join(','))
+          router.push(`/dashboard/analiz/rapor?id=${selected.id}&compareIds=${compareIds}`)
+        }}
+        onClose={() => setPeriodModalOpen(false)}
+      />
+    )}
     </FinrateShell>
   )
 }

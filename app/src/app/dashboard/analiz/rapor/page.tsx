@@ -35,6 +35,8 @@ function ErrorScreen({ message }: { message: string }) {
 function RaporContent() {
   const params = useSearchParams()
   const id = params.get('id')
+  // compareIds: manuel seçim (null = otomatik mod, boş string bile manuel mod)
+  const compareIds = params.get('compareIds')
 
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [error, setError]           = useState<string | null>(null)
@@ -49,7 +51,10 @@ function RaporContent() {
 
     ;(async () => {
       try {
-        const res = await fetch(`/api/analyses/${id}`)
+        const apiUrl = compareIds !== null
+          ? `/api/analyses/${id}?compareIds=${encodeURIComponent(compareIds)}`
+          : `/api/analyses/${id}`
+        const res = await fetch(apiUrl)
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error ?? `HTTP ${res.status}`)
@@ -62,10 +67,14 @@ function RaporContent() {
         setLoading(false)
       }
     })()
-  }, [id])
+  }, [id, compareIds])
 
   if (loading)        return <LoadingScreen />
   if (error || !reportData) return <ErrorScreen message={error ?? 'Veri alınamadı.'} />
+
+  const pdfUrl = compareIds !== null
+    ? `/api/analyses/${id}/pdf?type=executive15&compareIds=${encodeURIComponent(compareIds)}`
+    : `/api/analyses/${id}/pdf?type=executive15`
 
   return (
     <>
@@ -73,7 +82,7 @@ function RaporContent() {
       <div className="pdf-download-bar no-print">
         <button
           className="pdf-download-btn"
-          onClick={() => window.open(`/api/analyses/${id}/pdf?type=executive15`, '_blank')}
+          onClick={() => window.open(pdfUrl, '_blank')}
         >
           📄 PDF Olarak İndir
         </button>

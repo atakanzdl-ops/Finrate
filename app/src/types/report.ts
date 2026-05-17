@@ -198,6 +198,7 @@ export interface TrendChart {
 
 export interface TrendBar {
   year:        number
+  period:      string          // 'ANNUAL' | 'Q1' | 'Q2' | 'Q3' | 'Q4'
   isCurrent:   boolean        // en son yıl → koyu renk
   columns: {
     value:   number
@@ -210,6 +211,8 @@ export interface TrendBar {
 export interface GrowthTableRow {
   label:   string         // "Net Satışlar"
   years:   number[]       // [2021, 2022, 2023, 2024]
+  periods: string[]       // ['ANNUAL','ANNUAL','ANNUAL','Q1'] — years[i] ile index eşleşir
+  isCurrentFlags: boolean[] // years[i] için isCurrent bayrağı
   values:  string[]       // ["₺18.2M", "₺28.4M", "₺41.6M", "₺52.3M"]
   growth4y: string | null // "+187%" veya null (veri yoksa)
   growthColor?: string    // "#2dd4bf" yeşil için
@@ -218,7 +221,7 @@ export interface GrowthTableRow {
 // ─── BİLANÇO ANALİZİ ─────────────────────────────────────────────────────
 
 export interface BalanceSheet {
-  years:    { year: number; period: string }[]
+  years:    { year: number; period: string; isCurrent: boolean }[]
   items:    BalanceSheetItem[]
   totalAssets:       number      // son yıl
   totalLiabilities:  number      // hesaplanan: totalAssets - totalEquity
@@ -236,7 +239,7 @@ export interface BalanceSheetItem {
 // ─── GELİR TABLOSU ───────────────────────────────────────────────────────
 
 export interface IncomeStatement {
-  years:  { year: number; period: string }[]
+  years:  { year: number; period: string; isCurrent: boolean }[]
   items:  IncomeStatementItem[]
 }
 

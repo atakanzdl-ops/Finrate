@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData, TrendChart, GrowthTableRow } from '@/types/report'
+import { shortPeriodLabel } from '@/lib/periods'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'trends'>
@@ -16,30 +17,38 @@ function MiniBarChart({ chart }: { chart: TrendChart }) {
 
       {/* Çubuk grubu — T14: sabit 14px bar genişliği (referans baz) */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: `${maxH + 16}px` }}>
-        {chart.bars.map((bar, bi) => (
-          <div key={bi} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-            {/* Sütunlar yan yana */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: `${maxH}px` }}>
-              {bar.columns.map((col, ci) => (
-                <div key={ci} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                  {/* Etiket */}
-                  <div style={{ fontSize: '6.5px', color: '#64748b', marginBottom: '2px', textAlign: 'center', lineHeight: 1 }}>{col.label}</div>
-                  {/* Bar — 14px sabit genişlik */}
-                  <div style={{
-                    width: '14px',
-                    height: `${Math.max(3, col.value * maxH / 100)}px`,
-                    background: col.color,
-                    borderRadius: '3px 3px 0 0',
-                  }} />
-                </div>
-              ))}
+        {chart.bars.map((bar, bi) => {
+          const periodLbl = shortPeriodLabel(bar.period)
+          return (
+            <div key={bi} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              {/* Sütunlar yan yana */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: `${maxH}px` }}>
+                {bar.columns.map((col, ci) => (
+                  <div key={ci} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    {/* Etiket */}
+                    <div style={{ fontSize: '6.5px', color: '#64748b', marginBottom: '2px', textAlign: 'center', lineHeight: 1 }}>{col.label}</div>
+                    {/* Bar — 14px sabit genişlik */}
+                    <div style={{
+                      width: '14px',
+                      height: `${Math.max(3, col.value * maxH / 100)}px`,
+                      background: col.color,
+                      borderRadius: '3px 3px 0 0',
+                    }} />
+                  </div>
+                ))}
+              </div>
+              {/* Yıl + dönem etiketi */}
+              <div style={{ fontSize: '7px', color: bar.isCurrent ? '#0a192f' : '#94a3b8', fontWeight: bar.isCurrent ? 700 : 400, marginTop: '4px', textAlign: 'center', lineHeight: 1.3 }}>
+                {bar.year}
+                {periodLbl && (
+                  <div style={{ fontSize: '6px', color: bar.isCurrent ? '#0284c7' : '#94a3b8' }}>
+                    {periodLbl}
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Yıl etiketi */}
-            <div style={{ fontSize: '7px', color: bar.isCurrent ? '#0a192f' : '#94a3b8', fontWeight: bar.isCurrent ? 700 : 400, marginTop: '4px' }}>
-              {bar.year}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Legend */}
@@ -59,9 +68,14 @@ function GrowthRow({ row }: { row: GrowthTableRow }) {
   return (
     <tr>
       <td style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: '10px' }}>{row.label}</td>
-      {row.values.map((v, i) => (
-        <td key={i}>{v}</td>
-      ))}
+      {row.values.map((v, i) => {
+        const isCurrent = row.isCurrentFlags?.[i] ?? false
+        return (
+          <td key={i} style={isCurrent ? { fontWeight: 700, color: '#0a192f', background: '#f0f9ff' } : undefined}>
+            {v}
+          </td>
+        )
+      })}
       <td style={{
         fontFamily: "'JetBrains Mono', monospace",
         fontWeight: 700,
@@ -78,7 +92,10 @@ export default function TrendPage({ data, sector }: Props) {
   const { companyName, reportNo, trends } = data
   const { charts, growthTable } = trends
 
-  const years = growthTable[0]?.years ?? []
+  const growth0    = growthTable[0]
+  const years      = growth0?.years      ?? []
+  const periods    = growth0?.periods    ?? []
+  const isCurrentF = growth0?.isCurrentFlags ?? []
 
   return (
     <div className="pdf-page">
@@ -106,7 +123,20 @@ export default function TrendPage({ data, sector }: Props) {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Metrik</th>
-                {years.map(y => <th key={y}>{y}</th>)}
+                {years.map((y, i) => {
+                  const periodLbl = shortPeriodLabel(periods[i] ?? 'ANNUAL')
+                  const isCurrent = isCurrentF[i] ?? false
+                  return (
+                    <th key={i} style={isCurrent ? { background: '#f0f9ff', color: '#0369a1' } : undefined}>
+                      {y}
+                      {periodLbl && (
+                        <div style={{ fontSize: '6.5px', fontWeight: 400, color: '#0284c7', letterSpacing: 0 }}>
+                          {periodLbl}
+                        </div>
+                      )}
+                    </th>
+                  )
+                })}
                 <th>4Y Büyüme</th>
               </tr>
             </thead>

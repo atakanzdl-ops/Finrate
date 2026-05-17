@@ -50,8 +50,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const page = await browser.newPage()
 
     // req.nextUrl.origin → preview/prod URL ayrımı otomatik (NEXT_PUBLIC_APP_URL gerekmez)
+    const compareIds = req.nextUrl.searchParams.get('compareIds')
+    const compareQs = compareIds !== null ? `&compareIds=${encodeURIComponent(compareIds)}` : ''
     const targetUrl = new URL(
-      `/dashboard/analiz/rapor?id=${id}&type=${type}&print=1`,
+      `/dashboard/analiz/rapor?id=${id}&type=${type}&print=1${compareQs}`,
       req.nextUrl.origin,
     )
 

@@ -1,6 +1,7 @@
 'use client'
 import type { ReportData, BalanceSheetItem } from '@/types/report'
 import { fmtCurrency, fmtPct } from '../formatters'
+import { shortPeriodLabel } from '@/lib/periods'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo' | 'balanceSheet'>
@@ -59,7 +60,19 @@ export default function BalanceSheetPage({ data, sector }: Props) {
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Bilanço Kalemi</th>
-              {years.map(y => <th key={y.year}>{y.year}</th>)}
+              {years.map((y, i) => {
+                const periodLbl = shortPeriodLabel(y.period)
+                return (
+                  <th key={i} style={y.isCurrent ? { background: '#f0f9ff', color: '#0369a1' } : undefined}>
+                    {y.year}
+                    {periodLbl && (
+                      <div style={{ fontSize: '6.5px', fontWeight: 400, color: '#0284c7', letterSpacing: 0 }}>
+                        {periodLbl}
+                      </div>
+                    )}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
