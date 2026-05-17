@@ -90,8 +90,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     financialData: {
       select: {
         revenue: true,
+        cogs: true,
+        grossProfit: true,
+        operatingExpenses: true,
+        ebit: true,
+        interestExpense: true,
+        ebt: true,
         netProfit: true,
         ebitda: true,
+        taxExpense: true,
         totalAssets: true,
         totalEquity: true,
         totalLiabilitiesAndEquity: true,
