@@ -44,6 +44,7 @@ export interface AnalysisApiResponse {
 }
 
 interface FinancialDataRaw {
+  // Mevcut alanlar — ZORUNLU (number | null) — DOKUNMA
   revenue: number | null
   cogs: number | null
   grossProfit: number | null
@@ -73,6 +74,15 @@ interface FinancialDataRaw {
   paidInCapital: number | null
   retainedEarnings: number | null
   retainedLosses: number | null
+  // BUG-4 yeni alanlar — OPSİYONEL (geriye uyumlu)
+  otherCurrentAssets?: number | null
+  advancesReceived?: number | null
+  taxPayables?: number | null
+  shortTermProvisions?: number | null
+  deferredRevenue?: number | null
+  otherShortTermPayables?: number | null
+  otherCurrentLiabilities?: number | null
+  otherNonCurrentLiabilities?: number | null
 }
 
 interface SubjectiveInputRaw {
@@ -818,10 +828,31 @@ function buildTrendData(
 
 // ─── SAYFA 8: BİLANÇO ANALİZİ ───────────────────────────────────────────────
 
+// Görünür satırlara göre "Diğer" residual hesapla — toplam ile her zaman matematiksel tutarlı
+function residualOther(
+  total: number | null,
+  visibleItems: (number | null)[],
+): number | null {
+  if (total == null) return null
+  const sum = visibleItems.reduce<number>((acc, v) => acc + (v ?? 0), 0)
+  const diff = total - sum
+  if (Math.abs(diff) < 0.5) return null  // Yuvarlama toleransı
+  return diff
+}
+
 function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
   const years  = tableYears.map(y => ({ year: y.year, period: y.period, isCurrent: y.id === currentId }))
   const valArr = (fn: (fd: FinancialDataRaw) => number | null) =>
     tableYears.map(y => (y.fd ? fn(y.fd) : null))
+
+  // residual per-year mapper
+  const residualArr = (
+    totalFn: (fd: FinancialDataRaw) => number | null,
+    visibleFns: Array<(fd: FinancialDataRaw) => number | null>,
+  ) => tableYears.map(y => {
+    if (!y.fd) return null
+    return residualOther(totalFn(y.fd), visibleFns.map(fn => fn(y.fd!)))
+  })
 
   const items: BalanceSheetItem[] = [
     // AKTİF
@@ -829,13 +860,21 @@ function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
     { label: 'Nakit ve Nakit Benzerleri',   values: valArr(f => f.cash) },
     { label: 'Ticari Alacaklar',            values: valArr(f => f.tradeReceivables) },
     { label: 'Stoklar',                     values: valArr(f => f.inventory) },
-    { label: 'Diğer Dönen Varlıklar',       values: valArr(f => null) },   // Yok — göster
+    // Diğer = totalCurrentAssets - (cash + tradeReceivables + inventory)
+    { label: 'Diğer Dönen Varlıklar', values: residualArr(
+        f => f.totalCurrentAssets,
+        [f => f.cash, f => f.tradeReceivables, f => f.inventory],
+      ) },
     { label: 'TOPLAM DÖNEN VARLIKLAR',      values: valArr(f => f.totalCurrentAssets), isTotal: true },
 
     { label: 'DURAN VARLIKLAR', values: valArr(f => f.totalNonCurrentAssets), isMain: true },
     { label: 'Maddi Duran Varlıklar',            values: valArr(f => f.tangibleAssets) },
     { label: 'Maddi Olmayan Duran Varlıklar',    values: valArr(f => f.intangibleAssets ?? null) },
-    { label: 'Diğer Duran Varlıklar',            values: valArr(f => null) },
+    // Diğer = totalNonCurrentAssets - (tangibleAssets + intangibleAssets)
+    { label: 'Diğer Duran Varlıklar', values: residualArr(
+        f => f.totalNonCurrentAssets,
+        [f => f.tangibleAssets, f => f.intangibleAssets ?? null],
+      ) },
     { label: 'TOPLAM DURAN VARLIKLAR',           values: valArr(f => f.totalNonCurrentAssets), isTotal: true },
 
     { label: 'TOPLAM AKTİF', values: valArr(f => f.totalAssets), isTotal: true },
@@ -844,12 +883,20 @@ function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
     { label: 'KISA VADELİ YÜKÜMLÜLÜKLER', values: valArr(f => f.totalCurrentLiabilities), isMain: true },
     { label: 'Finansal Borçlar (KV)',       values: valArr(f => f.shortTermFinancialDebt) },
     { label: 'Ticari Borçlar',              values: valArr(f => f.tradePayables) },
-    { label: 'Diğer KV Yükümlülükler',     values: valArr(f => null) },
+    // Diğer = totalCurrentLiabilities - (shortTermFinancialDebt + tradePayables)
+    { label: 'Diğer KV Yükümlülükler', values: residualArr(
+        f => f.totalCurrentLiabilities,
+        [f => f.shortTermFinancialDebt, f => f.tradePayables],
+      ) },
     { label: 'TOPLAM KISA VADELİ YÜK.',    values: valArr(f => f.totalCurrentLiabilities), isTotal: true },
 
     { label: 'UZUN VADELİ YÜKÜMLÜLÜKLER', values: valArr(f => f.totalNonCurrentLiabilities), isMain: true },
     { label: 'Finansal Borçlar (UV)',       values: valArr(f => f.longTermFinancialDebt) },
-    { label: 'Diğer UV Yükümlülükler',     values: valArr(f => null) },
+    // Diğer = totalNonCurrentLiabilities - longTermFinancialDebt
+    { label: 'Diğer UV Yükümlülükler', values: residualArr(
+        f => f.totalNonCurrentLiabilities,
+        [f => f.longTermFinancialDebt],
+      ) },
     { label: 'TOPLAM UZUN VADELİ YÜK.',    values: valArr(f => f.totalNonCurrentLiabilities), isTotal: true },
 
     { label: 'ÖZKAYNAKLAR', values: valArr(f => f.totalEquity), isMain: true },
