@@ -127,7 +127,7 @@ export default function TrendPage({ data, sector }: Props) {
                   const periodLbl = shortPeriodLabel(periods[i] ?? 'ANNUAL')
                   const isCurrent = isCurrentF[i] ?? false
                   return (
-                    <th key={i} style={isCurrent ? { background: '#f0f9ff', color: '#0369a1' } : undefined}>
+                    <th key={i} style={isCurrent ? { background: 'var(--fr-primary)', color: '#fff', fontWeight: 700 } : undefined}>
                       {y}
                       {periodLbl && (
                         <div style={{ fontSize: '6.5px', fontWeight: 400, color: '#0284c7', letterSpacing: 0 }}>

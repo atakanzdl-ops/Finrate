@@ -63,7 +63,7 @@ export default function BalanceSheetPage({ data, sector }: Props) {
               {years.map((y, i) => {
                 const periodLbl = shortPeriodLabel(y.period)
                 return (
-                  <th key={i} style={y.isCurrent ? { background: '#f0f9ff', color: '#0369a1' } : undefined}>
+                  <th key={i} style={y.isCurrent ? { background: 'var(--fr-primary)', color: '#fff', fontWeight: 700 } : undefined}>
                     {y.year}
                     {periodLbl && (
                       <div style={{ fontSize: '6.5px', fontWeight: 400, color: '#0284c7', letterSpacing: 0 }}>

@@ -3,6 +3,7 @@
 // Saf fonksiyon — yan etki yok, DB çağrısı yok.
 
 import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark, getSectorBenchmark, getSectorWeights } from '@/lib/scoring/benchmarks'
+import { sortPeriods } from '@/lib/periods'
 import { computeSectorCategoryScores } from '@/lib/scoring/score'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
 import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus } from '@/types/report'
@@ -194,16 +195,16 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   // ── Rapor no — A3: FNR-YIL-FRM-XXXXXX (6 char hash, Türkçe transliterasyon)
   const reportNo = generateReportNumber(entity?.name, api.id ?? '', api.year)
 
-  // ── Tüm yıl serisi (trend + mevcut, asc) ──────────────────────────────────
-  const allYears: YearEntry[] = [
+  // ── Tüm yıl serisi (trend + mevcut, kronolojik sıralı) ───────────────────
+  const allYearsRaw: YearEntry[] = [
     ...api.trendAnalyses.map(t => ({
       id: t.id,
       year: t.year,
       period: t.period,
       fd: t.financialData as FinancialDataRaw | null,
       ratios: t.ratios,
-      score: t.finalScore,
-      rating: t.finalRating,
+      score: t.finalScore,   // CODEX D3: t.finalScore (t.score değil)
+      rating: t.finalRating, // CODEX D3: t.finalRating (t.rating değil)
     })),
     {
       id: api.id,
@@ -215,6 +216,9 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
       rating,
     },
   ]
+
+  // Kronolojik sırala — mevcut analiz hangi yıl/dönemde olursa olsun doğru yerde
+  const allYears: YearEntry[] = sortPeriods(allYearsRaw)
 
   // Bilanço/Gelir tablosu için son 6 yıl (en fazla)
   const tableYears = allYears.slice(-6)

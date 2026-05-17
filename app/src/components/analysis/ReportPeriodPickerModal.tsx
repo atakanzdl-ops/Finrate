@@ -34,15 +34,19 @@ export default function ReportPeriodPickerModal({ analysisId, onConfirm, onClose
       .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
       .then((d: ComparisonOptionsResponse) => {
         setData(d)
-        // Varsayılan: mevcut + son 3 (toplam maks 4)
-        const defaults = [
-          d.current.id,
-          ...d.options
-            .filter(o => o.id !== d.current.id)
-            .slice(-3)
-            .map(o => o.id),
-        ]
-        setSelected(new Set(defaults))
+        // Varsayılan: mevcut + mevcuttan önceki 3 dönem
+        const opts = d.options
+        const currentIdx = opts.findIndex(
+          (o: PeriodOption) => o.id === d.current.id
+        )
+        const defaultSet = new Set<string>()
+        defaultSet.add(d.current.id)
+        let count = 0
+        for (let i = currentIdx - 1; i >= 0 && count < 3; i--) {
+          defaultSet.add(opts[i].id)
+          count++
+        }
+        setSelected(defaultSet)
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
@@ -56,7 +60,10 @@ export default function ReportPeriodPickerModal({ analysisId, onConfirm, onClose
       if (next.has(id)) {
         next.delete(id)
       } else {
-        if (next.size >= MAX_SELECTION) return prev // max sınırı
+        if (next.size >= MAX_SELECTION) {
+          alert('En fazla 6 dönem seçebilirsiniz.')
+          return prev // CODEX D2: updater içinde return prev
+        }
         next.add(id)
       }
       return next
