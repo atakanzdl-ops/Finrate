@@ -12,7 +12,7 @@ function ISRow({ item, colCount, lastYear }: { item: IncomeStatementItem; colCou
   const isTotal = item.isTotal
   const isMain  = item.isMain
   const trClass = isMain ? 'mr' : isTotal ? 'tr' : ''
-  const showMargin = item.margin2024 != null && isTotal
+  const showMargin = item.margin2024 != null
 
   return (
     <tr className={trClass}>

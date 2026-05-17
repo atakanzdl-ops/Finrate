@@ -37,7 +37,10 @@ export function fmtPct(
   decimals = 1,
 ): string {
   if (value == null || isNaN(value)) return '—'
-  return `%${(value * 100).toFixed(decimals)}`
+  const pct = value * 100
+  const isNeg = pct < 0
+  const absStr = Math.abs(pct).toFixed(decimals)
+  return isNeg ? `-%${absStr}` : `%${absStr}`
 }
 
 /**

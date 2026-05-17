@@ -982,22 +982,30 @@ function buildIncomeStatement(tableYears: YearEntry[], currentId: string) {
   const revenue = lastFd?.revenue
   const marginFn = (v: number | null) =>
     (v != null && revenue != null && revenue > 0) ? v / revenue : null
+  // Gider satırları DB'de pozitif, ekranda negatif — marj da negatif olmalı
+  const negMarginFn = (v: number | null) =>
+    v != null ? marginFn(-v) : null
 
   const items: IncomeStatementItem[] = [
     { label: 'Net Satışlar',             values: valArr(f => f.revenue),            isMain: true },
-    { label: 'Satışların Maliyeti (-)',  values: valArr(f => f.cogs != null ? -f.cogs : null) },
+    { label: 'Satışların Maliyeti (-)',  values: valArr(f => f.cogs != null ? -f.cogs : null),
+      margin2024: negMarginFn(lastFd?.cogs ?? null) },
     { label: 'BRÜT KÂR',                values: valArr(f => f.grossProfit),         isTotal: true,
       margin2024: marginFn(lastFd?.grossProfit ?? null) },
 
-    { label: 'Faaliyet Giderleri (-)',   values: valArr(f => f.operatingExpenses != null ? -f.operatingExpenses : null) },
+    { label: 'Faaliyet Giderleri (-)',   values: valArr(f => f.operatingExpenses != null ? -f.operatingExpenses : null),
+      margin2024: negMarginFn(lastFd?.operatingExpenses ?? null) },
     { label: 'FVÖK (EBIT)',              values: valArr(f => f.ebit),                isTotal: true,
       margin2024: marginFn(lastFd?.ebit ?? null) },
     { label: 'FAVÖK (EBITDA)',           values: valArr(f => f.ebitda),              isTotal: true,
       margin2024: marginFn(lastFd?.ebitda ?? null) },
 
-    { label: 'Faiz Gideri (-)',          values: valArr(f => f.interestExpense != null ? -f.interestExpense : null) },
-    { label: 'VÖK (EBT)',                values: valArr(f => f.ebt),                 isTotal: true },
-    { label: 'Kurumlar Vergisi (-)',     values: valArr(f => f.taxExpense != null ? -f.taxExpense : null) },
+    { label: 'Faiz Gideri (-)',          values: valArr(f => f.interestExpense != null ? -f.interestExpense : null),
+      margin2024: negMarginFn(lastFd?.interestExpense ?? null) },
+    { label: 'VÖK (EBT)',                values: valArr(f => f.ebt),                 isTotal: true,
+      margin2024: marginFn(lastFd?.ebt ?? null) },
+    { label: 'Kurumlar Vergisi (-)',     values: valArr(f => f.taxExpense != null ? -f.taxExpense : null),
+      margin2024: negMarginFn(lastFd?.taxExpense ?? null) },
     { label: 'DÖNEM NET KÂRI',          values: valArr(f => f.netProfit),            isMain: true,
       margin2024: marginFn(lastFd?.netProfit ?? null) },
   ]
