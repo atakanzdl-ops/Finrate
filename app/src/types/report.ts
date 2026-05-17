@@ -276,7 +276,7 @@ export interface CccMetrics {
 export interface WorkingCapitalRow {
   label:  string
   values: (number | null)[]  // 2 yıl (önceki + son)
-  years:  number[]
+  years:  { year: number; period: string; isCurrent: boolean }[]
 }
 
 // ─── SENARYO ANALİZİ ─────────────────────────────────────────────────────

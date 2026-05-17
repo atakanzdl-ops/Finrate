@@ -283,7 +283,7 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     incomeStatement: buildIncomeStatement(tableYears, api.id),
 
     // ── Sayfa 10: Nakit Akış & Çalışma Sermayesi ─────────────────────────────
-    cashFlow: buildCashFlow(ratios, fd, tableYears, bm),
+    cashFlow: buildCashFlow(ratios, fd, tableYears, bm, api.id),
 
     // ── Sayfa 11: Senaryo Analizi ─────────────────────────────────────────────
     scenario: buildScenarioData(snap, target1Raw, target2Raw, rating, totalScore),
@@ -1012,6 +1012,7 @@ function buildCashFlow(
   fd: FinancialDataRaw | null,
   tableYears: YearEntry[],
   bm: typeof SECTOR_BENCHMARKS[string] | null,
+  currentId: string,
 ) {
   const dso = (ratios.receivablesTurnoverDays as number | null) ?? 0
   const dio = (ratios.inventoryTurnoverDays as number | null) ?? 0
@@ -1022,7 +1023,11 @@ function buildCashFlow(
 
   // Çalışma sermayesi tablosu (son 2 yıl)
   const lastTwo = tableYears.slice(-2)
-  const wcYears = lastTwo.map(y => y.year)
+  const wcYears = lastTwo.map(y => ({
+    year: y.year,
+    period: y.period,
+    isCurrent: y.id === currentId,
+  }))
   const workingCapitalTable = [
     { label: 'Ticari Alacaklar',      values: lastTwo.map(y => y.fd?.tradeReceivables ?? null), years: wcYears },
     { label: 'Stoklar',               values: lastTwo.map(y => y.fd?.inventory ?? null),         years: wcYears },
