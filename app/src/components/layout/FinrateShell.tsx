@@ -34,7 +34,7 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
       base === '/dashboard'
         ? pathname === '/dashboard'
         : pathname.startsWith(base)
-    return `nav-link${isActive ? ' active' : ''}`
+    return `nav-link sidebar-link${isActive ? ' active' : ''}`
   }
 
   const navItems = [

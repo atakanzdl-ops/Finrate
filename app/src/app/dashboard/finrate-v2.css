@@ -110,6 +110,12 @@ body {
   border-color: #d7e4ee;
 }
 
+/* Sidebar (hem .sidebar-nav hem .sidebar-footer) aktif öğesinde
+   border görünmesini engelle — topbar .nav-link davranışı korunur. */
+.sidebar-link.active {
+  border-color: transparent;
+}
+
 .dashboard-main {
   flex: 1;
   min-width: 0;
