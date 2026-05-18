@@ -756,6 +756,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }, { status: 400 })
     }
 
+    // === Faz 7.3.60.1: roadmapSnapshot invalidation (financialAccounts yazımı bittikten sonra) ===
+    await prisma.analysis.updateMany({
+      where: {
+        entityId,
+        userId,
+        roadmapSnapshot: { not: null },
+      },
+      data: { roadmapSnapshot: null },
+    })
+
     return jsonUtf8({
       imported: results.length,
       results,

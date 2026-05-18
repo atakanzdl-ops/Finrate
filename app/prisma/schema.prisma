@@ -317,7 +317,8 @@ model Analysis {
 
   ratios              String?  // JSON string
   consolidatedFinancials String? // JSON string
-  optimizerSnapshot   String?  // JSON string
+  optimizerSnapshot   String?  // JSON string (legacy)
+  roadmapSnapshot     String?  // V3 roadmap JSON (Faz 7.3.60.1)
 
   reportedAt          DateTime? // Rapor oluÅŸturulunca set edilir
 

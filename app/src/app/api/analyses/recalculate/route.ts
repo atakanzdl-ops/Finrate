@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   })
 
   let updated = 0
+  const updatedIds: string[] = []
 
   for (const fd of allData) {
     const fields = fd as unknown as Record<string, unknown>
@@ -81,8 +82,20 @@ export async function POST(req: NextRequest) {
           updatedAt:          new Date(),
         },
       })
+      updatedIds.push(fd.analysis.id)
       updated++
     }
+  }
+
+  // === Faz 7.3.60.1: roadmapSnapshot invalidation (sadece güncellenen analizler) ===
+  if (updatedIds.length > 0) {
+    await prisma.analysis.updateMany({
+      where: {
+        id:              { in: updatedIds },
+        roadmapSnapshot: { not: null },
+      },
+      data: { roadmapSnapshot: null },
+    })
   }
 
   return jsonUtf8({ recalculated: updated })

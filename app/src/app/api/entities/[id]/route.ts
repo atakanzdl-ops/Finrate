@@ -150,6 +150,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           recalculated++
         }
       }
+
+      // === Faz 7.3.60.1: roadmapSnapshot invalidation (sectorChanged guard kullanılıyor) ===
+      await prisma.analysis.updateMany({
+        where: {
+          entityId:        id,
+          userId,
+          roadmapSnapshot: { not: null },
+        },
+        data: { roadmapSnapshot: null },
+      })
     }
 
     return jsonUtf8({ entity, recalculated })

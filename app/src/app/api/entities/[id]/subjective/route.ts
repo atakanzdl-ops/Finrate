@@ -117,5 +117,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
   }
 
+  // === Faz 7.3.60.1: roadmapSnapshot invalidation (loop SONRASINDA, ayrı updateMany) ===
+  await prisma.analysis.updateMany({
+    where: {
+      entityId,
+      userId,
+      mode:             'SOLO',
+      roadmapSnapshot:  { not: null },
+    },
+    data: { roadmapSnapshot: null },
+  })
+
   return jsonUtf8({ subjectiveInput: saved, score, updatedAnalyses: analyses.length })
 }

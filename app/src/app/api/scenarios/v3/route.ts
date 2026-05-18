@@ -15,6 +15,10 @@ import {
   RATING_ORDER,
   normalizeLegacyRating,
 }                                    from '@/lib/scoring/scenarioV3/ratingReasoning'
+import {
+  buildRoadmapSnapshot,
+  buildRoadmapInputFingerprint,
+}                                    from '@/lib/scoring/scenarioV3/roadmapSnapshot'
 
 // --- SECTOR STRING -> SECTORCODE MAPPING ---
 
@@ -355,8 +359,8 @@ export async function POST(req: NextRequest) {
     let diagnosticsMode = false
     try { diagnosticsMode = new URL(req.url).searchParams.get('diagnostics') === '1' } catch { /* noop */ }
 
-    return NextResponse.json({
-      engine:         'v3',
+    const responsePayload = {
+      engine:         'v3' as const,
       analysisId,
       sector,
       currentRating,
@@ -386,7 +390,36 @@ export async function POST(req: NextRequest) {
       v2Comparison: includeV2Comparison
         ? { note: 'V2 karşılaştırması bu endpoint üzerinden desteklenmiyor. /api/scenarios/v2 ve /api/scenarios/v3 sonuçlarını client-side karşılaştırın.' }
         : undefined,
+    }
+
+    // === Faz 7.3.60.1: roadmapSnapshot kaydet (manuel kaynak) ===
+    // subjectiveTotal zaten scope'ta hesaplanmış (line ~221); fingerprint için kullan
+    const fingerprint = buildRoadmapInputFingerprint({
+      finalScore:            analysis.finalScore,
+      finalRating:           analysis.finalRating,
+      sectorCode:            analysis.entity?.sector ?? null,
+      financialAccountsHash: String(analysis.financialAccounts.length),
+      subjectiveTotal:       subjectiveTotal,
     })
+
+    const snapshot = buildRoadmapSnapshot(
+      responsePayload as import('@/lib/scoring/scenarioV3/responseTypes').ScenarioV3ApiResponse,
+      targetGrade,
+      'manual',
+      fingerprint,
+    )
+
+    try {
+      await prisma.analysis.update({
+        where: { id: analysisId },
+        data:  { roadmapSnapshot: JSON.stringify(snapshot) },
+      })
+    } catch (err) {
+      // Snapshot kaydedilemezse response yine dön (graceful degradation)
+      console.error('[scenarios/v3] roadmapSnapshot save failed:', err)
+    }
+
+    return NextResponse.json(responsePayload)
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'V3 senaryo hesaplanamadı'
