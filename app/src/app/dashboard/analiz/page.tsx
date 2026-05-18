@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Suspense, useState, useEffect, useRef } from 'react'
+import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -496,6 +496,19 @@ function AnalizPageContent() {
   const searchParams = useSearchParams()
   const entityId     = searchParams.get('entityId')
   const router       = useRouter()
+
+  // Hotfix I (K12) — Yol Haritası oluşturulduktan sonra listeyi yenile,
+  // seçili analizi güncel snapshot durumuna göre tazele (setSelected prev pattern).
+  const loadAnalyses = useCallback(() => {
+    fetch('/api/analyses')
+      .then(r => r.json())
+      .then(d => {
+        const list: Analysis[] = d.analyses ?? []
+        setAnalyses(list)
+        setSelected(prev => prev ? (list.find(a => a.id === prev.id) ?? prev) : prev)
+      })
+      .catch(e => console.error('[analiz] loadAnalyses error:', e))
+  }, [])
 
   useEffect(() => {
     const doLoad = () => {
@@ -1352,6 +1365,7 @@ function AnalizPageContent() {
                       analysisId={selected.id}
                       currentScore={cs}
                       currentGrade={cr}
+                      onRoadmapCreated={loadAnalyses}
                     />
                   )
                 )}

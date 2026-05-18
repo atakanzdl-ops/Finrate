@@ -85,7 +85,7 @@ function RaporContent() {
         </p>
         <button
           onClick={() => {
-            window.location.href = `/dashboard/analiz${id ? `?id=${id}` : ''}`
+            window.location.href = '/dashboard/analiz'
           }}
           style={{
             background:   '#0f2942',

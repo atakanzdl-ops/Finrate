@@ -61,6 +61,7 @@ interface ScenarioPanelV3Props {
   analysisId: string
   currentScore: number
   currentGrade: string
+  onRoadmapCreated?: () => void
 }
 
 type ApiErrorResponse = { error?: string }
@@ -1015,7 +1016,7 @@ function DetayTab({
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-export default function ScenarioPanelV3({ analysisId, currentScore: _currentScore, currentGrade }: ScenarioPanelV3Props) {
+export default function ScenarioPanelV3({ analysisId, currentScore: _currentScore, currentGrade, onRoadmapCreated }: ScenarioPanelV3Props) {
   const [targetGrade,         setTargetGrade]         = useState<string>('')
   const [selectedUiRating,    setSelectedUiRating]    = useState<string>('')
   const [activeTab,           setActiveTab]           = useState<'ozet' | 'aksiyon' | 'detay'>('ozet')
@@ -1047,6 +1048,7 @@ export default function ScenarioPanelV3({ analysisId, currentScore: _currentScor
       setResult(successData)
       setExpandedActions(new Set([0]))   // Faz 7.3.48: ilk aksiyonu otomatik aç
       setActiveTab('ozet')
+      onRoadmapCreated?.()               // Hotfix I — parent state refresh (K12)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata')
     } finally {
