@@ -33,19 +33,19 @@ export default function Icon() {
             stroke="rgba(255,255,255,0.07)"
             strokeWidth="2.9"
           />
-          {/* Gradient arc — drawn as two colored strokes blended */}
+          {/* Gradient arc — gap center 225° (bottom-left), arc from 260° to 190° clockwise */}
           <circle
             cx="16" cy="16" r="11"
             fill="none"
             stroke="url(#arcGrad)"
             strokeWidth="2.9"
             strokeLinecap="butt"
-            strokeDasharray="55 15"
-            strokeDashoffset="10"
-            transform="rotate(170 16 16)"
+            strokeDasharray="55.8 13.4"
+            strokeDashoffset="0"
+            transform="rotate(260 16 16)"
           />
-          {/* Teal dot at arc end */}
-          <circle cx="6.2" cy="19.5" r="1.8" fill="#0DC4A0" />
+          {/* Teal dot at arc end (190°) — matches FinrateLogoCanvas arcEnd */}
+          <circle cx="5.2" cy="14.1" r="1.8" fill="#0DC4A0" />
           <defs>
             <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#0284c7" />
