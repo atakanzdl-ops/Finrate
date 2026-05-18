@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       activityScore: true,
       ratios: true,
       optimizerSnapshot: true,
+      roadmapSnapshot:   true,   // YENİ — Faz 7.3.60.2
       reportedAt: true,   // Rapor oluşturulma tarihi
       entity: { select: { id: true, name: true, sector: true, taxNumber: true, entityType: true } },
       financialData: {
@@ -175,6 +176,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     reportedAt: a.reportedAt?.toISOString() ?? null,   // N1: Date → ISO string (jsonUtf8 Date guard ile çift güvence)
     ratios: a.ratios ? JSON.parse(a.ratios as string) : null,
     optimizerSnapshot: a.optimizerSnapshot ? JSON.parse(a.optimizerSnapshot as string) : null,
+    // YENİ — parse edilmiş wrapper dön (optimizerSnapshot pattern ile aynı, Codex D7)
+    roadmapSnapshot:   a.roadmapSnapshot   ? JSON.parse(a.roadmapSnapshot   as string) : null,
     subjectiveInput,      // SubjectiveInput | null
     trendAnalyses,        // önceki yıllar asc, maks 3 kayıt
   })

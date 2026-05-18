@@ -4,6 +4,8 @@ import { getUserIdFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
+import { validateRoadmapSnapshot } from '@/lib/scoring/scenarioV3/hasValidRoadmapSnapshot'
+import { ROADMAP_ERROR_CODES, ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
 export const runtime = 'nodejs'
 // Vercel serverless fonksiyon timeout (saniye) — PDF render ~20-40s sürer
@@ -24,6 +26,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // ─── Sahiplik kontrolü — kullanıcı başkasının analizini indiremez ──────────
   const owned = await prisma.analysis.findFirst({ where: { id, userId }, select: { id: true } })
   if (!owned) return jsonUtf8({ error: 'Analiz bulunamadı.' }, { status: 404 })
+
+  // === YENİ — Snapshot validation (409 Conflict) ===
+  const validation = await validateRoadmapSnapshot(id, userId)
+  if (!validation.valid) {
+    const isStale  = validation.reason === 'stale'
+    const code     = isStale ? ROADMAP_ERROR_CODES.ROADMAP_STALE    : ROADMAP_ERROR_CODES.ROADMAP_REQUIRED
+    const message  = isStale ? ROADMAP_MESSAGES.ROADMAP_STALE       : ROADMAP_MESSAGES.ROADMAP_REQUIRED
+    return jsonUtf8({ error: message, code }, { status: 409 })
+  }
 
   const requestedType = req.nextUrl.searchParams.get('type')
   const subscription = await prisma.subscription.findUnique({

@@ -6,7 +6,9 @@ import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark, getSectorBench
 import { sortPeriods } from '@/lib/periods'
 import { computeSectorCategoryScores } from '@/lib/scoring/score'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
-import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, WaterfallBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus } from '@/types/report'
+import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus, ScenarioData } from '@/types/report'
+import type { RoadmapSnapshotWrapper } from '@/lib/scoring/scenarioV3/roadmapSnapshot'
+import { mapV3ToScenarioDataV3 } from '@/lib/scoring/scenarioV3/roadmapPresentation'
 import { getNaceCode } from './naceMap'
 import {
   fmtCurrency, fmtPct, fmtPctSigned, fmtRatio, fmtDays,
@@ -16,7 +18,6 @@ import {
 } from './formatters'
 import {
   buildStrengths, buildWatchAreas, buildConclusion,
-  buildCollateralNote, buildScenarioNote,
   buildKkbSummary, buildBankSummary, buildCorpSummary, buildComplianceSummary,
   getSubjectiveStatus,
 } from './templates'
@@ -37,6 +38,8 @@ export interface AnalysisApiResponse {
   reportedAt: string | null
   ratios: Record<string, number | null> | null  // RatioResult + __financialScore + __subjectiveTotal
   optimizerSnapshot: OptimizerSnapshotRaw | null
+  // YENİ — parse edilmiş wrapper (detail endpoint JSON.parse yaptı, Codex D7)
+  roadmapSnapshot:   RoadmapSnapshotWrapper | null
   entity: { id: string; name: string; sector: string | null; taxNumber: string | null; entityType: string | null } | null
   financialData: FinancialDataRaw | null
   subjectiveInput: SubjectiveInputRaw | null
@@ -285,8 +288,8 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     // ── Sayfa 10: Nakit Akış & Çalışma Sermayesi ─────────────────────────────
     cashFlow: buildCashFlow(ratios, fd, tableYears, bm, api.id),
 
-    // ── Sayfa 11: Senaryo Analizi ─────────────────────────────────────────────
-    scenario: buildScenarioData(snap, target1Raw, target2Raw, rating, totalScore),
+    // ── Sayfa 11: Senaryo Analizi (V3-only, snapshot wrapper'dan) ────────────
+    scenario: buildScenarioData(api) ?? undefined,
 
     // ── Sayfa 12: Detaylı Aksiyon Planı ──────────────────────────────────────
     actionPlan: buildActionPlan(target1Raw, target2Raw),
@@ -1094,80 +1097,16 @@ function buildCashFlow(
   }
 }
 
-// ─── SAYFA 11: SENARYO ANALİZİ ───────────────────────────────────────────────
+// ─── SAYFA 11: SENARYO ANALİZİ (V3-only) ────────────────────────────────────
+// Legacy fallback kaldırıldı (Codex S6=A).
+// Snapshot backend'de valide edildi — burada sadece wrapper.response map ediliyor.
 
-function buildScenarioData(
-  snap: OptimizerSnapshotRaw | null,
-  t1: OptimizerTargetRaw | null,
-  t2: OptimizerTargetRaw | null,
-  rating: string,
-  totalScore: number,
-) {
-  const currentNote = buildScenarioNote(rating, totalScore)
-
-  const target1 = t1 ? {
-    rating:   t1.targetRating,
-    score:    Math.round(t1.idealPlan.projectedScore),
-    delta:    Math.round(t1.totalGain),                                    // N2: totalGain (optimizer'ın hesapladığı net kazanç)
-    timeline: t1.minimumPlan.suggestions[0]?.timeHorizon ?? '3-12 Ay',
-    actions:  t1.minimumPlan.suggestions.slice(0, 4).map(s => {
-      if (s.label) return s.label
-      const txt = s.actionText || ''
-      const match = txt.match(/^(.+?[.!?])(?:\s|$)/)  // F3: ilk gerçek cümle sonu (sayıdaki nokta değil)
-      if (match) return match[1]
-      return txt.length > 60 ? txt.substring(0, 60) + '…' : txt
-    }),
-    planNote: buildCollateralNote(t1.targetRating, Math.round(t1.idealPlan.projectedScore)),
-  } : {
-    rating: '—', score: totalScore + 3, delta: 3,
-    timeline: '3-12 Ay', actions: ['Senaryo verisi hesaplanmadı.'],
-    planNote: '—',
+function buildScenarioData(api: AnalysisApiResponse): ScenarioData | null {
+  if (!api.roadmapSnapshot) {
+    return null
   }
-
-  const target2 = t2 ? {
-    rating:   t2.targetRating,
-    score:    Math.round(t2.idealPlan.projectedScore),
-    delta:    Math.round(t2.totalGain),                                    // N2: totalGain
-    timeline: '6-18 Ay',
-    actions:  t2.minimumPlan.suggestions.slice(0, 4).map(s => {
-      if (s.label) return s.label
-      const txt = s.actionText || ''
-      const match = txt.match(/^(.+?[.!?])(?:\s|$)/)
-      if (match) return match[1]
-      return txt.length > 60 ? txt.substring(0, 60) + '…' : txt
-    }),
-    planNote: buildCollateralNote(t2.targetRating, Math.round(t2.idealPlan.projectedScore)),
-  } : {
-    rating: '—', score: totalScore + 6, delta: 6,
-    timeline: '6-18 Ay', actions: ['Senaryo verisi hesaplanmadı.'],
-    planNote: '—',
-  }
-
-  // Waterfall barlar
-  const waterfall: WaterfallBar[] = [
-    { label: 'Mevcut', value: totalScore, type: 'base', color: '#0a192f' },
-  ]
-
-  if (t1) {
-    const sug1 = t1.minimumPlan.suggestions[0]
-    const sug2 = t1.minimumPlan.suggestions[1]
-    if (sug1) waterfall.push({ label: sug1.label.replace(/ /g, '\n'), value: Math.round(sug1.scoreGain), type: 'delta', color: '#2dd4bf' })
-    if (sug2) waterfall.push({ label: sug2.label.replace(/ /g, '\n'), value: Math.round(sug2.scoreGain), type: 'delta', color: '#2dd4bf' })
-    waterfall.push({ label: '1. Hedef', value: Math.round(t1.idealPlan.projectedScore), type: 'target', color: '#22c55e' })
-  }
-
-  if (t2) {
-    const sug = t2.minimumPlan.suggestions.find(s => !t1?.minimumPlan.suggestions.find(s2 => s2.key === s.key))
-    if (sug) waterfall.push({ label: sug.label.replace(/ /g, '\n'), value: Math.round(sug.scoreGain), type: 'delta', color: '#2dd4bf' })
-    waterfall.push({ label: '2. Hedef', value: Math.round(t2.idealPlan.projectedScore), type: 'target', color: '#f59e0b' })
-  }
-
-  return {
-    current: { rating, score: totalScore, note: currentNote },  // F2: tek kaynak = finalScore (kapak ile tutarlı)
-    target1,
-    target2,
-    waterfall,
-  }
+  // Wrapper ALREADY PARSED (detail endpoint JSON.parse yaptı)
+  return mapV3ToScenarioDataV3(api.roadmapSnapshot.response)
 }
 
 // ─── SAYFA 12: AKSİYON PLANI ─────────────────────────────────────────────────

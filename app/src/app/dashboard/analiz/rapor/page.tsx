@@ -8,6 +8,7 @@ import ReportV2 from '@/components/report/ReportV2'
 import { mapToReportData, type AnalysisApiResponse } from '@/components/report/dataMapper'
 import type { ReportData } from '@/types/report'
 import { Logo } from '@/components/ui/Logo'
+import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
 // ─── Yükleme Ekranı ──────────────────────────────────────────────────────────
 function LoadingScreen() {
@@ -71,6 +72,37 @@ function RaporContent() {
 
   if (loading)        return <LoadingScreen />
   if (error || !reportData) return <ErrorScreen message={error ?? 'Veri alınamadı.'} />
+
+  // === YENİ — Snapshot yoksa SAYFA İÇERİĞİNİ BLOKLA (Codex D12) ===
+  const hasRoadmap = reportData.scenario != null
+  if (!hasRoadmap) {
+    return (
+      <div style={{ maxWidth: '600px', margin: '60px auto', padding: '32px', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+        <h2 style={{ marginBottom: '14px', color: '#1f2937' }}>Rapor Görüntülenemiyor</h2>
+        <p style={{ color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
+          {ROADMAP_MESSAGES.ROADMAP_REQUIRED}
+        </p>
+        <button
+          onClick={() => {
+            window.location.href = `/dashboard/analiz${id ? `?id=${id}` : ''}`
+          }}
+          style={{
+            background:   '#0f2942',
+            color:        '#fff',
+            padding:      '10px 24px',
+            borderRadius: '6px',
+            fontSize:     '14px',
+            fontWeight:   500,
+            border:       'none',
+            cursor:       'pointer',
+          }}
+        >
+          Analiz Sayfasına Dön
+        </button>
+      </div>
+    )
+  }
 
   const pdfUrl = compareIds !== null
     ? `/api/analyses/${id}/pdf?type=executive15&compareIds=${encodeURIComponent(compareIds)}`

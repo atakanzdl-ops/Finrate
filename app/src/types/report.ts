@@ -50,8 +50,8 @@ export interface ReportData {
   // Sayfa 10 — Nakit Akış & Çalışma Sermayesi
   cashFlow: CashFlowData
 
-  // Sayfa 11 — Senaryo Analizi
-  scenario: ScenarioData
+  // Sayfa 11 — Senaryo Analizi (opsiyonel — snapshot backend'de kontrol edilir)
+  scenario?: ScenarioData
 
   // Sayfa 12 — Detaylı Aksiyon Planı
   actionPlan: ActionPlanItem[]
@@ -279,36 +279,64 @@ export interface WorkingCapitalRow {
   years:  { year: number; period: string; isCurrent: boolean }[]
 }
 
-// ─── SENARYO ANALİZİ ─────────────────────────────────────────────────────
+// ─── SENARYO ANALİZİ V3 ──────────────────────────────────────────────────────
+// Legacy ScenarioData kaldırıldı (Codex S6=A)
 
-export interface ScenarioData {
-  current: ScenarioState
-  target1: ScenarioTarget
-  target2: ScenarioTarget
-  waterfall: WaterfallBar[]
+export type IssueSeverity = 'KRİTİK' | 'CİDDİ' | 'ORTA' | 'HAFİF'
+
+export type PerspectiveLevel = 'İyi' | 'Orta' | 'Zayıf' | 'Yüksek' | 'Düşük'
+
+export interface RoadmapHero {
+  currentRating:     string
+  targetRating:      string
+  reachable:         boolean
+  reachabilityLabel: string
+  confidence:        PerspectiveLevel
+  summaryText:       string
 }
 
-export interface ScenarioState {
-  rating:  string        // "BBB+"
-  score:   number        // 74
-  note:    string        // "Yatırım yapılabilir segment. Kefalet veya..."
+export interface RoadmapIssue {
+  title:          string
+  severity:       IssueSeverity
+  description:    string
+  evidence:       string
+  ifNotAddressed: string
 }
 
-export interface ScenarioTarget {
-  rating:   string       // "A"
-  score:    number       // 77
-  delta:    number       // +3
-  timeline: string       // "3-12 Ay"
-  actions:  string[]     // bullet point listesi
-  planNote: string       // "Maddi teminatsız kefalet yeterli"
+export interface RoadmapConsultant {
+  problem:           string
+  coreIssue:         string
+  shortTermPriority: string
+  structuralNeed:    string
+  finrateComment:    string
 }
 
-export interface WaterfallBar {
-  label:  string         // "Mevcut", "+Alacak\nTahsilat", "1. Hedef", ...
-  value:  number         // mutlak skor veya delta
-  type:   'base' | 'delta' | 'target'
-  color:  string         // "#0a192f", "#2dd4bf teal", "#22c55e", "#f59e0b"
+export interface RoadmapPerspective {
+  likidite:         PerspectiveLevel
+  yapisalRisk:      PerspectiveLevel
+  aktifVerimliligi: PerspectiveLevel
+  ratingGuveni:     PerspectiveLevel
 }
+
+export interface RoadmapIfNotDone {
+  generalWarning: string
+  issueRisks: Array<{
+    title: string
+    risk:  string
+  }>
+}
+
+export interface ScenarioDataV3 {
+  kind:        'v3-summary'
+  hero:        RoadmapHero
+  consultant:  RoadmapConsultant
+  issues:      RoadmapIssue[]
+  perspective: RoadmapPerspective
+  ifNotDone:   RoadmapIfNotDone
+}
+
+// Legacy kaldırıldı (Codex S6=A)
+export type ScenarioData = ScenarioDataV3
 
 // ─── AKSİYON PLANI ───────────────────────────────────────────────────────
 

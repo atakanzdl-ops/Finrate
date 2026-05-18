@@ -19,6 +19,7 @@ import ScenarioPanelV3 from '@/components/analysis/ScenarioPanelV3'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
 import { scoreToRating } from '@/lib/scoring/score'
+import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
 /* ─── Types ─────────────────────────────────────── */
 
@@ -45,6 +46,7 @@ interface Analysis {
   hasBalanceAccounts?: boolean
   hasIncomeAccounts?: boolean
   missingQuarterlySourceWarning?: 'MIZAN_MISSING' | 'BEYANNAME_MISSING' | null
+  hasRoadmapSnapshot?: boolean   // YENİ — Faz 7.3.60.2
 }
 
 type TabId = 'overview' | 'ratios' | 'scenario' | 'subjective' | 'trend'
@@ -705,18 +707,55 @@ function AnalizPageContent() {
               className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-[#1E293B] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
             />
           </div>
+          {/* === Rapor Oluştur — snapshot zorunlu (Faz 7.3.60.2) === */}
           <button
             onClick={() => {
               if (!selected) return
+              if (!(selected.hasRoadmapSnapshot ?? false)) return  // Defansif
               setPeriodModalOpen(true)
             }}
-            disabled={!selected}
+            disabled={!selected || !(selected?.hasRoadmapSnapshot ?? false)}
+            title={selected && !(selected.hasRoadmapSnapshot ?? false) ? ROADMAP_MESSAGES.BUTTON_DISABLED_TOOLTIP : undefined}
             className="btn btn-primary disabled:opacity-40"
           >
             <Download size={14} /> Rapor Oluştur
           </button>
         </div>
       </div>
+
+      {/* === Banner — snapshot yoksa, seçili analiz varken göster (Faz 7.3.60.2) === */}
+      {selected && !(selected.hasRoadmapSnapshot ?? false) && (
+        <div style={{
+          background:   '#fef3c7',
+          border:       '1px solid #fbbf24',
+          borderRadius: '6px',
+          padding:      '10px 14px',
+          fontSize:     '13px',
+          display:      'flex',
+          alignItems:   'center',
+          gap:          '10px',
+        }}>
+          <span style={{ color: '#92400e' }}>⚠️</span>
+          <span style={{ flex: 1, color: '#78350f' }}>
+            {ROADMAP_MESSAGES.BANNER_TEXT}
+          </span>
+          <button
+            onClick={() => setActiveTab('scenario')}
+            style={{
+              background:   '#92400e',
+              color:        '#fff',
+              padding:      '5px 12px',
+              borderRadius: '4px',
+              fontSize:     '12px',
+              fontWeight:   500,
+              border:       'none',
+              cursor:       'pointer',
+            }}
+          >
+            {ROADMAP_MESSAGES.BANNER_CTA}
+          </button>
+        </div>
+      )}
 
       {selected && (
         <div className="bg-white border border-slate-200 rounded-[4px]">

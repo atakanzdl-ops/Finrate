@@ -1,150 +1,322 @@
 'use client'
-import type { ReportData, WaterfallBar } from '@/types/report'
-import { fmtSigned } from '../formatters'
+import React from 'react'
+import type {
+  ScenarioDataV3,
+  RoadmapHero,
+  RoadmapIssue,
+  RoadmapConsultant,
+  RoadmapPerspective,
+  RoadmapIfNotDone,
+} from '@/types/report'
 
 interface Props {
-  data: Pick<ReportData, 'companyName' | 'reportNo' | 'scenario'>
+  data: {
+    companyName: string
+    reportNo:    string
+    scenario?:   ScenarioDataV3
+  }
   sector?: string
 }
 
-function WaterfallChart({ bars }: { bars: WaterfallBar[] }) {
-  const maxScore = Math.max(...bars.map(b => b.value), 100)
-  const BASE_H = 120  // px maksimum yükseklik
-
-  let cumulative = 0
-  const enriched = bars.map(b => {
-    const isBase   = b.type === 'base'
-    const isDelta  = b.type === 'delta'
-    const isTarget = b.type === 'target'
-    const startAt  = isBase || isTarget ? 0 : cumulative
-    const endAt    = isBase || isTarget ? b.value : cumulative + b.value
-    if (isDelta) cumulative += b.value
-    else if (isBase) cumulative = b.value
-    return { ...b, startAt, endAt, isBase, isDelta, isTarget }
-  })
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: `${BASE_H + 32}px`, padding: '0 8px' }}>
-      {enriched.map((b, i) => {
-        const h = Math.round((b.value / maxScore) * BASE_H)
-        const bottom = b.isDelta ? Math.round((b.startAt / maxScore) * BASE_H) : 0
-        const color = b.isBase ? '#0a192f' : b.isDelta ? '#2dd4bf' : b.isTarget === true && b.color?.includes('f59e0b') ? '#f59e0b' : '#22c55e'
-        const lines = b.label.split('\n')
-        return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {/* Değer */}
-            <div className="mono" style={{ fontSize: '8.5px', fontWeight: 800, color: '#0a192f', marginBottom: '3px' }}>
-              {b.isDelta ? fmtSigned(b.value) : b.value}
-            </div>
-            {/* Bar */}
-            <div style={{ position: 'relative', width: '100%', height: `${BASE_H}px` }}>
-              <div style={{
-                position: 'absolute',
-                bottom: `${bottom}px`,
-                left: 0,
-                right: 0,
-                height: `${Math.max(h, 6)}px`,
-                background: color,
-                borderRadius: b.isDelta ? '3px' : '6px 6px 0 0',
-                opacity: b.isDelta ? 0.85 : 1,
-              }} />
-            </div>
-            {/* Etiket */}
-            <div style={{ marginTop: '4px', textAlign: 'center', fontSize: '7px', color: '#64748b', lineHeight: 1.3 }}>
-              {lines.map((l, j) => <div key={j}>{l}</div>)}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function ScenarioPage({ data, sector }: Props) {
-  const { companyName, reportNo, scenario: sc } = data
-  const { current, target1, target2, waterfall } = sc
+  // Snapshot backend'de valide edildi; burada scenario null gelirse teknik hata anlamına gelir
+  if (!data.scenario) {
+    return null
+  }
+
+  const s = data.scenario
 
   return (
     <div className="pdf-page">
       <div className="wm">SENARYO</div>
       <div className="ph">
-        <div><div className="ph-sec">Bölüm 10</div><div className="ph-title">Senaryo Analizi</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 11</div></div>
+        <div>
+          <div className="ph-sec">Bölüm 10</div>
+          <div className="ph-title">Senaryo Analizi</div>
+        </div>
+        <div className="ph-right">
+          <div className="ph-ent">{data.companyName}</div>
+          {sector && <div className="ph-sector">{sector}</div>}
+          <div className="ph-pg">Sayfa 11</div>
+        </div>
       </div>
+
       <div className="pc">
+        <HeroBanner hero={s.hero} />
 
-        {/* Mevcut Durum */}
-        <div style={{ background: '#0a192f', borderRadius: '14px', padding: '18px 22px', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '8.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '6px' }}>Mevcut Durum</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-                <div className="outfit" style={{ fontSize: '48px', fontWeight: 900, color: '#2dd4bf', lineHeight: 1 }}>{current.rating}</div>
-                <div className="outfit" style={{ fontSize: '32px', fontWeight: 800, color: 'white', lineHeight: 1 }}>{current.score}<span style={{ fontSize: '16px', color: '#475569' }}>/100</span></div>
-              </div>
-            </div>
-            <div style={{ maxWidth: '300px', fontSize: '9px', color: '#94a3b8', lineHeight: 1.7 }}>{current.note}</div>
-          </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '64% 36%',
+          gap: '16px',
+          marginTop: '16px',
+        }}>
+          <ConsultantBlock consultant={s.consultant} issues={s.issues} />
+          <PerspectiveBlock perspective={s.perspective} />
         </div>
 
-        {/* 2 Hedef Kart + Waterfall */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-
-          {/* Hedef 1 */}
-          <div style={{ border: '2px solid #22c55e', borderRadius: '12px', padding: '14px 16px', background: '#f0fdf4' }}>
-            <div style={{ fontSize: '8px', color: '#166534', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '8px', fontWeight: 700 }}>1. Hedef</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
-              <div className="outfit" style={{ fontSize: '28px', fontWeight: 900, color: '#0a192f', lineHeight: 1 }}>{target1.rating}</div>
-              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#22c55e' }}>{fmtSigned(target1.delta)}</div>
-            </div>
-            <div style={{ fontSize: '8px', color: '#475569', marginBottom: '8px' }}>Süre: {target1.timeline}</div>
-            <div style={{ borderTop: '1px solid #86efac', paddingTop: '8px' }}>
-              {target1.actions.slice(0, 3).map((a, i) => (
-                <div key={i} style={{ fontSize: '8px', color: '#334155', padding: '2px 0', display: 'flex', gap: '5px' }}>
-                  <span style={{ color: '#22c55e', fontWeight: 700 }}>›</span>{a}
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '7.5px', color: '#0369a1', background: '#e0f2fe', padding: '6px 8px', borderRadius: '6px' }}>{target1.planNote}</div>
-          </div>
-
-          {/* Hedef 2 */}
-          <div style={{ border: '2px solid #f59e0b', borderRadius: '12px', padding: '14px 16px', background: '#fffbeb' }}>
-            <div style={{ fontSize: '8px', color: '#92400e', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '8px', fontWeight: 700 }}>2. Hedef</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
-              <div className="outfit" style={{ fontSize: '28px', fontWeight: 900, color: '#0a192f', lineHeight: 1 }}>{target2.rating}</div>
-              <div className="outfit" style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>{fmtSigned(target2.delta)}</div>
-            </div>
-            <div style={{ fontSize: '8px', color: '#475569', marginBottom: '8px' }}>Süre: {target2.timeline}</div>
-            <div style={{ borderTop: '1px solid #fde68a', paddingTop: '8px' }}>
-              {target2.actions.slice(0, 3).map((a, i) => (
-                <div key={i} style={{ fontSize: '8px', color: '#334155', padding: '2px 0', display: 'flex', gap: '5px' }}>
-                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>›</span>{a}
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '7.5px', color: '#92400e', background: '#fef9c3', padding: '6px 8px', borderRadius: '6px' }}>{target2.planNote}</div>
-          </div>
-
-          {/* Waterfall */}
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px' }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, color: '#0a192f', marginBottom: '10px' }}>Skor İlerlemesi</div>
-            <WaterfallChart bars={waterfall} />
-          </div>
-        </div>
-
-        {/* Değerlendirme */}
-        <div className="ev">
-          <div className="ev-t">Senaryo Değerlendirmesi</div>
-          <div className="ev-tx">
-            Mevcut {current.rating} ({current.score} puan) konumundan, belirlenen aksiyon planlarının hayata geçirilmesiyle {target1.rating} hedefine <strong style={{ color: 'white' }}>{target1.timeline}</strong> içinde ulaşılması öngörülmektedir. İkinci hedef olan {target2.rating} için ise {target2.timeline} vadeli kapsamlı iyileştirme programı gerekmektedir.
-          </div>
-        </div>
+        <IfNotDoneBox ifNotDone={s.ifNotDone} style={{ marginTop: '16px' }} />
       </div>
+
       <div className="pf">
         <span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span>
-        <span>finrate.com.tr · {reportNo}</span>
+        <span>finrate.com.tr · {data.reportNo}</span>
       </div>
     </div>
+  )
+}
+
+// === LOCAL HELPER COMPONENTS ===
+
+function HeroBanner({ hero }: { hero: RoadmapHero }) {
+  return (
+    <div style={{
+      background:   '#0f2942',
+      color:        '#ffffff',
+      padding:      '16px 20px',
+      borderRadius: '6px',
+    }}>
+      <div style={{ fontSize: '11px', opacity: 0.85 }}>
+        Mevcut: {hero.currentRating} → Hedef: {hero.targetRating}
+      </div>
+
+      <div style={{
+        fontSize:   '14px',
+        fontWeight: 600,
+        marginTop:  '6px',
+        lineHeight: 1.4,
+      }}>
+        {hero.summaryText}
+      </div>
+
+      <div style={{
+        marginTop:   '10px',
+        display:     'flex',
+        gap:         '14px',
+        fontSize:    '10px',
+        alignItems:  'center',
+      }}>
+        <span style={{
+          background:   hero.reachable ? '#10b981' : '#f59e0b',
+          padding:      '3px 9px',
+          borderRadius: '4px',
+          fontWeight:   500,
+        }}>
+          {hero.reachabilityLabel}
+        </span>
+        <span style={{ opacity: 0.9 }}>
+          Güven: <strong>{hero.confidence}</strong>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize:       '7.5px',
+      textTransform:  'uppercase',
+      letterSpacing:  '0.5px',
+      color:          '#0891b2',
+      marginTop:      '10px',
+      marginBottom:   '2px',
+      fontWeight:     600,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function severityBg(sev: string): string {
+  if (sev === 'KRİTİK') return '#dc2626'
+  if (sev === 'CİDDİ')  return '#f59e0b'
+  if (sev === 'ORTA')   return '#6b7280'
+  return '#9ca3af'
+}
+
+function ConsultantBlock({ consultant, issues }: { consultant: RoadmapConsultant; issues: RoadmapIssue[] }) {
+  return (
+    <div style={{
+      background:   '#ffffff',
+      border:       '1px solid #e5e7eb',
+      borderRadius: '6px',
+      padding:      '14px',
+      fontSize:     '9px',
+      lineHeight:   1.5,
+    }}>
+      <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '10px' }}>
+        Danışman Yorumu
+      </div>
+
+      <SubLabel>Temel Problem</SubLabel>
+      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.problem}</p>
+
+      {issues.length > 0 && (
+        <>
+          <SubLabel>Tespit Edilen Yapısal Sorunlar</SubLabel>
+          <ul style={{ paddingLeft: '14px', marginTop: '4px', marginBottom: '6px' }}>
+            {issues.map((iss, idx) => (
+              <li key={idx} style={{ marginBottom: '6px' }}>
+                <strong>{iss.title}</strong>{' '}
+                <span style={{
+                  fontSize:     '7.5px',
+                  background:   severityBg(iss.severity),
+                  color:        '#fff',
+                  padding:      '1px 5px',
+                  borderRadius: '3px',
+                  fontWeight:   500,
+                  marginLeft:   '3px',
+                }}>
+                  {iss.severity}
+                </span>
+                <div>{iss.description}</div>
+                {iss.evidence && (
+                  <div style={{
+                    fontStyle: 'italic',
+                    fontSize:  '8px',
+                    marginTop: '2px',
+                    color:     '#4b5563',
+                  }}>
+                    Kanıt: {iss.evidence}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <SubLabel>Çekirdek Mesele</SubLabel>
+      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.coreIssue}</p>
+
+      <SubLabel>Kısa Vadede Öncelik</SubLabel>
+      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.shortTermPriority}</p>
+
+      <SubLabel>Yapısal İhtiyaç</SubLabel>
+      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.structuralNeed}</p>
+
+      <SubLabel>Finrate Yorumu</SubLabel>
+      <p style={{ margin: 0 }}>{consultant.finrateComment}</p>
+    </div>
+  )
+}
+
+function perspectiveBg(level: string): string {
+  // İyi göstergeler yeşil, orta turuncu, zayıf gri
+  // Düşük = Yapısal Risk Düşük = iyi → yeşil
+  if (level === 'İyi' || level === 'Düşük') return '#10b981'
+  // Yüksek = Yapısal Risk Yüksek = kötü → kırmızı (Codex: kırmızı sınırlı kullanım)
+  if (level === 'Yüksek') return '#dc2626'
+  if (level === 'Orta')   return '#f59e0b'
+  return '#9ca3af'
+}
+
+function PerspectiveBlock({ perspective }: { perspective: RoadmapPerspective }) {
+  const rows = [
+    { label: 'Likidite',          value: perspective.likidite },
+    { label: 'Yapısal Risk',      value: perspective.yapisalRisk },
+    { label: 'Aktif Verimliliği', value: perspective.aktifVerimliligi },
+    { label: 'Rating Güveni',     value: perspective.ratingGuveni },
+  ]
+
+  return (
+    <div style={{
+      background:   '#ffffff',
+      border:       '1px solid #e5e7eb',
+      borderRadius: '6px',
+      padding:      '14px',
+      fontSize:     '9px',
+    }}>
+      <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '12px' }}>
+        Finrate Perspektifi
+      </div>
+
+      {rows.map((r, idx) => (
+        <div key={idx} style={{
+          display:         'flex',
+          justifyContent:  'space-between',
+          alignItems:      'center',
+          padding:         '7px 0',
+          borderBottom:    idx < rows.length - 1 ? '1px dashed #e5e7eb' : 'none',
+        }}>
+          <span>{r.label}</span>
+          <span style={{
+            fontSize:     '8px',
+            background:   perspectiveBg(r.value),
+            color:        '#fff',
+            padding:      '3px 9px',
+            borderRadius: '12px',
+            fontWeight:   500,
+          }}>
+            {r.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function IfNotDoneBox({ ifNotDone, style }: { ifNotDone: RoadmapIfNotDone; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background:   '#fef2f2',
+      border:       '1px solid #fecaca',
+      borderRadius: '6px',
+      padding:      '12px',
+      ...style,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+        <WarnIcon color="#dc2626" />
+        <span style={{
+          fontWeight:  600,
+          fontSize:    '11px',
+          marginLeft:  '5px',
+          color:       '#7f1d1d',
+        }}>
+          Aksiyon Alınmazsa
+        </span>
+      </div>
+
+      <p style={{
+        fontSize:     '9px',
+        lineHeight:   1.5,
+        margin:       0,
+        marginBottom: '6px',
+        color:        '#374151',
+      }}>
+        {ifNotDone.generalWarning}
+      </p>
+
+      {ifNotDone.issueRisks.length > 0 && (
+        <ul style={{
+          paddingLeft: '14px',
+          fontSize:    '9px',
+          lineHeight:  1.45,
+          margin:      0,
+          color:       '#374151',
+        }}>
+          {ifNotDone.issueRisks.map((r, idx) => (
+            <li key={idx} style={{ marginBottom: '4px' }}>
+              <strong>{r.title}:</strong>{' '}{r.risk}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// WarnIcon — sayfa 2, 4, 10 ile aynı pattern. Inline tanım:
+function WarnIcon({ color = '#dc2626', size = 14 }: { color?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h17a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }

@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       leverageScore: true,
       activityScore: true,
       ratios: true,
+      roadmapSnapshot: true,   // YENİ — boolean olarak expose edilecek
       entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
       financialAccounts: {
         select: { accountCode: true },
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
   })
 
   const analyses = raw.map((a: (typeof raw)[number]) => {
-    const { financialAccounts, ...rest } = a
+    const { financialAccounts, roadmapSnapshot, ...rest } = a
 
     const parsedRatios = rest.ratios ? JSON.parse(rest.ratios as string) : null
     const overallCoverage: number | null = parsedRatios?.__overallCoverage ?? null
@@ -66,6 +67,8 @@ export async function GET(req: NextRequest) {
       hasBalanceAccounts:              hasBalanceAccounts(accountCodes),
       hasIncomeAccounts:               hasIncomeAccounts(accountCodes),
       missingQuarterlySourceWarning:   detectMissingQuarterlySource(a.period, accountCodes),
+      // YENİ — boolean (frontend tüm JSON'a ihtiyacı yok, performans)
+      hasRoadmapSnapshot:              roadmapSnapshot != null,
     }
   })
 
