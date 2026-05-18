@@ -46,6 +46,13 @@ export default function Icon() {
           />
           {/* Teal dot at arc end (190°) — matches FinrateLogoCanvas arcEnd */}
           <circle cx="5.2" cy="14.1" r="1.8" fill="#0DC4A0" />
+          {/* F harfi — 3 rect, SVG path (font'a bağımlı değil, keskin) */}
+          {/* Sol dikey çizgi */}
+          <rect x="11" y="10" width="3" height="13" fill="#ffffff" />
+          {/* Üst yatay bar */}
+          <rect x="11" y="10" width="10" height="3" fill="#ffffff" />
+          {/* Orta yatay bar */}
+          <rect x="11" y="15" width="8" height="3" fill="#ffffff" />
           <defs>
             <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#0284c7" />
@@ -53,21 +60,6 @@ export default function Icon() {
             </linearGradient>
           </defs>
         </svg>
-
-        {/* F letter */}
-        <span
-          style={{
-            color: '#ffffff',
-            fontSize: 14,
-            fontWeight: 700,
-            lineHeight: 1,
-            position: 'relative',
-            zIndex: 1,
-            marginTop: 1,
-          }}
-        >
-          F
-        </span>
       </div>
     ),
     { ...size },
