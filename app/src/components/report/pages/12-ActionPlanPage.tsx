@@ -185,8 +185,8 @@ export default function ActionPlanPage({ data, sector, pageVariant }: Props) {
   // 4+2 bölüştürme
   const allActions  = actionPlan.actions
   const pageActions = pageVariant === 'primary'
-    ? allActions.slice(0, 4)
-    : allActions.slice(4)
+    ? allActions.slice(0, 3)
+    : allActions.slice(3)
 
   // Sayfa numarası (Faz 7.3.60.3 — Sayfa 12 ve Sayfa 13)
   const pageNumber = pageVariant === 'primary' ? 12 : 13
