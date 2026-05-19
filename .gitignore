@@ -41,3 +41,7 @@ app/dev-*.out.log
 app/.claude/
 .claude/
 .vercel
+
+graphify-out/
+
+.github/
