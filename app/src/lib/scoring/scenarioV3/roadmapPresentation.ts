@@ -13,6 +13,9 @@ import type {
   PerspectiveLevel,
   IssueSeverity,
   ScenarioDataV3,
+  ActionPlanV3,
+  ActionPlanItemV3,
+  ActionHorizon,
 } from '@/types/report'
 
 // Productivity layer türü (layerSummaries.productivity: unknown olarak tanımlı)
@@ -188,6 +191,62 @@ export function mapV3ToScenarioDataV3(
     }
   } catch (err) {
     console.error('mapV3ToScenarioDataV3 failed:', err)
+    return null
+  }
+}
+
+/**
+ * V3 response'tan PDF Sayfa 12+13 için action plan DTO üret.
+ * Hata olursa null döner.
+ */
+export function mapV3ToActionPlanV3(
+  response: ScenarioV3ApiResponse,
+): ActionPlanV3 | null {
+  try {
+    const da = response.decisionAnswer
+
+    if (!da) {
+      return null
+    }
+
+    // isFeasible (Codex teyit — canonicalOutcome.isFeasible obje field)
+    const isFeasible = da.canonicalOutcome?.isFeasible ?? true
+
+    // PAGE TITLE (web ScenarioPanelV3 line 640-642 BİREBİR)
+    const pageTitle = !isFeasible
+      ? 'Mevcut Seviyeyi Koruma — Aksiyon Önerileri'
+      : 'Firma Ne Yapmalı?'
+
+    // PAGE SUBTITLE (web ScenarioPanelV3 line 644-647 BİREBİR)
+    const actionCount = da.whatCompanyShouldDo?.length ?? 0
+    const pageSubtitle = !isFeasible
+      ? 'Aşağıdaki aksiyonlar BBB hedefine taşımaz; mevcut seviyeyi korumak için sıralanmıştır.'
+      : `Öncelik sırasına göre ${actionCount} aksiyon önerisi.`
+
+    // ACTIONS
+    const rawActions = da.whatCompanyShouldDo ?? []
+
+    const actions: ActionPlanItemV3[] = rawActions.map((a, idx) => ({
+      rank:              a.rank ?? idx + 1,
+      actionName:        a.actionName ?? 'Aksiyon',
+      horizonLabel:      (a.horizonLabel ?? '—') as ActionHorizon,
+      amountFormatted:   a.amountFormatted ?? '—',
+      bankerPerspective: a.bankerPerspective ?? '',
+    }))
+
+    // WHY CAPITAL
+    const whyCapitalAloneNotEnough = da.whyCapitalAloneIsNotEnough ?? ''
+
+    return {
+      kind: 'v3-actions',
+      isFeasible,
+      pageTitle,
+      pageSubtitle,
+      actions,
+      whyCapitalAloneNotEnough,
+    }
+  } catch (err) {
+    console.error('mapV3ToActionPlanV3 failed:', err)
     return null
   }
 }

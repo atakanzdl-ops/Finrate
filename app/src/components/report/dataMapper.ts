@@ -6,9 +6,9 @@ import { SECTOR_BENCHMARKS, SECTOR_WEIGHTS, type SectorBenchmark, getSectorBench
 import { sortPeriods } from '@/lib/periods'
 import { computeSectorCategoryScores } from '@/lib/scoring/score'
 import { calcSubjectiveScore } from '@/lib/scoring/subjective'
-import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, ActionPlanItem, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus, ScenarioData } from '@/types/report'
+import type { ReportData, RatioRow, BalanceSheetItem, IncomeStatementItem, GrowthTableRow, TrendBar, ActionPlanV3, SubjectiveCard, SubjectiveRow, RiskClassification, RiskOverallLevel, RiskMetricStatus, ScenarioData } from '@/types/report'
 import type { RoadmapSnapshotWrapper } from '@/lib/scoring/scenarioV3/roadmapSnapshot'
-import { mapV3ToScenarioDataV3 } from '@/lib/scoring/scenarioV3/roadmapPresentation'
+import { mapV3ToScenarioDataV3, mapV3ToActionPlanV3 } from '@/lib/scoring/scenarioV3/roadmapPresentation'
 import { getNaceCode } from './naceMap'
 import {
   fmtCurrency, fmtPct, fmtPctSigned, fmtRatio, fmtDays,
@@ -236,11 +236,6 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
   // Bilanço/Gelir tablosu için son 6 yıl (en fazla)
   const tableYears = allYears.slice(-6)
 
-  // ── Senaryo + Aksiyon ──────────────────────────────────────────────────────
-  const snap       = api.optimizerSnapshot
-  const target1Raw = snap?.targets?.[0] ?? null
-  const target2Raw = snap?.targets?.[1] ?? null
-
   // ── Subjektif ─────────────────────────────────────────────────────────────
   const subj = api.subjectiveInput
   const breakdown = subj
@@ -291,8 +286,8 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     // ── Sayfa 11: Senaryo Analizi (V3-only, snapshot wrapper'dan) ────────────
     scenario: buildScenarioData(api) ?? undefined,
 
-    // ── Sayfa 12: Detaylı Aksiyon Planı ──────────────────────────────────────
-    actionPlan: buildActionPlan(target1Raw, target2Raw),
+    // ── Sayfa 12+13: Aksiyon Planı V3 ────────────────────────────────────────
+    actionPlan: buildActionPlanV3(api) ?? undefined,
 
     // ── Sayfa 13: Subjektif Faktörler ─────────────────────────────────────────
     subjective: buildSubjectiveData(subj, breakdown, subjectiveTotal),
@@ -1109,73 +1104,14 @@ function buildScenarioData(api: AnalysisApiResponse): ScenarioData | null {
   return mapV3ToScenarioDataV3(api.roadmapSnapshot.response)
 }
 
-// ─── SAYFA 12: AKSİYON PLANI ─────────────────────────────────────────────────
+// ─── SAYFA 12+13: AKSİYON PLANI V3 ──────────────────────────────────────────
 
-const CATEGORY_STYLE: Record<string, { category: string; categoryColor: string; categoryBg: string; categoryBorder: string }> = {
-  liquidity:       { category: 'Likidite',  categoryColor: '#0284c7', categoryBg: '#eff6ff', categoryBorder: '#bfdbfe' },
-  profitability:   { category: 'Kârlılık',  categoryColor: '#0f766e', categoryBg: '#f0fdfa', categoryBorder: '#99f6e4' },
-  leverage:        { category: 'Kaldıraç',  categoryColor: '#7c3aed', categoryBg: '#f5f3ff', categoryBorder: '#ddd6fe' },
-  'working-capital': { category: 'Faaliyet', categoryColor: '#b45309', categoryBg: '#fffbeb', categoryBorder: '#fde68a' },
-}
-
-function buildBankImpact(actionFamily: string, actionText: string): string {
-  const texts: Record<string, string> = {
-    liquidity:         'Likidite iyileşmesi cari oran üzerinden kredi limitini doğrudan etkiler. Bankaların kısa vadeli kredi taleplerinde öncelikli değerlendirme kriteridir.',
-    profitability:     'Kârlılık artışı geri ödeme kapasitesini güçlendirir. Nakit akış projeksiyonlarında iyileşme ile kredi faiz oranı müzakeresini kolaylaştırır.',
-    leverage:          'Kaldıraç azalması borç servisi rasyolarını iyileştirir. Özkaynak güçlenmesi banka teminat hesaplamalarında olumlu etki yaratır.',
-    'working-capital': 'Çalışma sermayesi verimliliği nakit akışını iyileştirir. Kısa vadeli finansman ihtiyacının azalması revolver kredi maliyetini düşürür.',
+function buildActionPlanV3(api: AnalysisApiResponse): ActionPlanV3 | null {
+  if (!api.roadmapSnapshot) {
+    return null
   }
-  return texts[actionFamily] ?? 'Bu aksiyon finansal sağlamlığı güçlendirerek banka değerlendirmesini olumlu etkiler.'
-}
 
-function formatSuggestionValue(value: number | null, unit: RatioSuggestionRaw['unit']): string {
-  if (value == null) return '—'
-  if (unit === 'pct') return fmtPct(value)
-  if (unit === 'x') return fmtRatio(value)
-  if (unit === 'day') return fmtDays(value)
-  return value.toFixed(2)
-}
-
-function buildActionPlan(
-  t1: OptimizerTargetRaw | null,
-  t2: OptimizerTargetRaw | null,
-): ActionPlanItem[] {
-  const suggestions = [
-    ...(t1?.minimumPlan.suggestions ?? []),
-    ...(t2?.minimumPlan.suggestions ?? []),
-  ]
-
-  // Benzersiz key'lere göre deduplicate, scoreGain'e göre sırala
-  const seen = new Set<string>()
-  const unique = suggestions.filter(s => {
-    if (seen.has(s.key)) return false
-    seen.add(s.key)
-    return true
-  }).sort((a, b) => b.scoreGain - a.scoreGain)
-    .slice(0, 4)
-
-  return unique.map((s, i) => {
-    const style = CATEGORY_STYLE[s.actionFamily] ?? CATEGORY_STYLE['working-capital']
-    const currentFmt = formatSuggestionValue(s.currentValue, s.unit)
-    const targetFmt  = formatSuggestionValue(s.targetValue, s.unit)
-
-    return {
-      number:            i + 1,
-      title:             s.label,
-      category:          style.category,
-      categoryColor:     style.categoryColor,
-      categoryBg:        style.categoryBg,
-      categoryBorder:    style.categoryBorder,
-      description:       s.actionText,
-      bankImpact:        buildBankImpact(s.actionFamily, s.actionText),
-      currentValue:      currentFmt,
-      targetValue:       targetFmt,
-      currentToTarget:   `${currentFmt} → ${targetFmt}`,
-      scoreContribution: Math.round(s.scoreGain * 10) / 10,
-      duration:          s.timeHorizon,
-      difficulty:        s.difficulty === 'ZOR' ? 'Yüksek' : 'Orta',
-    }
-  })
+  return mapV3ToActionPlanV3(api.roadmapSnapshot.response)
 }
 
 // ─── SAYFA 13: SUBJEKTİF FAKTÖRLER ───────────────────────────────────────────

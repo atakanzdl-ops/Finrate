@@ -53,8 +53,8 @@ export interface ReportData {
   // Sayfa 11 — Senaryo Analizi (opsiyonel — snapshot backend'de kontrol edilir)
   scenario?: ScenarioData
 
-  // Sayfa 12 — Detaylı Aksiyon Planı
-  actionPlan: ActionPlanItem[]
+  // Sayfa 12+13 — Aksiyon Planı V3 (opsiyonel — snapshot backend'de kontrol edilir)
+  actionPlan?: ActionPlanV3
 
   // Sayfa 13 — Subjektif Faktörler (orijinal Sayfa 14)
   subjective: SubjectiveData
@@ -338,23 +338,27 @@ export interface ScenarioDataV3 {
 // Legacy kaldırıldı (Codex S6=A)
 export type ScenarioData = ScenarioDataV3
 
-// ─── AKSİYON PLANI ───────────────────────────────────────────────────────
+// ─── AKSİYON PLANI V3 ────────────────────────────────────────────────────
 
-export interface ActionPlanItem {
-  number:            number        // 1, 2, 3, 4
-  title:             string        // "Alacak Tahsil Süresinin Kısaltılması"
-  category:          string        // 'Faaliyet', 'Kaldıraç', 'Kârlılık'
-  categoryColor:     string        // badge renk: "#0284c7", "#7c3aed", "#0f766e"
-  categoryBg:        string        // badge arka plan: "#eff6ff", "#f5f3ff", "#f0fdfa"
-  categoryBorder:    string        // badge kenarlık: "#bfdbfe", "#ddd6fe", "#99f6e4"
-  description:       string        // actionText
-  bankImpact:        string        // template — banka etkisi açıklaması
-  currentValue:      string        // "58 gün"
-  targetValue:       string        // "45 gün"
-  currentToTarget:   string        // "58 gün → 45 gün"
-  scoreContribution: number        // 3.2
-  duration:          string        // "3–6 ay"
-  difficulty:        string        // "Orta", "Yüksek"
+// ActionHorizon = string (V3 motoru 'Kısa Vade (0-6 ay)' gibi
+// uzun string'ler döndürüyor — Codex teyitli)
+export type ActionHorizon = string
+
+export interface ActionPlanItemV3 {
+  rank: number
+  actionName: string
+  horizonLabel: ActionHorizon
+  amountFormatted: string
+  bankerPerspective: string
+}
+
+export interface ActionPlanV3 {
+  kind: 'v3-actions'
+  isFeasible: boolean
+  pageTitle: string
+  pageSubtitle: string
+  actions: ActionPlanItemV3[]
+  whyCapitalAloneNotEnough: string
 }
 
 // ─── SUBJEKTİF FAKTÖRLER ─────────────────────────────────────────────────

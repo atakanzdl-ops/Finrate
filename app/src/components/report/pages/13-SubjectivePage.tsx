@@ -55,8 +55,8 @@ export default function SubjectivePage({ data, sector }: Props) {
     <div className="pdf-page">
       <div className="wm">SUBJEKTİF</div>
       <div className="ph">
-        <div><div className="ph-sec">Bölüm 12</div><div className="ph-title">Subjektif Faktörler</div></div>
-        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 13</div></div>
+        <div><div className="ph-sec">Bölüm 13</div><div className="ph-title">Subjektif Faktörler</div></div>
+        <div className="ph-right"><div className="ph-ent">{companyName}</div>{sector && <div className="ph-sector">{sector}</div>}<div className="ph-pg">Sayfa 14</div></div>
       </div>
       <div className="pc">
 

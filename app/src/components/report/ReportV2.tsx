@@ -61,16 +61,19 @@ export default function ReportV2({ data }: Props) {
       {/* Sayfa 11 — Senaryo Analizi */}
       <ScenarioPage data={data} sector={sector} />
 
-      {/* Sayfa 12 — Detaylı Aksiyon Planı */}
-      <ActionPlanPage data={data} sector={sector} />
+      {/* Sayfa 12 — Aksiyon Planı (ilk 4) */}
+      <ActionPlanPage data={data} sector={sector} pageVariant="primary" />
 
-      {/* Sayfa 13 — Subjektif Faktörler */}
+      {/* Sayfa 13 — Aksiyon Planı (devam) + Sermaye Kutusu */}
+      <ActionPlanPage data={data} sector={sector} pageVariant="overflow" />
+
+      {/* Sayfa 14 — Subjektif Faktörler (eskiden Sayfa 13) */}
       <SubjectivePage data={data} sector={sector} />
 
-      {/* Sayfa 14 — Metodoloji & Açıklamalar */}
+      {/* Sayfa 15 — Metodoloji & Açıklamalar (eskiden Sayfa 14) */}
       <MethodologyPage data={data} sector={sector} />
 
-      {/* Sayfa 15 — Kapanış (sektör yok, farklı layout) */}
+      {/* Sayfa 16 — Kapanış (eskiden Sayfa 15) */}
       <ClosingPage data={data} />
     </div>
   )
