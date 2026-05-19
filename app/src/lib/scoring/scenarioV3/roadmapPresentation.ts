@@ -16,7 +16,11 @@ import type {
   ActionPlanV3,
   ActionPlanItemV3,
   ActionHorizon,
+  AccountMovement,
+  RatioImpact,
+  RatioImpactRow,
 } from '@/types/report'
+import { CHART_OF_ACCOUNTS } from '@/lib/scoring/chartOfAccounts'
 
 // Productivity layer türü (layerSummaries.productivity: unknown olarak tanımlı)
 type ProductivityLayer = {
@@ -195,6 +199,77 @@ export function mapV3ToScenarioDataV3(
   }
 }
 
+// ============= LOCAL HELPERS =============
+// Web AccountImpactTable.tsx ve RatioTransparencyBlock.tsx'ten alındı.
+// Lib katmanı için local yazıldı (client component import etmiyoruz).
+
+function getAccountSideLocal(code: string): 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE' {
+  const acc = CHART_OF_ACCOUNTS[code]
+  if (acc) return acc.side
+  const p = code.charAt(0)
+  if (p === '1' || p === '2') return 'ASSET'
+  if (p === '3' || p === '4') return 'LIABILITY'
+  if (p === '5') return 'EQUITY'
+  if (p === '6') return 'INCOME'
+  return 'EXPENSE'
+}
+
+function getProposedBalanceLocal(current: number, legSide: 'DEBIT' | 'CREDIT', side: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE', amount: number): number {
+  const increases = (side === 'ASSET' && legSide === 'DEBIT') || (side === 'LIABILITY' && legSide === 'CREDIT') || (side === 'EQUITY' && legSide === 'CREDIT')
+  return increases ? current + amount : current - amount
+}
+
+function formatAmountLocal(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} Mn`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)} K`
+  return `${n.toFixed(0)}`
+}
+
+function formatPercentLocal(n: number): string {
+  return `%${(n * 100).toFixed(1)}`
+}
+
+function formatTurnoverLocal(n: number): string {
+  return `${n.toFixed(2)}x`
+}
+
+function buildRatioImpactFromRT(rt: unknown): RatioImpact | null {
+  if (!rt || typeof rt !== 'object') return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = rt as any
+  const kind = data.kind ?? 'balance'
+
+  if (kind === 'margin') {
+    const rows: RatioImpactRow[] = [
+      { label: 'Bugünkü', value: formatPercentLocal(data.current ?? 0), color: 'navy' },
+      { label: 'Gerçekçi 12 ay', value: formatPercentLocal(data.realisticTarget ?? 0), color: 'teal' },
+      { label: 'TCMB sektör', value: formatPercentLocal(data.sectorMedian ?? 0), color: 'navy' },
+    ]
+    return { title: data.metricLabel ?? 'Marj', rows, formula: data.formula?.description ?? '' }
+  }
+
+  if (kind === 'turnover') {
+    const rows: RatioImpactRow[] = [
+      { label: 'Bugünkü', value: formatTurnoverLocal(data.current ?? 0), color: 'navy' },
+      { label: 'Gerçekçi 12 ay', value: formatTurnoverLocal(data.realisticTarget ?? 0), color: 'teal' },
+      { label: 'TCMB sektör', value: formatTurnoverLocal(data.sectorMedian ?? 0), color: 'navy' },
+    ]
+    return { title: data.metricLabel ?? 'Devir Hızı', rows, formula: data.formula?.description ?? '' }
+  }
+
+  // kind === 'balance' veya undefined (geriye uyum)
+  const formula = data.formula ?? {}
+  const formulaStr = formula.targetLabel && formula.basisLabel
+    ? `${formula.targetLabel} = (${formula.basisLabel} × ${formula.targetDays ?? '?'}) / ${formula.periodDays ?? '?'}`
+    : ''
+  const rows: RatioImpactRow[] = [
+    { label: 'Bugünkü', value: formatAmountLocal(data.currentBalance ?? 0), color: 'navy' },
+    { label: 'Gerçekçi 12 ay', value: formatAmountLocal(data.realisticTarget ?? 0), color: 'teal' },
+    { label: 'TCMB sektör', value: formatAmountLocal(data.sectorMedian ?? 0), color: 'navy' },
+  ]
+  return { title: 'Hedef', rows, formula: formulaStr }
+}
+
 /**
  * V3 response'tan PDF Sayfa 12+13 için action plan DTO üret.
  * Hata olursa null döner.
@@ -225,14 +300,53 @@ export function mapV3ToActionPlanV3(
 
     // ACTIONS
     const rawActions = da.whatCompanyShouldDo ?? []
+    const legsByAction = da.accountingLegsByAction ?? {}
+    const currentBalances = response.currentAccountBalances ?? {}
 
-    const actions: ActionPlanItemV3[] = rawActions.map((a, idx) => ({
-      rank:              a.rank ?? idx + 1,
-      actionName:        a.actionName ?? 'Aksiyon',
-      horizonLabel:      (a.horizonLabel ?? '—') as ActionHorizon,
-      amountFormatted:   a.amountFormatted ?? '—',
-      bankerPerspective: a.bankerPerspective ?? '',
-    }))
+    const actions: ActionPlanItemV3[] = rawActions.map((a, idx) => {
+      // Tüm leg'leri topla
+      const legData = legsByAction[a.actionId]
+      const allLegs = [
+        ...(legData?.debits ?? []).map((l: { accountCode: string; accountName?: string; amountTRY: number }) => ({ ...l, legSide: 'DEBIT' as const })),
+        ...(legData?.credits ?? []).map((l: { accountCode: string; accountName?: string; amountTRY: number }) => ({ ...l, legSide: 'CREDIT' as const })),
+      ]
+
+      // 690 kapanış + akış hesapları (INCOME/EXPENSE) filtrele — sadece bilanço gösterilir
+      const balanceLegs = allLegs.filter(leg => {
+        if (leg.accountCode === '690') return false
+        const side = getAccountSideLocal(leg.accountCode)
+        return side === 'ASSET' || side === 'LIABILITY' || side === 'EQUITY'
+      })
+
+      // Her bilanço leg'i için Mevcut/Önerilen/Δ hesapla
+      const accountMovements: AccountMovement[] = balanceLegs.map(leg => {
+        const side = getAccountSideLocal(leg.accountCode)
+        const current = (currentBalances as Record<string, number>)[leg.accountCode] ?? 0
+        const proposed = getProposedBalanceLocal(current, leg.legSide, side, leg.amountTRY)
+        const deltaTRY = proposed - current
+        return {
+          accountCode: leg.accountCode,
+          accountName: leg.accountName ?? '',
+          currentTRY: current,
+          proposedTRY: proposed,
+          deltaTRY,
+          isIncrease: deltaTRY >= 0,
+        }
+      })
+
+      // Rasyo etkisini map et (varsa)
+      const ratioImpact = buildRatioImpactFromRT(a.ratioTransparency)
+
+      return {
+        rank:              a.rank ?? idx + 1,
+        actionName:        a.actionName ?? 'Aksiyon',
+        horizonLabel:      (a.horizonLabel ?? '—') as ActionHorizon,
+        amountFormatted:   a.amountFormatted ?? '—',
+        bankerPerspective: a.bankerPerspective ?? '',
+        accountMovements,
+        ratioImpact:       ratioImpact ?? undefined,
+      }
+    })
 
     // WHY CAPITAL
     const whyCapitalAloneNotEnough = da.whyCapitalAloneIsNotEnough ?? ''

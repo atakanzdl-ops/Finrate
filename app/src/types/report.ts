@@ -344,12 +344,38 @@ export type ScenarioData = ScenarioDataV3
 // uzun string'ler döndürüyor — Codex teyitli)
 export type ActionHorizon = string
 
+// Bilanço hareketi — ASSET/LIABILITY/EQUITY hesaplar için
+export interface AccountMovement {
+  accountCode: string
+  accountName: string
+  currentTRY: number
+  proposedTRY: number
+  deltaTRY: number
+  isIncrease: boolean
+}
+
+// Rasyo etkisi satırı
+export interface RatioImpactRow {
+  label: string
+  value: string
+  color: 'navy' | 'teal'
+}
+
+// Rasyo etkisi blok
+export interface RatioImpact {
+  title: string
+  rows: RatioImpactRow[]
+  formula: string
+}
+
 export interface ActionPlanItemV3 {
   rank: number
   actionName: string
   horizonLabel: ActionHorizon
   amountFormatted: string
   bankerPerspective: string
+  accountMovements: AccountMovement[]
+  ratioImpact?: RatioImpact
 }
 
 export interface ActionPlanV3 {
