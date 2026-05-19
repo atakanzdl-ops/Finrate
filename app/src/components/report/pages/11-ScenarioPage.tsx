@@ -149,54 +149,19 @@ function ConsultantBlock({ consultant, issues }: { consultant: RoadmapConsultant
       </div>
 
       <SubLabel>Temel Problem</SubLabel>
-      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.problem}</p>
-
-      {issues.length > 0 && (
-        <>
-          <SubLabel>Tespit Edilen Yapısal Sorunlar</SubLabel>
-          <ul style={{ paddingLeft: '14px', marginTop: '4px', marginBottom: '6px' }}>
-            {issues.map((iss, idx) => (
-              <li key={idx} style={{ marginBottom: '6px' }}>
-                <strong>{iss.title}</strong>{' '}
-                <span style={{
-                  fontSize:     '7.5px',
-                  background:   severityBg(iss.severity),
-                  color:        '#fff',
-                  padding:      '1px 5px',
-                  borderRadius: '3px',
-                  fontWeight:   500,
-                  marginLeft:   '3px',
-                }}>
-                  {iss.severity}
-                </span>
-                <div>{iss.description}</div>
-                {iss.evidence && (
-                  <div style={{
-                    fontStyle: 'italic',
-                    fontSize:  '8px',
-                    marginTop: '2px',
-                    color:     '#4b5563',
-                  }}>
-                    Kanıt: {iss.evidence}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <p style={{ margin: 0, marginBottom: '6px', whiteSpace: 'pre-line' }}>{consultant.problem}</p>
 
       <SubLabel>Çekirdek Mesele</SubLabel>
-      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.coreIssue}</p>
+      <p style={{ margin: 0, marginBottom: '6px', whiteSpace: 'pre-line' }}>{consultant.coreIssue}</p>
 
       <SubLabel>Kısa Vadede Öncelik</SubLabel>
-      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.shortTermPriority}</p>
+      <p style={{ margin: 0, marginBottom: '6px', whiteSpace: 'pre-line' }}>{consultant.shortTermPriority}</p>
 
       <SubLabel>Yapısal İhtiyaç</SubLabel>
-      <p style={{ margin: 0, marginBottom: '6px' }}>{consultant.structuralNeed}</p>
+      <p style={{ margin: 0, marginBottom: '6px', whiteSpace: 'pre-line' }}>{consultant.structuralNeed}</p>
 
       <SubLabel>Finrate Yorumu</SubLabel>
-      <p style={{ margin: 0 }}>{consultant.finrateComment}</p>
+      <p style={{ margin: 0, whiteSpace: 'pre-line' }}>{consultant.finrateComment}</p>
     </div>
   )
 }
@@ -281,27 +246,11 @@ function IfNotDoneBox({ ifNotDone, style }: { ifNotDone: RoadmapIfNotDone; style
         fontSize:     '9px',
         lineHeight:   1.5,
         margin:       0,
-        marginBottom: '6px',
         color:        '#374151',
+        whiteSpace:   'pre-line',
       }}>
         {ifNotDone.generalWarning}
       </p>
-
-      {ifNotDone.issueRisks.length > 0 && (
-        <ul style={{
-          paddingLeft: '14px',
-          fontSize:    '9px',
-          lineHeight:  1.45,
-          margin:      0,
-          color:       '#374151',
-        }}>
-          {ifNotDone.issueRisks.map((r, idx) => (
-            <li key={idx} style={{ marginBottom: '4px' }}>
-              <strong>{r.title}:</strong>{' '}{r.risk}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }
