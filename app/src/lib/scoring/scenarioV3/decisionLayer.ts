@@ -1490,7 +1490,7 @@ export function buildDecisionAnswer(
   actualRatingValidation?: ActualRatingValidation | null,
   targetPackageContext?: TargetPackageContext,
 ): DecisionAnswer {
-  // ── Faz 7.3.8d: Hedef pakete gore filtreleme ─────────────────────────────
+  // ── Hotfix VI: B/BB ayrı aksiyon listesi — saf subset ───────────────────
   // Bagam yoksa (eski cagrilar veya test mock'lari) filtreleme calistirilmaz —
   // engineResult.portfolio aynen kullanilir, davranis 7.3.8c oncesi gibi.
   let portfolioForUI: SelectedAction[] = engineResult.portfolio
@@ -1510,8 +1510,15 @@ export function buildDecisionAnswer(
       v3EstimatedRating:      engineResult.finalTargetRating,
       requestedTarget,
     })
-    portfolioForUI    = engineResult.portfolio  // Faz 7.3.31: tam portföy — subset paradoksunu önler
-    targetPackageMeta = pkg.meta               // meta korunur (badge/banner state için)
+
+    // Hotfix VI: subset kullan, B/BB ayrımı.
+    // selectTargetPackage gap'e göre uygun paket döner:
+    //  - Gap küçükse (B → BB): 1-3 aksiyon subset
+    //  - Gap büyükse (D → B): tam portföy fallback
+    //  - REACHED: boş paket (zaten hedef üstünde)
+    // Pad/garanti yok — engine'in akıllı kararına güveniyoruz.
+    portfolioForUI    = pkg.selectedActions  // Hotfix VI: subset kullan, B/BB ayrımı
+    targetPackageMeta = pkg.meta             // meta korunur (badge/banner state için)
   }
 
   // Filtered view: yalniz portfolio swap edilir, diger alanlar korunur.
