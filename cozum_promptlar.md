@@ -1,9 +1,3 @@
-Harika bir strateji! Projeyi adım adım, her seferinde tek bir odağa odaklanarak düzeltmek en sağlıklı yazılım geliştirme yöntemidir.
-
-Aşağıda, karşına çıkacak yapay zekaya (ya da bana) doğrudan kopyalayıp yapıştırabileceğin, kod tabanındaki ilgili dosyaları hedefleyen ve nokta atışı çözümler üretecek **adım adım prompt listesi** yer alıyor. Süreci en kritikten başlayarak 4 faza böldüm.
-
----
-
 ## 🛠️ Faz 1: Altyapı, CI/CD ve Güvenlik Sıkılaştırma
 
 ### Prompt 1: TypeScript Build Hatalarını Açma ve Migration Düzenlemesi
