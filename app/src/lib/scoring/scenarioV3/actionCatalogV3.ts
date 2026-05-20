@@ -661,6 +661,32 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     'Fazla stoku nakde çevirmek hem işletme sermayesini serbest bırakır hem de stok devir süresi (DIO) üzerinde ölçülebilir iyileşme sağlayabilir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire, eskime riski) aksiyonun gerçek etkisini doğrudan belirler.',
 }
 
+// ── A08 — Yerel ipotek flag helper (computeAmount ↔ buildTransactions senkron) ──
+/**
+ * A08 için ipotek flag hesabı.
+ * computeAmount ve buildTransactions'ın AYNI MDV bazı ve UV borç formülünü
+ * kullanmasını garanti eder.
+ *
+ * MDV bazı: getNetFixedAssets ile birebir aynı
+ *   Pozitif: 250+251+252+253+254+255+256+258+259
+ *   Negatif: 257
+ *
+ * İpotek koşulu: UV Mali Borç / Net MDV > 0.40
+ */
+function _a08IpotekFlag(balances: Record<string, number>): boolean {
+  const mdvNet = sumByCodesPrefixNet(
+    balances,
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257']
+  )
+  const uvDebt = sumByCodesPrefixNet(
+    balances,
+    ['400', '401', '405', '407', '409'],
+    ['402', '408']
+  )
+  return mdvNet > 0 && uvDebt / mdvNet > 0.40
+}
+
 // ── A08 ──────────────────────────────────────────────────────────────────────
 const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   id: 'A08_FIXED_ASSET_DISPOSAL',
@@ -675,18 +701,8 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
 
     const balances = context.accountBalances ?? {}
 
-    // computeAmount ile AYNI isIpotekli hesabı
-    const tangibleNet = sumByCodesPrefixNet(
-      balances,
-      ['250', '251', '252', '253', '254', '255', '256'],
-      ['257', '258']
-    )
-    const uvDebt = sumByCodesPrefixNet(
-      balances,
-      ['400', '401', '405', '407', '409'],
-      ['402', '408']
-    )
-    const isIpotekli = tangibleNet > 0 && uvDebt / tangibleNet > 0.40
+    // computeAmount ile AYNI helper → ipotek flag senkron
+    const isIpotekli = _a08IpotekFlag(balances)
 
     const selected = selectIdleAssetAccount(
       { sector: context.sector, accountBalances: balances },
@@ -749,9 +765,9 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
     // ====================================================================
     // GUARD 3 — İpotek Tespiti (Gemini)
     // (UV Mali Borç / Net MDV) > 0.40 → 250+252 muhtemelen rehinli
+    // buildTransactions ile AYNI helper → senkron garantisi
     // ====================================================================
-    const uvMaliBorc = getLongTermFinancialDebt(ctx)
-    const isIpotekli = mdvNet > 0 && uvMaliBorc / mdvNet > 0.40
+    const isIpotekli = _a08IpotekFlag(balances)
 
     // ====================================================================
     // EŞİK 1 — Likidite Stresi

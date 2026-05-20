@@ -584,26 +584,38 @@ export function sumByCodesPrefixNet(
 // ─── getGrossFixedAssets ─────────────────────────────────────────────────────
 
 /**
- * Brüt MDV: 250-255 hesapları (amortisman düşülmemiş).
+ * Brüt Maddi Duran Varlık — amortisman düşülmemiş.
+ *
+ * Engine ana formülü ile birebir uyumlu:
+ *   250 Arazi + 251 Yeraltı + 252 Binalar + 253 Tesis/Makine + 254 Taşıtlar
+ *   + 255 Diğer + 256 Diğer MDV + 258 Yapılmakta Olan Yatırım + 259 Verilen Avans
+ *
+ * Guard 2 (Yeni Yatırım): 257 / brütMDV < 0.15 kontrolü için kullanılır.
  */
 export function getGrossFixedAssets(ctx: FirmContext): number {
   return sumByCodesPrefix(
     ctx.accountBalances ?? {},
-    ['250', '251', '252', '253', '254', '255']
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259']
   )
 }
 
 // ─── getNetFixedAssets ───────────────────────────────────────────────────────
 
 /**
- * Net MDV: brüt MDV − birikmiş amortisman (257, 258).
- * Negatife düşmez (sıfırda kalan).
+ * Net Maddi Duran Varlık — birikmiş amortisman (257) düşülmüş.
+ *
+ * Engine ana formülü ile birebir uyumlu:
+ *   Pozitif: 250+251+252+253+254+255+256+258+259
+ *   Negatif: 257 (Birikmiş Amortisman)
+ *
+ * NOT: 256 (Diğer MDV), 258 (Yapılmakta Olan Yatırım), 259 (Verilen Avans) DAHİL.
+ *      258/259 satılabilir havuzuna (selectIdleAssetAccount) dahil edilmez.
  */
 export function getNetFixedAssets(ctx: FirmContext): number {
   return sumByCodesPrefixNet(
     ctx.accountBalances ?? {},
-    ['250', '251', '252', '253', '254', '255'],
-    ['257', '258']
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257']
   )
 }
 
