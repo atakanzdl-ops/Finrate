@@ -22,7 +22,19 @@ import {
   FirmContext,
 } from './contracts'
 
-import { getPeriodDays, getBenchmarkValue, applyFeasibilityCap, getInventoryBalance, getCogs, computeDIO } from './ratioHelpers'
+import {
+  getPeriodDays,
+  getBenchmarkValue,
+  applyFeasibilityCap,
+  getInventoryBalance,
+  getCogs,
+  computeDIO,
+  getNetFixedAssets,
+  getConstructionSafeFixedAssets,
+  isIdleAssetCandidate,
+  getFixedAssetRatioBenchmark,
+  selectIdleAssetAccount,
+} from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
 
@@ -647,17 +659,46 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 1_000_000)
     if (amount <= 0) return []
+
+    // Akıllı hesap seçimi: mevcut bakiye ve sektör kısıtına göre en uygun MDV hesabı
+    const acct = selectIdleAssetAccount(context as unknown as FirmContext, amount)
+
     return [
       makeBalancedTransaction(
         'A08_MAIN',
-        'Atıl maddi duran varlık satışı (253 → 102)',
+        `Atıl maddi duran varlık satışı (${acct.accountCode} → 102)`,
         'ASSET_DISPOSAL',
         [
-          { accountCode: '102', accountName: 'Bankalar',                      side: 'DEBIT',  amount, description: 'Varlık satış geliri'                     },
-          { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar',     side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri)'  },
+          { accountCode: '102',            accountName: 'Bankalar',         side: 'DEBIT',  amount, description: 'Varlık satış geliri'                    },
+          { accountCode: acct.accountCode, accountName: acct.accountName,   side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri)' },
         ]
       ),
     ]
+  },
+
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx: FirmContext): number | null => {
+    // İnşaatta 250/253/254 proje varlığı sayılır → güvenli alt-küme kullan
+    const safeBalance = ctx.sector === 'CONSTRUCTION'
+      ? getConstructionSafeFixedAssets(ctx)
+      : getNetFixedAssets(ctx)
+
+    // Minimum bakiye guard
+    if (safeBalance < 1_000_000) return null
+
+    // Çift koşul: MDV fazlası VE düşük aktif devir (her ikisi gerekli)
+    if (!isIdleAssetCandidate(ctx)) return null
+
+    // Hedef MDV: Toplam Aktif × sektör benchmark oranı
+    const targetMDV = ctx.totalAssets * getFixedAssetRatioBenchmark(ctx.sector)
+
+    // Zaten benchmark altındaysa ya da tam bakiye hedef üstündeyse öneri yok
+    if (safeBalance <= targetMDV) return null
+
+    // %25 feasibility cap: tek seferlik çok büyük hareket
+    const capped = applyFeasibilityCap(safeBalance, targetMDV, 0.25)
+    return capped >= 1_000_000 ? capped : null
   },
 
   preconditions: {
@@ -680,7 +721,7 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   },
 
   sectorCompatibility: {
-    CONSTRUCTION:  'primary',
+    CONSTRUCTION:  'applicable',  // Proje varlıkları hariç, güvenli alt-küme kullanılır
     MANUFACTURING: 'primary',
     TRADE:         'applicable',
     RETAIL:        'applicable',

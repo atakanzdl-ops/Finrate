@@ -535,6 +535,11 @@ export function buildActionRatioTransparency(
     return buildEquityRatioTransparency(action, ctx, amount)
   }
 
+  // ── A08 — MDV Atıl Varlık Disposal ──
+  if (action.id === 'A08_FIXED_ASSET_DISPOSAL') {
+    return buildFixedAssetDisposalTransparency(action, ctx, amount)
+  }
+
   // ── Faz 7.3.50A.11: A20 — GROSS_MARGIN nakit kanal (102/621, 320 gerektirmez) ──
   if (action.id === 'A20_GROSS_MARGIN_REFORM') {
     return buildMarginRatioTransparency(action, ctx, amount)
@@ -550,6 +555,270 @@ export function buildActionRatioTransparency(
     default:
       // A05 ve diğerleri: mevcut balance/DSO helper
       return buildRatioTransparency(action, ctx, amount)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A08 MDV (Maddi Duran Varlık) Helpers — Refactor 2
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── sumByCodesPrefixNet ─────────────────────────────────────────────────────
+
+/**
+ * Net bakiye: pozitif hesaplar toplamı − negatif (kontra) hesaplar toplamı.
+ * Örnek: getNetFixedAssets için
+ *   positivePrefixes = ['250','251','252','253','254','255']
+ *   negativePrefixes = ['257','258'] (birikmiş amortisman)
+ */
+export function sumByCodesPrefixNet(
+  balances: Record<string, number>,
+  positivePrefixes: string[],
+  negativePrefixes: string[]
+): number {
+  const gross = sumByCodesPrefix(balances, positivePrefixes)
+  const contra = sumByCodesPrefix(balances, negativePrefixes)
+  return Math.max(gross - contra, 0)
+}
+
+// ─── getGrossFixedAssets ─────────────────────────────────────────────────────
+
+/**
+ * Brüt MDV: 250-255 hesapları (amortisman düşülmemiş).
+ */
+export function getGrossFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['250', '251', '252', '253', '254', '255']
+  )
+}
+
+// ─── getNetFixedAssets ───────────────────────────────────────────────────────
+
+/**
+ * Net MDV: brüt MDV − birikmiş amortisman (257, 258).
+ * Negatife düşmez (sıfırda kalan).
+ */
+export function getNetFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['250', '251', '252', '253', '254', '255'],
+    ['257', '258']
+  )
+}
+
+// ─── getConstructionSafeFixedAssets ──────────────────────────────────────────
+
+/**
+ * İnşaat sektörü güvenli MDV:
+ * 250 (Arazi), 253 (Tesis/Makine — operasyonel), 254 (Taşıtlar — proje) HARİÇ.
+ * Sadece: 251 (Yeraltı/Yerüstü Düzenleri), 252 (Binalar), 255 (Diğer MDV).
+ */
+export function getConstructionSafeFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['251', '252', '255'],
+    ['257', '258']
+  )
+}
+
+// ─── computeFixedAssetRatio ──────────────────────────────────────────────────
+
+/**
+ * MDV / Toplam Aktif oranı.
+ * null döner: totalAssets 0 veya negatif ise.
+ */
+export function computeFixedAssetRatio(
+  netMDV: number,
+  totalAssets: number
+): number | null {
+  if (totalAssets <= 0) return null
+  return netMDV / totalAssets
+}
+
+// ─── getFixedAssetRatioBenchmark ─────────────────────────────────────────────
+
+/**
+ * Sektör bazlı MDV/Aktif üst eşiği (FINRATE_ESTIMATE).
+ * Bu oran aşıldığında (×1.20 tolerans ile) MDV fazlası sinyali verilir.
+ *
+ * Değerler: Codex 5 tur audit + TCMB sektör bilançoları referanslı tahmin.
+ */
+const FIXED_ASSET_RATIO_BENCHMARKS: Record<string, number> = {
+  MANUFACTURING: 0.50,  // İmalat: makine ağırlıklı, %50 normal
+  CONSTRUCTION:  0.35,  // İnşaat: proje stoku yüksek, MDV %35 sınır
+  TRADE:         0.30,  // Ticaret: hafif, %30 üstü fazla
+  RETAIL:        0.25,  // Perakende: çok hafif
+  SERVICES:      0.40,  // Hizmet: ofis/ekipman, %40
+  IT:            0.20,  // BT: en hafif
+}
+
+export function getFixedAssetRatioBenchmark(sector: string): number {
+  return FIXED_ASSET_RATIO_BENCHMARKS[sector.toUpperCase()] ?? 0.40
+}
+
+// ─── isFixedAssetHeavy ───────────────────────────────────────────────────────
+
+/**
+ * Firma MDV/Aktif oranı sektör benchmark'ının %20 üstünde mi?
+ * Eşik 1: MDV fazlası tespiti.
+ */
+export function isFixedAssetHeavy(ctx: FirmContext): boolean {
+  const netMDV = getNetFixedAssets(ctx)
+  if (netMDV <= 0) return false
+  const ratio = computeFixedAssetRatio(netMDV, ctx.totalAssets)
+  if (ratio == null) return false
+  const benchmark = getFixedAssetRatioBenchmark(ctx.sector)
+  return ratio > benchmark * 1.20  // %20 tolerans
+}
+
+// ─── computeCurrentAssetTurnover ─────────────────────────────────────────────
+
+/**
+ * Aktif devir hızı = Net Satış / Toplam Aktif.
+ * null: totalAssets 0 ise.
+ */
+export function computeCurrentAssetTurnover(ctx: FirmContext): number | null {
+  if (ctx.totalAssets <= 0) return null
+  return ctx.netSales / ctx.totalAssets
+}
+
+// ─── isLowAssetTurnover ───────────────────────────────────────────────────────
+
+/**
+ * Aktif devir hızı sektör benchmark'ının %80 altında mı?
+ * Eşik 2: Düşük aktif verimliliği tespiti.
+ */
+export function isLowAssetTurnover(ctx: FirmContext): boolean {
+  const turnover = computeCurrentAssetTurnover(ctx)
+  if (turnover == null) return false
+  const bm = getBenchmarkValue(ctx.sector, 'assetTurnover')
+  if (bm == null) return false
+  return turnover < bm.value * 0.80  // benchmark'ın %80 altı
+}
+
+// ─── isIdleAssetCandidate ─────────────────────────────────────────────────────
+
+/**
+ * Atıl varlık satışı için uygun mu?
+ * GEREKLI: MDV fazlası (Eşik 1) VE düşük aktif devir (Eşik 2) — her ikisi.
+ * Tek başına düşük aktif devir yetmez (A06 ile çakışır).
+ */
+export function isIdleAssetCandidate(ctx: FirmContext): boolean {
+  return isFixedAssetHeavy(ctx) && isLowAssetTurnover(ctx)
+}
+
+// ─── isConstructionExcludedAccount ───────────────────────────────────────────
+
+/**
+ * İnşaat sektöründe hariç tutulan MDV hesabı mı?
+ * 250: Arazi/Arsalar (proje arazisi)
+ * 253: Tesis, Makine ve Cihazlar (operasyonel ekipman)
+ * 254: Taşıtlar (proje taşıtı)
+ */
+export function isConstructionExcludedAccount(accountCode: string): boolean {
+  const code = accountCode.trim()
+  return ['250', '253', '254'].some(prefix =>
+    code === prefix ||
+    code.startsWith(`${prefix}.`) ||
+    code.startsWith(`${prefix}-`) ||
+    code.startsWith(`${prefix}/`)
+  )
+}
+
+// ─── selectIdleAssetAccount ───────────────────────────────────────────────────
+
+export interface IdleAssetAccountResult {
+  accountCode: string
+  accountName: string
+  balance: number
+}
+
+/**
+ * Aksiyon için en uygun MDV hesabını seç.
+ * Kural:
+ * 1. İnşaatta 250/253/254 hariç tutulur
+ * 2. Amount'u karşılayan (%90 güvenlik bandı) hesaplar arasından en küçük bakiyeli seçilir
+ * 3. Hiçbiri tam kapsamıyorsa en büyük bakiyeli fallback
+ * 4. Hiç bakiye yoksa '253' default (tip güvencesi için)
+ */
+export function selectIdleAssetAccount(
+  ctx: FirmContext,
+  amount: number
+): IdleAssetAccountResult {
+  const MDV_ACCOUNTS: IdleAssetAccountResult[] = [
+    { accountCode: '255', accountName: 'Diğer Maddi Duran Varlıklar',    balance: ctx.accountBalances['255'] ?? 0 },
+    { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar',       balance: ctx.accountBalances['253'] ?? 0 },
+    { accountCode: '252', accountName: 'Binalar',                          balance: ctx.accountBalances['252'] ?? 0 },
+    { accountCode: '254', accountName: 'Taşıtlar',                         balance: ctx.accountBalances['254'] ?? 0 },
+    { accountCode: '251', accountName: 'Yeraltı ve Yerüstü Düzenleri',    balance: ctx.accountBalances['251'] ?? 0 },
+    { accountCode: '250', accountName: 'Arazi ve Arsalar',                 balance: ctx.accountBalances['250'] ?? 0 },
+  ]
+
+  // İnşaat: 250/253/254 hariç
+  const filtered = ctx.sector === 'CONSTRUCTION'
+    ? MDV_ACCOUNTS.filter(c => !isConstructionExcludedAccount(c.accountCode))
+    : MDV_ACCOUNTS
+
+  // Pozitif bakiyeli adaylar
+  const withBalance = filtered.filter(c => c.balance > 0)
+  if (withBalance.length === 0) {
+    return { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar', balance: 0 }
+  }
+
+  // Amount × (1/0.90) ≤ balance → hesap miktarı karşılıyor
+  const canCover = withBalance.filter(c => c.balance * 0.90 >= amount)
+  if (canCover.length > 0) {
+    // En küçük bakiyeli: en az operasyonel etki
+    return canCover.reduce((min, c) => c.balance < min.balance ? c : min)
+  }
+
+  // Hiçbiri tam kapsamıyorsa: en büyük bakiyeli
+  return withBalance.reduce((max, c) => c.balance > max.balance ? c : max)
+}
+
+// ─── buildFixedAssetDisposalTransparency ──────────────────────────────────────
+
+/**
+ * A08 MDV disposal için ratio transparency.
+ * currentBalance:  net MDV (güvenli hesaplar)
+ * realisticTarget: aksiyon sonrası MDV (MDV - amount)
+ * sectorMedian:    sektör benchmark MDV hedefi (totalAssets × benchmarkRatio)
+ * formula:         targetDays/periodDays = benchmarkRatio (örn: 50/100 = %50)
+ */
+function buildFixedAssetDisposalTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): BalanceRatioTransparency | null {
+  const netMDV = ctx.sector === 'CONSTRUCTION'
+    ? getConstructionSafeFixedAssets(ctx)
+    : getNetFixedAssets(ctx)
+
+  if (netMDV <= 0) return null
+
+  const benchmarkRatio = getFixedAssetRatioBenchmark(ctx.sector)
+  const targetMDV      = ctx.totalAssets * benchmarkRatio
+  const realisticTarget = Math.max(netMDV - amount, 0)
+
+  return {
+    kind:             'balance',
+    currentBalance:   netMDV,
+    realisticTarget,
+    sectorMedian:     targetMDV,
+    capPercent:       0.25,
+    formula: {
+      targetLabel: 'Hedef Net MDV',
+      basisLabel:  'Toplam Aktif',
+      basisValue:  ctx.totalAssets,
+      targetDays:  Math.round(benchmarkRatio * 100),   // % olarak (örn. 50)
+      periodDays:  100,                                 // bölen (% normalizer)
+    },
+    attribution: {
+      sourceType:  'FINRATE_ESTIMATE',
+      sectorLabel: getSectorLabel(ctx.sector),
+      year:        new Date().getFullYear(),
+    },
+    method: 'period-end-balance',
   }
 }
 
