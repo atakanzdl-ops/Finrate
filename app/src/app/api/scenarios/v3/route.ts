@@ -247,6 +247,7 @@ export async function POST(req: NextRequest) {
       targetRating,
       accountBalances: balances,
       incomeStatement,
+      period: analysis.period,    // YENİ: Q1/Q2/Q3/Q4/ANNUAL
     }
 
     const [conservativeResult, typicalResult, aggressiveResult] = await Promise.all([

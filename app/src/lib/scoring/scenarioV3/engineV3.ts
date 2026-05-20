@@ -137,6 +137,9 @@ export interface EngineInput {
     operatingCashFlow?: number
   }
 
+  /** Finansal dönem tipi: 'Q1'|'Q2'|'Q3'|'Q4'|'ANNUAL' */
+  period?: string
+
   /** Opsiyonel: arama uzayini daraltmak icin filtre */
   options?: {
     maxActionsPerHorizon?: number
@@ -296,6 +299,7 @@ interface FirmContext {
   netSales:         number
   operatingProfit:  number
   grossProfit:      number
+  costOfGoodsSold?: number          // YENİ: A06 DIO için
   interestExpense:  number
   operatingCashFlow: number | null
   /** Finansal dönem tipi — computeAmount period-day hesabı için */
@@ -624,9 +628,10 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
     netSales:         input.incomeStatement.netSales,
     operatingProfit:  input.incomeStatement.operatingProfit,
     grossProfit:      input.incomeStatement.grossProfit,
+    costOfGoodsSold:  input.incomeStatement.costOfGoodsSold,   // YENİ
     interestExpense:  input.incomeStatement.interestExpense,
     operatingCashFlow: input.incomeStatement.operatingCashFlow ?? null,
-    period: (input as any).financialData?.period ?? 'ANNUAL',
+    period: input.period ?? (input as any).financialData?.period ?? 'ANNUAL',  // GÜNCELLE
   }
 }
 
@@ -635,6 +640,7 @@ export function buildIncomeStatementDeltas(transactions: AccountingTransaction[]
   grossProfitDelta: number
   operatingProfitDelta: number
   netIncomeDelta: number
+  costOfGoodsSoldDelta: number
 } {
   const deltaByCode = new Map<string, number>()
 
@@ -671,11 +677,31 @@ export function buildIncomeStatementDeltas(transactions: AccountingTransaction[]
   const netIncomeDelta =
     operatingProfitDelta - financeExpenseDelta + extraordinaryIncomeDelta - extraordinaryExpenseDelta - taxExpenseDelta
 
+  // COGS delta: 620-623 hesap transaction'larından gerçek delta
+  // A12/A20 gibi aksiyonlar bu hesapları direkt değiştirir
+  let costOfGoodsSoldDelta = 0
+  for (const tx of transactions) {
+    for (const leg of tx.legs) {
+      const code = leg.accountCode.trim()
+      const isCogsAccount = ['620', '621', '622', '623'].some(prefix =>
+        code === prefix ||
+        code.startsWith(`${prefix}.`) ||
+        code.startsWith(`${prefix}-`) ||
+        code.startsWith(`${prefix}/`)
+      )
+      if (isCogsAccount) {
+        if (leg.side === 'DEBIT') costOfGoodsSoldDelta += leg.amount
+        else if (leg.side === 'CREDIT') costOfGoodsSoldDelta -= leg.amount
+      }
+    }
+  }
+
   return {
     netSalesDelta,
     grossProfitDelta,
     operatingProfitDelta,
     netIncomeDelta,
+    costOfGoodsSoldDelta,
   }
 }
 
@@ -703,6 +729,10 @@ function updateFirmContextFromTransactions(
   const operatingProfit = context.operatingProfit + deltas.operatingProfitDelta
   const netIncome = context.netIncome + deltas.netIncomeDelta
 
+  // COGS gerçek delta'dan güncellenir (A12/A20 gibi aksiyonlar
+  // 620-623 hesaplarını direkt değiştirir)
+  const costOfGoodsSold = (context.costOfGoodsSold ?? 0) + deltas.costOfGoodsSoldDelta
+
   return {
     ...context,
     accountBalances: updatedBalances,
@@ -711,6 +741,7 @@ function updateFirmContextFromTransactions(
     totalRevenue: netSales,
     netSales,
     grossProfit,
+    costOfGoodsSold,        // YENİ
     operatingProfit,
     netIncome,
   }

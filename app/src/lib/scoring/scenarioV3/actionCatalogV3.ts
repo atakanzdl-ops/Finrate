@@ -19,9 +19,10 @@ import {
   AccountingLeg,
   SectorCode,
   SemanticType,
+  FirmContext,
 } from './contracts'
 
-import { getPeriodDays, getBenchmarkValue, applyFeasibilityCap } from './ratioHelpers'
+import { getPeriodDays, getBenchmarkValue, applyFeasibilityCap, getInventoryBalance, getCogs, computeDIO } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
 
@@ -558,13 +559,50 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   preconditions: {
     requiredAccountCodes: ['150', '151', '152', '153'],
     minSourceAmountTRY: 2_000_000,
-    sectorMustExclude: ['IT', 'SERVICES'],
+    sectorMustExclude: ['IT', 'SERVICES', 'CONSTRUCTION'],  // CONSTRUCTION eklendi
   },
 
   qualityCoefficient: 0.85,
   sustainability: 'SEMI_RECURRING',
 
   repeatDecay: { first: 1.00, second: 0.70, third: 0.45, maxRepeats: 3 },
+
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx: FirmContext): number | null => {
+    // CONSTRUCTION guard (defensive, sectorMustExclude zaten kontrol ediyor)
+    if (ctx.sector === 'CONSTRUCTION') return null
+
+    // 1. Stok bakiyesi (prefix-safe, alt hesaplar dahil)
+    const stockBalance = getInventoryBalance(ctx)
+    if (stockBalance <= 0) return null
+
+    // 2. COGS
+    const cogs = getCogs(ctx)
+    if (cogs == null || cogs <= 0) return null
+
+    // 3. Period days (Türk muhasebe kümülatif: Q1=90, Q4=ANNUAL=365)
+    const periodDays = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' }).days
+
+    // 4. Mevcut DIO
+    const currentDIO = computeDIO(stockBalance, cogs, periodDays)
+    if (currentDIO == null) return null
+
+    // 5. Sektör hedef DIO
+    const sectorBench = getBenchmarkValue(ctx.sector, 'inventoryDays')
+    const sectorDIO = sectorBench?.value ?? 90
+
+    // 6. Zaten sektör hedefine yakınsa öneri yok
+    if (currentDIO <= sectorDIO * 1.10) return null
+
+    // 7. Hedef stok
+    const targetStock = (cogs * sectorDIO) / periodDays
+
+    // 8. Feasibility cap %25 (büyük tek seferlik azalış riskli)
+    const cappedDelta = applyFeasibilityCap(stockBalance, targetStock, 0.25)
+
+    return cappedDelta > 0 ? cappedDelta : null
+  },
 
   suggestedAmount: {
     basis: 'source_account',
@@ -575,7 +613,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   },
 
   sectorCompatibility: {
-    CONSTRUCTION:  'applicable',
+    CONSTRUCTION:  'not_applicable',  // İnşaat stoğu = proje maliyeti, A06 geçerli değil
     MANUFACTURING: 'primary',
     TRADE:         'primary',
     RETAIL:        'primary',

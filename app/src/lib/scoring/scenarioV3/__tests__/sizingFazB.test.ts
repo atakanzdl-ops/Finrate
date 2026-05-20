@@ -31,6 +31,9 @@ function computeTypicalAmount(
 
 // ─── T1–T5: A06 Sizing Değerleri ─────────────────────────────────────────────
 
+// NOT: A06 artık useRatioBasedAmount=true + computeAmount (DIO) kullanır.
+// suggestedAmount field'ları ActionTemplateV3 tip uyumu için korunuyor
+// ama aktif davranışta etkili değil. Yeni davranış: a06DIORefactor.test.ts
 describe('A06 suggestedAmount sizing — Faz 7.3.43B', () => {
 
   const a06 = ACTION_CATALOG_V3['A06_INVENTORY_MONETIZATION']!

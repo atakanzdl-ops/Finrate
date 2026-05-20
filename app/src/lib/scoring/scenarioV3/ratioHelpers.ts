@@ -121,6 +121,71 @@ function getCurrentBalanceForAction(action: ActionTemplateV3, ctx: FirmContext):
   return 0
 }
 
+// ─── sumByCodesPrefix ────────────────────────────────────────────────────────
+
+/**
+ * Hesap kodlarını prefix bazlı topla.
+ * "150" prefix'i şunları yakalar:
+ *   - "150" (exact)
+ *   - "150.01" (alt hesap nokta)
+ *   - "150-01" (alt hesap tire)
+ *   - "150/01" (alt hesap slash)
+ * Yakalamaz:
+ *   - "1500" (farklı hesap)
+ *   - "15000" (farklı hesap)
+ *   - "" (boş string)
+ */
+export function sumByCodesPrefix(
+  balances: Record<string, number>,
+  prefixes: string[]
+): number {
+  if (!balances) return 0
+  let sum = 0
+  for (const [code, balance] of Object.entries(balances)) {
+    if (balance == null) continue
+    const normalizedCode = code.trim()
+    if (!normalizedCode) continue
+    const isMatch = prefixes.some(prefix =>
+      normalizedCode === prefix ||
+      normalizedCode.startsWith(`${prefix}.`) ||
+      normalizedCode.startsWith(`${prefix}-`) ||
+      normalizedCode.startsWith(`${prefix}/`)
+    )
+    if (isMatch) {
+      sum += Math.abs(balance)
+    }
+  }
+  return sum
+}
+
+// ─── getInventoryBalance ──────────────────────────────────────────────────────
+
+/**
+ * Stok bakiyesi (150-153 hesapları, alt hesaplar dahil)
+ * 159 (Verilen Sipariş Avansları) HARİÇ — gerçek stok değil.
+ */
+export function getInventoryBalance(ctx: FirmContext): number {
+  return sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153']
+  )
+}
+
+// ─── computeDIO ───────────────────────────────────────────────────────────────
+
+/**
+ * Days Inventory Outstanding (Stok devir gün)
+ * DIO = (inventory / cogs) * periodDays
+ */
+export function computeDIO(
+  inventory: number,
+  cogs: number,
+  periodDays: number
+): number | null {
+  if (inventory <= 0 || cogs <= 0 || periodDays <= 0) return null
+  return (inventory / cogs) * periodDays
+}
+
 // ─── getCogs ────────────────────────────────────────────────────────────────
 
 /**
@@ -128,13 +193,28 @@ function getCurrentBalanceForAction(action: ActionTemplateV3, ctx: FirmContext):
  * cogs alanı varsa kullanır, yoksa netSales - grossProfit.
  */
 export function getCogs(ctx: FirmContext): number | null {
-  if ('cogs' in ctx && typeof (ctx as any).cogs === 'number' && (ctx as any).cogs > 0) {
-    return (ctx as any).cogs
+  // 1. Direkt costOfGoodsSold field
+  if (ctx.costOfGoodsSold != null && ctx.costOfGoodsSold > 0) {
+    return ctx.costOfGoodsSold
   }
+
+  // 2. 620-623 hesap kodlarından topla (TDHP)
+  // 620 Satılan Mamuller Maliyeti
+  // 621 Satılan Ticari Mallar Maliyeti
+  // 622 Satılan Hizmet Maliyeti
+  // 623 Diğer Satışların Maliyeti
+  const cogsFromAccounts = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['620', '621', '622', '623']
+  )
+  if (cogsFromAccounts > 0) return cogsFromAccounts
+
+  // 3. netSales - grossProfit derive
   if (ctx.netSales > 0 && typeof ctx.grossProfit === 'number') {
     const derived = ctx.netSales - ctx.grossProfit
     return derived > 0 ? derived : null
   }
+
   return null
 }
 
@@ -165,15 +245,12 @@ export function getPeriodDays(fd: any): { days: number; source: 'explicit' | 'de
     if (p === 'ANNUAL' || p === 'FULL_YEAR') {
       return { days: 365, source: 'derived' }
     }
-    if (p === 'Q1' || p === 'Q2' || p === 'Q3' || p === 'Q4') {
-      return { days: 90, source: 'derived' }
-    }
-    if (p === 'H1' || p === 'H2') {
-      return { days: 182, source: 'derived' }
-    }
-    if (p === '9M') {
-      return { days: 273, source: 'derived' }
-    }
+    // Türk muhasebe kümülatif dönem mantığı
+    if (p === 'Q4') return { days: 365, source: 'derived' }
+    if (p === 'Q3' || p === '9M') return { days: 273, source: 'derived' }
+    if (p === 'Q2' || p === 'H1') return { days: 182, source: 'derived' }
+    if (p === 'Q1') return { days: 90, source: 'derived' }
+    if (p === 'H2') return { days: 182, source: 'derived' }
   }
 
   // Fallback: 365 + warn
@@ -270,27 +347,16 @@ function buildDIORatioTransparency(
   ctx: FirmContext,
   amount: number
 ): BalanceRatioTransparency | null {
-  const stockBalance =
-    (ctx.accountBalances['150'] ?? 0) +
-    (ctx.accountBalances['151'] ?? 0) +
-    (ctx.accountBalances['152'] ?? 0) +
-    (ctx.accountBalances['153'] ?? 0)
-
+  const stockBalance = getInventoryBalance(ctx)
   if (stockBalance <= 0) return null
 
-  // COGS: önce doğrudan hesap bakiyeleri, yoksa netSales - grossProfit
-  const rawCogs =
-    (ctx.accountBalances['620'] ?? 0) +
-    (ctx.accountBalances['621'] ?? 0) +
-    (ctx.accountBalances['622'] ?? 0) +
-    (ctx.accountBalances['623'] ?? 0)
-  const cogs = rawCogs > 0 ? rawCogs : (getCogs(ctx) ?? 0)
-  if (cogs <= 0) return null
+  const cogs = getCogs(ctx)
+  if (cogs == null || cogs <= 0) return null
 
   const benchmarkField = (action.targetRatio?.benchmarkField ?? 'inventoryDays') as keyof import('../benchmarks').SectorBenchmark
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
   const targetDays  = bm?.value ?? action.targetRatio?.fallback ?? 90
-  const periodDays  = 365
+  const periodDays  = getPeriodDays({ period: ctx.period ?? 'ANNUAL' }).days
 
   // realisticTarget: panel aksiyonunun stoka etkisi (sıfıra clamp)
   const realisticTarget = Math.max(stockBalance - amount, 0)

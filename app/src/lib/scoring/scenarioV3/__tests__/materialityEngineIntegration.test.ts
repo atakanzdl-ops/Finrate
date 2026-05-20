@@ -218,7 +218,10 @@ describe('T9 — DEKA 2022 BB regression (runEngineV3 crash yok)', () => {
 
 describe('T10-T12 — Non-regression: GÜN 1-2 sizing değerleri korundu', () => {
 
-  test('T10: A06 GÜN 1 sizing — min %2, typical %4, max %10', () => {
+  // NOT: A06 artık computeAmount (DIO) kullanıyor. Bu test
+  // suggestedAmount field'larının tip uyumu için var olduğunu
+  // doğrular. Yeni davranış a06DIORefactor.test.ts içinde.
+  test('T10: A06 suggestedAmount fields preserved (DIO refactor sonrası)', () => {
     const sa = ACTION_CATALOG_V3['A06_INVENTORY_MONETIZATION']!.suggestedAmount
     expect(sa.minPctOfBasis).toBe(0.02)
     expect(sa.typicalPctOfBasis).toBe(0.04)

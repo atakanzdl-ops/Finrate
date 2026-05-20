@@ -328,6 +328,7 @@ export interface FirmContext {
   netSales:          number
   operatingProfit:   number
   grossProfit:       number
+  costOfGoodsSold?:  number          // YENİ: A06 DIO için
   interestExpense:   number
   operatingCashFlow: number | null
   /** Finansal dönem tipi — computeAmount period-day hesabı için */
