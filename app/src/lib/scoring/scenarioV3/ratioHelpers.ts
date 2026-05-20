@@ -12,6 +12,7 @@ import type {
   MarginRatioTransparency,
   TurnoverRatioTransparency,
   AttributionSource,
+  SectorCode,
 } from './contracts'
 import { getSectorBenchmark } from '../benchmarks'
 import type { SectorBenchmark } from '../benchmarks'
@@ -728,52 +729,97 @@ export function isConstructionExcludedAccount(accountCode: string): boolean {
 // ─── selectIdleAssetAccount ───────────────────────────────────────────────────
 
 export interface IdleAssetAccountResult {
-  accountCode: string
-  accountName: string
-  balance: number
+  /** Yeni alanlar */
+  code:         string
+  name:         string
+  balance:      number
+  usableAmount: number   // balance × 0.90 veya capped amount — senkronizasyon için
+  /** Geri uyum alanları (eski çağrıcılar için) */
+  accountCode:  string
+  accountName:  string
 }
 
 /**
- * Aksiyon için en uygun MDV hesabını seç.
- * Kural:
- * 1. İnşaatta 250/253/254 hariç tutulur
- * 2. Amount'u karşılayan (%90 güvenlik bandı) hesaplar arasından en küçük bakiyeli seçilir
- * 3. Hiçbiri tam kapsamıyorsa en büyük bakiyeli fallback
- * 4. Hiç bakiye yoksa '253' default (tip güvencesi için)
+ * Atıl varlık satışı için akıllı hesap seçimi.
+ *
+ * Öncelik (253 Tesis/Makine HARIÇ — operasyonel):
+ *   1. 256 Diğer MDV
+ *   2. 250 Arazi ve Arsalar
+ *   3. 252 Binalar
+ *   4. 255 Demirbaşlar
+ *   5. 254 Taşıtlar
+ *
+ * CONSTRUCTION: 250 hariç (proje arazisi) → 256, 252, 255, 254
+ * isIpotekli:   250 ve 252 rehin altında → 256, 255, 254
+ *
+ * Güvenlik tamponu: bakiye × %90 satılabilir
+ *
+ * KRİTİK BUG FIX: Aday yoksa NULL döner (eskiden 253 dönerdi!).
+ * Fallback tutarı 1M altında kalırsa da NULL döner.
  */
 export function selectIdleAssetAccount(
-  ctx: FirmContext,
-  amount: number
-): IdleAssetAccountResult {
-  const MDV_ACCOUNTS: IdleAssetAccountResult[] = [
-    { accountCode: '255', accountName: 'Diğer Maddi Duran Varlıklar',    balance: ctx.accountBalances['255'] ?? 0 },
-    { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar',       balance: ctx.accountBalances['253'] ?? 0 },
-    { accountCode: '252', accountName: 'Binalar',                          balance: ctx.accountBalances['252'] ?? 0 },
-    { accountCode: '254', accountName: 'Taşıtlar',                         balance: ctx.accountBalances['254'] ?? 0 },
-    { accountCode: '251', accountName: 'Yeraltı ve Yerüstü Düzenleri',    balance: ctx.accountBalances['251'] ?? 0 },
-    { accountCode: '250', accountName: 'Arazi ve Arsalar',                 balance: ctx.accountBalances['250'] ?? 0 },
+  ctx: { sector: SectorCode | string; accountBalances?: Record<string, number> },
+  amount: number,
+  isIpotekli?: boolean
+): IdleAssetAccountResult | null {
+  const MDV_PRIORITY = [
+    { code: '256', name: 'Diğer Maddi Duran Varlıklar' },
+    { code: '250', name: 'Arazi ve Arsalar'             },
+    { code: '252', name: 'Binalar'                      },
+    { code: '255', name: 'Demirbaşlar'                  },
+    { code: '254', name: 'Taşıtlar'                     },
   ]
 
-  // İnşaat: 250/253/254 hariç
-  const filtered = ctx.sector === 'CONSTRUCTION'
-    ? MDV_ACCOUNTS.filter(c => !isConstructionExcludedAccount(c.accountCode))
-    : MDV_ACCOUNTS
-
-  // Pozitif bakiyeli adaylar
-  const withBalance = filtered.filter(c => c.balance > 0)
-  if (withBalance.length === 0) {
-    return { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar', balance: 0 }
+  // Sektör ve ipotek filtresi
+  let priorityList = MDV_PRIORITY
+  if (ctx.sector === 'CONSTRUCTION') {
+    priorityList = MDV_PRIORITY.filter(p => p.code !== '250')
+  }
+  if (isIpotekli) {
+    priorityList = priorityList.filter(p => p.code !== '250' && p.code !== '252')
   }
 
-  // Amount × (1/0.90) ≤ balance → hesap miktarı karşılıyor
-  const canCover = withBalance.filter(c => c.balance * 0.90 >= amount)
-  if (canCover.length > 0) {
-    // En küçük bakiyeli: en az operasyonel etki
-    return canCover.reduce((min, c) => c.balance < min.balance ? c : min)
+  const balances = ctx.accountBalances ?? {}
+  const candidates = priorityList
+    .map(item => ({
+      code:    item.code,
+      name:    item.name,
+      balance: sumByCodesPrefix(balances, [item.code]),
+    }))
+    .filter(c => c.balance > 0)
+
+  // KRİTİK: Aday yoksa NULL — 253 default DÖNMEZ (eski BUG fix)
+  if (candidates.length === 0) return null
+
+  // Öncelik sırasında %90 tamponu karşılayan ilk hesap
+  for (const c of candidates) {
+    if (c.balance * 0.90 >= amount) {
+      return {
+        code:        c.code,
+        name:        c.name,
+        balance:     c.balance,
+        usableAmount: amount,        // tam talep karşılandı
+        accountCode: c.code,         // geri uyum
+        accountName: c.name,         // geri uyum
+      }
+    }
   }
 
-  // Hiçbiri tam kapsamıyorsa: en büyük bakiyeli
-  return withBalance.reduce((max, c) => c.balance > max.balance ? c : max)
+  // Hiçbiri tam kapsamıyorsa: en büyük bakiyeli, %90 cap
+  const largest = candidates.reduce((max, c) => c.balance > max.balance ? c : max, candidates[0])
+  const cappedAmount = largest.balance * 0.90
+
+  // Cap sonrası 1M altında → null (küçük hareket anlamsız)
+  if (cappedAmount < 1_000_000) return null
+
+  return {
+    code:        largest.code,
+    name:        largest.name,
+    balance:     largest.balance,
+    usableAmount: cappedAmount,
+    accountCode: largest.code,       // geri uyum
+    accountName: largest.name,       // geri uyum
+  }
 }
 
 // ─── buildFixedAssetDisposalTransparency ──────────────────────────────────────
@@ -820,6 +866,172 @@ function buildFixedAssetDisposalTransparency(
     },
     method: 'period-end-balance',
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A08 Likidite & Bilanço Helpers — Refactor 2 Tamamlama
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── getCashBalance ───────────────────────────────────────────────────────────
+
+/**
+ * Hazır Değerler — 100+101+102+108 eksi 103 (alınan çekler)
+ */
+export function getCashBalance(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['100', '101', '102', '108'],
+    ['103']
+  )
+}
+
+// ─── getShortTermFinancialDebt ────────────────────────────────────────────────
+
+/**
+ * KV Mali Borç — 300-309 arasından 302 (alınan çekler) ve 308 hariç
+ */
+export function getShortTermFinancialDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['300', '301', '303', '304', '305', '306', '309'],
+    ['302', '308']
+  )
+}
+
+// ─── getShortTermTradeDebt ────────────────────────────────────────────────────
+
+/**
+ * KV Ticari Borç — 320, 321, 326, 329 eksi 322 (alınan çekler)
+ */
+export function getShortTermTradeDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['320', '321', '326', '329'],
+    ['322']
+  )
+}
+
+// ─── getLongTermFinancialDebt ─────────────────────────────────────────────────
+
+/**
+ * UV Mali Borç — 400, 401, 405, 407, 409 eksi 402, 408
+ */
+export function getLongTermFinancialDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['400', '401', '405', '407', '409'],
+    ['402', '408']
+  )
+}
+
+// ─── getTradeReceivables ──────────────────────────────────────────────────────
+
+/**
+ * Ticari Alacaklar — 120, 121, 126, 127, 128 eksi 122 (şüpheli) ve 129
+ */
+export function getTradeReceivables(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['120', '121', '126', '127', '128'],
+    ['122', '129']
+  )
+}
+
+// ─── getAccumulatedDepreciation ───────────────────────────────────────────────
+
+/**
+ * Birikmiş Amortisman (257) — pozitif değer
+ */
+export function getAccumulatedDepreciation(ctx: FirmContext): number {
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, ['257'])
+}
+
+// ─── getRevaluationReserve ────────────────────────────────────────────────────
+
+/**
+ * MDV Yeniden Değerleme Fonu (522)
+ */
+export function getRevaluationReserve(ctx: FirmContext): number {
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, ['522'])
+}
+
+// ─── getCurrentRatio ──────────────────────────────────────────────────────────
+
+/**
+ * Cari Oran — Dönen Varlık / KV Yükümlülük
+ * Dönen varlık: nakit + ticari alacak + stok (150-159)
+ * KV yükümlülük: KV mali borç + KV ticari borç + diğer KV
+ */
+export function getCurrentRatio(ctx: FirmContext): number | null {
+  const cash        = getCashBalance(ctx)
+  const receivables = getTradeReceivables(ctx)
+  const inventory   = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153', '157', '158', '159']
+  )
+  const currentAssets = cash + receivables + inventory
+
+  const stDebt  = getShortTermFinancialDebt(ctx)
+  const stTrade = getShortTermTradeDebt(ctx)
+  const otherSt = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['340', '349', '360', '361', '368', '369', '370', '371', '372', '373', '379']
+  )
+  const currentLiabilities = stDebt + stTrade + otherSt
+
+  if (currentLiabilities <= 0) return null
+  return currentAssets / currentLiabilities
+}
+
+// ─── getNetWorkingCapital ─────────────────────────────────────────────────────
+
+/**
+ * Net İşletme Sermayesi — Dönen Varlık − KV Yükümlülük
+ */
+export function getNetWorkingCapital(ctx: FirmContext): number {
+  const cash        = getCashBalance(ctx)
+  const receivables = getTradeReceivables(ctx)
+  const inventory   = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153', '157', '158', '159']
+  )
+  const currentAssets = cash + receivables + inventory
+
+  const stDebt  = getShortTermFinancialDebt(ctx)
+  const stTrade = getShortTermTradeDebt(ctx)
+  const otherSt = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['340', '349', '360', '361', '368', '369']
+  )
+  const currentLiabilities = stDebt + stTrade + otherSt
+
+  return currentAssets - currentLiabilities
+}
+
+// ─── getIdleAssetPoolBalance ──────────────────────────────────────────────────
+
+/**
+ * Atıl varlık pool — sektör ve ipotek duyarlı.
+ *
+ * Varsayılan: 256, 250, 252, 255
+ * CONSTRUCTION: 250 hariç (proje arazisi) → 256, 252, 255
+ * isIpotekli:   250 ve 252 rehin altında → sadece 256, 255
+ */
+export function getIdleAssetPoolBalance(
+  ctx: FirmContext,
+  options?: { isIpotekli?: boolean }
+): number {
+  let codes = ['256', '250', '252', '255']
+
+  if (ctx.sector === 'CONSTRUCTION') {
+    codes = ['256', '252', '255']
+  }
+
+  if (options?.isIpotekli) {
+    codes = codes.filter(c => c !== '250' && c !== '252')
+  }
+
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, codes)
 }
 
 // ─── detectExtremeDeviation ──────────────────────────────────────────────────

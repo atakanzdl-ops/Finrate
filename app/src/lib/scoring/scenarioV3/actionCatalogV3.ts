@@ -29,11 +29,24 @@ import {
   getInventoryBalance,
   getCogs,
   computeDIO,
+  sumByCodesPrefix,
+  sumByCodesPrefixNet,
   getNetFixedAssets,
+  getGrossFixedAssets,
   getConstructionSafeFixedAssets,
   isIdleAssetCandidate,
   getFixedAssetRatioBenchmark,
   selectIdleAssetAccount,
+  getCashBalance,
+  getShortTermFinancialDebt,
+  getShortTermTradeDebt,
+  getLongTermFinancialDebt,
+  getTradeReceivables,
+  getAccumulatedDepreciation,
+  getRevaluationReserve,
+  getCurrentRatio,
+  getNetWorkingCapital,
+  getIdleAssetPoolBalance,
 } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
@@ -657,20 +670,56 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   horizons: ['medium', 'long'],
 
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
+    const amount = context.amount
     if (amount <= 0) return []
 
-    // Akıllı hesap seçimi: mevcut bakiye ve sektör kısıtına göre en uygun MDV hesabı
-    const acct = selectIdleAssetAccount(context as unknown as FirmContext, amount)
+    const balances = context.accountBalances ?? {}
+
+    // computeAmount ile AYNI isIpotekli hesabı
+    const tangibleNet = sumByCodesPrefixNet(
+      balances,
+      ['250', '251', '252', '253', '254', '255', '256'],
+      ['257', '258']
+    )
+    const uvDebt = sumByCodesPrefixNet(
+      balances,
+      ['400', '401', '405', '407', '409'],
+      ['402', '408']
+    )
+    const isIpotekli = tangibleNet > 0 && uvDebt / tangibleNet > 0.40
+
+    const selected = selectIdleAssetAccount(
+      { sector: context.sector, accountBalances: balances },
+      amount,
+      isIpotekli
+    )
+
+    // selectIdleAssetAccount null dönerse → boş aksiyon
+    if (!selected) return []
+
+    const finalAmount = selected.usableAmount
+    if (finalAmount < 1_000_000) return []
 
     return [
       makeBalancedTransaction(
         'A08_MAIN',
-        `Atıl maddi duran varlık satışı (${acct.accountCode} → 102)`,
+        `Atıl maddi duran varlık satışı (${selected.code} → 102)`,
         'ASSET_DISPOSAL',
         [
-          { accountCode: '102',            accountName: 'Bankalar',         side: 'DEBIT',  amount, description: 'Varlık satış geliri'                    },
-          { accountCode: acct.accountCode, accountName: acct.accountName,   side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri)' },
+          {
+            accountCode: '102',
+            accountName: 'Bankalar',
+            side:        'DEBIT',
+            amount:      finalAmount,
+            description: 'Varlık satış geliri',
+          },
+          {
+            accountCode: selected.code,
+            accountName: selected.name,
+            side:        'CREDIT',
+            amount:      finalAmount,
+            description: `${selected.name} (net defter değeri)`,
+          },
         ]
       ),
     ]
@@ -679,26 +728,103 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   useRatioBasedAmount: true,
 
   computeAmount: (ctx: FirmContext): number | null => {
-    // İnşaatta 250/253/254 proje varlığı sayılır → güvenli alt-küme kullan
-    const safeBalance = ctx.sector === 'CONSTRUCTION'
-      ? getConstructionSafeFixedAssets(ctx)
-      : getNetFixedAssets(ctx)
+    const balances = ctx.accountBalances ?? {}
 
-    // Minimum bakiye guard
-    if (safeBalance < 1_000_000) return null
+    // ====================================================================
+    // GUARD 1 — Yeniden Değerleme Şişkinliği (Gemini)
+    // (522 Fonu / Net MDV) > 0.30 → MDV fiktif şişkin, satış yanlış sinyal
+    // ====================================================================
+    const mdvNet   = getNetFixedAssets(ctx)
+    const reval522 = getRevaluationReserve(ctx)
+    if (mdvNet > 0 && reval522 / mdvNet > 0.30) return null
 
-    // Çift koşul: MDV fazlası VE düşük aktif devir (her ikisi gerekli)
-    if (!isIdleAssetCandidate(ctx)) return null
+    // ====================================================================
+    // GUARD 2 — Yeni Yatırım (Gemini)
+    // (257 Birikmiş Amortisman / Brüt MDV) < 0.15 → varlık çok yeni
+    // ====================================================================
+    const mdvGross  = getGrossFixedAssets(ctx)
+    const accDep257 = getAccumulatedDepreciation(ctx)
+    if (mdvGross > 0 && accDep257 / mdvGross < 0.15) return null
 
-    // Hedef MDV: Toplam Aktif × sektör benchmark oranı
-    const targetMDV = ctx.totalAssets * getFixedAssetRatioBenchmark(ctx.sector)
+    // ====================================================================
+    // GUARD 3 — İpotek Tespiti (Gemini)
+    // (UV Mali Borç / Net MDV) > 0.40 → 250+252 muhtemelen rehinli
+    // ====================================================================
+    const uvMaliBorc = getLongTermFinancialDebt(ctx)
+    const isIpotekli = mdvNet > 0 && uvMaliBorc / mdvNet > 0.40
 
-    // Zaten benchmark altındaysa ya da tam bakiye hedef üstündeyse öneri yok
-    if (safeBalance <= targetMDV) return null
+    // ====================================================================
+    // EŞİK 1 — Likidite Stresi
+    // En az bir kriter sağlanmalı
+    // ====================================================================
+    const currentRatio  = getCurrentRatio(ctx)
+    const nwc           = getNetWorkingCapital(ctx)
+    const cashBalance   = getCashBalance(ctx)
+    const receivables   = getTradeReceivables(ctx)
 
-    // %25 feasibility cap: tek seferlik çok büyük hareket
-    const capped = applyFeasibilityCap(safeBalance, targetMDV, 0.25)
-    return capped >= 1_000_000 ? capped : null
+    let likiditeStres = false
+
+    if (currentRatio !== null && currentRatio < 1.2) likiditeStres = true
+    if (nwc < ctx.totalAssets * 0.10)                likiditeStres = true
+    if (cashBalance <= 0) {
+      likiditeStres = true
+    } else {
+      const kvBorc      = getShortTermFinancialDebt(ctx) + getShortTermTradeDebt(ctx)
+      const denominator = cashBalance + receivables
+      if (denominator > 0 && kvBorc / denominator > 5) likiditeStres = true
+    }
+
+    if (!likiditeStres) return null
+
+    // ====================================================================
+    // EŞİK 2 — Verimsizlik (çift koşul güçlendirildi)
+    // ====================================================================
+    const benchmarkRatio = getFixedAssetRatioBenchmark(ctx.sector)
+    const mdvAktifOrani  = mdvNet / Math.max(ctx.totalAssets, 1)
+    const assetTurnover  = ctx.netSales / Math.max(ctx.totalAssets, 1)
+    const sectorATBench  = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    const sectorAT       = sectorATBench?.value ?? 0.80
+
+    let verimsiz = false
+    if (assetTurnover < sectorAT * 0.85 && mdvAktifOrani > benchmarkRatio * 1.10) verimsiz = true
+    if (mdvAktifOrani > benchmarkRatio * 1.20) verimsiz = true
+
+    if (!verimsiz) return null
+
+    // ====================================================================
+    // EŞİK 3 — Satılabilir Pool Minimum (%5 aktif)
+    // ====================================================================
+    const pool = getIdleAssetPoolBalance(ctx, { isIpotekli })
+    if (pool < ctx.totalAssets * 0.05) return null
+
+    // ====================================================================
+    // CAP HESAPLAMA — min(Cap1, Cap2, Cap3)
+    // ====================================================================
+    const fazlaMDV   = Math.max(mdvNet - ctx.totalAssets * benchmarkRatio, 0)
+    const stPressure = getShortTermFinancialDebt(ctx) + getShortTermTradeDebt(ctx) - cashBalance
+
+    const cap1 = pool * 0.30
+    const cap2 = fazlaMDV * 0.25
+    const cap3 = Math.max(stPressure * 0.50, 0)
+
+    const rawAmount = Math.min(cap1, cap2, cap3)
+    if (rawAmount < 1_000_000) return null
+
+    // ====================================================================
+    // SENKRONİZASYON FIX (Gemini)
+    // computeAmount → selectIdleAssetAccount → usableAmount döner
+    // buildTransactions ayni selected.usableAmount'u kullanır
+    // ====================================================================
+    const selected = selectIdleAssetAccount(
+      { sector: ctx.sector, accountBalances: balances },
+      rawAmount,
+      isIpotekli
+    )
+
+    if (!selected) return null
+
+    // %90 cap uygulanmış final tutarı dön
+    return selected.usableAmount
   },
 
   preconditions: {
@@ -721,10 +847,10 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   },
 
   sectorCompatibility: {
-    CONSTRUCTION:  'applicable',  // Proje varlıkları hariç, güvenli alt-küme kullanılır
-    MANUFACTURING: 'primary',
-    TRADE:         'applicable',
-    RETAIL:        'applicable',
+    CONSTRUCTION:  'applicable',   // Proje varlıkları hariç, güvenli alt-küme kullanılır
+    MANUFACTURING: 'applicable',   // primary → applicable (Gemini: imalat makinesi korunmalı)
+    TRADE:         'primary',
+    RETAIL:        'primary',
     SERVICES:      'not_applicable',
     IT:            'not_applicable',
   },

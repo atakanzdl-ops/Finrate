@@ -16,6 +16,7 @@ import {
   isLowAssetTurnover,
   isIdleAssetCandidate,
   selectIdleAssetAccount,
+  getIdleAssetPoolBalance,
 } from '../ratioHelpers'
 import type { FirmContext } from '../contracts'
 
@@ -168,63 +169,68 @@ describe('isIdleAssetCandidate — her iki koşul zorunlu', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. selectIdleAssetAccount Testleri
+// YENİ öncelik sırası: 256 > 250 > 252 > 255 > 254 (253 DIŞARIDA — operasyonel)
+// Null dönüş BUG fix: aday yoksa null (eski davranış: 253 default)
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('selectIdleAssetAccount', () => {
-  test('255 öncelikli — amount karşılayabiliyorsa seçilir', () => {
+  test('256 (Diğer MDV) öncelikli — amount karşılıyorsa seçilir', () => {
     const ctx = makeCtx({
       accountBalances: {
-        '255': 20_000_000,
-        '253': 50_000_000,
+        '256': 20_000_000,   // öncelikli
         '252': 80_000_000,
+        '255': 30_000_000,
       },
     })
-    // amount=5M, 255 bakiyesi=20M → 20M×0.90=18M ≥ 5M → 255 seçilir
+    // amount=5M, 256 bakiyesi=20M → 20M×0.90=18M ≥ 5M → 256 seçilir
     const result = selectIdleAssetAccount(ctx, 5_000_000)
-    expect(result.accountCode).toBe('255')
+    expect(result).not.toBeNull()
+    expect(result!.accountCode).toBe('256')
   })
 
-  test('255 yetmezse 253 seçilir (en küçük yeterli bakiye)', () => {
+  test('256 yetersiz, 252 seçilir (öncelikte 250 > 252 ama 250 yok)', () => {
     const ctx = makeCtx({
       accountBalances: {
-        '255':  1_000_000,   // 1M×0.90=900K < 10M → yetersiz
-        '253': 15_000_000,   // 15M×0.90=13.5M ≥ 10M → yeterli
-        '252': 50_000_000,   // 50M×0.90=45M ≥ 10M → yeterli ama büyük
+        '256':  1_000_000,   // 1M×0.90=900K < 10M → yetersiz
+        '252': 15_000_000,   // 15M×0.90=13.5M ≥ 10M → yeterli
+        '255': 50_000_000,   // yeterli ama öncelikte 252 daha önce
       },
     })
-    // amount=10M, 255 yetersiz, 253 ve 252 yeterli → en küçük yeterli seçilir
+    // 256 yetersiz, 250(yok), 252 karşılıyor → 252 seçilir
     const result = selectIdleAssetAccount(ctx, 10_000_000)
-    expect(result.accountCode).toBe('253')
+    expect(result).not.toBeNull()
+    expect(result!.accountCode).toBe('252')
   })
 
-  test('CONSTRUCTION: 253 hariç → 252 seçilir', () => {
+  test('CONSTRUCTION: 250 hariç → 252 seçilir (253 zaten listede yok)', () => {
     const ctx = makeCtx({
       sector: 'CONSTRUCTION',
       accountBalances: {
-        '253': 50_000_000,   // CONSTRUCTION'da hariç
+        '250': 50_000_000,   // CONSTRUCTION'da hariç
         '252': 20_000_000,   // dahil
+        '253': 30_000_000,   // 253 hiçbir sektörde listede değil
       },
     })
     const result = selectIdleAssetAccount(ctx, 5_000_000)
-    expect(result.accountCode).toBe('252')
+    expect(result).not.toBeNull()
+    expect(result!.accountCode).toBe('252')
   })
 
-  test('CONSTRUCTION: 250/253/254 hepsi hariç, bakiye yoksa "253" default', () => {
+  test('CONSTRUCTION: yalnız 250 var → null (250 hariç, başka aday yok)', () => {
+    // KRİTİK BUG FIX: eskiden '253' default dönerdi
     const ctx = makeCtx({
       sector: 'CONSTRUCTION',
-      accountBalances: { '250': 50_000_000, '253': 30_000_000, '254': 10_000_000 },
+      accountBalances: { '250': 50_000_000 },  // CONSTRUCTION'da hariç
     })
-    // Tüm bakiyeli hesaplar hariç → default fallback
     const result = selectIdleAssetAccount(ctx, 5_000_000)
-    expect(result.accountCode).toBe('253')
-    expect(result.balance).toBe(0)
+    expect(result).toBeNull()   // 253 default dönmez artık!
   })
 
-  test('Hiç bakiye yoksa "253" default döner', () => {
+  test('Hiç uygun bakiye yoksa null döner (eski BUG fix)', () => {
+    // KRİTİK BUG FIX: eskiden '253' default dönerdi
     const ctx = makeCtx({ accountBalances: {} })
     const result = selectIdleAssetAccount(ctx, 5_000_000)
-    expect(result.accountCode).toBe('253')
-    expect(result.balance).toBe(0)
+    expect(result).toBeNull()   // 253 default dönmez artık!
   })
 })
 
@@ -285,40 +291,69 @@ describe('A08 computeAmount — 5 null firma', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. computeAmount — Sentetik MANUFACTURING ~17.5M
+// 4. computeAmount — Sentetik Pozitif Testler (YENİ LOGİK)
+//
+// YENİ computeAmount: 3 Guard + 3 Eşik + min(Cap1,Cap2,Cap3)
+// Pozitif test için şunlar gerekir:
+//   Guard 1: reval522/mdvNet ≤ 0.30
+//   Guard 2: accDep257/mdvGross ≥ 0.15  ← eskiden yoktu, kritik
+//   Guard 3: isIpotekli tespiti (soft)
+//   Eşik 1: likidite stresi (cari oran < 1.2 vb.)
+//   Eşik 2: verimsizlik (MDV/Aktif fazlası veya düşük devir+MDV fazlası)
+//   Eşik 3: pool ≥ totalAssets × 0.05
+//   rawAmount = min(pool×0.30, fazlaMDV×0.25, stPressure×0.50)
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('A08 computeAmount — sentetik MANUFACTURING testi', () => {
-  test('MANUFACTURING — ağırlıklı MDV (%70) + düşük aktif devir → cap = 17_500_000', () => {
+  test('MANUFACTURING — Guard + Eşik + Cap hesabı (deterministik)', () => {
     /**
-     * Kurulum:
-     *   totalAssets = 100M
-     *   accountBalances: { '252': 70M } → getNetFixedAssets = 70M
-     *   ratio = 70/100 = 0.70 > 0.60 (benchmark×1.2) → isFixedAssetHeavy ✓
-     *   netSales = 50M → turnover = 0.50 < 0.696 (0.87×0.8) → isLowAssetTurnover ✓
+     * Kurulum (tüm guardları geçmek için):
+     *   '252': 72M (Binalar — brüt MDV)
+     *   '257': 11M (Amortisman — 11/72 = 0.153 ≥ 0.15 → Guard 2 ✓)
+     *   '102':  3M (Nakit — düşük → likidite stresi ✓)
+     *   '300': 25M (KV Mali Borç)
      *
-     * Hesaplama:
-     *   safeBalance = 70M
-     *   targetMDV   = 100M × 0.50 = 50M
-     *   desiredMovement = max(70M − 50M, 0) = 20M
-     *   maxMovement     = 70M × 0.25 = 17_500_000
-     *   capped = min(20M, 17.5M) = 17_500_000 ≥ 1M → döner
+     * Guard 1: reval522=0 ✓
+     * Guard 2: 11/72 = 0.153 ≥ 0.15 ✓
+     * Guard 3: uvMaliBorc=0 → isIpotekli=false ✓
+     *
+     * Eşik 1: currentAssets=3M, KV=25M → cR=0.12 < 1.2 → likiditeStres ✓
+     * Eşik 2: mdvNet=61M, mdvAktifOrani=61/100=0.61 > 0.50×1.20=0.60 → verimsiz ✓
+     * Eşik 3: pool=72M (252 dahil) > 5M ✓
+     *
+     * Cap hesabı:
+     *   fazlaMDV = 61M − 50M = 11M
+     *   stPressure = 25M + 0 − 3M = 22M
+     *   cap1 = 72M × 0.30 = 21.6M
+     *   cap2 = 11M × 0.25 = 2.75M
+     *   cap3 = 22M × 0.50 = 11M
+     *   rawAmount = min(21.6M, 2.75M, 11M) = 2_750_000
+     *   selectIdleAssetAccount → 252 (72M×0.90≥2.75M) → usableAmount=2.75M
      */
     const ctx = makeCtx({
       sector: 'MANUFACTURING',
-      totalAssets:  100_000_000,
-      netSales:      50_000_000,
-      accountBalances: { '252': 70_000_000 },
+      totalAssets:   100_000_000,
+      netSales:       40_000_000,
+      accountBalances: {
+        '252': 72_000_000,
+        '257': 11_000_000,
+        '102':  3_000_000,
+        '300': 25_000_000,
+      },
     })
     const result = A08.computeAmount!(ctx)
     expect(result).not.toBeNull()
-    expect(result).toBe(17_500_000)
+    expect(result).toBe(2_750_000)
   })
 
-  test('MANUFACTURING — amortisman düşülünce düşük net MDV → isFixedAssetHeavy=false → null', () => {
+  test('MANUFACTURING — amortisman düşülünce verimsizlik koşulu sağlanmaz → null', () => {
     /**
-     * Brüt = 70M ama birikmiş amortisman = 15M → net = 55M
-     * ratio = 55/100 = 0.55 < 0.60 → NOT heavy → null
+     * Brüt = 70M, amortisman = 15M → net = 55M
+     * mdvAktifOrani = 55/100 = 0.55
+     * 0.55 > 0.50×1.20=0.60? No
+     * 0.55 > 0.50×1.10=0.55? No (eşit, katı > gerekli)
+     * assetTurnover = 40M/100M = 0.40 < 0.87×0.85=0.74 ✓, ama mdvAktifOrani 0.55 NOT > 0.55
+     * → verimsiz=false → null
      */
     const ctx = makeCtx({
       accountBalances: { '252': 70_000_000, '257': 15_000_000 },
@@ -327,29 +362,331 @@ describe('A08 computeAmount — sentetik MANUFACTURING testi', () => {
     expect(A08.computeAmount!(ctx)).toBeNull()
   })
 
-  test('CONSTRUCTION — güvenli alt-küme (251/252/255) ağırlıklıysa döner', () => {
+  test('CONSTRUCTION — güvenli alt-küme + yeterli amortisman + KV baskısı → döner', () => {
     /**
-     * totalAssets = 100M
-     * '252' = 50M (dahil), '253' = 30M (hariç), '250' = 20M (hariç)
-     * getConstructionSafeFixedAssets = 50M → ratio = 50/100 = 0.50 > benchmark(0.35)×1.20=0.42 ✓
-     * netSales = 20M → turnover = 0.20 < 0.32×0.80=0.256 ✓ (inşaat benchmarkı)
+     * CONSTRUCTION + depresyonlu bina (252) + KV baskısı:
+     *   '252': 50M, '257': 10M → mdvNet=40M, mdvGross=50M (dep 10/50=0.20 ≥ 0.15 ✓)
+     *   '102': 2M, '300': 20M → stPressure=20M-2M=18M, cR=2/20=0.10 < 1.2 ✓
      *
-     * targetMDV = 100M × 0.35 = 35M
-     * desiredMovement = 50M − 35M = 15M
-     * maxMovement = 50M × 0.25 = 12.5M → capped = 12.5M ≥ 1M → döner
+     * Eşik 2: CONSTRUCTION benchmarkRatio=0.35
+     *   mdvAktifOrani=40/100=0.40; 0.40 > 0.35×1.20=0.42? No
+     *   assetTurnover=15/100=0.15 < 0.32×0.85=0.272 ✓, mdvAktifOrani 0.40 > 0.35×1.10=0.385 ✓
+     *   → verimsiz=true ✓
+     *
+     * Pool (CONSTRUCTION): codes=['256','252','255'] → 50M ≥ 5M ✓
+     * Cap: fazlaMDV=max(40M-35M,0)=5M; stPressure=18M
+     *   cap1=50M×0.30=15M; cap2=5M×0.25=1.25M; cap3=18M×0.50=9M
+     *   rawAmount=min(15M,1.25M,9M)=1.25M ≥ 1M ✓
+     * selectIdleAssetAccount → 252 → usableAmount=1.25M
      */
     const ctx = makeCtx({
       sector: 'CONSTRUCTION',
       totalAssets:  100_000_000,
-      netSales:      20_000_000,
+      netSales:      15_000_000,
       accountBalances: {
-        '252': 50_000_000,   // dahil
-        '253': 30_000_000,   // hariç (CONSTRUCTION)
-        '250': 20_000_000,   // hariç (CONSTRUCTION)
+        '252': 50_000_000,
+        '257': 10_000_000,
+        '102':  2_000_000,
+        '300': 20_000_000,
       },
     })
     const result = A08.computeAmount!(ctx)
     expect(result).not.toBeNull()
-    expect(result).toBe(12_500_000)
+    expect(result).toBe(1_250_000)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. Gemini Guard Testleri
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('A08 Guard 1 — Yeniden Değerleme Şişkinliği (522/MDV > 0.30 → null)', () => {
+  test('İSRA benzeri: 522/MDV = 0.75 > 0.30 → null', () => {
+    const ctx: FirmContext = {
+      sector: 'CONSTRUCTION',
+      accountBalances: {
+        '252': 1_000_000_000,
+        '257': 200_000_000,   // dep: 200/1000 = 0.20 ≥ 0.15 (Guard 2 geçer)
+        '522': 600_000_000,   // yeniden değerleme = MDV'nin %75'i
+        '102':   1_000_000,
+        '300':  31_000_000,
+      },
+      totalAssets:   1_500_000_000,
+      totalEquity:     700_000_000,
+      totalRevenue:    200_000_000,
+      netIncome:         5_000_000,
+      netSales:        200_000_000,
+      operatingProfit:  10_000_000,
+      grossProfit:      30_000_000,
+      interestExpense:   5_000_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+    // mdvNet = 800M, reval522 = 600M → 600/800 = 0.75 > 0.30 → null
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+})
+
+describe('A08 Guard 2 — Yeni Yatırım (257/BrütMDV < 0.15 → null)', () => {
+  test('Amortisman < %15 brüt MDV → yeni ekipman, satış yanlış → null', () => {
+    const ctx: FirmContext = {
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '253': 50_000_000,   // büyük makine
+        '257':  5_000_000,   // dep: 5/50 = 0.10 < 0.15 → yeni yatırım
+        '102':    100_000,
+        '300': 24_000_000,
+      },
+      totalAssets:   106_400_000,
+      totalEquity:    38_700_000,
+      totalRevenue:   17_700_000,
+      netIncome:       1_000_000,
+      netSales:       17_700_000,
+      operatingProfit: 2_900_000,
+      grossProfit:     3_900_000,
+      interestExpense: 1_800_000,
+      operatingCashFlow: null,
+      period: 'Q1',
+    }
+    // 5/50 = 0.10 < 0.15 → Guard 2 fires → null
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+})
+
+describe('A08 Guard 3 — İpotek Pool Filtresi', () => {
+  test('UV Borç yüksek → 250+252 havuz dışı, sadece 255+256 kalır', () => {
+    const ctx = makeCtx({
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '250': 10_000_000,
+        '252': 20_000_000,
+        '255':  5_000_000,
+        '256':  1_000_000,
+      },
+    })
+    // isIpotekli=true olduğunda: codes=['256','255'] (250+252 hariç)
+    const pool = getIdleAssetPoolBalance(ctx, { isIpotekli: true })
+    expect(pool).toBe(6_000_000)  // 255 + 256 = 5M + 1M
+  })
+
+  test('CONSTRUCTION + isIpotekli → sadece 256 + 255 (250+252 hariç)', () => {
+    const ctx = makeCtx({
+      sector: 'CONSTRUCTION',
+      accountBalances: {
+        '250': 30_000_000,   // CONSTRUCTION hariç
+        '252': 20_000_000,   // isIpotekli hariç
+        '255':  8_000_000,   // dahil
+        '256':  2_000_000,   // dahil
+      },
+    })
+    const pool = getIdleAssetPoolBalance(ctx, { isIpotekli: true })
+    expect(pool).toBe(10_000_000)  // 255 + 256
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. Senkronizasyon Fix Testi
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('A08 — computeAmount ↔ buildTransactions Tutar Senkron', () => {
+  test('computeAmount ile buildTransactions aynı tutarı üretir', () => {
+    /**
+     * TRADE firma — gerçekçi atıl varlık senaryosu:
+     *   '252': 72M bina (brüt), '257': 15M dep (15/72=0.208≥0.15 ✓)
+     *   '102': 3M nakit, '300': 25M KV borç
+     *   netSales: 15M (turnover=0.15 < TRADE=1.20×0.85=1.02 → verimsiz)
+     */
+    const ctx: FirmContext = {
+      sector: 'TRADE',
+      accountBalances: {
+        '252': 72_000_000,
+        '257': 15_000_000,
+        '102':  3_000_000,
+        '300': 25_000_000,
+      },
+      totalAssets:   100_000_000,
+      totalEquity:    25_000_000,
+      totalRevenue:   15_000_000,
+      netIncome:        -500_000,
+      netSales:       15_000_000,
+      operatingProfit:  100_000,
+      grossProfit:     1_500_000,
+      interestExpense: 4_000_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+
+    const computedAmount = A08.computeAmount!(ctx)
+    expect(computedAmount).not.toBeNull()
+
+    // buildTransactions ile aynı amount
+    const txs = A08.buildTransactions({
+      sector:          ctx.sector,
+      amount:          computedAmount!,
+      accountBalances: ctx.accountBalances,
+      netSales:        ctx.netSales,
+      grossProfit:     ctx.grossProfit,
+    } as any)
+
+    expect(txs.length).toBeGreaterThan(0)
+    expect(txs[0].legs[0].amount).toBe(computedAmount!)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. selectIdleAssetAccount Null Fix (BUG fix teyit)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('selectIdleAssetAccount — null fix (eskiden 253 dönerdi BUG)', () => {
+  test('Yalnızca 253 var → null (253 listede yok, operasyonel)', () => {
+    const ctx = makeCtx({
+      sector: 'MANUFACTURING',
+      accountBalances: { '253': 100_000_000 },  // 253 hiçbir sektörde listede değil
+    })
+    const result = selectIdleAssetAccount(ctx, 5_000_000)
+    expect(result).toBeNull()   // ESKİ BUG: 253 dönerdi, ŞİMDİ null
+  })
+
+  test('CONSTRUCTION + sadece 250 var → null (250 CONSTRUCTION hariç)', () => {
+    const ctx = makeCtx({
+      sector: 'CONSTRUCTION',
+      accountBalances: { '250': 50_000_000 },
+    })
+    const result = selectIdleAssetAccount(ctx, 5_000_000)
+    expect(result).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. 5 Firma Snapshot (hepsi null — Atakan vizyonu: A08 nadir öneri)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('A08 — 5 Firma Snapshot (Hepsi null beklenir)', () => {
+  test('ORGANIKA → null (Guard 2: yeni yatırım, dep < %15)', () => {
+    const ctx: FirmContext = {
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '102':    100_000,
+        '120':  8_000_000,
+        '150': 24_700_000,
+        '253': 35_000_000,
+        '257':  3_000_000,   // dep: 3/35 = 0.086 < 0.15 → Guard 2 null
+        '300': 24_000_000,
+        '320':  5_000_000,
+      },
+      totalAssets:   106_400_000,
+      totalEquity:    38_700_000,
+      totalRevenue:   17_700_000,
+      netIncome:       1_000_000,
+      netSales:       17_700_000,
+      operatingProfit: 2_900_000,
+      grossProfit:     3_900_000,
+      interestExpense: 1_800_000,
+      operatingCashFlow: null,
+      period: 'Q1',
+    }
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+
+  test('ENES → null (MDV küçük, havuz < %5 aktif)', () => {
+    const ctx: FirmContext = {
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '102':    500_000,
+        '120':  3_000_000,
+        '150': 24_700_000,
+        '253':  5_000_000,   // küçük MDV
+        '257':  1_500_000,   // dep: 1.5/5 = 0.30 ≥ 0.15 (Guard 2 geçer)
+        '300':  5_000_000,
+      },
+      totalAssets:    39_100_000,
+      totalEquity:    11_000_000,
+      totalRevenue:   31_500_000,
+      netIncome:          50_000,
+      netSales:       31_500_000,
+      operatingProfit:   970_000,
+      grossProfit:     1_500_000,
+      interestExpense:   900_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+
+  test('iPOS → null (aktif devir yüksek → verimsizlik eşiği sağlanmaz)', () => {
+    const ctx: FirmContext = {
+      sector: 'MANUFACTURING',
+      accountBalances: {
+        '102':  22_800_000,
+        '120':  30_000_000,
+        '150': 169_000_000,
+        '253':  80_000_000,
+        '257':  15_000_000,  // dep: 15/80 = 0.1875 ≥ 0.15 (Guard 2 geçer)
+        '400': 122_000_000,
+      },
+      totalAssets:   317_700_000,
+      totalEquity:   114_000_000,
+      totalRevenue:  229_700_000,
+      netIncome:       2_100_000,
+      netSales:      229_700_000,
+      operatingProfit: 31_000_000,
+      grossProfit:     97_400_000,
+      interestExpense: 17_000_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+
+  test('İSRA → null (Guard 1: yeniden değerleme şişkinliği)', () => {
+    const ctx: FirmContext = {
+      sector: 'CONSTRUCTION',
+      accountBalances: {
+        '102':   25_900_000,
+        '120':   50_000_000,
+        '150':  583_000_000,
+        '252':  800_000_000,
+        '257':  200_000_000,  // dep: 200/800 = 0.25 ≥ 0.15 (Guard 2 geçer)
+        '300':   31_200_000,
+        '400':  143_000_000,
+        '522':  800_000_000,  // büyük yeniden değerleme: 800/(800-200)=1.33 > 0.30 → null
+      },
+      totalAssets:   2_570_000_000,
+      totalEquity:   1_100_000_000,
+      totalRevenue:    381_400_000,
+      netIncome:        10_800_000,
+      netSales:        381_400_000,
+      operatingProfit:  29_700_000,
+      grossProfit:      89_900_000,
+      interestExpense:  17_900_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+    expect(A08.computeAmount!(ctx)).toBeNull()
+  })
+
+  test('DEKAM → null (likidite stresi yok: yüksek ciro → cari oran OK)', () => {
+    const ctx: FirmContext = {
+      sector: 'CONSTRUCTION',
+      accountBalances: {
+        '102':   5_000_000,
+        '120':  60_000_000,
+        '151': 262_400_000,
+        '253':  30_000_000,  // 253 CONSTRUCTION: safeFixed=0
+        '257':   8_000_000,
+        '320':  71_900_000,
+      },
+      totalAssets:   361_000_000,
+      totalEquity:   141_000_000,
+      totalRevenue:  328_000_000,
+      netIncome:      13_700_000,
+      netSales:      328_000_000,
+      operatingProfit: -26_000_000,
+      grossProfit:    -22_500_000,
+      interestExpense:  5_300_000,
+      operatingCashFlow: null,
+      period: 'Q4',
+    }
+    expect(A08.computeAmount!(ctx)).toBeNull()
   })
 })
