@@ -63,7 +63,9 @@ function summarise(r: any) {
   }
 }
 
-const ACTIONS = ['A05', 'A06', 'A10', 'A12', 'A18'] as const
+// R4: A18 İnşaat için kaldırıldı — DEKAM grossMargin ≈ 0.182 ≥ yeni benchmark 0.18
+// A18 DEKAM için applied=false (aşağıda ayrı test var). TRADE A18 scoreAttribution.test.ts'de.
+const ACTIONS = ['A05', 'A06', 'A10', 'A12'] as const
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DEKAM (İNŞAAT) × 5 AKSİYON — flag=true
@@ -92,6 +94,31 @@ describe('post-4b: DEKAM × aksiyonlar (ENABLE_SECTOR_THRESHOLD_OVERRIDES=true)'
       })
     })
   }
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEKAM × A18 — R4: İnşaat benchmark %24→%18, DEKAM marjı %18.2 artık hedefte
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('post-4b: DEKAM × A18 (R4 — İnşaat %18 benchmark, applied=false)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let result: any
+  beforeAll(() => {
+    result = computeScoreAttribution('A18', DEKAM_INPUT, DEKAM_SUBJECTIVE_TOTAL, DEKAM_SECTOR)
+  })
+
+  test('applied = false (DEKAM marjı %18.2 ≥ yeni benchmark %18)', () => {
+    // R4: İnşaat benchmark 0.24 → 0.18; DEKAM grossMargin ≈ 0.182 ≥ 0.18 → uygulanmaz
+    expect(result.applied).toBe(false)
+  })
+
+  test('objectiveDelta = 0 (applied=false)', () => {
+    expect(result.objectiveDelta).toBe(0)
+  })
+
+  test('snapshot (post-4b canonical)', () => {
+    expect(summarise(result)).toMatchSnapshot()
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════

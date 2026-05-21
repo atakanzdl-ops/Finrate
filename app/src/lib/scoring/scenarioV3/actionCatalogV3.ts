@@ -47,6 +47,7 @@ import {
   getCurrentRatio,
   getNetWorkingCapital,
   getIdleAssetPoolBalance,
+  getGrossMarginReductionTarget,   // R4: A12+A20 ortak helper
 } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
@@ -1174,33 +1175,22 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   },
 
   computeAmount: (ctx) => {
-    const netSales    = ctx.netSales    ?? 0
-    const grossProfit = ctx.grossProfit ?? 0
-    if (netSales <= 0 || grossProfit < 0) return null
+    // R4 — Brüt zarar guard kaldırıldı; ortak helper kullanılıyor
+    const baseReduction = getGrossMarginReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = grossProfit / netSales
+    const accountBalances = ctx.accountBalances ?? {}
+    const supplier320     = accountBalances['320'] ?? 0
+    const cogs621         = accountBalances['621'] ?? 0
 
-    // TCMB sektör hedef brüt marjı
-    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
-    const targetMargin = bm?.value ?? 0.30
+    // R4 KONSERVATİF cap'ler (eski %50'den daha sıkı — mali müşavir kararı)
+    // Tedarikçi kanal: max %30, COGS kanal: max %20
+    const maxFromSupplier = supplier320 * 0.30
+    const maxFromCogs     = cogs621     * 0.20
 
-    // Mevcut marj zaten hedefte (5% tolerans) → aksiyon gereksiz
-    if (currentMargin >= targetMargin * 1.05) return null
+    if (maxFromSupplier <= 0) return null  // tedarikçi kanal şart (A12 320 kanalı)
 
-    // Hedef marjа ulaşmak için gereken maliyet azaltımı
-    const requiredImprovement = (targetMargin - currentMargin) * netSales
-
-    // Bilanço sınırları
-    const balances        = ctx.accountBalances ?? {}
-    const supplierBalance = balances['320'] ?? 0
-    const cogsBalance     = balances['621'] ?? 0
-
-    // Yıllık tedarikçi pazarlık üst sınırı (%50 — B3a-CAP hotfix)
-    const cap             = 0.50
-    const maxFromSupplier = supplierBalance * cap
-    const maxFromCogs     = cogsBalance     * cap
-
-    const result = Math.min(requiredImprovement, maxFromSupplier, maxFromCogs)
+    const result = Math.min(baseReduction, maxFromSupplier, maxFromCogs)
     return result > 0 ? result : null
   },
 
@@ -1904,34 +1894,44 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   },
 
   computeAmount: (ctx) => {
-    const netSales    = ctx.netSales    ?? 0
-    const grossProfit = ctx.grossProfit ?? 0
-    if (!ctx.netSales || netSales <= 0) return null
-    if (grossProfit < 0) return null
+    // R4 — Brüt zarar guard kaldırıldı; A20 nakit kanal (tedarikçi bağımsız)
+    const baseReduction = getGrossMarginReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = grossProfit / netSales
+    const cogs = getCogs(ctx) ?? 0
+    if (cogs <= 0) return null
 
-    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
-    const targetMargin = bm?.value
-    if (!targetMargin || currentMargin >= targetMargin) return null
+    // Cap: COGS'un %30'u — nakit kanal makul üst sınır
+    const cap = cogs * 0.30
 
-    const gap    = targetMargin - currentMargin
-    const target = gap * netSales * 0.5
-
-    return Math.min(target, netSales * 0.20)
+    const result = Math.min(baseReduction, cap)
+    return result > 0 ? result : null
   },
 
   buildTransactions: (context) => {
     const amount = context.amount ?? 0
     if (amount <= 0) return []
     return [
+      // 1. Operasyonel etki: nakit artar, maliyet azalır
       makeBalancedTransaction(
-        'A20_GROSS_MARGIN_REFORM',
-        'Brüt marj iyileştirme — maliyet düşüşü ve nakit tasarruf',
+        'A20_REFORM_NAKİT',
+        'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
         'OPERATIONAL_MARGIN',
         [
-          { accountCode: '102', accountName: 'Bankalar',              side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
-          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',  side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
+          { accountCode: '102', accountName: 'Bankalar',             side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
+          { accountCode: '621', accountName: 'Satılan Mal Maliyeti', side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
+        ]
+      ),
+      // 2. R4 — Kar zinciri (A12 pattern, vergi YOK — A12/A18/A19 ile tutarlı)
+      // SONNET NOTU: 690/590 dönem sonu kar transferi simülasyonudur;
+      //              anlık yevmiye değil. Sistemin "ne yapmalı" gösterimi için.
+      makeBalancedTransaction(
+        'A20_PROFIT_TRANSFER',
+        'Brüt Marj Reformu — Kar Aktarımı',
+        'OPERATIONAL_MARGIN',
+        [
+          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
         ]
       ),
     ]

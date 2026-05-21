@@ -262,6 +262,50 @@ export function getPeriodDays(fd: any): { days: number; source: 'explicit' | 'de
   return { days: 365, source: 'unknown' }
 }
 
+// ─── getGrossMarginReductionTarget (R4) ─────────────────────────────────────
+
+/**
+ * R4 — Brüt Marj Açığı Hedefi (Half-gap formülü)
+ *
+ * A12 ve A20'nin ortak hesaplama mantığı.
+ * Atakan kararı: gap × netSales × 0.5
+ *
+ * Brüt zarar firma için de çalışır (guard kaldırıldı — R4).
+ *
+ * SONNET NOTU: Bu rakam KADEMELİ İYİLEŞTİRME HEDEFİDİR.
+ * Tek dönemde değil, 12-18 ay vadede uygulanır.
+ * UI'da transparency katmanında bu uyarı gösterilmelidir.
+ *
+ * @returns null:
+ *   - netSales geçersiz (sıfır, negatif, NaN)
+ *   - grossProfit NaN
+ *   - targetMargin tanımsız veya sıfır
+ *   - currentMargin >= targetMargin (zaten hedef üstünde)
+ * @returns number: önerilen maliyet azalma tutarı (TRY)
+ */
+export function getGrossMarginReductionTarget(ctx: FirmContext): number | null {
+  const netSales    = ctx.netSales    ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const grossProfit = ctx.grossProfit ?? 0
+  if (!Number.isFinite(grossProfit)) return null
+
+  const currentMargin = grossProfit / netSales
+
+  // Sektör hedef brüt marjı
+  const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
+  const targetMargin = bm?.value ?? 0
+  if (!targetMargin || targetMargin <= 0) return null
+
+  if (currentMargin >= targetMargin) return null
+
+  // Half-gap (Atakan kararı) — 12-18 ay vade için makul
+  const gap       = targetMargin - currentMargin
+  const reduction = gap * netSales * 0.5
+
+  return reduction > 0 ? reduction : null
+}
+
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
 
 /**
@@ -391,9 +435,12 @@ function buildDIORatioTransparency(
 }
 
 /**
- * A12 — Brüt Kâr Marjı transparency.
- * current: mevcut brüt marj
+ * A12 / A20 — Brüt Kâr Marjı transparency.
+ * current: mevcut brüt marj (negatif olabilir — R4 DEKAM desteği)
  * realisticTarget: aksiyon sonrası beklenen marj (sektör medyanı ile sınırlı)
+ *
+ * R4 — A20 nakit kanal: 320 Satıcılar gösterilmez (102/621 kanalı).
+ * R4 — Kademeli hedef uyarısı formula.description'a eklendi (Sonnet kritik 1).
  */
 function buildMarginRatioTransparency(
   action: ActionTemplateV3,
@@ -403,9 +450,11 @@ function buildMarginRatioTransparency(
   const netSales    = ctx.netSales    ?? 0
   const grossProfit = ctx.grossProfit ?? 0
 
-  if (netSales <= 0 || grossProfit < 0) return null
+  // R4: brüt zarar guard kaldırıldı — negatif grossProfit desteklenir (DEKAM senaryosu)
+  // ESKİ: if (netSales <= 0 || grossProfit < 0) return null
+  if (netSales <= 0) return null
 
-  const current = grossProfit / netSales
+  const current = grossProfit / netSales  // negatif olabilir (brüt zarar)
 
   const benchmarkField = (action.targetRatio?.benchmarkField ?? 'grossMargin') as keyof import('../benchmarks').SectorBenchmark
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
@@ -418,6 +467,22 @@ function buildMarginRatioTransparency(
     ? current
     : Math.min(current + amount / netSales, sectorMedian)
 
+  // R4 — A20 nakit kanal: 320 gösterilmez (Codex 3)
+  const isNakitKanal = action.id === 'A20_GROSS_MARGIN_REFORM'
+  const accounts = isNakitKanal
+    ? [
+        { code: '102', name: 'Bankalar',              delta: +amount, description: 'Nakit tasarruf etkisi' },
+        { code: '621', name: 'Satılan Mal Maliyeti',  delta: -amount, description: 'Maliyet azalışı'       },
+      ]
+    : [
+        { code: '320', name: 'Satıcılar',              delta: -amount, description: 'Tedarikçi iskonto'  },
+        { code: '621', name: 'Satılan Mal Maliyeti',   delta: -amount, description: 'Maliyet azalışı'    },
+      ]
+
+  // R4 — Kademeli hedef uyarısı (Sonnet kritik 1): 12-18 ay vade
+  const baseDesc = 'Brüt Kâr Marjı = (Net Satış − Maliyet) / Net Satış'
+  const description = `${baseDesc} — Kademeli iyileştirme hedefi (12-18 ay vade).`
+
   return {
     kind: 'margin',
     metricLabel: 'Brüt Kâr Marjı',
@@ -425,13 +490,10 @@ function buildMarginRatioTransparency(
     realisticTarget,
     sectorMedian,
     formula: {
-      description: 'Brüt Kâr Marjı = (Net Satış − Maliyet) / Net Satış',
+      description,
       netSales,
       costToReduce: amount,
-      accounts: [
-        { code: '320', name: 'Satıcılar',              delta: -amount, description: 'Tedarikçi iskonto'  },
-        { code: '621', name: 'Satılan Mal Maliyeti',   delta: -amount, description: 'Maliyet azalışı'    },
-      ],
+      accounts,
     },
   }
 }

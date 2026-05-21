@@ -177,23 +177,24 @@ describe('DEKAM (İnşaat) × A18 — Brüt marj iyileştirme', () => {
 
   test('brüt marj durumuna göre applied kontrolü', () => {
     // DEKAM: grossMargin = 4,454,088/24,454,088 ≈ 0.182
-    // Hedef: İnşaat benchmark 0.24, cap 5 puan → achievable = min(0.24, 0.182+0.05) = 0.232
-    // 0.232 > 0.182 → uygulanabilir
-    expect(result.applied).toBe(true)
+    // R4: İnşaat benchmark 0.24 → 0.18 (Atakan kararı)
+    // achievable = min(0.18, 0.182+0.05) = 0.18 < 0.182 → currentMargin >= benchmark → uygulanmaz
+    // Eski (%24): achievable = min(0.24, 0.182+0.05) = 0.232 > 0.182 → uygulanabilirdi
+    expect(result.applied).toBe(false)
   })
 
-  test('grossProfit arttı', () => {
+  test('grossProfit değişmedi (applied=false, aksiyon uygulanmadı)', () => {
     const before = result.beforeInput.grossProfit ?? 0
     const after  = result.afterInput.grossProfit  ?? 0
-    expect(after).toBeGreaterThan(before)
+    expect(after).toBe(before)
   })
 
-  test('profitability categoryDelta pozitif', () => {
-    expect(result.categoryDelta.profitability).toBeGreaterThan(0)
+  test('profitability categoryDelta sıfır (applied=false)', () => {
+    expect(result.categoryDelta.profitability).toBe(0)
   })
 
-  test('objectiveDelta > 0', () => {
-    expect(result.objectiveDelta).toBeGreaterThan(0)
+  test('objectiveDelta = 0 (applied=false)', () => {
+    expect(result.objectiveDelta).toBe(0)
   })
 
   test('snapshot', () => {

@@ -176,7 +176,8 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     currentRatio: 1.50,  quickRatio: 0.94,
     cashRatio: 0.12,     netWorkingCapitalRatio: 0.12,  cashConversionCycle: 102,
     // Kârlılık
-    grossMargin: 0.24,   ebitdaMargin: 0.09,  ebitMargin: 0.070,
+    // R4 — Atakan kararı: KOBİ inşaat default %18 (eski: %24 büyük EPC seviyesi)
+    grossMargin: 0.18,   ebitdaMargin: 0.09,  ebitMargin: 0.070,
     netProfitMargin: 0.050, roa: 0.010,        roe: 0.029,
     roic: 0.055,         revenueGrowth: 0.48,
     // Kaldıraç
