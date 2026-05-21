@@ -6,7 +6,7 @@
  * T3: A06 typicalPct %4 × küçük firma (stok 4.5M) → 2M (absoluteMinTRY kilidi)
  * T4: A06 absoluteMinTRY hâlâ 2_000_000
  * T5: A06 requiredAccountCodes değişmedi
- * T6: getDynamicMaterialityFloor smoke test
+ * T6: getDynamicMaterialityFloor smoke test (R3.2: Atakan kademeli formüle güncellendi)
  * T7: A10 suggestedAmount DEĞİŞMEDİ (non-regression)
  * T8: A15 suggestedAmount DEĞİŞMEDİ (non-regression)
  * T9: A18 suggestedAmount DEĞİŞMEDİ (non-regression)
@@ -75,10 +75,10 @@ describe('A06 suggestedAmount sizing — Faz 7.3.43B', () => {
 
 describe('getDynamicMaterialityFloor — Faz 7.3.43B', () => {
 
-  test('T6a: horizon=medium, totalAssets=100M → 1M (100M × 1% = 1M > 500K taban)', () => {
+  test('T6a: horizon=medium, totalAssets=100M → 500K (R3.2: 50M–500M tier %0.5 → max(500K,500K)=500K)', () => {
     const floor = getDynamicMaterialityFloor('medium', 100_000_000)
-    // max(500_000, 100_000_000 × 0.01) = max(500_000, 1_000_000) = 1_000_000
-    expect(floor).toBe(1_000_000)
+    // R3.2 Atakan kademeli: 100M → 50M–500M bant → 0.5% → max(500_000, 100M×0.005) = 500_000
+    expect(floor).toBe(500_000)
   })
 
   test('T6b: horizon=short, totalAssets=10M → 250K (taban devreye girer)', () => {
@@ -87,10 +87,10 @@ describe('getDynamicMaterialityFloor — Faz 7.3.43B', () => {
     expect(floor).toBe(250_000)
   })
 
-  test('T6c: horizon=long, totalAssets=200M → 2M (200M × 1% = 2M > 1M taban)', () => {
+  test('T6c: horizon=long, totalAssets=200M → 1M (R3.2: 50M–500M tier %0.5 → max(1M,1M)=1M)', () => {
     const floor = getDynamicMaterialityFloor('long', 200_000_000)
-    // max(1_000_000, 200_000_000 × 0.01) = max(1_000_000, 2_000_000) = 2_000_000
-    expect(floor).toBe(2_000_000)
+    // R3.2 Atakan kademeli: 200M → 50M–500M bant → 0.5% → max(1_000_000, 200M×0.005) = 1_000_000
+    expect(floor).toBe(1_000_000)
   })
 
   test('T6d: horizon=short, totalAssets=100M → 500K (100M × 0.5% = 500K > 250K taban)', () => {
