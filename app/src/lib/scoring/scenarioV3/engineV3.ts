@@ -829,8 +829,15 @@ function calculateAmountCandidates(
   if (useRatioBased && action.computeAmount) {
     const v = action.computeAmount(context)
     if (v !== null && v > 0) {
-      // Materiality bypass: computeAmount aktif aksiyonlarda
-      // MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY uygulanmaz.
+      // R3.2 — Seçenek C: saçma tutar guard (dinamik materyalite tabanı altı → reddet)
+      // computeAmount aktif aksiyonlarda MATERIALITY_BY_HORIZON.minAbsoluteAmountTRY bypass
+      // ediliyordu; büyük firmalarda bu çok düşük tutarlar üretiyordu. Artık
+      // getDynamicMaterialityFloor(horizon, totalAssets) tabanının altındaki tutarlar red edilir.
+      const safeAssets    = Number.isFinite(context.totalAssets) ? Math.max(0, context.totalAssets) : 0
+      const dynamicFloor  = getDynamicMaterialityFloor(horizon, safeAssets)
+      if (v < dynamicFloor) {
+        return []
+      }
       // B3b-3: wrapper metrik tipine göre doğru üreticiyi seçer
       // (A12 → GROSS_MARGIN; A05 → DSO fallback; vb.)
       const transparency = buildActionRatioTransparency(action, context, v)

@@ -1,30 +1,24 @@
 /**
  * materialityEngineIntegration.test.ts — Hibrit Materyalite Floor Entegrasyonu (Faz 7.3.43D)
  *
- * DEĞIŞIKLIK: engineV3.ts calculateAmountCandidates
- *   ÖNCE: minAbs = max(absoluteMinTRY, matLimit.minAbsoluteAmountTRY)
- *   SONRA: safeAssets + dynamicFloor + minAbs = max(absoluteMinTRY, matLimit, dynamicFloor)
+ * R3.2 GÜNCELLEME: getDynamicMaterialityFloor Atakan kademeli formülüne geçti.
+ * scaleFactor artık horizon'a değil, aktif büyüklüğüne göre kademeleniyor:
+ *   < 50M   → %1.0 | 50M–500M → %0.5 | 500M–5B → %0.3 | >5B → %0.1
  *
- * MATERIALITY_BY_HORIZON static eşikler:
+ * MATERIALITY_BY_HORIZON static eşikler (değişmedi):
  *   short:  minAbsoluteAmountTRY = 1_500_000
  *   medium: minAbsoluteAmountTRY = 2_500_000
  *   long:   minAbsoluteAmountTRY = 4_000_000
  *
- * getDynamicMaterialityFloor:
- *   short:  max(250_000,   totalAssets × 0.005)
- *   medium: max(500_000,   totalAssets × 0.01)
- *   long:   max(1_000_000, totalAssets × 0.01)
+ * R3.2 sonrası getDynamicMaterialityFloor (asset-size tiers):
+ *   357M (50M–500M bant) → 357M × 0.5% = 1_785_000 (tüm horizonlar için)
+ *   100M (50M–500M bant) → 100M × 0.5% = 500_000; max(baseFloor, 500K) → 500K
  *
- * Hibrit devreye girer (dynamic > static) eşikleri:
- *   short:  totalAssets > 300_000_000  (300M × 0.5% = 1.5M = static eşiği)
- *   medium: totalAssets > 250_000_000  (250M × 1%   = 2.5M = static eşiği)
- *   long:   totalAssets > 400_000_000  (400M × 1%   = 4.0M = static eşiği)
- *
- * T1:  Büyük firma medium (357M) → dynamicFloor = 3.57M > 2.5M static → kilit açılır
- * T2:  Orta firma medium (100M)  → dynamicFloor = 1.0M  < 2.5M static → static korur
- * T3:  Küçük firma short (50M)   → dynamicFloor = 250K  < 1.5M static → static korur
- * T4:  Büyük firma short (357M)  → dynamicFloor = 1.785M > 1.5M static → kilit açılır
- * T5:  Büyük firma long (357M)   → dynamicFloor = 3.57M < 4.0M static  → static korur
+ * T1:  Büyük firma medium (357M) → dynamicFloor=1.785M < static=2.5M → static korur  [R3.2]
+ * T2:  Orta firma medium (100M)  → dynamicFloor=500K   < static=2.5M → static korur  [R3.2]
+ * T3:  Küçük firma short (50M)   → dynamicFloor=250K   < static=1.5M → static korur
+ * T4:  Büyük firma short (357M)  → dynamicFloor=1.785M > static=1.5M → kilit açılır
+ * T5:  Büyük firma long (357M)   → dynamicFloor=1.785M < static=4.0M → static korur  [R3.2]
  * T6a: A12 ratio-based + null → portfolio'da yok (D-pre fix korunuyor)
  * T6b: A12 ratio-based + pozitif → candidate üretir
  * T7:  NaN-safe undefined totalAssets → safeAssets=0, floor=baseFloor
@@ -80,18 +74,18 @@ describe('T1-T5 — getDynamicMaterialityFloor hibrit floor mantığı (Faz 7.3.
   const staticShort  = MATERIALITY_BY_HORIZON['short'].minAbsoluteAmountTRY   // 1_500_000
   const staticLong   = MATERIALITY_BY_HORIZON['long'].minAbsoluteAmountTRY    // 4_000_000
 
-  test('T1: büyük firma medium (357M) → dynamicFloor=3.57M > static=2.5M', () => {
+  test('T1: büyük firma medium (357M) → R3.2: 50M–500M bant %0.5 → dynamicFloor=1.785M < static=2.5M → static korur', () => {
     const dynamicFloor = getDynamicMaterialityFloor('medium', 357_000_000)
-    // 357M × 1% = 3_570_000 > 500K baseFloor → 3_570_000
-    expect(dynamicFloor).toBeCloseTo(3_570_000, -2)
-    expect(dynamicFloor).toBeGreaterThan(staticMedium)   // hibrit devreye girer
+    // R3.2: 357M → 50M–500M bant → 357M × 0.5% = 1_785_000 > 500K baseFloor → 1_785_000
+    expect(dynamicFloor).toBeCloseTo(1_785_000, -2)
+    expect(dynamicFloor).toBeLessThan(staticMedium)      // static korur (dynamic < 2.5M)
   })
 
-  test('T2: orta firma medium (100M) → dynamicFloor=1.0M < static=2.5M → static korur', () => {
+  test('T2: orta firma medium (100M) → R3.2: 50M–500M bant %0.5 → dynamicFloor=500K → baseFloor kazanır', () => {
     const dynamicFloor = getDynamicMaterialityFloor('medium', 100_000_000)
-    // 100M × 1% = 1_000_000 > 500K baseFloor → 1_000_000
-    expect(dynamicFloor).toBe(1_000_000)
-    expect(dynamicFloor).toBeLessThan(staticMedium)      // hibrit devreye girmez
+    // R3.2: 100M → 50M–500M bant → 100M × 0.5% = 500_000 = baseFloor → 500_000
+    expect(dynamicFloor).toBe(500_000)
+    expect(dynamicFloor).toBeLessThan(staticMedium)      // static korur
   })
 
   test('T3: küçük firma short (50M) → dynamicFloor=250K < static=1.5M → static korur', () => {
@@ -108,11 +102,11 @@ describe('T1-T5 — getDynamicMaterialityFloor hibrit floor mantığı (Faz 7.3.
     expect(dynamicFloor).toBeGreaterThan(staticShort)    // hibrit devreye girer
   })
 
-  test('T5: büyük firma long (357M) → dynamicFloor=3.57M < static=4.0M → static korur', () => {
+  test('T5: büyük firma long (357M) → R3.2: 50M–500M bant %0.5 → dynamicFloor=1.785M < static=4.0M → static korur', () => {
     const dynamicFloor = getDynamicMaterialityFloor('long', 357_000_000)
-    // 357M × 1% = 3_570_000 > 1M baseFloor → 3_570_000
-    expect(dynamicFloor).toBeCloseTo(3_570_000, -2)
-    expect(dynamicFloor).toBeLessThan(staticLong)        // hibrit devreye girmez
+    // R3.2: 357M → 50M–500M bant → 357M × 0.5% = 1_785_000 > 1M baseFloor → 1_785_000
+    expect(dynamicFloor).toBeCloseTo(1_785_000, -2)
+    expect(dynamicFloor).toBeLessThan(staticLong)        // static korur (dynamic < 4M)
   })
 
 })
