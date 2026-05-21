@@ -306,6 +306,174 @@ export function getGrossMarginReductionTarget(ctx: FirmContext): number | null {
   return reduction > 0 ? reduction : null
 }
 
+// ─── getOperatingExpenses (R5) ───────────────────────────────────────────────
+
+/**
+ * R5 — Faaliyet Gideri Tespiti (KOBİ fallback dahil)
+ *
+ * Üç kademe:
+ * 1. Detay hesaplar (632 + 633 + 634)
+ * 2. Fallback: gelir tablosu farkı (brütKar - faaliyetKar)
+ * 3. Null
+ *
+ * Atakan Karar 3: KOBİ mizanında detay yoksa toplamdan hesapla.
+ *
+ * SONNET UYARISI: brütKar - faaliyetKar formülü 640/641 (Diğer Faaliyet
+ * Gelirleri) ve 654/659 (Diğer Faaliyet Giderleri) etkisini içerir.
+ * KOBİ pratik yaklaşımı, hata payı küçük çoğu durumda.
+ * Büyük firmalarda (iPOS, İSRA) sapma olabilir.
+ */
+export function getOperatingExpenses(ctx: FirmContext): number | null {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesaplar (büyük firma)
+  const opex632 = accountBalances['632'] ?? 0
+  const opex633 = accountBalances['633'] ?? 0
+  const opex634 = accountBalances['634'] ?? 0
+  const opexDetay = opex632 + opex633 + opex634
+
+  if (opexDetay > 0) return opexDetay
+
+  // 2. Fallback: gelir tablosu farkı (KOBİ)
+  // Uyarı: 640/641/654/659 etkisini içerebilir. KOBİ için pratik.
+  const grossProfit    = ctx.grossProfit    ?? 0
+  const operatingProfit = ctx.operatingProfit ?? 0
+
+  if (Number.isFinite(grossProfit) && Number.isFinite(operatingProfit)) {
+    const opexFallback = grossProfit - operatingProfit
+    if (opexFallback > 0) return opexFallback
+  }
+
+  // 3. Hiç bulunamadı
+  return null
+}
+
+// ─── getFinancialExpenses (R5) ───────────────────────────────────────────────
+
+/**
+ * R5 — Finansman Gideri Tespiti (KOBİ fallback dahil)
+ *
+ * Üç kademe:
+ * 1. Detay hesap (780 + 781 Finansman Giderleri)
+ * 2. Fallback: mevcut borç helper'ları × tahmini faiz
+ * 3. Null
+ *
+ * SONNET UYARISI: %25 tahmini faiz TR 2025 alt sınır.
+ * Gerçek ticari kredi faizi %35-50 arasında olabilir.
+ * Konservatif tahmin. isEstimated=true ise UI'da uyarı gösterilmeli (R13).
+ *
+ * Codex Düzeltme 3: Mevcut getShortTermFinancialDebt / getLongTermFinancialDebt
+ * helper'larını kullanır (yeni toplama yazılmadı).
+ */
+export function getFinancialExpenses(ctx: FirmContext): {
+  amount: number | null
+  isEstimated: boolean
+} {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesap (780 Finansman Giderleri)
+  const fin780 = accountBalances['780'] ?? 0
+  const fin781 = accountBalances['781'] ?? 0
+  const finGider = fin780 + fin781
+
+  if (finGider > 0) {
+    return { amount: finGider, isEstimated: false }
+  }
+
+  // 2. Fallback: mevcut borç helper'ları (Codex önerisi)
+  // 300-309 + 400-409 kapsayan mevcut helper'lar kullanılır
+  const kvBorç   = getShortTermFinancialDebt(ctx)
+  const uvBorç   = getLongTermFinancialDebt(ctx)
+  const toplamBorç = kvBorç + uvBorç
+
+  if (toplamBorç > 0) {
+    // TR 2025 alt sınır tahmini; gerçek oran %35-50 olabilir
+    const TAHMINI_FAIZ_ORANI = 0.25
+    return {
+      amount:      toplamBorç * TAHMINI_FAIZ_ORANI,
+      isEstimated: true,
+    }
+  }
+
+  // 3. Bulunamadı
+  return { amount: null, isEstimated: false }
+}
+
+// ─── getOperatingExpenseReductionTarget (R5) ─────────────────────────────────
+
+/**
+ * R5 — Faaliyet Gideri Azaltma Hedefi (Half-gap)
+ *
+ * A21 için tutar hesabı.
+ * operatingExpenseRatio sektör benchmark'ı kullanılır.
+ * Half-gap katsayısı 0.5 (R4 ile tutarlı).
+ *
+ * @returns null:
+ *   - netSales geçersiz
+ *   - opex tespit edilemedi
+ *   - currentRatio ≤ targetRatio (zaten hedef altında)
+ */
+export function getOperatingExpenseReductionTarget(ctx: FirmContext): number | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const opex = getOperatingExpenses(ctx)
+  if (opex === null || opex <= 0) return null
+
+  const currentRatio = opex / netSales
+
+  const bm = getBenchmarkValue(ctx.sector, 'operatingExpenseRatio')
+  if (!bm || bm.value <= 0) return null
+
+  // Zaten hedef altında → null
+  if (currentRatio <= bm.value) return null
+
+  // Half-gap (R4 pattern)
+  const gap       = currentRatio - bm.value
+  const reduction = gap * netSales * 0.5
+
+  return reduction > 0 ? reduction : null
+}
+
+// ─── getFinancialExpenseReductionTarget (R5) ──────────────────────────────────
+
+/**
+ * R5 — Finansman Gideri Azaltma Hedefi (Half-gap)
+ *
+ * A14 için tutar hesabı. isEstimated flag taşır.
+ *
+ * @returns null:
+ *   - netSales geçersiz
+ *   - finansman gideri tespit edilemedi
+ *   - currentRatio ≤ targetRatio
+ */
+export function getFinancialExpenseReductionTarget(
+  ctx: FirmContext
+): { amount: number; isEstimated: boolean } | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const finResult = getFinancialExpenses(ctx)
+  if (finResult.amount === null || finResult.amount <= 0) return null
+
+  const currentRatio = finResult.amount / netSales
+
+  const bm = getBenchmarkValue(ctx.sector, 'financialExpenseRatio')
+  if (!bm || bm.value <= 0) return null
+
+  if (currentRatio <= bm.value) return null
+
+  const gap       = currentRatio - bm.value
+  const reduction = gap * netSales * 0.5
+
+  if (reduction <= 0) return null
+
+  return {
+    amount:      reduction,
+    isEstimated: finResult.isEstimated,
+  }
+}
+
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
 
 /**

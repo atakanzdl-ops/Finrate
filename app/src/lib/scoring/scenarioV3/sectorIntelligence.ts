@@ -87,6 +87,7 @@ export const BENCHMARK_FIELD_RELIABILITY: Record<keyof SectorBenchmark, DataReli
   payablesTurnoverDays:   'FINRATE_ESTIMATE',
   fixedAssetTurnover:     'FINRATE_ESTIMATE',
   operatingExpenseRatio:  'FINRATE_ESTIMATE',
+  financialExpenseRatio:  'FINRATE_ESTIMATE',  // R5 yeni alan — KOBİ sektör tahmini
 }
 
 // ─── METRIC KEY + POLARITY + BAZLI EŞİK ──────────────────────────────────────

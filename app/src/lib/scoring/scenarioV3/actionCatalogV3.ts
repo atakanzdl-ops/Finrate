@@ -47,7 +47,11 @@ import {
   getCurrentRatio,
   getNetWorkingCapital,
   getIdleAssetPoolBalance,
-  getGrossMarginReductionTarget,   // R4: A12+A20 ortak helper
+  getGrossMarginReductionTarget,            // R4: A12+A20 ortak helper
+  getOperatingExpenses,                     // R5: A21 faaliyet gideri tespiti
+  getOperatingExpenseReductionTarget,       // R5: A21 azaltma hedefi
+  getFinancialExpenses,                     // R5: A14 finansman gideri tespiti
+  getFinancialExpenseReductionTarget,       // R5: A14 azaltma hedefi
 } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
@@ -1343,11 +1347,65 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   semanticType: 'FINANCE_COST_REDUCTION',
   horizons: ['medium', 'long'],
 
-  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
-  buildTransactions: () => [],
+  // R5 — computeAmount EKLENDİ (önceden yoktu)
+  computeAmount: (ctx) => {
+    // Atakan Karar 1: A14 güncellendi (id korundu, computeAmount eklendi)
+    // Finansman gideri rasyo bazlı (financialExpenseRatio hedef)
+    const result = getFinancialExpenseReductionTarget(ctx)
+    if (result === null) return null
+
+    // Cap: finExp × %30
+    const finResult = getFinancialExpenses(ctx)
+    if (finResult.amount === null || finResult.amount <= 0) return null
+
+    const cap = finResult.amount * 0.30
+    return Math.min(result.amount, cap)
+  },
+
+  useRatioBasedAmount: true,
+
+  // R5 — buildTransactions fiş üretiyor (eskiden boş array döndürüyordu)
+  buildTransactions: (context) => {
+    const amount = context.amount ?? 0
+    if (amount <= 0) return []
+
+    // R5 Hotfix — Sonnet: isEstimated uyarısı
+    // 780/781 yoksa tutar borç × %25 tahmininden geliyor → kullanıcı bilgilendirilmeli
+    const fin780 = (context.accountBalances?.['780'] ?? 0)
+    const fin781 = (context.accountBalances?.['781'] ?? 0)
+    const isEstimated = (fin780 + fin781) === 0   // borç bazlı tahmin → true
+
+    return [
+      // 1. Operasyonel: nakit artar, finansman gideri azalır
+      makeBalancedTransaction(
+        'A14_FINEXP_REDUCTION',
+        isEstimated
+          ? 'Finansman Gideri Azaltma — Tahmini faiz oranına (%25) dayalı hesaplama'
+          : 'Finansman Gideri Azaltma — Kredi Yeniden Yapılandırma',
+        'FINANCE_COST_REDUCTION',
+        [
+          { accountCode: '102', accountName: 'Bankalar',               side: 'DEBIT',  amount, description: isEstimated ? 'Tahmini finansman gideri azalışı (borç × %25)' : 'Finansman gideri azalışı nakit etkisi' },
+          { accountCode: '780', accountName: 'Finansman Giderleri',    side: 'CREDIT', amount, description: 'Finansman gideri azalışı'               },
+        ]
+      ),
+      // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)
+      makeBalancedTransaction(
+        'A14_PROFIT_TRANSFER',
+        isEstimated
+          ? 'Finansman Gideri Azaltma — Kar Aktarımı (tahmini)'
+          : 'Finansman Gideri Azaltma — Kar Aktarımı',
+        'FINANCE_COST_REDUCTION',
+        [
+          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı'  },
+        ]
+      ),
+    ]
+  },
 
   preconditions: {
-    requiredAccountCodes: ['660', '661', '780'],
+    // R5 — requiredAccountCodes ['660','661','780'] KALDIRILDI
+    // Eligibility: 780 OR borç > 0 → computeAmount içinde kontrol edilir
     minSourceAmountTRY: 200_000,
   },
 
@@ -1989,40 +2047,45 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
   useRatioBasedAmount: true,
 
   computeAmount: (ctx) => {
-    const netSales       = ctx.netSales       ?? 0
-    const operatingProfit = ctx.operatingProfit ?? 0
-    if (!ctx.netSales || netSales <= 0) return null
-    if (operatingProfit < 0) return null
+    // R5 — Faaliyet gideri rasyo bazlı (operatingExpenseRatio hedef)
+    // Atakan Karar 1: A21 güncellendi (id korundu)
+    // ÖNCE: ebitMargin hedef + operatingProfit<0 guard
+    // SONRA: operatingExpenseRatio hedef + guard kalktı
+    const baseReduction = getOperatingExpenseReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = operatingProfit / netSales
+    // Cap: opex × %25 (konservatif, tek dönem hedefi)
+    const opex = getOperatingExpenses(ctx) ?? 0
+    if (opex <= 0) return null
 
-    const bm = getBenchmarkValue(ctx.sector, 'ebitMargin')
-    const targetMargin = bm?.value
-    if (!targetMargin || currentMargin >= targetMargin) return null
-
-    const gap        = targetMargin - currentMargin
-    const baseTarget = gap * netSales * 0.5
-
-    // OPEX kaynak guard
-    const balances  = ctx.accountBalances ?? {}
-    const opexTotal = (balances['630'] ?? 0) + (balances['631'] ?? 0) + (balances['632'] ?? 0)
-    if (opexTotal <= 0) return null
-    const opexCap = opexTotal * 0.5
-
-    return Math.min(baseTarget, netSales * 0.10, opexCap)
+    const cap = opex * 0.25
+    return Math.min(baseReduction, cap)
   },
 
   buildTransactions: (context) => {
+    // R5 — Kar zinciri eklendi (R4 A12/A20 pattern, vergi YOK)
     const amount = context.amount ?? 0
     if (amount <= 0) return []
     return [
+      // 1. Operasyonel: nakit artar, faaliyet gideri azalır
+      // KOBİ fallback: 632 temsili (gerçek hesap kırılımı mizan detayına bağlı)
       makeBalancedTransaction(
-        'A21_OPERATING_PROFIT_REFORM',
-        'Faaliyet kârı iyileştirme — gider optimizasyonu',
+        'A21_OPEX_REDUCTION',
+        'Faaliyet Kârı Reformu — Gider Optimizasyonu (Nakit Kanal)',
         'OPEX_REDUCTION',
         [
-          { accountCode: '102', accountName: 'Bankalar',                   side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
-          { accountCode: '632', accountName: 'Genel Yönetim Giderleri',    side: 'CREDIT', amount, description: 'Faaliyet gideri azalışı'      },
+          { accountCode: '102', accountName: 'Bankalar',                side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
+          { accountCode: '632', accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount, description: 'Faaliyet gideri azalışı'      },
+        ]
+      ),
+      // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)
+      makeBalancedTransaction(
+        'A21_PROFIT_TRANSFER',
+        'Faaliyet Kârı Reformu — Kar Aktarımı',
+        'OPEX_REDUCTION',
+        [
+          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı'  },
         ]
       ),
     ]
