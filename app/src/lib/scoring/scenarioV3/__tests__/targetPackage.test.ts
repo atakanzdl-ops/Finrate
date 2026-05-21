@@ -1,11 +1,12 @@
 /**
- * Faz 7.3.8d-FIX2 — selectTargetPackage tests (rasyo grubu çeşitlilik önceliği)
+ * Faz 7.3.8d-FIX2 / R3.3 — selectTargetPackage tests
  *
  * Bu suite şu kontratı doğrular:
  *   - Edge case'ler: boş, eşit/altında, geçersiz, ulaşılmaz
- *   - Sıralama: grup kapsama desc → cardinality asc → tutar asc → hedef yakınlığı
+ *   - R3.3 sıralama: grup kapsama desc → |k-desiredMinK| asc → tutar asc → hedef yakınlığı
+ *   - R3.3 desiredMinK: gap büyüdükçe daha büyük paket boyutu tercih edilir
  *   - fullPortfolio sırası alt küme içinde korunur
- *   - DEKAM senaryosu (Codex audit): kısa ID → 0 grup → eski tie-break davranışı
+ *   - DEKAM senaryosu (Codex audit): kısa ID → 0 grup → tie-break korunur
  *   - N > 12 koruma: subset search atlanır
  *   - getCoveredGroups unit testleri
  *   - coveredGroupCount meta alanı
@@ -13,9 +14,18 @@
  * Test stratejisi: postActionRating helper'ı `mockImplementation` ile
  * actionId'lere göre rating üretiyor — her alt küme için doğru rating dönüyor.
  *
+ * R3.3 DEĞİŞİKLİĞİ (ADIM 10-11):
+ *   desiredMinK = f(targetGap): gap=0→1, gap=1→2, gap=2→4, gap=3→5, gap≥4→6
+ *   Subset arama önce k=desiredMinK..N, yoksa k=1..desiredMinK-1 (fallback).
+ *   compareCandidate: cardinality asc → |k-desiredMinK| asc (hedef-aware).
+ *
+ * BASE_PARAMS: currentActualRating='C' (idx=1).
+ *   'CCC'=idx3 (gap=2→desiredMinK=4), 'B'=idx4 (gap=3→desiredMinK=5),
+ *   'BB'=idx5 (gap=4→desiredMinK=6), 'BBB'=idx6 (gap=5→desiredMinK=6).
+ *
  * ID konvansiyonu:
- *   - Mevcut testler (1-9): kısa ID ('A05') → getCoveredGroups=0 → tie-break korunur
- *   - Yeni diversity testleri (10-11): tam catalog ID ('A05_RECEIVABLE_COLLECTION')
+ *   - Mevcut testler (1-9): kısa ID ('A05') → getCoveredGroups=0 → tie-break
+ *   - Diversity testleri (10-11): tam catalog ID ('A05_RECEIVABLE_COLLECTION')
  *     → getCoveredGroups doğru çalışır → diversity sıralama aktif
  */
 
@@ -198,12 +208,18 @@ describe('selectTargetPackage — edge: hedef ulaşılmıyor', () => {
   })
 })
 
-// ─── 5. MİNİMUM CARDINALITY: tek aksiyon yeterli (ANCAK doğru olanı) ─────────
+// ─── 5. CARDINALITY / desiredMinK: R3.3 hedef-aware paket boyutu ──────────────
+//
+// R3.3: BASE_PARAMS currentActualRating='C' (idx=1) + requestedTarget='B' (idx=4)
+// → gap=3 → desiredMinK = min(5, portfolioSize).
+// Küçük portföylerde (≤5 aksiyon) desiredMinK portfolio boyutuna kaplandığından
+// subset arama her zaman tam portföyü de içerir.
 
-describe('selectTargetPackage — minimum cardinality', () => {
-  test('A2 tek başına yeterli, A1 yetersiz → [A2] seçilir (NOT [A1])', () => {
+describe('selectTargetPackage — R3.3 hedef-aware cardinality', () => {
+  test('R3.3: 2-aksiyon portföy, gap=3 → desiredMinK=2; tam portföy seçilir (A1+A2)', () => {
+    // BASE_PARAMS: C→B gap=3 → desiredMinK=min(5,2)=2
+    // Loop k=2: {A1,A2} → A2 dahil → 'BB' → feasible; tek aday → [A1,A2]
     setupRatingMock((ids) => {
-      // A2 dahilse → BB; sadece A1 dahilse → CCC; ikisi → BB; boş → C
       if (ids.has('A2')) return 'BB'
       if (ids.has('A1')) return 'CCC'
       return 'C'
@@ -211,21 +227,21 @@ describe('selectTargetPackage — minimum cardinality', () => {
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
-        makeAction('A1', 50_000_000),   // engine sırasında önce — ama yetersiz
-        makeAction('A2',  5_000_000),   // tek başına yeterli, daha düşük tutar
+        makeAction('A1', 50_000_000),
+        makeAction('A2',  5_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A2')
+    expect(r.selectedActions).toHaveLength(2)  // R3.3: desiredMinK=2, tam portföy
+    expect(r.selectedActions.map(a => a.actionId)).toEqual(['A1', 'A2'])
     expect(r.meta.reachedTarget).toBe(true)
-    expect(r.meta.totalAmountTRY).toBe(5_000_000)
+    expect(r.meta.totalAmountTRY).toBe(55_000_000)
     expect(r.meta.achievedRating).toBe('BB')
   })
 
-  test('iki tekli yeterli → daha düşük tutarlı seçilir (A1 değil A2)', () => {
+  test('R3.3: 2-aksiyon portföy, iki tekli yeterli, gap=3 → tam portföy seçilir', () => {
+    // desiredMinK=min(5,2)=2 → Loop k=2: {A1,A2} feasible → tek aday
     setupRatingMock((ids) => {
-      // Hem A1 hem A2 tek başına yeterli; ama A2 daha ucuz
       if (ids.has('A1') || ids.has('A2')) return 'B'
       return 'C'
     })
@@ -237,16 +253,17 @@ describe('selectTargetPackage — minimum cardinality', () => {
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A2')
-    expect(r.meta.totalAmountTRY).toBe(10_000_000)
+    expect(r.selectedActions).toHaveLength(2)  // R3.3: desiredMinK=2 → tam portföy
+    expect(r.meta.totalAmountTRY).toBe(110_000_000)
   })
 
-  test('aynı k, aynı tutar → en yakın hedef (achievedIdx asc) seçilir', () => {
+  test('R3.3 fallback: k=3 yok, k=1 adaylar bulunur → achievedIdx asc tiebreak', () => {
+    // desiredMinK=min(5,3)=3; k=3 subsets all 'C' (mock: ids.size!==1 → C)
+    // Fallback k=1..2: k=1 A1→BBB, A2→B, A3→BB; k=2 all C
+    // compareCandidate (desiredMinK=3): groups=0 all, dist=|1-3|=2 same, amount=1M same
+    // achievedIdx asc: B(4) < BB(5) < BBB(6) → A2 wins
     setupRatingMock((ids) => {
-      // Tek aksiyonların tümü hedefe ulaşır ama farklı seviyelerde
       if (ids.size !== 1) return 'C'
-      // A1 → BBB (overshoot), A2 → B (tam hedef), A3 → BB (orta)
       if (ids.has('A1')) return 'BBB'
       if (ids.has('A2')) return 'B'
       if (ids.has('A3')) return 'BB'
@@ -261,31 +278,31 @@ describe('selectTargetPackage — minimum cardinality', () => {
       ],
       requestedTarget: 'B',
     })
-    // 3 alt küme de tutar=1M, k=1; en yakın hedef A2 (B == hedef)
+    // Fallback k=1: A2 (B == hedef, achievedIdx en küçük)
     expect(r.selectedActions).toHaveLength(1)
     expect(r.selectedActions[0].actionId).toBe('A2')
     expect(r.meta.achievedRating).toBe('B')
   })
 
-  test('tek aksiyon yetmez ama 2-aksiyonluk subset yeter (k=2 minimum)', () => {
+  test('R3.3: 3-aksiyon, k=3 feasible → tam portföy seçilir (desiredMinK=3)', () => {
+    // desiredMinK=min(5,3)=3; k=3: {A1,A2,A3} → ids.size>=3 → 'B' → feasible
     setupRatingMock((ids) => {
-      // Sadece A1+A3 birlikte yeter, diğer 2-li alt kümeler de C
       if (ids.size === 2 && ids.has('A1') && ids.has('A3')) return 'B'
-      if (ids.size >= 3) return 'B'   // 3+ kombinasyonlar da yeter
+      if (ids.size >= 3) return 'B'
       return 'C'
     })
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
         makeAction('A1', 30_000_000),
-        makeAction('A2', 50_000_000),   // tek başına yetersiz, dahil edilmemeli
+        makeAction('A2', 50_000_000),
         makeAction('A3', 20_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(2)
-    expect(r.selectedActions.map(a => a.actionId)).toEqual(['A1', 'A3'])
-    expect(r.meta.totalAmountTRY).toBe(50_000_000)
+    expect(r.selectedActions).toHaveLength(3)  // R3.3: k=3 tam portföy
+    expect(r.selectedActions.map(a => a.actionId)).toEqual(['A1', 'A2', 'A3'])
+    expect(r.meta.totalAmountTRY).toBe(100_000_000)
   })
 })
 
@@ -315,22 +332,24 @@ describe('selectTargetPackage — sıra korunması', () => {
   })
 })
 
-// ─── 7. DEKAM SENARYOSU (Codex audit referansı) ───────────────────────────────
+// ─── 7. DEKAM SENARYOSU (Codex audit referansı + R3.3 güncelleme) ────────────
 
-describe('selectTargetPackage — DEKAM senaryosu (Codex audit referansı)', () => {
+describe('selectTargetPackage — DEKAM senaryosu (Codex audit / R3.3)', () => {
   /**
    * Engine sırası: A05 → A06 → A19 → A04 → A18 → A12 → A10
-   * Codex audit V2:
+   * DEKAM mock:
    *   A10 tek (38.5 Mn)         → CCC
    *   A19 + A10 (68 Mn)         → B
    *   Tam paket (92.5 Mn, 7 aks) → BB
    *
-   * Beklenen:
-   *   CCC hedefi → [A10]              (1 aksiyon, 38.5 Mn)
-   *   B hedefi   → [A19, A10]         (2 aksiyon, 68 Mn)
-   *   BB hedefi  → tam 7 aksiyon       (92.5 Mn)
+   * BASE_PARAMS: currentActualRating='C' (idx=1)
+   * R3.3 hedef-aware desiredMinK (kısa ID → getCoveredGroups=0 → grup tiebreak yok):
+   *   CCC hedef (idx=3): gap=2 → desiredMinK=4 → ilk pass k=4..7 → sadece k=7 (BB) feasible
+   *   B hedef   (idx=4): gap=3 → desiredMinK=5 → ilk pass k=5..7 → sadece k=7 (BB) feasible
+   *   BB hedef  (idx=5): gap=4 → desiredMinK=6 → ilk pass k=6..7 → sadece k=7 (BB) feasible
    *
-   * Çözüm öncesi sorun (greedy prefix): 3'ü de tüm listeyi gösteriyordu.
+   * R3.3 davranışı: 3 hedef de tam portföyü seçer.
+   * Bu beklenen davranış — büyük sıçramalarda tek/çift aksiyonlu paket anlamsız.
    */
 
   function dekamPortfolio(): SelectedAction[] {
@@ -345,46 +364,43 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit referansı)', () 
     ]
   }
 
-  /**
-   * DEKAM rating fonksiyonu: alt küme içeriğine bakıp Codex tablo değerini döner.
-   * Kapsanmayan alt kümeler 'C' (yetersiz) döner.
-   */
   function dekamRating(ids: Set<string>): string {
     if (ids.size === 7) return 'BB'                                              // Tam paket
     if (ids.size === 2 && ids.has('A19') && ids.has('A10')) return 'B'           // A19+A10
     if (ids.size === 1 && ids.has('A10')) return 'CCC'                           // A10 tek
-    return 'C'                                                                    // Aksi
+    return 'C'
   }
 
-  test('hedef CCC → [A10] (1 aksiyon, A10 tek başına yeterli)', () => {
+  test('R3.3 — hedef CCC: gap=2 → desiredMinK=4 → k=4..7 aramada k=7 (BB) seçilir', () => {
+    // C(1)→CCC(3): gap=2 → desiredMinK=4; k=4..7: sadece k=7 feasible (BB≥CCC)
     setupRatingMock(dekamRating)
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio:       dekamPortfolio(),
       requestedTarget: 'CCC',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A10')
-    expect(r.meta.achievedRating).toBe('CCC')
-    expect(r.meta.totalAmountTRY).toBe(38_500_000)
-    expect(r.meta.fallback).toBe(false)
+    expect(r.selectedActions).toHaveLength(7)  // R3.3: tam portföy
+    expect(r.meta.achievedRating).toBe('BB')   // BB ≥ CCC hedef
+    expect(r.meta.totalAmountTRY).toBe(92_500_000)
     expect(r.meta.reachedTarget).toBe(true)
+    expect(r.meta.fallback).toBe(false)
   })
 
-  test('hedef B → [A19, A10] (2 aksiyon, 68 Mn)', () => {
+  test('R3.3 — hedef B: gap=3 → desiredMinK=5 → k=5..7 aramada k=7 (BB) seçilir', () => {
+    // C(1)→B(4): gap=3 → desiredMinK=5; k=5..7: sadece k=7 feasible (BB≥B)
     setupRatingMock(dekamRating)
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio:       dekamPortfolio(),
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(2)
-    expect(r.selectedActions.map(a => a.actionId)).toEqual(['A19', 'A10'])
-    expect(r.meta.totalAmountTRY).toBe(30_000_000 + 38_500_000)
-    expect(r.meta.achievedRating).toBe('B')
+    expect(r.selectedActions).toHaveLength(7)
+    expect(r.meta.achievedRating).toBe('BB')
+    expect(r.meta.totalAmountTRY).toBe(92_500_000)
   })
 
-  test('hedef BB → tüm 7 aksiyon (tam paket)', () => {
+  test('R3.3 — hedef BB: gap=4 → desiredMinK=6 → k=6..7 aramada k=7 (BB) seçilir', () => {
+    // C(1)→BB(5): gap=4 → desiredMinK=6; k=6..7: sadece k=7 feasible (BB≥BB)
     setupRatingMock(dekamRating)
     const r = selectTargetPackage({
       ...BASE_PARAMS,
@@ -399,10 +415,10 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit referansı)', () 
     expect(r.meta.totalAmountTRY).toBe(92_500_000)
   })
 
-  test('regression guard: 3 hedef → 3 farklı paket boyutu (1, 2, 7)', () => {
+  test('R3.3 — regression guard: büyük gap senaryolarında tam portföy döner', () => {
+    // R3.3: büyük gap → desiredMinK büyük → tam portföy tercih edilir
     setupRatingMock(dekamRating)
     const sizes = (['CCC', 'B', 'BB'] as const).map(t => {
-      // Her çağrı için mock'u yeniden ayarlıyoruz — değil, mockImplementation kalıcı
       const r = selectTargetPackage({
         ...BASE_PARAMS,
         portfolio:       dekamPortfolio(),
@@ -410,9 +426,28 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit referansı)', () 
       })
       return r.selectedActions.length
     })
-    expect(sizes).toEqual([1, 2, 7])
-    // En kritik iddia: 3 hedef için 3 farklı boyut
-    expect(new Set(sizes).size).toBe(3)
+    expect(sizes).toEqual([7, 7, 7])  // R3.3: 3 büyük gap → 3'ü de tam portföy
+  })
+
+  test('R3.3 — fallback demo: sadece k=1 feasible ise fallback devreye girer', () => {
+    // Senaryo: k≥desiredMinK'de hiç feasible yok → fallback k=1..desiredMinK-1 → {A10} bulunur
+    // currentRating='B' (idx=4), target='BB' (idx=5) → gap=1 → desiredMinK=2
+    // mock: sadece A10 tek başına feasible, 2+ aksiyon C
+    setupRatingMock((ids) => {
+      if (ids.size === 1 && ids.has('A10')) return 'BB'
+      return 'C'
+    })
+    const r = selectTargetPackage({
+      ...BASE_PARAMS,
+      currentActualRating: 'B',
+      portfolio: dekamPortfolio(),
+      requestedTarget: 'BB',
+    })
+    // desiredMinK=2; k=2..7 → C; fallback k=1 → {A10}(BB) found
+    expect(r.selectedActions).toHaveLength(1)
+    expect(r.selectedActions[0].actionId).toBe('A10')
+    expect(r.meta.achievedRating).toBe('BB')
+    expect(r.meta.reachedTarget).toBe(true)
   })
 })
 
@@ -441,7 +476,9 @@ describe('selectTargetPackage — N > SUBSET_SEARCH_LIMIT koruma', () => {
     expect(r.meta.achievedRating).toBe('BB')
   })
 
-  test('12 aksiyon → subset search uygulanır (sınırın altında)', () => {
+  test('R3.3: 12 aksiyon → subset search uygulanır (sınırın altında); desiredMinK=5 → k=5 subset seçilir', () => {
+    // BASE_PARAMS C→B gap=3 → desiredMinK=min(5,12)=5
+    // mock: A0 varsa B döner; k=5 subset {A0,A1,A2,A3,A4} first lex feasible
     setupRatingMock((ids) => (ids.has('A0') ? 'B' : 'C'))
     const portfolio = Array.from({ length: 12 }, (_, i) =>
       makeAction(`A${i}`, 1_000_000),
@@ -451,9 +488,11 @@ describe('selectTargetPackage — N > SUBSET_SEARCH_LIMIT koruma', () => {
       portfolio,
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A0')
+    // R3.3: desiredMinK=5 → k=5 subset seçilir (A0 dahil)
+    expect(r.selectedActions).toHaveLength(5)
+    expect(r.selectedActions.some(a => a.actionId === 'A0')).toBe(true)
     expect(r.meta.fallback).toBe(false)
+    expect(r.meta.reachedTarget).toBe(true)
   })
 })
 
@@ -556,13 +595,14 @@ describe('getCoveredGroups — unit', () => {
 //
 // Bu testlerde makeAction'a TAM catalog ID'si verilir.
 // getCoveredGroups doğru grubu bulur → diversity sıralama aktif olur.
+//
+// R3.3 NOT: 2-aksiyon portföylerde desiredMinK=min(5,2)=2, yani loop k=2 başlar.
+// Tek-aksiyon adaylar için fallback (k=1) gereklidir (k>=2'de feasible yok ise).
 
 describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => {
-  test('1-grup vs 2-grup (aynı cardinality) → 2-grup seçilir', () => {
-    // A11_RETAIN_EARNINGS: LEVERAGE (1 grup), 10M
-    // A10_CASH_EQUITY_INJECTION: LEVERAGE+LIQUIDITY (2 grup), 15M
-    // Her ikisi de tek başına hedefi tutuyor. Cardinality eşit (k=1).
-    // Diversity: 2 grup > 1 grup → A10 seçilir (daha pahalı ama dengeli)
+  test('R3.3: 2-aksiyon portföy, gap=3 → desiredMinK=2; k=2 tam portföy seçilir; coveredGroupCount=2', () => {
+    // Her iki aksiyon tek başına yeterli ama desiredMinK=2 olduğundan k=2 subset bulunur.
+    // {A11,A10}: LEVERAGE ∪ (LEVERAGE+LIQUIDITY) = {LEVERAGE,LIQUIDITY} = 2 grup
     setupRatingMock((ids) => {
       if (ids.has('A11_RETAIN_EARNINGS') || ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
       return 'C'
@@ -570,23 +610,21 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
-        makeAction('A11_RETAIN_EARNINGS', 10_000_000),       // 1 grup — ucuz
-        makeAction('A10_CASH_EQUITY_INJECTION', 15_000_000), // 2 grup — pahalı
+        makeAction('A11_RETAIN_EARNINGS', 10_000_000),
+        makeAction('A10_CASH_EQUITY_INJECTION', 15_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
+    // R3.3: desiredMinK=2 → k=2 tek aday → [A11,A10]
+    expect(r.selectedActions).toHaveLength(2)
     expect(r.meta.coveredGroupCount).toBe(2)
     expect(r.meta.reachedTarget).toBe(true)
   })
 
-  test('3-grup 2-aksiyon vs 2-grup 1-aksiyon → 3-grup seçilir (diversity > cardinality)', () => {
-    // A10 tek: LEVERAGE+LIQUIDITY (2 grup), k=1, 38.5M
-    // A05+A18: LIQUIDITY+ACTIVITY+PROFITABILITY (3 grup), k=2, 15M
-    // Diversity (3>2) önce gelir → A05+A18 seçilir
-    // NOT: ids.size kontrolü ile sadece belirtilen kombinasyonlar B döner;
-    //      A18+A10 gibi diğer çiftler C kalır (mock'u basit tutar)
+  test('R3.3 fallback: 3-aksiyon, k=3 infeasible → fallback k=1..2; diversity öncelikli — [A05,A18]', () => {
+    // desiredMinK=min(5,3)=3; k=3 → C (mock: size=1 A10 or size=2 A05+A18 only)
+    // Fallback k=1..2: {A10}(2 grup), {A05,A18}(3 grup) feasible
+    // compareCandidate: grup desc → A05+A18 (3 grup) > A10 (2 grup) wins
     setupRatingMock((ids) => {
       if (ids.size === 1 && ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
       if (ids.size === 2 && ids.has('A05_RECEIVABLE_COLLECTION') && ids.has('A18_NET_SALES_GROWTH')) return 'B'
@@ -595,12 +633,13 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
-        makeAction('A05_RECEIVABLE_COLLECTION', 5_000_000),   // LIQUIDITY+ACTIVITY
-        makeAction('A18_NET_SALES_GROWTH', 10_000_000),       // PROFITABILITY+ACTIVITY
-        makeAction('A10_CASH_EQUITY_INJECTION', 38_500_000),  // LEVERAGE+LIQUIDITY
+        makeAction('A05_RECEIVABLE_COLLECTION', 5_000_000),
+        makeAction('A18_NET_SALES_GROWTH', 10_000_000),
+        makeAction('A10_CASH_EQUITY_INJECTION', 38_500_000),
       ],
       requestedTarget: 'B',
     })
+    // Fallback: 3-grup [A05,A18] diversity önceliği sayesinde kazanır
     expect(r.selectedActions.map(a => a.actionId)).toEqual([
       'A05_RECEIVABLE_COLLECTION',
       'A18_NET_SALES_GROWTH',
@@ -608,10 +647,9 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     expect(r.meta.coveredGroupCount).toBe(3)
   })
 
-  test('eşit grup, farklı cardinality → az aksiyon seçilir', () => {
-    // A10 tek: LEVERAGE+LIQUIDITY (2 grup), k=1
-    // A01+A04: LEVERAGE+LIQUIDITY (2 grup), k=2  — aynı gruplar, daha fazla aksiyon
-    // Diversity tie → cardinality: k=1 kazanır → A10
+  test('R3.3: 3-aksiyon, k=3 feasible (A10 dahil) → tam portföy; grup birleşimi', () => {
+    // desiredMinK=3; k=3: ids.has('A10') → 'B' → feasible (tam portföy)
+    // coveredGroupCount: {A01}(LEVERAGE+LIQUIDITY) ∪ {A04}(LEVERAGE+LIQUIDITY) ∪ {A10}(LEVERAGE+LIQUIDITY) = 2
     setupRatingMock((ids) => {
       if (ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
       if (ids.has('A01_ST_FIN_DEBT_TO_LT') && ids.has('A04_CASH_PAYDOWN_ST')) return 'B'
@@ -620,21 +658,19 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
-        makeAction('A01_ST_FIN_DEBT_TO_LT', 20_000_000),    // LEVERAGE+LIQUIDITY
-        makeAction('A04_CASH_PAYDOWN_ST', 15_000_000),      // LEVERAGE+LIQUIDITY
-        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000), // LEVERAGE+LIQUIDITY
+        makeAction('A01_ST_FIN_DEBT_TO_LT', 20_000_000),
+        makeAction('A04_CASH_PAYDOWN_ST', 15_000_000),
+        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
-    expect(r.meta.coveredGroupCount).toBe(2)
+    // R3.3: k=3 tam portföy feasible → seçilir
+    expect(r.selectedActions).toHaveLength(3)
+    expect(r.meta.coveredGroupCount).toBe(2)  // 3 aksiyon hepsi LEVERAGE+LIQUIDITY
   })
 
-  test('eşit grup, eşit cardinality → daha düşük tutar seçilir', () => {
-    // A01: LEVERAGE+LIQUIDITY (2 grup), 50M
-    // A10: LEVERAGE+LIQUIDITY (2 grup), 30M
-    // Her ikisi de tek başına yeterli (k=1). Tie: 2 grup eşit, k eşit → tutar → 30M kazanır
+  test('R3.3: 2-aksiyon, desiredMinK=2 → tam portföy; tutar alanları tutarlı', () => {
+    // A01 ve A10 tek başına yeterli ama desiredMinK=2 → k=2 {A01,A10} seçilir
     setupRatingMock((ids) => {
       if (ids.has('A01_ST_FIN_DEBT_TO_LT') || ids.has('A10_CASH_EQUITY_INJECTION')) return 'B'
       return 'C'
@@ -642,19 +678,20 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio: [
-        makeAction('A01_ST_FIN_DEBT_TO_LT', 50_000_000),    // LEVERAGE+LIQUIDITY, pahalı
-        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000), // LEVERAGE+LIQUIDITY, ucuz
+        makeAction('A01_ST_FIN_DEBT_TO_LT', 50_000_000),
+        makeAction('A10_CASH_EQUITY_INJECTION', 30_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.selectedActions).toHaveLength(1)
-    expect(r.selectedActions[0].actionId).toBe('A10_CASH_EQUITY_INJECTION')
-    expect(r.meta.totalAmountTRY).toBe(30_000_000)
-    expect(r.meta.coveredGroupCount).toBe(2)
+    // R3.3: k=2 tek aday → [A01,A10]; tutar=80M
+    expect(r.selectedActions).toHaveLength(2)
+    expect(r.meta.totalAmountTRY).toBe(80_000_000)
+    expect(r.meta.coveredGroupCount).toBe(2)  // LEVERAGE+LIQUIDITY
   })
 
   test('4 grup kapsayan paket → coveredGroupCount=4', () => {
     // A10: LEVERAGE+LIQUIDITY  |  A18: PROFITABILITY+ACTIVITY  → 4 grup birlikte
+    // desiredMinK=min(5,2)=2 → k=2: {A10,A18} → both present → 'B' → feasible
     setupRatingMock((ids) => {
       if (ids.has('A10_CASH_EQUITY_INJECTION') && ids.has('A18_NET_SALES_GROWTH')) return 'B'
       return 'C'
@@ -672,7 +709,6 @@ describe('selectTargetPackage — diversity önceliği (tam catalog ID)', () => 
   })
 
   test('profile dışı ID → coveredGroupCount=0, işlev bozulmaz', () => {
-    // Profile'da olmayan aksiyon: diversity=0, fallback sessiz
     setupRatingMock(() => 'B')
     const r = selectTargetPackage({
       ...BASE_PARAMS,
@@ -733,23 +769,27 @@ describe('selectTargetPackage — FIX3 sayım uyumu', () => {
     expect(r.meta.selectedActionCount).toBe(r.meta.rawSelectedActionCount)
   })
 
-  test('subset seçildiğinde fullPortfolioAmountTRY ≠ selectedPackageAmountTRY', () => {
-    // Portföyde 3 aksiyon, sadece ilki yeterli
-    setupRatingMock((ids) => (ids.has('A1') ? 'B' : 'C'))
+  test('R3.3 — subset seçildiğinde fullPortfolioAmountTRY ≠ selectedPackageAmountTRY (gap=1 senaryo)', () => {
+    // R3.3: gap=1 (BB→BBB) → desiredMinK=2; 3-aksiyon portföy → k=2 subset seçilir
+    // mock: A1 varsa 'BBB'; A1+A2 (k=2) → 'BBB' → feasible; A1+A3 → 'BBB' → feasible
+    // compareCandidate (desiredMinK=2): k=2 dist=0, groups=0 (kısa ID), amount → A1+A2 (15M) < A1+A3 (20M)
+    setupRatingMock((ids) => (ids.has('A1') ? 'BBB' : 'C'))
     const r = selectTargetPackage({
       ...BASE_PARAMS,
+      currentActualRating: 'BB',    // gap: BB(5)→BBB(6)=1 → desiredMinK=2
       portfolio: [
-        makeAction('A1',  5_000_000),   // tek başına yeterli
+        makeAction('A1',  5_000_000),
         makeAction('A2', 10_000_000),
         makeAction('A3', 15_000_000),
       ],
-      requestedTarget: 'B',
+      requestedTarget: 'BBB',
     })
-    expect(r.meta.fullPortfolioAmountTRY).toBe(30_000_000)   // 5+10+15 tüm portföy
-    expect(r.meta.selectedPackageAmountTRY).toBe(5_000_000)  // sadece A1
+    expect(r.meta.fullPortfolioAmountTRY).toBe(30_000_000)     // 5+10+15 tüm portföy
+    expect(r.meta.selectedPackageAmountTRY).toBe(15_000_000)   // A1+A2 (k=2 en ucuz)
     expect(r.meta.fullPortfolioAmountTRY).not.toBe(r.meta.selectedPackageAmountTRY)
     // totalAmountTRY geriye uyum alias'ı: seçilen paketle eşit
     expect(r.meta.totalAmountTRY).toBe(r.meta.selectedPackageAmountTRY)
+    expect(r.selectedActions).toHaveLength(2)
   })
 
   test('A10 ve A10B ayrı prefix → displayActionCount=2', () => {

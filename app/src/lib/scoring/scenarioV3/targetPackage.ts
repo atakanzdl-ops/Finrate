@@ -1,22 +1,23 @@
 /**
- * TARGET PACKAGE SELECTOR (Faz 7.3.8d-FIX2)
+ * TARGET PACKAGE SELECTOR (Faz 7.3.8d-FIX2 / R3.3)
  *
  * Mevcut V3 portföyünden, kullanıcının istediği hedef rating'e
  * ulaşmak için OPTİMAL aksiyon paketini seçer.
  *
- * Algoritma — rasyo grubu çeşitlilik öncelikli alt küme araması:
+ * Algoritma — R3.3 hedef-aware rasyo grubu çeşitlilik öncelikli alt küme araması:
  *   1. requestedTarget parse edilir; geçersizse → tüm liste fallback
  *   2. currentIdx >= targetIdx → boş paket, reachedTarget=true
  *   3. Boş portföy → reachedTarget=false, boş paket
- *   4. Tüm C(N,k) alt kümeleri (k=1..N) calculateActualPostActionRating ile
- *      gerçek post-rating'e çevrilir; hedefe ulaşan tüm adaylar toplanır.
- *   5. Adaylar şu öncelik sırasıyla karşılaştırılır (bankacı kredi komitesi mantığı):
+ *   4. targetGap = targetIdx - currentIdx hesaplanır; desiredMinK türetilir:
+ *        gap=0→1 | gap=1→2 | gap=2→4 | gap=3→5 | gap≥4→6
+ *   5. C(N,k) alt kümeleri önce k=desiredMinK..N, sonra (yoksa) k=1..desiredMinK-1
+ *      aralığında aranır; hedefe ulaşan tüm adaylar toplanır.
+ *   6. Adaylar şu öncelik sırasıyla karşılaştırılır (bankacı kredi komitesi mantığı):
  *        a) Rasyo grubu kapsama desc (LIQUIDITY/PROFITABILITY/LEVERAGE/ACTIVITY)
- *           → çok grubu kapsayan "dengeli paket" tercih edilir
- *        b) Cardinality asc (daha az aksiyon)
+ *        b) |cardinality − desiredMinK| asc  [R3.3: hedef-aware, eski "cardinality asc"]
  *        c) En düşük totalAmountTRY
  *        d) En yakın hedef (achievedIdx asc — hedefi en az aşan)
- *   6. Hiçbir alt küme yeterli değilse → tüm liste fallback,
+ *   7. Hiçbir alt küme yeterli değilse → tüm liste fallback,
  *      reachedTarget=false, achievedRating=fullPortfolio post-rating
  *
  * KORUMA: N > SUBSET_SEARCH_LIMIT (12) ise 2^N patlamasını engellemek
@@ -24,7 +25,7 @@
  *
  * ÇIKTI ŞEKLİ:
  *   { selectedActions, meta: TargetPackageMeta, validation }
- *   YENİ meta alanı: coveredGroupCount (0..4) — UI "4/4 grup kapsanmış" için
+ *   meta.coveredGroupCount (0..4) — UI "4/4 grup kapsanmış" için
  *
  * selectedActions sırası: fullPortfolio orijinal sırası korunur.
  *
@@ -253,6 +254,20 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
 
   const targetIdx = ratingToIndex(targetGrade)
 
+  // ── R3.3 ADIM 10: targetGap + desiredMinK — hedef-aware paket büyüklüğü ────────
+  // targetGap: mevcut → hedef arası not adımı (0 ise zaten aşıldı)
+  // desiredMinK: o gap için "anlamlı" minimum aksiyon sayısı
+  //   gap=0 → 1 | gap=1 → 2 | gap=2 → 4 | gap=3 → 5 | gap≥4 → 6
+  // Mantık: Büyük sıçramalar tek aksiyonla çözülemez; paket büyüklüğünü zorluyoruz.
+  const targetGap = Math.max(targetIdx - currentIdx, 0)
+  let desiredMinK: number
+  if      (targetGap === 0) desiredMinK = 1
+  else if (targetGap === 1) desiredMinK = 2
+  else if (targetGap === 2) desiredMinK = 4
+  else if (targetGap === 3) desiredMinK = 5
+  else                       desiredMinK = 6
+  desiredMinK = Math.min(desiredMinK, fullCount)
+
   // ── EDGE: Mevcut rating zaten hedefte/üstünde → boş paket (veya tutarsızlık) ─
   if (currentIdx >= targetIdx) {
     // decisionCurrentRating sağlandıysa kaynak tutarlılığını kontrol et.
@@ -391,17 +406,24 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   }
 
   /**
-   * Aday karşılaştırıcı — bankacı kredi komitesi mantığı:
-   *   1. Grup kapsama desc  (çok grup = dengeli paket)
-   *   2. Cardinality asc    (daha az aksiyon)
-   *   3. Tutar asc          (daha düşük maliyet)
-   *   4. achievedIdx asc    (hedefi en az aşan)
+   * Aday karşılaştırıcı — R3.3 hedef-aware bankacı kredi komitesi mantığı:
+   *   1. Grup kapsama desc          (çok grup = dengeli paket)
+   *   2. desiredMinK yakınlığı asc  (R3.3: gap büyükse küçük paket anlamsız)
+   *   3. Tutar asc                  (daha düşük maliyet)
+   *   4. achievedIdx asc            (hedefi en az aşan)
+   *
+   * R3.3 DEĞİŞİKLİĞİ: Eski "cardinality asc" (daha az aksiyon önce) yerine
+   * "desiredMinK'ye en yakın cardinality asc" kullanılıyor.
+   * Büyük hedef sıçramalarında tek-aksiyonlu paketler otomatik olarak geri plana düşer.
    */
   function compareCandidate(a: Candidate, b: Candidate): number {
     const aGroups = getCoveredGroups(a.actionIds).size
     const bGroups = getCoveredGroups(b.actionIds).size
-    if (aGroups !== bGroups) return bGroups - aGroups          // desc: fazla grup önce
-    if (a.indices.length !== b.indices.length) return a.indices.length - b.indices.length
+    if (aGroups !== bGroups) return bGroups - aGroups                              // desc: fazla grup önce
+    // R3.3: hedef-aware cardinality — desiredMinK'ye en yakın paket önce
+    const aDist = Math.abs(a.indices.length - desiredMinK)
+    const bDist = Math.abs(b.indices.length - desiredMinK)
+    if (aDist !== bDist) return aDist - bDist
     if (a.totalAmount !== b.totalAmount) return a.totalAmount - b.totalAmount
     return a.achievedIdx - b.achievedIdx
   }
@@ -409,38 +431,54 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   const allFeasible: Candidate[] = []
   let lastValidation: ActualRatingValidation | null = null
 
-  for (let k = 1; k <= fullCount; k++) {
-    for (const indices of combinationsOfSize(fullCount, k)) {
-      const subset       = indices.map(i => fullPortfolio[i])
-      const totalAmount  = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
-      const transactions = flattenTransactions(subset)
+  /**
+   * Alt küme aramasını verilen k aralığında çalıştır.
+   * Sonuçları allFeasible'a push'lar, lastValidation'ı günceller.
+   */
+  function runSubsetSearch(kStart: number, kEnd: number): void {
+    for (let k = kStart; k <= kEnd; k++) {
+      for (const indices of combinationsOfSize(fullCount, k)) {
+        const subset       = indices.map(i => fullPortfolio[i])
+        const totalAmount  = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+        const transactions = flattenTransactions(subset)
 
-      const validation = calculateActualPostActionRating({
-        initialBalances:        params.initialBalances,
-        transactions,
-        sector:                 params.sector,
-        subjectiveTotal:        params.subjectiveTotal,
-        v3EstimatedRating:      params.v3EstimatedRating,
-        currentObjectiveScore:  params.currentObjectiveScore,
-        currentCombinedScore:   params.currentCombinedScore,
-        currentActualRating:    params.currentActualRating,
-      })
-      lastValidation = validation
-
-      const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
-      const achievedIdx    = ratingToIndex(achievedRating)
-
-      if (achievedIdx >= targetIdx) {
-        allFeasible.push({
-          indices:      [...indices],
-          actionIds:    subset.map(a => a.actionId),
-          validation,
-          achievedRating,
-          achievedIdx,
-          totalAmount,
+        const validation = calculateActualPostActionRating({
+          initialBalances:        params.initialBalances,
+          transactions,
+          sector:                 params.sector,
+          subjectiveTotal:        params.subjectiveTotal,
+          v3EstimatedRating:      params.v3EstimatedRating,
+          currentObjectiveScore:  params.currentObjectiveScore,
+          currentCombinedScore:   params.currentCombinedScore,
+          currentActualRating:    params.currentActualRating,
         })
+        lastValidation = validation
+
+        const achievedRating = tryParseRating(validation.postActualRating) ?? fallbackCurrent
+        const achievedIdx    = ratingToIndex(achievedRating)
+
+        if (achievedIdx >= targetIdx) {
+          allFeasible.push({
+            indices:      [...indices],
+            actionIds:    subset.map(a => a.actionId),
+            validation,
+            achievedRating,
+            achievedIdx,
+            totalAmount,
+          })
+        }
       }
     }
+  }
+
+  // R3.3 ADIM 11: hedef-aware subset arama
+  // Önce k=desiredMinK..fullCount araması yapılır (hedefe uygun boyutta paketler).
+  // Eğer hiç feasible bulunamazsa k=1..desiredMinK-1 güvenlik fallback'i çalışır.
+  runSubsetSearch(desiredMinK, fullCount)
+  if (allFeasible.length === 0 && desiredMinK > 1) {
+    // Büyük gap için yeterli sayıda aksiyon yoksa bile hedefi yakalayan herhangi
+    // bir paketi bul (daha küçük k'larla).
+    runSubsetSearch(1, desiredMinK - 1)
   }
 
   // ── EN İYİ ADAY: çeşitlilik → cardinality → tutar → yakınlık ────────────────
@@ -477,13 +515,15 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   warnings.push(
     'Mevcut aksiyonlarla hedef rating elde edilemiyor — tüm portföy gösteriliyor.',
   )
-  const finalAchieved = lastValidation
-    ? (tryParseRating(lastValidation.postActualRating) ?? fallbackCurrent)
-    : fallbackCurrent
+  // TypeScript control-flow narrowing cannot track mutations done inside nested
+  // function declarations (runSubsetSearch). Use optional-chaining cast to bypass.
+  const lv = lastValidation as ActualRatingValidation | null
+  const finalAchieved: RatingGrade =
+    tryParseRating(lv?.postActualRating ?? '') ?? fallbackCurrent
 
   return {
     selectedActions: fullPortfolio,
-    validation: lastValidation,
+    validation: lv,
     meta: {
       status:                   'NOT_REACHED',
       reachedTarget:            false,
