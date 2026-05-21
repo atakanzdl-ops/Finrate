@@ -931,10 +931,10 @@ function isActionApplicable(
   previouslySelected:   string[],
   baselineContext?:     FirmContext,
 ): { applicable: boolean; reason?: string } {
-  // 1. Horizon destegi
-  if (!action.horizons.includes(horizon)) {
-    return { applicable: false, reason: `Horizon ${horizon} desteklenmiyor` }
-  }
+  // 1. Horizon destegi — R3: vade filtresi yumusatildi, hard-reject kaldirildi.
+  // if (!action.horizons.includes(horizon)) {
+  //   return { applicable: false, reason: `Horizon ${horizon} desteklenmiyor` }
+  // }
 
   // 2. Sektor uyumlulugu
   const sectorCompat = action.sectorCompatibility[context.sector]
@@ -1079,17 +1079,14 @@ function scoreCandidate(
   previouslySelectedIds: string[],
 ): ScoreBreakdown {
 
-  // 0. Horizon fit - binary (hareket olmayan horizon'a skor yok)
-  const horizonFit = action.horizons.includes(horizon) ? 1.0 : 0.0
-  if (horizonFit === 0.0) {
-    return {
-      totalScore: 0, qualityScore: 0, productivityRepairStrength: 'NONE',
-      sustainabilityWeight: 0, horizonFit: 0, guardrailPenalty: 0,
-      repeatDecay: 1, diversityPenalty: 0,
-      breakdown: 'horizon_fit=0 (not in action.horizons)',
-      transactions: [],
-    }
-  }
+  // 0. Horizon fit — R3: vade filtresi yumusatildi, her aksiyon her horizon'a uygulanabilir.
+  // Eski hard-reject (horizonFit===0.0 → return 0) kaldirildi; horizonFit sabit 1.0.
+  const horizonFit = 1.0
+  // Eski kod (R3 oncesi):
+  // const horizonFit = action.horizons.includes(horizon) ? 1.0 : 0.0
+  // if (horizonFit === 0.0) {
+  //   return { totalScore: 0, ..., breakdown: 'horizon_fit=0 (not in action.horizons)', transactions: [] }
+  // }
 
   // 1. Transactions build - context signals icin de kullanilacak
   const buildCtx = {

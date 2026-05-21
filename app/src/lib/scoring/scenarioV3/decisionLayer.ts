@@ -1081,6 +1081,8 @@ function buildUiReadyRows(engineResult: EngineResult): UiReadyRow[] {
 // ─── HELPER: FRIENDLY REJECT REASON ─────────────────────────────────────────
 
 export function toFriendlyRejectReason(rawReason: string): string {
+  // R3: horizon hard-reject kaldirildi (engineV3 isActionApplicable ADIM 1).
+  // Bu dal artik ulasilamaz; geriye donuk uyumluluk icin korunuyor.
   if (rawReason.includes('Horizon') && rawReason.includes('desteklenmiyor')) {
     return 'Bu vade için uygun değil.'
   }

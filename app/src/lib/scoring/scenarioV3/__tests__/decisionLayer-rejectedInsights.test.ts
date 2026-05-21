@@ -13,7 +13,9 @@ import { toFriendlyRejectReason, buildDecisionAnswer } from '../decisionLayer'
 // ─── toFriendlyRejectReason ───────────────────────────────────────────────────
 
 describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
-  it('Horizon short desteklenmiyor → Bu vade için uygun değil.', () => {
+  // R3 ADIM 4: engineV3 horizon hard-reject kaldirildi; bu reason artik ulasilamaz.
+  // Geriye donuk uyumluluk icin toFriendlyRejectReason dal'i korunuyor — test gecmeye devam eder.
+  it('Horizon short desteklenmiyor → Bu vade için uygun değil. [R3: unreachable branch, kept for compat]', () => {
     expect(toFriendlyRejectReason('Horizon short desteklenmiyor'))
       .toBe('Bu vade için uygun değil.')
   })
@@ -163,7 +165,7 @@ describe('buildDecisionAnswer — enginePortfolioCount / rejectedInsightCount (F
       portfolio: [],
       rejectedCandidates: [
         { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Kaynak bakiye yetersiz — min 1.000.000 TL' },
-        { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Horizon short desteklenmiyor' },  // aynı actionId → gruplanır
+        { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Horizon short desteklenmiyor' },  // aynı actionId → gruplanır (R3: bu reason artık üretilmez, gruplama mantığı test amaçlı korunuyor)
         { actionId: 'A05_RECEIVABLE_COLLECTION', reason: 'sektoru icin uygulanamaz' },   // farklı actionId → ayrı insight
       ],
     })
