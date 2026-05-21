@@ -14,10 +14,12 @@
  * Test stratejisi: postActionRating helper'ı `mockImplementation` ile
  * actionId'lere göre rating üretiyor — her alt küme için doğru rating dönüyor.
  *
- * R3.3 DEĞİŞİKLİĞİ (ADIM 10-11):
+ * R3.3 FIX (ADIM 1-3):
+ *   ADIM 1: currentIdx = ratingToIndex(decisionCurrentRating ?? currentActualRating)
+ *           SOURCE_MISMATCH erken çıkışı dead code (decisionCurrentRating<target → search çalışır)
+ *   ADIM 2: runSubsetSearch(1, fullCount) tek çağrı — fallback kaldırıldı
+ *   ADIM 3: compareCandidate gap-aware: kolay(≤1) → desiredMinK eşiği+az aksiyon; zor(≥2) → dist
  *   desiredMinK = f(targetGap): gap=0→1, gap=1→2, gap=2→4, gap=3→5, gap≥4→6
- *   Subset arama önce k=desiredMinK..N, yoksa k=1..desiredMinK-1 (fallback).
- *   compareCandidate: cardinality asc → |k-desiredMinK| asc (hedef-aware).
  *
  * BASE_PARAMS: currentActualRating='C' (idx=1).
  *   'CCC'=idx3 (gap=2→desiredMinK=4), 'B'=idx4 (gap=3→desiredMinK=5),
@@ -371,17 +373,19 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit / R3.3)', () => {
     return 'C'
   }
 
-  test('R3.3 — hedef CCC: gap=2 → desiredMinK=4 → k=4..7 aramada k=7 (BB) seçilir', () => {
-    // C(1)→CCC(3): gap=2 → desiredMinK=4; k=4..7: sadece k=7 feasible (BB≥CCC)
+  test('R3.3 fix — hedef CCC: k=1..7 tam tarama; gap=2 ZOR HEDEF, desiredMinK=4 → {A19,A10}(dist=2) kazanır', () => {
+    // C(1)→CCC(3): gap=2 → desiredMinK=4; k=1..7 tam tarama (ADIM 2 fix)
+    // Feasible: k=1 {A10}→CCC(dist|1-4|=3), k=2 {A19,A10}→B≥CCC(dist|2-4|=2), k=7→BB(dist|7-4|=3)
+    // ZOR HEDEF (gap≥2): groups(0=tie) → dist asc: k=2 kazanır (dist=2)
     setupRatingMock(dekamRating)
     const r = selectTargetPackage({
       ...BASE_PARAMS,
       portfolio:       dekamPortfolio(),
       requestedTarget: 'CCC',
     })
-    expect(r.selectedActions).toHaveLength(7)  // R3.3: tam portföy
-    expect(r.meta.achievedRating).toBe('BB')   // BB ≥ CCC hedef
-    expect(r.meta.totalAmountTRY).toBe(92_500_000)
+    expect(r.selectedActions).toHaveLength(2)       // {A19,A10} — dist=2 kazanır
+    expect(r.meta.achievedRating).toBe('B')          // B ≥ CCC hedef
+    expect(r.meta.totalAmountTRY).toBe(68_500_000)  // 30M + 38.5M
     expect(r.meta.reachedTarget).toBe(true)
     expect(r.meta.fallback).toBe(false)
   })
@@ -415,8 +419,11 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit / R3.3)', () => {
     expect(r.meta.totalAmountTRY).toBe(92_500_000)
   })
 
-  test('R3.3 — regression guard: büyük gap senaryolarında tam portföy döner', () => {
-    // R3.3: büyük gap → desiredMinK büyük → tam portföy tercih edilir
+  test('R3.3 fix — regression guard: CCC→k=2(dist=2), B/BB→k=7(dist=2/1)', () => {
+    // R3.3 fix (ADIM 2): k=1..7 tam tarama; seçim distance-a göre
+    // CCC(gap=2, desiredMinK=4): feasible {A19,A10}(dist=2) < k=7(dist=3) → size=2
+    // B  (gap=3, desiredMinK=5): feasible {A19,A10}→B(dist=3) < k=7→BB(dist=2) → size=7
+    // BB (gap=4, desiredMinK=6): sadece k=7 feasible → size=7
     setupRatingMock(dekamRating)
     const sizes = (['CCC', 'B', 'BB'] as const).map(t => {
       const r = selectTargetPackage({
@@ -426,7 +433,7 @@ describe('selectTargetPackage — DEKAM senaryosu (Codex audit / R3.3)', () => {
       })
       return r.selectedActions.length
     })
-    expect(sizes).toEqual([7, 7, 7])  // R3.3: 3 büyük gap → 3'ü de tam portföy
+    expect(sizes).toEqual([2, 7, 7])
   })
 
   test('R3.3 — fallback demo: sadece k=1 feasible ise fallback devreye girer', () => {
@@ -850,25 +857,27 @@ describe('selectTargetPackage — FIX3 sayım uyumu', () => {
 
 describe('selectTargetPackage — decisionCurrentRating tutarsız kaynak tespiti (Faz 7.3.19)', () => {
 
-  // T13: Tutarsızlık — currentActualRating hedefte, decisionCurrentRating altında
-  test('T13 — currentActualRating≥target ama decisionCurrentRating<target → inconsistentSources:true, tam portföy döner', () => {
-    // Hiçbir mock gerekmez — erken çıkış calculateActualPostActionRating çağırmaz
+  // T13: R3.3 ADIM 1 — decisionCurrentRating currentIdx'i sürer, SOURCE_MISMATCH erken çıkışı artık yok
+  test('T13 — R3.3 ADIM 1: decisionCurrentRating<target ≤ currentActualRating → subset search çalışır, NOT_REACHED', () => {
+    // ADIM 1: currentIdx = ratingToIndex(decisionCurrentRating ?? currentActualRating)
+    // decisionCurrentRating='CCC'(3) < target='B'(4) → erken çıkış TETİKLENMİYOR
+    // Subset search çalışır; mock → C → NOT_REACHED (hiçbir subset feasible değil)
+    setupRatingMock(() => 'C')
     const r = selectTargetPackage({
       ...BASE_PARAMS,
-      currentActualRating:    'BB',   // >= 'B' → normal erken çıkış tetikler
-      decisionCurrentRating:  'CCC',  // < 'B' → tutarsızlık tespiti
+      currentActualRating:    'BB',   // currentActualRating >= 'B' ama artık currentIdx için kullanılmıyor
+      decisionCurrentRating:  'CCC',  // currentIdx = ratingToIndex('CCC')=3 < targetIdx('B')=4
       portfolio: [
         makeAction('A1', 1_000_000),
         makeAction('A2', 2_000_000),
       ],
       requestedTarget: 'B',
     })
-    expect(r.meta.inconsistentSources).toBe(true)
-    expect(r.meta.fallback).toBe(true)
+    // ADIM 1 davranışı: erken çıkış yok → subset search çalışır → NOT_REACHED
+    expect(r.meta.status).toBe('NOT_REACHED')
     expect(r.meta.reachedTarget).toBe(false)
-    expect(r.selectedActions).toHaveLength(2)         // tam portföy — boş değil
-    expect(r.meta.warnings.length).toBeGreaterThan(0)
-    expect(r.meta.warnings[0]).toMatch(/tutarsızlık/i)
+    expect(r.meta.inconsistentSources).toBeFalsy()    // SOURCE_MISMATCH erken çıkışı dead code
+    expect(r.selectedActions).toHaveLength(2)          // NOT_REACHED → tam portföy fallback
   })
 
   // T14: Tutarlı — her iki kaynak da hedefin üstünde → normal boş paket
@@ -938,19 +947,24 @@ describe('selectTargetPackage — status enum (Faz 7.3.20)', () => {
     expect(r.meta.achievedRating).toBeDefined()
   })
 
-  // T18: SOURCE_MISMATCH — currentActualRating hedefte, decisionCurrentRating altında
-  test('T18 — SOURCE_MISMATCH → status: SOURCE_MISMATCH, inconsistentSources: true', () => {
+  // T18: R3.3 ADIM 1 — decisionCurrentRating<target → SOURCE_MISMATCH artık NOT_REACHED döner
+  test('T18 — R3.3 ADIM 1: decisionCurrentRating<target → status: NOT_REACHED (SOURCE_MISMATCH dead code)', () => {
+    // ADIM 1: currentIdx uses decisionCurrentRating → erken çıkış tetiklenmez → subset search
+    // Mock: hiçbir kombinasyon B'ye ulaşamıyor → NOT_REACHED
+    setupRatingMock(() => 'C')
     const r = selectTargetPackage({
       ...BASE_PARAMS,
-      currentActualRating:   'BB',   // >= 'B' → normal erken çıkış tetikler
-      decisionCurrentRating: 'CCC',  // < 'B' → tutarsızlık
+      currentActualRating:   'BB',   // artık currentIdx için kullanılmıyor
+      decisionCurrentRating: 'CCC',  // currentIdx=3 < targetIdx('B')=4 → search çalışır
       portfolio:             [makeAction('A1', 1_000_000)],
       requestedTarget:       'B',
     })
-    expect(r.meta.status).toBe('SOURCE_MISMATCH')
-    expect(r.meta.inconsistentSources).toBe(true)  // geriye uyum
-    expect(r.meta.reachedTarget).toBe(false)        // geriye uyum
-    expect(r.selectedActions).toHaveLength(1)       // tam portföy döner
+    // ADIM 1 davranışı: SOURCE_MISMATCH erken çıkışı dead code → NOT_REACHED
+    expect(r.meta.status).toBe('NOT_REACHED')
+    expect(r.meta.reachedTarget).toBe(false)
+    expect(r.meta.inconsistentSources).toBeFalsy()   // SOURCE_MISMATCH artık set edilmiyor
+    expect(r.meta.fallback).toBe(true)
+    expect(r.selectedActions).toHaveLength(1)         // NOT_REACHED → tam portföy fallback
   })
 
   // T19: N > SUBSET_SEARCH_LIMIT → FALLBACK (arama atlandı)

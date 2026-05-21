@@ -10,13 +10,11 @@
  *   3. Boş portföy → reachedTarget=false, boş paket
  *   4. targetGap = targetIdx - currentIdx hesaplanır; desiredMinK türetilir:
  *        gap=0→1 | gap=1→2 | gap=2→4 | gap=3→5 | gap≥4→6
- *   5. C(N,k) alt kümeleri önce k=desiredMinK..N, sonra (yoksa) k=1..desiredMinK-1
- *      aralığında aranır; hedefe ulaşan tüm adaylar toplanır.
- *   6. Adaylar şu öncelik sırasıyla karşılaştırılır (bankacı kredi komitesi mantığı):
- *        a) Rasyo grubu kapsama desc (LIQUIDITY/PROFITABILITY/LEVERAGE/ACTIVITY)
- *        b) |cardinality − desiredMinK| asc  [R3.3: hedef-aware, eski "cardinality asc"]
- *        c) En düşük totalAmountTRY
- *        d) En yakın hedef (achievedIdx asc — hedefi en az aşan)
+ *   5. C(N,k) alt kümeleri k=1..N tam aralığında aranır; hedefe ulaşan tüm adaylar
+ *      toplanır. Sıralama kararı compareCandidate'e bırakılır (R3.3 fix Codex 1).
+ *   6. Adaylar gap'e göre çift modlu öncelik sırasıyla karşılaştırılır:
+ *        KOLAY (gap<=1):  desiredMinK eşiği → grup → az aksiyon → tutar → achievedIdx
+ *        ZOR   (gap>=2):  grup → |cardinality−desiredMinK| → tutar → achievedIdx
  *   7. Hiçbir alt küme yeterli değilse → tüm liste fallback,
  *      reachedTarget=false, achievedRating=fullPortfolio post-rating
  *
@@ -217,7 +215,11 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   const warnings: string[]   = []
   const fullPortfolio        = params.portfolio
   const fullCount            = fullPortfolio.length
-  const currentIdx           = ratingToIndex(params.currentActualRating)
+  // R3.3 düzeltme (Codex 4): decisionCurrentRating fallback ile currentActualRating.
+  // Hotfix VI sonrası route.ts decisionCurrentRating geçiriyor (er.currentRating).
+  // targetGap ve erken çıkış kararı her zaman karar motoru kaynağına dayanmalı.
+  const currentRatingSource  = params.decisionCurrentRating ?? params.currentActualRating
+  const currentIdx           = ratingToIndex(currentRatingSource)
   const fallbackCurrent      = tryParseRating(params.currentActualRating) ?? 'C'
 
   // ── FIX3: Tam portföy türetilmiş sabitler (tüm return'lerde kullanılır) ──────
@@ -406,24 +408,43 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
   }
 
   /**
-   * Aday karşılaştırıcı — R3.3 hedef-aware bankacı kredi komitesi mantığı:
-   *   1. Grup kapsama desc          (çok grup = dengeli paket)
-   *   2. desiredMinK yakınlığı asc  (R3.3: gap büyükse küçük paket anlamsız)
-   *   3. Tutar asc                  (daha düşük maliyet)
-   *   4. achievedIdx asc            (hedefi en az aşan)
+   * Aday karşılaştırıcı — R3.3 düzeltme (Gemini 3): targetGap'e göre çift modlu sıralama.
    *
-   * R3.3 DEĞİŞİKLİĞİ: Eski "cardinality asc" (daha az aksiyon önce) yerine
-   * "desiredMinK'ye en yakın cardinality asc" kullanılıyor.
-   * Büyük hedef sıçramalarında tek-aksiyonlu paketler otomatik olarak geri plana düşer.
+   * KOLAY HEDEF (targetGap <= 1):
+   *   1. desiredMinK eşiği desc   (≥ desiredMinK olanlar önce — Hotfix VI barajı)
+   *   2. Rasyo grubu kapsama desc (dengeli paket)
+   *   3. Aksiyon sayısı asc       (az aksiyon önce — Hotfix VI mantığı korunur)
+   *
+   * ZOR HEDEF (targetGap >= 2):
+   *   1. Rasyo grubu kapsama desc (dengeli paket)
+   *   2. |cardinality − desiredMinK| asc  (hedefe uygun boyut, hantal paketten kaçın)
+   *
+   * Her iki modda ortak sonlandırıcılar:
+   *   3/4. Tutar asc       (daha düşük maliyet)
+   *   4/5. achievedIdx asc (hedefi en az aşan)
    */
   function compareCandidate(a: Candidate, b: Candidate): number {
     const aGroups = getCoveredGroups(a.actionIds).size
     const bGroups = getCoveredGroups(b.actionIds).size
-    if (aGroups !== bGroups) return bGroups - aGroups                              // desc: fazla grup önce
-    // R3.3: hedef-aware cardinality — desiredMinK'ye en yakın paket önce
-    const aDist = Math.abs(a.indices.length - desiredMinK)
-    const bDist = Math.abs(b.indices.length - desiredMinK)
-    if (aDist !== bDist) return aDist - bDist
+    const aSize   = a.indices.length
+    const bSize   = b.indices.length
+
+    if (targetGap <= 1) {
+      // KOLAY HEDEF: Hotfix VI az-aksiyon mantığı + desiredMinK eşiği
+      const aDesired = aSize >= desiredMinK ? 1 : 0
+      const bDesired = bSize >= desiredMinK ? 1 : 0
+      if (aDesired !== bDesired) return bDesired - aDesired        // eşik geçen önce
+      if (aGroups  !== bGroups)  return bGroups - aGroups          // fazla grup önce
+      if (aSize    !== bSize)    return aSize - bSize              // az aksiyon önce
+    } else {
+      // ZOR HEDEF: grup çeşitliliği, ardından desiredMinK yakınlığı
+      if (aGroups !== bGroups) return bGroups - aGroups            // fazla grup önce
+      const aDist = Math.abs(aSize - desiredMinK)
+      const bDist = Math.abs(bSize - desiredMinK)
+      if (aDist !== bDist) return aDist - bDist                    // desiredMinK'ye yakın önce
+    }
+
+    // Ortak sonlandırıcılar
     if (a.totalAmount !== b.totalAmount) return a.totalAmount - b.totalAmount
     return a.achievedIdx - b.achievedIdx
   }
@@ -471,15 +492,10 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     }
   }
 
-  // R3.3 ADIM 11: hedef-aware subset arama
-  // Önce k=desiredMinK..fullCount araması yapılır (hedefe uygun boyutta paketler).
-  // Eğer hiç feasible bulunamazsa k=1..desiredMinK-1 güvenlik fallback'i çalışır.
-  runSubsetSearch(desiredMinK, fullCount)
-  if (allFeasible.length === 0 && desiredMinK > 1) {
-    // Büyük gap için yeterli sayıda aksiyon yoksa bile hedefi yakalayan herhangi
-    // bir paketi bul (daha küçük k'larla).
-    runSubsetSearch(1, desiredMinK - 1)
-  }
+  // R3.3 düzeltme (Codex 1): TÜM subset'leri k=1..fullCount tek çağrıyla tara.
+  // Küçük feasible subset'ler büyük subset varlığında bile aday havuzunda kalır.
+  // Sıralama kararı compareCandidate'e bırakılır (desiredMinK proximity + gap-aware).
+  runSubsetSearch(1, fullCount)
 
   // ── EN İYİ ADAY: çeşitlilik → cardinality → tutar → yakınlık ────────────────
   if (allFeasible.length > 0) {
