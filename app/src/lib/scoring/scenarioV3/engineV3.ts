@@ -1108,6 +1108,22 @@ function scoreCandidate(
   }
   const transactions = action.buildTransactions(buildCtx)
 
+  // R6 — Engine empty-tx guard: aksiyonun yevmiyesi yoksa portfolio'ya ekleme
+  if (transactions.length === 0) {
+    return {
+      totalScore:                 0,
+      qualityScore:               0,
+      productivityRepairStrength: 'NONE',
+      sustainabilityWeight:       0,
+      horizonFit:                 0,
+      guardrailPenalty:           0,
+      repeatDecay:                0,
+      diversityPenalty:           0,
+      transactions:               [],
+      breakdown:                  'empty_transactions_rejected',
+    }
+  }
+
   // 2. Quality score - V3-4 calculateQuality() GERCEK CALL
   //    repeatIndex = 1 (her zaman first-time quality degerlendir)
   //    Orchestrator-level repeat decay ayri mekanizma olarak uygulanir

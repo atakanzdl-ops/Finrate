@@ -441,7 +441,7 @@ export function detectInefficiencies(
         `Faaliyet kârı / aktif oranı aktif büyüklüğünü taşımıyor ` +
         `(${(metrics.operatingProfitToAssets * 100).toFixed(2)}% vs ${(expectedOperatingYield * 100).toFixed(2)}% beklenen)`,
       repairableByActions: [
-        'A12_GROSS_MARGIN_IMPROVEMENT', 'A13_OPEX_OPTIMIZATION', 'A18_NET_SALES_GROWTH',
+        'A12_GROSS_MARGIN_IMPROVEMENT', 'A21_OPERATING_PROFIT_REFORM', 'A18_NET_SALES_GROWTH',
       ],
     })
   }
@@ -562,13 +562,6 @@ export const ACTION_REPAIR_PROFILES: Record<string, ActionRepairProfile> = {
     },
     affectedComponents: ['operatingYield', 'cashSupport'],
     productivityNote: 'Brüt marj iyileşmesi aktif verimini doğrudan artırır',
-  },
-  A13_OPEX_OPTIMIZATION: {
-    repairs: {
-      OPERATING_YIELD_GAP: 'STRONG',
-    },
-    affectedComponents: ['operatingYield'],
-    productivityNote: 'Faaliyet gideri azalması faaliyet kârını artırır',
   },
   A14_FINANCE_COST_REDUCTION: {
     repairs: {},

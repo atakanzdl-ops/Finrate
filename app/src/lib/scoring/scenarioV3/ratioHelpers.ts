@@ -14,6 +14,7 @@ import type {
   AttributionSource,
   SectorCode,
 } from './contracts'
+import { getDynamicMaterialityFloor } from './contracts'
 import { getSectorBenchmark } from '../benchmarks'
 import type { SectorBenchmark } from '../benchmarks'
 
@@ -1297,4 +1298,193 @@ export function detectExtremeDeviation(
     isExtreme: ratio > 5 || ratio < 0.2,
     severity,
   }
+}
+
+// ─── Diagnostic Types & Helpers (R6) ─────────────────────────────────────────
+
+/**
+ * R6 — Tanı notları
+ *
+ * SECTOR_TARGET_MET:  Rasyo zaten sektör benchmarkının altında — aksiyon gerekmiyor.
+ * MATERIALITY_BELOW:  Rasyo üstünde ama gap/tutar önemsiz — öneri üretilmedi.
+ * DATA_NOT_FOUND:     Gerekli hesap verisi yok — hesaplama yapılamadı.
+ */
+export type EvaluationNote =
+  | 'SECTOR_TARGET_MET'
+  | 'MATERIALITY_BELOW'
+  | 'DATA_NOT_FOUND'
+
+export interface DiagnosticResult {
+  evaluationNote:   EvaluationNote
+  currentRatio?:    number
+  benchmarkRatio?:  number
+  gap?:             number
+  computedAmount?:  number
+  userMessage:      string
+}
+
+// ─── diagnoseFinancialExpenseReduction (R6) ───────────────────────────────────
+
+/**
+ * R6 — A14 için tanısal yardımcı (ORGANIKA debug / UI açıklama).
+ *
+ * Ana akış (A14.computeAmount) DOKUNULMAZ.
+ * Bu helper sadece "neden null?" sorusunu cevaplar.
+ *
+ * @returns null → öneri üretildi (normal durum); DiagnosticResult → neden üretilemedi
+ */
+export function diagnoseFinancialExpenseReduction(ctx: FirmContext): DiagnosticResult | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Net satış verisi bulunamadı — finansman gideri analizi yapılamadı.',
+    }
+  }
+
+  const finResult = getFinancialExpenses(ctx)
+  if (finResult.amount === null || finResult.amount <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Finansman gideri (780/781) veya mali borç (300/400) tespit edilemedi.',
+    }
+  }
+
+  const currentRatio = finResult.amount / netSales
+  const bm           = getBenchmarkValue(ctx.sector, 'financialExpenseRatio')
+  if (!bm || bm.value <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      currentRatio,
+      userMessage:    'Sektör finansman gideri benchmark değeri bulunamadı.',
+    }
+  }
+
+  const benchmarkRatio = bm.value
+
+  if (currentRatio <= benchmarkRatio) {
+    return {
+      evaluationNote: 'SECTOR_TARGET_MET',
+      currentRatio,
+      benchmarkRatio,
+      gap:            0,
+      userMessage:    `Finansman gideri oranı (${(currentRatio * 100).toFixed(1)}%) sektör hedefinin (${(benchmarkRatio * 100).toFixed(1)}%) altında — aksiyon gerekmiyor.`,
+    }
+  }
+
+  const gap       = currentRatio - benchmarkRatio
+  const reduction = gap * netSales * 0.5
+
+  // R6 HOTFIX (Codex K11): Gerçek dynamic materiality floor kullan
+  // Önceki: sadece reduction <= 0 (dead code — gap>0 + netSales>0 ise reduction>0)
+  // Şimdi: engine ile aynı eşik (medium horizon, totalAssets bazlı)
+  if (reduction <= 0) {
+    // Güvenlik: negatif/sıfır reduction (teorik olarak ulaşılamaz)
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: 0,
+      userMessage:    'Hesaplanan azaltma tutarı sıfır — anlamlı öneri yapılamadı.',
+    }
+  }
+
+  // Dynamic materiality floor (engine R3.2 ile aynı — medium horizon default)
+  const safeAssets   = Math.max(ctx.totalAssets ?? 0, 0)
+  const materialityFloor = getDynamicMaterialityFloor('medium', safeAssets)
+  if (reduction < materialityFloor) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: reduction,
+      userMessage:    `Hesaplanan azaltma tutarı (${(reduction / 1_000_000).toFixed(2)}M TL) materyal eşiğin altında (${(materialityFloor / 1_000_000).toFixed(2)}M TL) — öneri üretilmedi.`,
+    }
+  }
+
+  // Öneri üretildi — null dönülür (DiagnosticResult sadece "neden null?" içindir)
+  return null
+}
+
+// ─── diagnoseOperatingExpenseReduction (R6) ──────────────────────────────────
+
+/**
+ * R6 — A21 için tanısal yardımcı.
+ *
+ * Ana akış (A21.computeAmount) DOKUNULMAZ.
+ *
+ * @returns null → öneri üretildi; DiagnosticResult → neden üretilemedi
+ */
+export function diagnoseOperatingExpenseReduction(ctx: FirmContext): DiagnosticResult | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Net satış verisi bulunamadı — faaliyet gideri analizi yapılamadı.',
+    }
+  }
+
+  const opex = getOperatingExpenses(ctx)
+  if (opex === null || opex <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Faaliyet gideri (632-634) veya KOBİ fallback (brüt kâr − faaliyet kârı) tespit edilemedi.',
+    }
+  }
+
+  const currentRatio = opex / netSales
+  const bm           = getBenchmarkValue(ctx.sector, 'operatingExpenseRatio')
+  if (!bm || bm.value <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      currentRatio,
+      userMessage:    'Sektör faaliyet gideri benchmark değeri bulunamadı.',
+    }
+  }
+
+  const benchmarkRatio = bm.value
+
+  if (currentRatio <= benchmarkRatio) {
+    return {
+      evaluationNote: 'SECTOR_TARGET_MET',
+      currentRatio,
+      benchmarkRatio,
+      gap:            0,
+      userMessage:    `Faaliyet gideri oranı (${(currentRatio * 100).toFixed(1)}%) sektör hedefinin (${(benchmarkRatio * 100).toFixed(1)}%) altında — aksiyon gerekmiyor.`,
+    }
+  }
+
+  const gap       = currentRatio - benchmarkRatio
+  const reduction = gap * netSales * 0.5
+
+  // R6 HOTFIX (Codex K11): Gerçek dynamic materiality floor kullan
+  if (reduction <= 0) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: 0,
+      userMessage:    'Hesaplanan azaltma tutarı sıfır — anlamlı öneri yapılamadı.',
+    }
+  }
+
+  // Dynamic materiality floor (engine R3.2 ile aynı — medium horizon default)
+  const safeAssets       = Math.max(ctx.totalAssets ?? 0, 0)
+  const materialityFloor = getDynamicMaterialityFloor('medium', safeAssets)
+  if (reduction < materialityFloor) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: reduction,
+      userMessage:    `Hesaplanan azaltma tutarı (${(reduction / 1_000_000).toFixed(2)}M TL) materyal eşiğin altında (${(materialityFloor / 1_000_000).toFixed(2)}M TL) — öneri üretilmedi.`,
+    }
+  }
+
+  // Öneri üretildi
+  return null
 }

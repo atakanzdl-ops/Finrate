@@ -355,6 +355,27 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
   semanticType: 'DEBT_REPAYMENT',
   horizons: ['short', 'medium'],
 
+  // R6 — computeAmount: nakit %80 / borç %30, %15 anlamlı etki, 500K min
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    const accountBalances = ctx.accountBalances ?? {}
+    const mevcutNakit = accountBalances['102'] ?? 0
+    const kvBorç      = accountBalances['300'] ?? 0
+
+    if (mevcutNakit <= 0) return null
+    if (kvBorç <= 0)      return null
+
+    const nakitCap  = mevcutNakit * 0.80   // mevcut nakitin en fazla %80'ini kullan
+    const borçHedef = kvBorç * 0.30        // KV borcun %30'unu kapat
+    const oneri     = Math.min(nakitCap, borçHedef)
+
+    if (oneri < 500_000) return null
+    // Atakan Karar 5: %15 anlamlı etki — öneri / kvBorç < %15 → sembolik → elensin
+    if (oneri / kvBorç < 0.15) return null
+
+    return oneri
+  },
+
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 500_000)
     if (amount <= 0) return []
@@ -899,28 +920,87 @@ const A09_SALE_LEASEBACK: ActionTemplateV3 = {
   semanticType: 'SALE_LEASEBACK',
   horizons: ['medium', 'long'],
 
+  // R6 — computeAmount: arsa(250)+bina(252) havuzu, 3 guard + %40 cap
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    const accountBalances = ctx.accountBalances ?? {}
+
+    const arsa = accountBalances['250'] ?? 0
+    const bina = accountBalances['252'] ?? 0
+    const realEstatePool = arsa + bina
+
+    // GUARD 1: Minimum 5M TL gayrimenkul havuzu
+    if (realEstatePool < 5_000_000) return null
+
+    // GUARD 2: Yeniden değerleme şişkinliği — 522/bina > %30 → fiktif değer
+    const reval522 = accountBalances['522'] ?? 0
+    if (bina > 0 && reval522 / bina > 0.30) return null
+
+    // GUARD 3: Gayrimenkul/aktif oranı — < %10 → sat-leaseback için yetersiz
+    const toplamAktif = ctx.totalAssets ?? 0
+    if (toplamAktif <= 0) return null
+    if (realEstatePool / toplamAktif < 0.10) return null
+
+    // Sonnet Düzeltme 7: Arsa için sat-leaseback tutarsız (geri kira yok)
+    // Sadece bina varsa öneri yap
+    if (bina <= 0) return null
+
+    // R6 HOTFIX (Codex K8): Cap SADECE bina bazlı
+    // Önceki: realEstatePool × 0.40 → arsa büyükse 252 negatife düşüyordu
+    // (250=90M, 252=10M → önceki öneri 40M → 252 bakiyesi -30M HATA)
+    const oneri = bina * 0.40   // CAP %40 — sadece satılan varlık (bina)
+    if (oneri < 1_000_000) return null
+    return oneri
+  },
+
+  // R6 — buildTransactions: dynamic (bina yoksa boş dizi → engine guard devreye girer)
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 5_000_000)
+    const { amount } = context
     if (amount <= 0) return []
-    // Simplified model: Varlık satış etkisi. TFRS 16 kullanım hakkı varlığı
-    // ve kira yükümlülüğü bu katalog aşamasında tam modellenmemiştir.
+
+    const balances = context.accountBalances ?? {}
+    const bina = balances['252'] ?? 0
+    // Sonnet Düzeltme 7: Arsa (250) için geri kira tutarsız → sadece bina varsa yevmiye
+    if (bina <= 0) return []
+
     return [
       makeBalancedTransaction(
-        'A09_SALE',
-        'Maddi duran varlık satışı — Simplified (TFRS 16 kira yükümlülüğü ayrıca izlenmeli)',
+        'A09_SALE_LEASEBACK',
+        'Bina sat-geri kirala — Simplified (TFRS 16 kira yükümlülüğü ayrıca izlenmeli)',
         'SALE_LEASEBACK',
         [
-          { accountCode: '102', accountName: 'Bankalar',  side: 'DEBIT',  amount, description: 'Satış bedeli nakit girişi'                    },
-          { accountCode: '252', accountName: 'Binalar',   side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri, simplified)' },
+          { accountCode: '102', accountName: 'Bankalar', side: 'DEBIT',  amount, description: 'Satış bedeli nakit girişi'                              },
+          { accountCode: '252', accountName: 'Binalar',  side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri, simplified)' },
         ]
       ),
     ]
   },
 
   preconditions: {
-    requiredAccountCodes: ['252', '253', '254'],
+    // R6: sadece arsa(250) ve bina(252) — 253/254 prefix bug düzeltildi
+    requiredAccountCodes: ['250', '252'],
     minSourceAmountTRY: 5_000_000,
     sectorMustExclude: ['IT', 'SERVICES', 'RETAIL'],
+    // R6 HOTFIX (Codex K9): A08 _a08IpotekFlag pattern'e yaklaştır
+    // Önceki: sadece 400+401; şimdi 400+401+405+407+409 (tüm UV finansal borç)
+    // + 257 amortisman netleme (net MDV için)
+    customCheck: (analysis) => {
+      // UV finansal borç (A08 pattern: 400/401/405/407/409)
+      const uvBorç = sumAccountsByPrefix(analysis, ['400', '401', '405', '407', '409'])
+      // Gross gayrimenkul
+      const bina        = sumAccountsByPrefix(analysis, ['252'])
+      const arsa        = sumAccountsByPrefix(analysis, ['250'])
+      // 257 birikmiş amortisman netleme (A08 pattern)
+      const amortisman  = sumAccountsByPrefix(analysis, ['257'])
+      const netMDV      = (bina + arsa) - amortisman
+      if (netMDV > 0 && uvBorç / netMDV > 0.40) {
+        return {
+          pass:   false,
+          reason: 'Gayrimenkul üzerinde yüksek ipotek riski tespit edildi (UV borç oranı). Sat-geri kirala için danışman incelemesi gerekir.',
+        }
+      }
+      return { pass: true }
+    },
   },
 
   qualityCoefficient: 0.50,
@@ -1295,11 +1375,12 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
 
   preconditions: {
     minSourceAmountTRY: 300_000,
-    customCheck: (analysis) => {
-      const opex = sumAccountsByPrefix(analysis, ['630', '631', '632', '633', '660'])
-      if (opex <= 0) return { pass: false, reason: 'Faaliyet gideri (630-633) bulunamadı' }
-      return { pass: true }
-    },
+    // R6 — A13 devre dışı: işlevselliği A21_OPERATING_PROFIT_REFORM'a taşındı.
+    // DB backward compat için id korundu (roadmapSnapshot JSON referansları bozulmasın).
+    customCheck: () => ({
+      pass: false,
+      reason: 'Bu aksiyon güncellenmiş yöntemle (Faaliyet Karı Reformu) değerlendirilmektedir.',
+    }),
   },
 
   qualityCoefficient: 0.70,
