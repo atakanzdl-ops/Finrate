@@ -333,6 +333,10 @@ export interface FirmContext {
   operatingCashFlow: number | null
   /** Finansal dönem tipi — computeAmount period-day hesabı için */
   period?:           string
+  /** R6 Hotfix 2 — Baseline alanları: greedy loop başındaki frozen snapshot */
+  baselineAccountBalances?: Record<string, number>
+  baselineGrossProfit?:     number
+  baselineNetSales?:        number
 }
 
 // ============ ACTION TEMPLATE V3 ============
@@ -455,6 +459,10 @@ export interface ActionBuildContext {
   accountBalances?: Record<string, number>
   netSales?: number
   grossProfit?: number
+  /** R6 Hotfix 2 — Baseline alanları: greedy loop başındaki frozen snapshot */
+  baselineAccountBalances?: Record<string, number>
+  baselineGrossProfit?:     number
+  baselineNetSales?:        number
 }
 
 // ============ ENGINE OUTPUT ============

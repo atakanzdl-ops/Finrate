@@ -356,11 +356,13 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
   horizons: ['short', 'medium'],
 
   // R6 — computeAmount: nakit %80 / borç %30, %15 anlamlı etki, 500K min
+  // R6 Hotfix 2: baseline kullan — greedy loop önceki A20 nakitini şişirmiş olabilir
   useRatioBasedAmount: true,
   computeAmount: (ctx: FirmContext): number | null => {
-    const accountBalances = ctx.accountBalances ?? {}
-    const mevcutNakit = accountBalances['102'] ?? 0
-    const kvBorç      = accountBalances['300'] ?? 0
+    // R6 Hotfix 2: baselineAccountBalances kullan (greedy simulation'dan etkilenmez)
+    const baseline   = ctx.baselineAccountBalances ?? ctx.accountBalances ?? {}
+    const mevcutNakit = baseline['102'] ?? 0
+    const kvBorç      = baseline['300'] ?? 0
 
     if (mevcutNakit <= 0) return null
     if (kvBorç <= 0)      return null
@@ -1876,6 +1878,11 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   },
 
   buildTransactions: (context) => {
+    // R6 Hotfix 2: Baseline brüt zarar guard — greedy loop A20 grossProfit'i şişirmiş olabilir
+    // Analiz başındaki gerçek grossProfit'i kontrol et
+    const baselineGrossProfit = context.baselineGrossProfit ?? context.grossProfit ?? 0
+    if (baselineGrossProfit <= 0) return []
+
     const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
     if (netSales <= 0 || grossProfit <= 0) return []

@@ -304,6 +304,10 @@ interface FirmContext {
   operatingCashFlow: number | null
   /** Finansal dönem tipi — computeAmount period-day hesabı için */
   period?:          string
+  /** R6 Hotfix 2 — Baseline alanları: greedy loop başındaki frozen snapshot */
+  baselineAccountBalances?: Record<string, number>
+  baselineGrossProfit?:     number
+  baselineNetSales?:        number
 }
 
 interface AmountCandidate {
@@ -618,6 +622,7 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
   // buildV3BalanceTotals: kontra hesaplar (103, 257, 268, 501, 580, 591 vb.) POZİTİF MUTLAK'tan çıkarılır
   const { totalAssets, totalEquity } = buildV3BalanceTotals(b)
 
+  const frozenBalances = { ...input.accountBalances }
   return {
     sector:           input.sector,
     accountBalances:  { ...input.accountBalances },
@@ -632,6 +637,10 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
     interestExpense:  input.incomeStatement.interestExpense,
     operatingCashFlow: input.incomeStatement.operatingCashFlow ?? null,
     period: input.period ?? (input as any).financialData?.period ?? 'ANNUAL',  // GÜNCELLE
+    // R6 Hotfix 2 — frozen at analysis start, never mutated by greedy loop
+    baselineAccountBalances: frozenBalances,
+    baselineGrossProfit:     input.incomeStatement.grossProfit,
+    baselineNetSales:        input.incomeStatement.netSales,
   }
 }
 
@@ -744,6 +753,10 @@ function updateFirmContextFromTransactions(
     costOfGoodsSold,        // YENİ
     operatingProfit,
     netIncome,
+    // R6 Hotfix 2 — explicitly carry baseline fields (never overwritten)
+    baselineAccountBalances: context.baselineAccountBalances,
+    baselineGrossProfit:     context.baselineGrossProfit,
+    baselineNetSales:        context.baselineNetSales,
   }
 }
 
@@ -1105,6 +1118,10 @@ function scoreCandidate(
     accountBalances: context.accountBalances,
     netSales:        context.netSales,
     grossProfit:     context.grossProfit,
+    // R6 Hotfix 2 — baseline fields for guards that must use analysis-start values
+    baselineAccountBalances: context.baselineAccountBalances,
+    baselineGrossProfit:     context.baselineGrossProfit,
+    baselineNetSales:        context.baselineNetSales,
   }
   const transactions = action.buildTransactions(buildCtx)
 
@@ -1569,7 +1586,16 @@ function runLocalRepair(
       accountBalances: repairContext.accountBalances,
       netSales: repairContext.netSales,
       grossProfit: repairContext.grossProfit,
+      // R6 Hotfix 2 — baseline fields for guards
+      baselineAccountBalances: repairContext.baselineAccountBalances,
+      baselineGrossProfit:     repairContext.baselineGrossProfit,
+      baselineNetSales:        repairContext.baselineNetSales,
     })
+    // R6 Hotfix 2 — repair empty-tx guard: boş yevmiyeli aksiyon eklenmez
+    if (repairTxs.length === 0) {
+      algorithmTrace.push(`[local_repair] iter ${iterCount}: ${missed.actionId} empty_transactions_rejected`)
+      continue
+    }
     const repairQuality = calculateQuality({
       template: action, transactions: repairTxs, sector: repairContext.sector,
       repeatIndex: 1, rawScoreDelta: 1.0,
