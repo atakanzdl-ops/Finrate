@@ -145,13 +145,15 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     })
 
   test('A19 normal senaryoda 2 transaction üretir (4 leg + Tx2 690/590)', () => {
+    // makeA19Context() default: CONSTRUCTION sektör
+    // R8.1 mali müşavir: CONSTRUCTION stoklu → 622 (Hizmet Üretim Maliyeti — Tek Düzen resmi adı)
     const txs = a19.buildTransactions(makeA19Context())
 
     expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(4)
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT', amount: 20_000_000 })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT', amount: 20_000_000 })
-    expect(txs[0].legs[2]).toMatchObject({ accountCode: '621', side: 'DEBIT' })
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '622', side: 'DEBIT' })  // R8.1: inşaat 622
     expect(txs[0].legs[2].amount).toBeCloseTo(14_000_000, 2)
     expect(txs[0].legs[3]).toMatchObject({ accountCode: '153', side: 'CREDIT' })
     expect(txs[0].legs[3].amount).toBeCloseTo(14_000_000, 2)

@@ -33,7 +33,7 @@ export const DEKAM_INPUT: EngineInput = {
     '340': 15_000_000,          // Alınan Sipariş Avansları
     '400': 40_000_000,          // UV Mali Borç
     '500': 80_000_000,          // Ödenmiş Sermaye
-    '621': 350_500_000,         // Satılan Hizmet Maliyeti
+    '621': 350_500_000,         // Satılan Mal Maliyeti (DEKAM inşaat COGS)
     '780': 5_375_060,           // Finansman Giderleri (sektör altı: 1.64%)
   },
   incomeStatement: {

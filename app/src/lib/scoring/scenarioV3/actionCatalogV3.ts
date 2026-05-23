@@ -2045,7 +2045,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
         // Avansın yarattığı hasılata gerçekçi maliyet eklenir; tam hasılat = tam kâr saçma
         const costAccountCode = context.sector === 'CONSTRUCTION' ? '622' : '621'
         const costAccountName = context.sector === 'CONSTRUCTION'
-          ? 'Satılan Hizmet Maliyeti'
+          ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
           : 'Satılan Mal Maliyeti'
         const costAmount   = Math.round(amount * (1 - grossMargin))
         const profitAmount = amount - costAmount
@@ -2113,6 +2113,15 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     const costAmount   = amount * (1 - grossMargin)
     const profitAmount = amount * grossMargin
 
+    // R8.1: İnşaat firmaları için 622 Hizmet Üretim Maliyeti (mali müşavir disiplini)
+    // Sonnet + Codex ortak bulgu: inşaat proje teslimatında 621 (SMM) değil
+    // 622 = Hizmet Üretim Maliyeti (Tek Düzen Hesap Planı resmi adı).
+    // Diğer sektörler (imalat/ticaret/perakende) → 621 SMM korunur.
+    const stockedCostCode = context.sector === 'CONSTRUCTION' ? '622' : '621'
+    const stockedCostName = context.sector === 'CONSTRUCTION'
+      ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
+      : 'Satılan Mal Maliyeti'
+
     return [
       makeBalancedTransaction(
         'A19_DELIVERY_REVENUE_AND_COST',
@@ -2121,7 +2130,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
         [
           { accountCode: '340',              accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount,      description: 'Avans çözülmesi' },
           { accountCode: '600',              accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,      description: 'Hasılat artışı'  },
-          { accountCode: '621',              accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
+          { accountCode: stockedCostCode,    accountName: stockedCostName,            side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
           { accountCode: dominantStock.code, accountName: dominantStock.name,         side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'  },
         ]
       ),

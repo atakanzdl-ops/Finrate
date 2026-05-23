@@ -396,7 +396,7 @@ describe('R7B — criticalIssues mandatori katmanı', () => {
 describe('R7B mini — A19 stoksuz COGS fallback (Codex audit)', () => {
 
   test('A19 inşaat stoksuz: 622 DEBIT + 770 CREDIT (sektör marj fallback)', () => {
-    // R7B mini: CONSTRUCTION non-service + stoksuz → 622 (Satılan Hizmet Maliyeti) + 770 simülasyon
+    // R7B mini: CONSTRUCTION non-service + stoksuz → 622 (Hizmet Üretim Maliyeti) + 770 simülasyon
     // grossMargin = 15M/100M = 0.15; costAmount = 10M × 0.85 = 8.5M; profitAmount = 1.5M
     const txs = A19.buildTransactions({
       amount: 10_000_000,
@@ -415,7 +415,7 @@ describe('R7B mini — A19 stoksuz COGS fallback (Codex audit)', () => {
     expect(legs.find(l => l.accountCode === '340' && l.side === 'DEBIT')?.amount).toBe(10_000_000)
     // 600 hasılat
     expect(legs.find(l => l.accountCode === '600' && l.side === 'CREDIT')?.amount).toBe(10_000_000)
-    // 622 inşaat COGS (Satılan Hizmet Maliyeti — proje bazlı)
+    // 622 inşaat COGS (Hizmet Üretim Maliyeti — Tek Düzen resmi ad)
     const costLeg = legs.find(l => l.accountCode === '622' && l.side === 'DEBIT')
     expect(costLeg).toBeDefined()
     expect(costLeg!.amount).toBeGreaterThan(0)
@@ -491,6 +491,103 @@ describe('R7B mini — A19 stoksuz COGS fallback (Codex audit)', () => {
       ['630', '631', '632'].includes(l.accountCode) && l.side === 'CREDIT'
     )
     expect(opexLeg?.description).toContain('KOBİ')
+  })
+
+})
+
+// ─── R8.1 — A19 inşaat stoklu 622 (mali müşavir disiplini) ───────────────────
+
+describe('R8.1 — A19 inşaat stoklu 622 (mali müşavir)', () => {
+
+  // T1: İnşaat stoklu → 622 Hizmet Üretim Maliyeti (R8.1 YENİ)
+  test('A19 inşaat stoklu: 622 DEBIT + 150 CREDIT (R8.1)', () => {
+    // İSRA benzeri stoklu inşaat senaryo (150 İlk Madde 307M, avans 937M)
+    // grossMargin = 75M/500M = 0.15; costAmount = 200M × 0.85 = 170M
+    const txs = A19.buildTransactions({
+      amount:              200_000_000,
+      sector:              'CONSTRUCTION',
+      netSales:            500_000_000,
+      grossProfit:          75_000_000,
+      baselineNetSales:    500_000_000,
+      baselineGrossProfit:  75_000_000,
+      accountBalances: {
+        '340': 900_000_000,   // büyük avans bakiyesi
+        '150': 300_000_000,   // stok zengin
+      },
+    } as any)
+
+    const legs = txs[0]?.legs ?? []
+
+    // 340 avans çözülmesi
+    expect(legs.find(l => l.accountCode === '340' && l.side === 'DEBIT')).toBeDefined()
+    // 600 hasılat
+    expect(legs.find(l => l.accountCode === '600' && l.side === 'CREDIT')).toBeDefined()
+
+    // R8.1 KRİTİK: 622 (Hizmet Üretim Maliyeti) — inşaat için (Tek Düzen resmi adı)
+    const cost622 = legs.find(l => l.accountCode === '622' && l.side === 'DEBIT')
+    expect(cost622).toBeDefined()
+    expect(cost622!.amount).toBeGreaterThan(0)
+
+    // 621 OLMAMALI (imalat mantığı inşaata uygulanmaz)
+    const wrong621 = legs.find(l => l.accountCode === '621' && l.side === 'DEBIT')
+    expect(wrong621).toBeUndefined()
+
+    // Stok 150 azalır (maliyet karşılığı)
+    const stock150 = legs.find(l => l.accountCode === '150' && l.side === 'CREDIT')
+    expect(stock150).toBeDefined()
+    expect(stock150!.amount).toBeCloseTo(cost622!.amount, 0)
+
+    // 320 YASAK (R7B mini koruma)
+    expect(legs.find(l => l.accountCode === '320')).toBeUndefined()
+  })
+
+  // T2: İmalat stoklu → 621 + 150 KORUNUR (regression — R7B davranış)
+  test('A19 imalat stoklu: 621 + 150 KORUNUR (regression)', () => {
+    const txs = A19.buildTransactions({
+      amount:              10_000_000,
+      sector:              'MANUFACTURING',
+      netSales:            100_000_000,
+      grossProfit:          20_000_000,
+      baselineNetSales:    100_000_000,
+      baselineGrossProfit:  20_000_000,
+      accountBalances: {
+        '340': 20_000_000,
+        '150':  5_000_000,
+      },
+    } as any)
+
+    const legs = txs[0]?.legs ?? []
+
+    // İmalat için 621 SMM KORUNMALI
+    expect(legs.find(l => l.accountCode === '621' && l.side === 'DEBIT')).toBeDefined()
+    expect(legs.find(l => l.accountCode === '150' && l.side === 'CREDIT')).toBeDefined()
+
+    // 622 OLMAMALI (sadece inşaatta)
+    expect(legs.find(l => l.accountCode === '622' && l.side === 'DEBIT')).toBeUndefined()
+  })
+
+  // T3: İnşaat stoksuz → 622 + 770 KORUNUR (R7B mini regression)
+  test('A19 inşaat stoksuz: 622 + 770 KORUNUR (R7B mini regression)', () => {
+    const txs = A19.buildTransactions({
+      amount:              10_000_000,
+      sector:              'CONSTRUCTION',
+      netSales:            100_000_000,
+      grossProfit:          15_000_000,
+      baselineNetSales:    100_000_000,
+      baselineGrossProfit:  15_000_000,
+      accountBalances: {
+        '340': 20_000_000,
+        // 150 YOK (stoksuz dal)
+      },
+    } as any)
+
+    const legs = txs[0]?.legs ?? []
+
+    // R7B mini: stoksuz inşaat 622 + 770
+    expect(legs.find(l => l.accountCode === '622' && l.side === 'DEBIT')).toBeDefined()
+    expect(legs.find(l => l.accountCode === '770' && l.side === 'CREDIT')).toBeDefined()
+    // 150 YOK (stoksuz → 770 simülasyon)
+    expect(legs.find(l => l.accountCode === '150')).toBeUndefined()
   })
 
 })
