@@ -123,6 +123,13 @@ export interface ActionDependencySpec {
   blocks?: string[]
   /** Kendi kaynak gereksinimi (hesap kodları) */
   sourceAccountRequirements?: string[]
+  /**
+   * R7A — KOBİ fallback flag: computeAmount kaynak hesaplar olmadan da tutarı
+   * türetebiliyorsa (ratioHelpers fallback), semantic kaynak hard check bypass edilir.
+   * Aksi halde 780/632/621 gibi hesaplar olmayan KOBİ'lerde A14/A21/A20 sessizce
+   * HARD_REJECT alır ve kullanıcıya görünmez.
+   */
+  allowComputedSource?: boolean
   /** Minimum bakiye gereksinimi */
   minSourceBalance?: number
   /** Firmanın kârda olması gerekir mi (A11 gibi) */
@@ -203,6 +210,7 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     sourceAccountRequirements: ['600', '621'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.30,  // Gelir iyileşmesi uzun vadede nakde döner
+    // NOT (R7A tarama): A12 KOBİ fallback yok — 600/621 fiziksel zorunlu. DOKUNULMAZ.
   },
   A13_OPEX_OPTIMIZATION: {
     // Duzeltme: 770-772 maliyet merkezi hesaplari cogu KOBİ'de yok.
@@ -210,11 +218,15 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     sourceAccountRequirements: ['630', '631', '632'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.50,
+    // NOT: R6'da disable (customCheck pass:false). allowComputedSource GEREKSIZ.
   },
   A14_FINANCE_COST_REDUCTION: {
     sourceAccountRequirements: ['780'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.40,
+    // R7A: 780 yoksa KOBİ fallback (300/400 × %25) computeAmount'ta türetilir.
+    // Kaynak hard check bypass → ORGANIKA A14 artık portfolyo'ya girer.
+    allowComputedSource: true,
   },
   A15_DEBT_TO_EQUITY_SWAP: {
     sourceAccountRequirements: ['331'],
@@ -240,11 +252,19 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     sourceAccountRequirements: ['600', '621'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.30,
+    // R7A: getCogs 620-623 yoksa netSales-grossProfit türetir.
+    // KOBİ profil'de 621 olmayabilir → allowComputedSource bypass.
+    allowComputedSource: true,
   },
   A21_OPERATING_PROFIT_REFORM: {
-    sourceAccountRequirements: ['630', '631', '632'],
+    // R7A: getOperatingExpenses 632/634 bakar (630/631/633 DEĞİL).
+    // 633 kaldırıldı (R7A Mini) — A14 ile çakışıyordu, yanlış hesap grubu.
+    // Genişletilmiş array + KOBİ fallback (grossProfit - operatingProfit) için flag.
+    sourceAccountRequirements: ['630', '631', '632', '634'],
     producesLiquidity: true,
     liquidityImpactRatio: 0.50,
+    // R7A: 632/634 yoksa grossProfit-operatingProfit fallback türetir.
+    allowComputedSource: true,
   },
 }
 
@@ -336,6 +356,13 @@ export function checkEconomicImpossibility(
     }, 0)
 
     if (totalSource < proposedAmountTRY && !isSourceIrrelevant(action.id)) {
+      // R7A — allowComputedSource: KOBİ fallback'li aksiyonlar (A14, A21, A20)
+      // computeAmount zaten tutarı ratioHelpers fallback ile türetiyor.
+      // Kaynak hesap fiziksel olarak yoksa HARD_REJECT yerine PASS döndür.
+      if (spec.allowComputedSource) {
+        return passResult(action.id)
+      }
+
       return {
         pass: false,
         severity: 'HARD_REJECT',

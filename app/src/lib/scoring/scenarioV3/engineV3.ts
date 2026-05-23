@@ -327,6 +327,8 @@ interface ScoreBreakdown {
   diversityPenalty:           number
   breakdown:                  string
   transactions:               AccountingTransaction[]
+  /** R7A Mini — HARD_REJECT varsa guardrail'den gelen mesaj (rejectedLog için) */
+  guardrailViolationReason?:  string
 }
 
 // ─── HORIZON LIMITS ───────────────────────────────────────────────────────────
@@ -1206,6 +1208,12 @@ function scoreCandidate(
     guardrailReport.hasSoftBlock  ? 0.7 :
     guardrailReport.hasWarning    ? 0.2 : 0.0
 
+  // R7A Mini: HARD_REJECT mesajını sakla — rejectedLog'da okunabilir sebep için
+  const guardrailViolationReason: string | undefined = guardrailReport.hasHardReject
+    ? (guardrailReport.results.find(r => r.severity === 'HARD_REJECT')?.message
+        ?? 'Semantic guardrail engelledi')
+    : undefined
+
   // 6. Repeat decay - orchestrator seviyesi (V3-4'tan AYRI)
   const sameActionCount = previouslySelectedIds.filter(id => id === action.id).length
   const repeatDecay     = calculateRepeatDecay(action, sameActionCount)
@@ -1240,6 +1248,7 @@ function scoreCandidate(
     diversityPenalty,
     breakdown,
     transactions,
+    guardrailViolationReason,
   }
 }
 
@@ -1319,7 +1328,18 @@ function runGreedySelection(
         }
 
         const scoreResult = scoreCandidate(action, amt.amountTRY, currentContext, horizon, allSelectedIds)
-        if (scoreResult.totalScore <= 0) continue
+        if (scoreResult.totalScore <= 0) {
+          // R7A — Sessiz hard reject loglama: guardrail = 1.0 ise rejectedLog'a yaz
+          // R7A Mini: guardrailViolationReason — guardrail mesajı (okunabilir, breakdown değil)
+          if (scoreResult.guardrailPenalty >= 1.0) {
+            rejectedLog.push({
+              actionId: action.id,
+              reason:   scoreResult.guardrailViolationReason
+                          ?? `Semantic guardrail hard reject (${amt.label}): ${scoreResult.breakdown}`,
+            })
+          }
+          continue
+        }
 
         candidates.push({
           action,

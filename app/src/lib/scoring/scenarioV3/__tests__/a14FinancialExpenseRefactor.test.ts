@@ -137,9 +137,10 @@ describe('R5 — A14_FINANCE_COST_REDUCTION buildTransactions (2 tx, kar zinciri
     expect(txs).toHaveLength(2)
   })
 
-  // T9: tx[0] denklik — 102/780
-  test('T9 — tx[0]: 102 DEBIT = 780 CREDIT (finansman gideri azalışı)', () => {
-    const txs = a14.buildTransactions(makeBuildCtx())
+  // T9: tx[0] denklik — 102/780 (gerçek 780 kaydı varsa)
+  // R7A Mini: accountBalances: { '780': 3_000_000 } → isEstimated=false → '780' kullanılır
+  test('T9 — tx[0]: 102 DEBIT = 780 CREDIT (780 hesabı kayıtlı)', () => {
+    const txs = a14.buildTransactions(makeBuildCtx({ accountBalances: { '780': 3_000_000 } }))
     const tx0 = txs[0]
     expect(tx0.legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT'  })
     expect(tx0.legs[1]).toMatchObject({ accountCode: '780', side: 'CREDIT' })
@@ -183,6 +184,20 @@ describe('R5 — A14_FINANCE_COST_REDUCTION buildTransactions (2 tx, kar zinciri
       const credit = tx.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
       expect(debit).toBe(credit)
     }
+  })
+
+  // T14: KOBİ (R7A Mini) — 780 yok → isEstimated:true → 660 kullanılır
+  // Yevmiyede 780 hesabına negatif bakiye oluşmasını önler
+  test('T14 — KOBİ: 780 hesabı yoksa tx[0] 102 DEBIT = 660 CREDIT', () => {
+    const txs = a14.buildTransactions(makeBuildCtx({ accountBalances: {} }))
+    expect(txs).toHaveLength(2)
+    const tx0 = txs[0]
+    expect(tx0.legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT'  })
+    expect(tx0.legs[1]).toMatchObject({ accountCode: '660', side: 'CREDIT' })
+    // Denklik
+    const debit  = tx0.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const credit = tx0.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debit).toBe(credit)
   })
 
 })

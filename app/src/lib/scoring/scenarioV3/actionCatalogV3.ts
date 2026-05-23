@@ -1448,15 +1448,23 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   useRatioBasedAmount: true,
 
   // R5 — buildTransactions fiş üretiyor (eskiden boş array döndürüyordu)
+  // R7A Mini (Sonnet BLOCKER 1): isEstimated:true → 660 kullan (780 değil)
+  // 780 hesabı olmayan KOBİ'lerde 780'i negatife düşürmemek için.
   buildTransactions: (context) => {
     const amount = context.amount ?? 0
     if (amount <= 0) return []
 
-    // R5 Hotfix — Sonnet: isEstimated uyarısı
-    // 780/781 yoksa tutar borç × %25 tahmininden geliyor → kullanıcı bilgilendirilmeli
+    // 780/781 yoksa tutar borç × %25 tahmininden geliyor → isEstimated:true
     const fin780 = (context.accountBalances?.['780'] ?? 0)
     const fin781 = (context.accountBalances?.['781'] ?? 0)
-    const isEstimated = (fin780 + fin781) === 0   // borç bazlı tahmin → true
+    const isEstimated = (fin780 + fin781) === 0
+
+    // R7A Mini: KOBİ (isEstimated:true) → 660 Kısa Vadeli Borçlanma Maliyeti
+    // Gerçek 780 varsa → 780 Finansman Giderleri (mevcut davranış)
+    const creditAccountCode = isEstimated ? '660' : '780'
+    const creditAccountName = isEstimated
+      ? 'Kısa Vadeli Borçlanma Maliyeti (Tahmini)'
+      : 'Finansman Giderleri'
 
     return [
       // 1. Operasyonel: nakit artar, finansman gideri azalır
@@ -1467,8 +1475,24 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
           : 'Finansman Gideri Azaltma — Kredi Yeniden Yapılandırma',
         'FINANCE_COST_REDUCTION',
         [
-          { accountCode: '102', accountName: 'Bankalar',               side: 'DEBIT',  amount, description: isEstimated ? 'Tahmini finansman gideri azalışı (borç × %25)' : 'Finansman gideri azalışı nakit etkisi' },
-          { accountCode: '780', accountName: 'Finansman Giderleri',    side: 'CREDIT', amount, description: 'Finansman gideri azalışı'               },
+          {
+            accountCode: '102',
+            accountName: 'Bankalar',
+            side: 'DEBIT',
+            amount,
+            description: isEstimated
+              ? 'Tahmini finansman gideri azalışı (borç × %25) — Simülasyon'
+              : 'Finansman gideri azalışı nakit etkisi',
+          },
+          {
+            accountCode: creditAccountCode,
+            accountName: creditAccountName,
+            side: 'CREDIT',
+            amount,
+            description: isEstimated
+              ? 'Tahmini finansman gideri üzerinden simülasyon (780 mevcut değil)'
+              : 'Finansman gideri azalışı',
+          },
         ]
       ),
       // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)
