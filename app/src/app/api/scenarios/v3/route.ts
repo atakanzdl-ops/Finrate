@@ -296,6 +296,9 @@ export async function POST(req: NextRequest) {
           currentCombinedScore,
           currentActualRating,
           decisionCurrentRating: er.currentRating,
+          // R7B — criticalIssues mandatori enjeksiyonu için
+          netSales:    incomeStatement.netSales,
+          grossProfit: incomeStatement.grossProfit,
         },
       )
 

@@ -178,6 +178,9 @@ export interface SelectedAction {
 
   /** UI transparency bloku — sadece computeAmount aktif aksiyonlarda dolu */
   ratioTransparency?:         import('./contracts').RatioTransparency
+
+  /** R7B — criticalIssues: zorunlu aksiyon bayrağı (paket seçiminden bağımsız) */
+  mandatory?:                 boolean
 }
 
 export interface HorizonPortfolio {

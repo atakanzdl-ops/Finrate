@@ -45,6 +45,7 @@ import {
   ratingToIndex,
 } from './ratingReasoning'
 import { ceilingTypeToDisplay, confidenceToDisplay, formatCeilingDisplay } from '../displayMaps'
+import { getMandatoryActionsForFirm } from './criticalIssues'  // R7B
 import type {
   CeilingConstraint,
   DriverGroup,
@@ -327,6 +328,12 @@ export interface TargetPackageContext {
    * selectTargetPackage'e doğrudan iletilir.
    */
   decisionCurrentRating?: string
+  /**
+   * R7B — criticalIssues için gelir tablosu verileri.
+   * Mandatori aksiyon enjeksiyonunda kullanılır.
+   */
+  netSales?:    number
+  grossProfit?: number
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1521,6 +1528,32 @@ export function buildDecisionAnswer(
     // Pad/garanti yok — engine'in akıllı kararına güveniyoruz.
     portfolioForUI    = pkg.selectedActions  // Hotfix VI: subset kullan, B/BB ayrımı
     targetPackageMeta = pkg.meta             // meta korunur (badge/banner state için)
+
+    // R7B — criticalIssues: Mandatori aksiyon enjeksiyonu
+    // netSales sağlandıysa koşulları değerlendir; eksikse atla (geriye uyumlu).
+    if (targetPackageContext.netSales !== undefined) {
+      const mandatoryIds = getMandatoryActionsForFirm({
+        sector:          targetPackageContext.sector as import('./contracts').SectorCode,
+        netSales:        targetPackageContext.netSales,
+        grossProfit:     targetPackageContext.grossProfit ?? 0,
+        accountBalances: accountBalances as Record<string, number>,
+      })
+      for (const actionId of mandatoryIds) {
+        const alreadyIn = portfolioForUI.find(a => a.actionId === actionId)
+        if (alreadyIn) {
+          // Mevcut öğeyi mandatory olarak işaretle (kopya — immutability)
+          portfolioForUI = portfolioForUI.map(a =>
+            a.actionId === actionId ? { ...a, mandatory: true } : a
+          )
+        } else {
+          // Full portfolio'dan al ve mandatory ekle
+          const candidate = engineResult.portfolio.find(a => a.actionId === actionId)
+          if (candidate) {
+            portfolioForUI = [...portfolioForUI, { ...candidate, mandatory: true }]
+          }
+        }
+      }
+    }
   }
 
   // Filtered view: yalniz portfolio swap edilir, diger alanlar korunur.

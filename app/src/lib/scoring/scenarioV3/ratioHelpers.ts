@@ -313,25 +313,32 @@ export function getGrossMarginReductionTarget(ctx: FirmContext): number | null {
  * R5 — Faaliyet Gideri Tespiti (KOBİ fallback dahil)
  *
  * Üç kademe:
- * 1. Detay hesaplar (632 + 633 + 634)
+ * 1. Detay hesaplar (630 + 631 + 632)
  * 2. Fallback: gelir tablosu farkı (brütKar - faaliyetKar)
  * 3. Null
  *
  * Atakan Karar 3: KOBİ mizanında detay yoksa toplamdan hesapla.
  *
+ * R7A: 633 KALDIRILDI — finansman gideri (A14) ile semantik çakışma.
+ *      634 chartOfAccounts'ta yok — kullanılmıyordu.
+ *
  * SONNET UYARISI: brütKar - faaliyetKar formülü 640/641 (Diğer Faaliyet
  * Gelirleri) ve 654/659 (Diğer Faaliyet Giderleri) etkisini içerir.
  * KOBİ pratik yaklaşımı, hata payı küçük çoğu durumda.
  * Büyük firmalarda (iPOS, İSRA) sapma olabilir.
+ *
+ * API: number | null — KORUNUR (mevcut çağrı yerleri değişmez)
  */
 export function getOperatingExpenses(ctx: FirmContext): number | null {
   const accountBalances = ctx.accountBalances ?? {}
 
   // 1. Detay hesaplar (büyük firma)
+  // R7A: 633 kaldırıldı (A14 finansman gideri ile semantik çakışma)
+  // R7A: 634 chartOfAccounts'ta yok — kullanılmıyordu
+  const opex630 = accountBalances['630'] ?? 0
+  const opex631 = accountBalances['631'] ?? 0
   const opex632 = accountBalances['632'] ?? 0
-  const opex633 = accountBalances['633'] ?? 0
-  const opex634 = accountBalances['634'] ?? 0
-  const opexDetay = opex632 + opex633 + opex634
+  const opexDetay = opex630 + opex631 + opex632
 
   if (opexDetay > 0) return opexDetay
 
@@ -346,6 +353,41 @@ export function getOperatingExpenses(ctx: FirmContext): number | null {
   }
 
   // 3. Hiç bulunamadı
+  return null
+}
+
+/**
+ * R7B — Faaliyet Gideri Detayı (isEstimated bilgisi ile)
+ *
+ * getOperatingExpenses'in API'si KORUNUR (number | null).
+ * Bu helper A21 buildTransactions için ek bilgi sağlar.
+ * Mevcut çağrı yerleri getOperatingExpenses kullanmaya devam eder.
+ */
+export function getOperatingExpensesDetail(ctx: FirmContext): {
+  amount: number
+  isEstimated: boolean
+} | null {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesaplar (büyük firma) — R7A: 633/634 yok
+  const opex630 = accountBalances['630'] ?? 0
+  const opex631 = accountBalances['631'] ?? 0
+  const opex632 = accountBalances['632'] ?? 0
+  const directSum = opex630 + opex631 + opex632
+
+  if (directSum > 0) {
+    return { amount: directSum, isEstimated: false }
+  }
+
+  // 2. KOBİ fallback
+  const grossProfit    = ctx.grossProfit    ?? 0
+  const operatingProfit = ctx.operatingProfit ?? 0
+
+  if (Number.isFinite(grossProfit) && Number.isFinite(operatingProfit)) {
+    const estimated = grossProfit - operatingProfit
+    if (estimated > 0) return { amount: estimated, isEstimated: true }
+  }
+
   return null
 }
 

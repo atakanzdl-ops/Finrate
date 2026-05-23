@@ -49,6 +49,7 @@ import {
   getIdleAssetPoolBalance,
   getGrossMarginReductionTarget,            // R4: A12+A20 ortak helper
   getOperatingExpenses,                     // R5: A21 faaliyet gideri tespiti
+  getOperatingExpensesDetail,               // R7B: A21 build için isEstimated bilgisi
   getOperatingExpenseReductionTarget,       // R5: A21 azaltma hedefi
   getFinancialExpenses,                     // R5: A14 finansman gideri tespiti
   getFinancialExpenseReductionTarget,       // R5: A14 azaltma hedefi
@@ -1178,30 +1179,19 @@ const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
   semanticType: 'RETAINED_EARNINGS',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
-    if (amount <= 0) return []
-    return [
-      makeBalancedTransaction(
-        'A11_MAIN',
-        'Dönem net kârı dağıtılmayıp geçmiş yıllar kârına aktarılıyor (590 → 570)',
-        'RETAINED_EARNINGS',
-        [
-          { accountCode: '590', accountName: 'Dönem Net Kârı',          side: 'DEBIT',  amount, description: 'Dönem kârı transferi'     },
-          { accountCode: '570', accountName: 'Geçmiş Yıllar Kârları',   side: 'CREDIT', amount, description: 'Birikmiş kâr artışı'       },
-        ]
-      ),
-    ]
-  },
+  // R7B — A11 disable (A13 patern)
+  // 590 → 570 özkaynak içi transfer: toplam özkaynak değişmez, rating etkisi sıfır.
+  // Atakan canlı tespiti: A11 önerildiğinde özkaynak toplamı artmıyor.
+  buildTransactions: () => [],
 
   preconditions: {
-    requiredAccountCodes: ['590'],
     minSourceAmountTRY: 1_000_000,
-    customCheck: (analysis) => {
-      const netProfit = sumAccountsByPrefix(analysis, ['590'])
-      if (netProfit <= 0) return { pass: false, reason: 'Dönem net kârı pozitif değil — kâr tutma uygulanamaz' }
-      return { pass: true }
-    },
+    // R7B — A11 devre dışı (A13 patern)
+    // DB backward compat için id korunur (roadmapSnapshot referansları bozulmasın).
+    customCheck: () => ({
+      pass: false,
+      reason: 'Dönem kârı özkaynakta zaten yer almaktadır; 590 → 570 transferi özkaynak toplamını değiştirmez ve rating üzerinde ek etki yaratmaz.',
+    }),
   },
 
   qualityCoefficient: 0.65,
@@ -1701,6 +1691,40 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
     reliability:    'TCMB_DIRECT',
   },
 
+  // R7B — Rasyo bazlı (R5 kararı uygulanma)
+  // Hedef: sektör asset turnover benchmark'ına doğru satış büyümesi
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    const baselineAssets = ctx.totalAssets ?? 0
+    if (baselineAssets <= 0) return null
+
+    const baselineRevenue = ctx.baselineNetSales ?? ctx.netSales ?? 0
+    if (baselineRevenue <= 0) return null
+
+    // Brüt zarar guard: negatif marjda satış artışı zarar büyütür
+    const baselineGrossProfit = ctx.baselineGrossProfit ?? ctx.grossProfit ?? 0
+    if (baselineGrossProfit <= 0) return null
+
+    // Sektör asset turnover benchmark
+    const sectorTurnover = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    if (!sectorTurnover) return null
+
+    const currentTurnover = baselineRevenue / baselineAssets
+    if (currentTurnover >= sectorTurnover.value) return null  // Hedef üstünde
+
+    // Hedef satış = sektör benchmark × mevcut aktifler
+    const targetRevenue = sectorTurnover.value * baselineAssets
+    const revenueGap    = targetRevenue - baselineRevenue
+
+    // Gerçekçi cap: mevcut satışın %50'si kadar artış
+    const realisticCap = baselineRevenue * 0.50
+    const amount = Math.min(revenueGap, realisticCap)
+
+    if (amount < 1_000_000) return null
+    return amount
+  },
+
   buildTransactions: (context) => {
     const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
@@ -1729,19 +1753,58 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: 2 leg + Tx2 (hizmet/bilişim modeli veya stoksuz satış)
-    // Stoksuzda maliyet yok → profitAmount = amount (tam ciro kâr)
+    // Stok yoksa — sektöre göre ayrı yol
     if (totalStock <= 0) {
       const amount = clampAmount(context.amount, 1_000_000)
       if (amount <= 0) return []
+
+      if (isServiceLike(context.sector)) {
+        // Hizmet/bilişim: maliyet yok → tam ciro kâr (mevcut davranış)
+        return [
+          makeBalancedTransaction(
+            'A18_REVENUE_ONLY',
+            `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+            'OPERATIONAL_REVENUE',
+            [
+              { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+              { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+            ]
+          ),
+          makeBalancedTransaction(
+            'A18_PROFIT_TRANSFER',
+            'Dönem kâr aktarımı',
+            'OPERATIONAL_REVENUE',
+            [
+              { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+              { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
+            ]
+          ),
+        ]
+      }
+
+      // R7B — İmalat/ticaret/inşaat: stok yoksa sektör marj fallback ile COGS tanı
+      // (Stoksuz imalat/ticaret: mizan eksik — tam ciro = tam kâr saçma)
+      const baselineSales = context.baselineNetSales ?? netSales
+      const baselineGP    = context.baselineGrossProfit ?? grossProfit
+      const sectorMarginFallback =
+        context.sector === 'TRADE' ? 0.25
+        : context.sector === 'CONSTRUCTION' ? 0.15
+        : 0.20  // MANUFACTURING default
+      const currentMargin = baselineSales > 0
+        ? Math.max(baselineGP / baselineSales, 0.05)
+        : sectorMarginFallback
+      const costAmount   = Math.round(amount * (1 - currentMargin))
+      const profitAmount = amount - costAmount
       return [
         makeBalancedTransaction(
-          'A18_REVENUE_ONLY',
-          `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+          'A18_REVENUE_AND_COST_FALLBACK',
+          `Net satış artışı + sektör marj fallback (${debitCode} + 600 / 621 + 770)`,
           'OPERATIONAL_REVENUE',
           [
-            { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
-            { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+            { accountCode: debitCode, accountName: debitName,                  side: 'DEBIT',  amount,      description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+            { accountCode: '600',     accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,      description: 'Net satış artışı'                                       },
+            { accountCode: '621',     accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount,   description: 'Maliyet artışı (sektör marj fallback)'         },
+            { accountCode: '770',     accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount,   description: 'Maliyet karşılığı (simülasyon)'                },
           ]
         ),
         makeBalancedTransaction(
@@ -1749,8 +1812,8 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
           'Dönem kâr aktarımı',
           'OPERATIONAL_REVENUE',
           [
-            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
+            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
+            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
           ]
         ),
       ]
@@ -1816,7 +1879,7 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
         return { pass: false, reason: 'Brüt zarar — düşük marjda satış artışı zarar büyütür' }
       }
 
-      const bm = getBenchmarkValue(sector, 'grossMargin')
+      const bm = sector ? getBenchmarkValue(sector, 'grossMargin') : null
       const targetMargin = bm?.value
 
       if (!targetMargin) {
@@ -1901,6 +1964,43 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     reliability:    'TCMB_DIRECT',
   },
 
+  // R7B — Rasyo bazlı (R5 kararı uygulanma)
+  // Avans tutarı: 340 × %10-60 pct yerine avans bazlı + asset turnover hedefi
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    // R6 Hotfix 2: brüt zarar guard
+    const baselineGrossProfit = ctx.baselineGrossProfit ?? ctx.grossProfit ?? 0
+    if (baselineGrossProfit <= 0) return null
+
+    // Avans bakiyesi
+    const advance = ctx.accountBalances?.['340'] ?? 0
+    if (advance <= 0) return null
+
+    // Asset turnover hedefi
+    const sectorTurnover = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    if (!sectorTurnover) return null
+
+    const baselineAssets  = ctx.totalAssets ?? 0
+    if (baselineAssets <= 0) return null
+
+    const baselineRevenue = ctx.baselineNetSales ?? ctx.netSales ?? 0
+
+    // Avans dönüşüm cap: 340 × %30 (tek dönem gerçekçi sınır)
+    const advanceConversionCap = advance * 0.30
+
+    // Asset turnover gap
+    const targetRevenue = sectorTurnover.value * baselineAssets
+    const revenueGap    = Math.max(targetRevenue - baselineRevenue, 0)
+
+    // Her iki cap'in min'i — avans yoksa büyük bir tutar üretmez
+    const gapCap = revenueGap > 0 ? revenueGap : advanceConversionCap
+    const amount = Math.min(advanceConversionCap, gapCap, advance)
+
+    if (amount < 1_000_000) return null
+    return amount
+  },
+
   buildTransactions: (context) => {
     // R6 Hotfix 2: Baseline brüt zarar guard — greedy loop A20 grossProfit'i şişirmiş olabilir
     // Analiz başındaki gerçek grossProfit'i kontrol et
@@ -1932,14 +2032,48 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: 2 leg + Tx2 (340 / 600 + 690 / 590)
-    // Stoksuzda maliyet yok → profitAmount = amount (tam avans tutarı kâr)
+    // Stok yoksa: sektöre göre ayrı yol
     if (totalStock <= 0) {
       const amount = clampAmount(
         Math.min(context.amount, advanceBalance),
         1_000_000
       )
       if (amount <= 0) return []
+
+      if (!isServiceLike(context.sector)) {
+        // R7B mini — İmalat/ticaret/inşaat stoksuz: sektör marj fallback COGS (CODEX audit)
+        // Avansın yarattığı hasılata gerçekçi maliyet eklenir; tam hasılat = tam kâr saçma
+        const costAccountCode = context.sector === 'CONSTRUCTION' ? '622' : '621'
+        const costAccountName = context.sector === 'CONSTRUCTION'
+          ? 'Satılan Hizmet Maliyeti'
+          : 'Satılan Mal Maliyeti'
+        const costAmount   = Math.round(amount * (1 - grossMargin))
+        const profitAmount = amount - costAmount
+        return [
+          makeBalancedTransaction(
+            'A19_DELIVERY_REVENUE_AND_COST_FALLBACK',
+            `Alınan avans teslimatla hasılata dönüşür + sektör marj COGS (${costAccountCode}+770)`,
+            'ADVANCE_TO_REVENUE',
+            [
+              { accountCode: '340',          accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount,           description: 'Avans çözülmesi' },
+              { accountCode: '600',          accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,           description: 'Hasılat artışı'  },
+              { accountCode: costAccountCode, accountName: costAccountName,            side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı (sektör marj fallback)' },
+              { accountCode: '770',          accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount, description: 'Maliyet karşılığı (simülasyon)'        },
+            ]
+          ),
+          makeBalancedTransaction(
+            'A19_PROFIT_TRANSFER',
+            'Dönem kâr aktarımı',
+            'ADVANCE_TO_REVENUE',
+            [
+              { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
+              { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
+            ]
+          ),
+        ]
+      }
+
+      // Hizmet/bilişim: tam hasılat = tam kâr (avans çözülmesi — maliyet yok)
       return [
         makeBalancedTransaction(
           'A19_DELIVERY_REVENUE_ONLY',
@@ -2175,19 +2309,40 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
   },
 
   buildTransactions: (context) => {
-    // R5 — Kar zinciri eklendi (R4 A12/A20 pattern, vergi YOK)
+    // R7B — Dinamik faaliyet gideri hesabı (en yüklü 630/631/632 seçilir)
+    // R7B mini — getOperatingExpensesDetail: isEstimated bilgisi description'a yansıtılır
+    // R5 — Kar zinciri (R4 A12/A20 pattern, vergi 691 YOK)
     const amount = context.amount ?? 0
     if (amount <= 0) return []
+
+    // isEstimated: detay hesap yoksa KOBİ fallback (grossProfit - operatingProfit)
+    const detail        = getOperatingExpensesDetail(context as unknown as import('./contracts').FirmContext)
+    const isEstimatedOp = detail?.isEstimated ?? true   // detay yok → tahmin
+
+    // En yüklü gider hesabı: 630/631/632 — büyük firmada doğru hesaba girer
+    // KOBİ fallback (tümü 0): 632 Genel Yönetim Giderleri temsili
+    const balances = context.accountBalances ?? {}
+    const candidates = [
+      { code: '630', name: 'Araştırma ve Geliştirme Giderleri',    amount: balances['630'] ?? 0 },
+      { code: '631', name: 'Pazarlama, Satış ve Dağıtım Giderleri', amount: balances['631'] ?? 0 },
+      { code: '632', name: 'Genel Yönetim Giderleri',               amount: balances['632'] ?? 0 },
+    ]
+    const dominant   = candidates.reduce((max, c) => c.amount > max.amount ? c : max, candidates[2])
+    const creditCode = dominant.amount > 0 ? dominant.code : '632'
+    const creditName = dominant.amount > 0 ? dominant.name : 'Genel Yönetim Giderleri'
+    const opexDesc   = isEstimatedOp
+      ? 'Faaliyet gideri azalışı (KOBİ tahmin — detay hesap yok)'
+      : 'Faaliyet gideri azalışı'
+
     return [
-      // 1. Operasyonel: nakit artar, faaliyet gideri azalır
-      // KOBİ fallback: 632 temsili (gerçek hesap kırılımı mizan detayına bağlı)
+      // 1. Operasyonel: nakit artar, en yüklü faaliyet gideri azalır
       makeBalancedTransaction(
         'A21_OPEX_REDUCTION',
         'Faaliyet Kârı Reformu — Gider Optimizasyonu (Nakit Kanal)',
         'OPEX_REDUCTION',
         [
-          { accountCode: '102', accountName: 'Bankalar',                side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
-          { accountCode: '632', accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount, description: 'Faaliyet gideri azalışı'      },
+          { accountCode: '102',      accountName: 'Bankalar', side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
+          { accountCode: creditCode, accountName: creditName,  side: 'CREDIT', amount, description: opexDesc                       },
         ]
       ),
       // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)

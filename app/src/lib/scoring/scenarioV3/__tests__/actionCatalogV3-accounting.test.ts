@@ -169,19 +169,22 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs[0].legs[3].amount).toBeCloseTo(7_000_000, 2)
   })
 
-  test('A19 stok hepsi boş: 2 tx (Tx1: 340/600, Tx2: 690/590)', () => {
-    // 150-153 hepsinin bakiyesi 0 → totalStock=0 → stoksuz dal
-    // B3b-1-FIX: stoksuz dalda da Tx2 eklenir; profitAmount = amount
+  test('A19 stok hepsi boş (CONSTRUCTION): 2 tx, Tx1 4-leg (R7B mini: 622+770 COGS)', () => {
+    // R7B mini: CONSTRUCTION non-service + stoksuz → 4-leg COGS fallback (622+770)
+    // grossMargin = 30M/100M = 0.30; costAmount = 20M×0.70 = 14M; profitAmount = 6M
     const txs = a19.buildTransactions(makeA19Context({
       accountBalances: { '340': 50_000_000, '150': 0, '151': 0, '152': 0, '153': 0 },
     }))
 
     expect(txs.length).toBe(2)
-    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs.length).toBe(4)  // R7B mini: non-service stoksuz → COGS fallback
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT',  amount: 20_000_000 })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT', amount: 20_000_000 })
-    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 20_000_000 })
-    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 20_000_000 })
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '622', side: 'DEBIT'  })  // inşaat COGS
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '770', side: 'CREDIT' })  // simülasyon
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    expect(txs[1].legs[0].amount).toBeLessThan(txs[0].legs[0].amount)
   })
 
   test('A19 net satış yoksa boş array döner', () => {
@@ -289,19 +292,23 @@ describe('Faz 7.3.6B3a-FIX3 — A18 Net Satış Artışı muhasebe doğrulaması
 
   // ── 2-leg + Tx2 (stok yok — B3b-1-FIX) ──
 
-  test('A18 inşaat + stok yok: 2 tx (Tx1: 120/600, Tx2: 690/590)', () => {
+  test('A18 inşaat + stok yok: 2 tx, Tx1 4-leg (R7B: 120/600/621/770 COGS fallback)', () => {
+    // R7B: CONSTRUCTION non-service + stoksuz → sektör marj fallback COGS (770 simülasyon)
+    // grossMargin = 30M/100M = 0.30; costAmount = 10M×0.70 = 7M; profitAmount = 3M
     const txs = a18.buildTransactions(makeA18Context({
       sector:         'CONSTRUCTION',
       accountBalances: {},
     }))
     expect(txs.length).toBe(2)
-    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs.length).toBe(4)  // R7B: non-service stoksuz → 4 leg (COGS fallback)
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '120', side: 'DEBIT'  })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '621', side: 'DEBIT'  })
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '770', side: 'CREDIT' })
     expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
     expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
-    // stoksuzda profitAmount = amount (costAmount yok)
-    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
+    // R7B: profitAmount < amount (COGS kesildi; tam kâr yanılgısı giderildi)
+    expect(txs[1].legs[0].amount).toBeLessThan(txs[0].legs[0].amount)
   })
 
   test('A18 hizmet + stok yok: 2 tx (Tx1: 102/600, Tx2: 690/590)', () => {
@@ -435,15 +442,18 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2.legs[1].amount).toBeCloseTo(3_000_000, 0)
   })
 
-  test('A18 stoksuz: 2 tx (Tx2: 690/590, profitAmount=amount)', () => {
-    // B3b-1-FIX: stoksuzda da Tx2 eklenir; maliyet yok → profitAmount = amount
+  test('A18 stoksuz (MANUFACTURING): 2 tx, Tx1 4-leg (R7B: 621/770 COGS fallback)', () => {
+    // R7B: imalat (non-service) + stoksuz → sektör marj fallback COGS (770 simülasyon)
+    // grossMargin = 30M/100M = 0.30; costAmount = 10M×0.70 = 7M; profitAmount = 3M
     const txs = a18.buildTransactions(makeA18Ctx({ accountBalances: {} }))
     expect(txs.length).toBe(2)
-    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs.length).toBe(4)  // R7B: non-service stoksuz → 4 leg (COGS fallback)
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '621', side: 'DEBIT'  })
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '770', side: 'CREDIT' })
     expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
     expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
-    // stoksuzda profitAmount = amount (costAmount yok)
-    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
+    // R7B: profitAmount < amount (COGS kesildi; tam kâr yanılgısı giderildi)
+    expect(txs[1].legs[0].amount).toBeLessThan(txs[0].legs[0].amount)
   })
 
   test('A18 Tx2 denklik: 690 DEBIT = 590 CREDIT', () => {
@@ -455,14 +465,14 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2debit).toBeCloseTo(tx2credit, 2)
   })
 
-  test('A18 159 bakiyeli: 159 stok havuzunda değil, totalStock=0 → stoksuz dal (2 tx)', () => {
+  test('A18 159 bakiyeli: 159 stok havuzunda değil, totalStock=0 → stoksuz dal (R7B: 4-leg Tx1)', () => {
     // 159 B3b-1 ile stockAccounts'tan çıkarıldı; stoksuz dal tetiklenir
-    // B3b-1-FIX: stoksuz dalda da Tx2 var → 2 transaction
+    // R7B: MANUFACTURING (non-service) stoksuz → COGS fallback → Tx1 4-leg, Tx2 690/590
     const txs = a18.buildTransactions(makeA18Ctx({
       accountBalances: { '159': 10_000_000 }, // sadece 159 var
     }))
-    expect(txs.length).toBe(2)        // stoksuz → Tx1 (2 leg) + Tx2 (690/590)
-    expect(txs[0].legs.length).toBe(2)
+    expect(txs.length).toBe(2)        // stoksuz → Tx1 (4 leg COGS fallback) + Tx2 (690/590)
+    expect(txs[0].legs.length).toBe(4)
     expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT' })
   })
 
@@ -480,17 +490,20 @@ describe('Faz 7.3.6B3b-1 — A18/A19 Tx2 (690/590) + 159 stok hariç', () => {
     expect(tx2.legs[1].amount).toBeCloseTo(6_000_000, 0)
   })
 
-  test('A19 stoksuz: 2 tx (Tx1: 340/600, Tx2: 690/590, profitAmount=amount)', () => {
-    // B3b-1-FIX: stoksuzda da Tx2 eklenir; maliyet yok → profitAmount = amount
+  test('A19 stoksuz (CONSTRUCTION): 2 tx, Tx1 4-leg (R7B mini: 622+770 COGS fallback)', () => {
+    // R7B mini: CONSTRUCTION non-service + stoksuz → 4-leg COGS fallback
+    // grossMargin = 30M/100M = 0.30; costAmount = 20M×0.70 = 14M; profitAmount = 6M
     const txs = a19.buildTransactions(makeA19Ctx({
       accountBalances: { '340': 50_000_000, '150': 0, '151': 0, '152': 0, '153': 0 },
     }))
     expect(txs.length).toBe(2)
-    expect(txs[0].legs.length).toBe(2)
+    expect(txs[0].legs.length).toBe(4)  // R7B mini: non-service stoksuz → COGS fallback
+    expect(txs[0].legs[2]).toMatchObject({ accountCode: '622', side: 'DEBIT'  })  // inşaat COGS
+    expect(txs[0].legs[3]).toMatchObject({ accountCode: '770', side: 'CREDIT' })  // simülasyon
     expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
     expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
-    // profitAmount = amount (costAmount = 0 çünkü stok yok)
-    expect(txs[1].legs[0].amount).toBe(txs[0].legs[0].amount)
+    // R7B mini: profitAmount < amount (COGS kesildi)
+    expect(txs[1].legs[0].amount).toBeLessThan(txs[0].legs[0].amount)
   })
 
   test('A19 Tx2 denklik: 690 DEBIT = 590 CREDIT', () => {
@@ -854,15 +867,17 @@ describe('Faz 7.3.50A.11 — A21_OPERATING_PROFIT_REFORM computeAmount + buildTr
     expect(result).toBeCloseTo(12_500_000, 0)
   })
 
-  // T10: R5 — buildTransactions → 2 tx (102/632 + 690/590 kar zinciri)
-  test('T10 — buildTransactions: 2 tx (R5) — tx[0]: 102/632, tx[1]: 690/590', () => {
+  // T10: R7B — buildTransactions → 2 tx (102/dominant + 690/590 kar zinciri)
+  // makeA21Ctx: { '630': 5M, '631': 3M, '632': 2M } → dominant=630 (en yüklü)
+  test('T10 — buildTransactions: 2 tx (R7B) — tx[0]: 102/630 (dominant), tx[1]: 690/590', () => {
+    // R7B: 630=5M > 631=3M > 632=2M → dominant=630 seçilir
     const txs = a21.buildTransactions(makeA21Ctx({ amount: 2_000_000 }))
     expect(txs).toHaveLength(2)
-    // tx[0]: nakit kanal
+    // tx[0]: nakit kanal — dominant=630 (en yüklü gider hesabı)
     expect(txs[0].legs).toHaveLength(2)
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT',  amount: 2_000_000 })
-    expect(txs[0].legs[1]).toMatchObject({ accountCode: '632', side: 'CREDIT', amount: 2_000_000 })
-    // tx[1]: kar zinciri — Dönem Kârı / Dönem Net Kârı (R5 — R4 pattern, vergi YOK)
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '630', side: 'CREDIT', amount: 2_000_000 })
+    // tx[1]: kar zinciri — Dönem Kârı / Dönem Net Kârı (R7B — R5 pattern, vergi YOK)
     expect(txs[1].legs).toHaveLength(2)
     expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 2_000_000 })
     expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 2_000_000 })

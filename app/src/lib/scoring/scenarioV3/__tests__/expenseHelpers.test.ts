@@ -39,10 +39,10 @@ function makeCtx(overrides: Partial<FirmContext> = {}): FirmContext {
 
 describe('R5 — getOperatingExpenses', () => {
 
-  // T1: Detay hesaplar (büyük firma — 632+633+634)
-  test('T1 — 632+633+634 detay → toplamları döner', () => {
+  // T1: Detay hesaplar (büyük firma — 630+631+632) — R7B: 633/634 kaldırıldı
+  test('T1 — 630+631+632 detay → toplamları döner (R7B)', () => {
     const result = getOperatingExpenses(makeCtx({
-      accountBalances: { '632': 5_000_000, '633': 3_000_000, '634': 2_000_000 },
+      accountBalances: { '630': 3_000_000, '631': 2_000_000, '632': 5_000_000 },
     }))
     expect(result).toBe(10_000_000)
   })
@@ -55,13 +55,14 @@ describe('R5 — getOperatingExpenses', () => {
     expect(result).toBe(8_000_000)
   })
 
-  // T3: 630/631 dahil edilmez (R5 — sadece 632-634)
-  test('T3 — 630/631 olan ama 632-634 sıfır → KOBİ fallback kullanılır', () => {
-    // 632+633+634 = 0 → detay yok → fallback = grossProfit(15M) - operatingProfit(5M) = 10M
+  // T3: R7B — 630+631 artık detay havuzunda, doğrudan toplanır (KOBİ fallback bypass)
+  test('T3 — 630+631 detay hesaplar → toplamları döner (R7B: KOBİ fallback bypass)', () => {
+    // R7B: getOperatingExpenses 630+631+632 toplamını kullanır
+    // 630=10M + 631=5M + 632=0 = 15M → detay >0 → fallback devreye girmez
     const result = getOperatingExpenses(makeCtx({
       accountBalances: { '630': 10_000_000, '631': 5_000_000 },
     }))
-    expect(result).toBe(10_000_000)  // fallback, 630/631 değil
+    expect(result).toBe(15_000_000)  // R7B: 630+631+632 direkt toplamı
   })
 
   // T4: KOBİ fallback (accountBalances boş)

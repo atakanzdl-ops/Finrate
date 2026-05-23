@@ -240,6 +240,9 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
   },
   A18_NET_SALES_GROWTH: {
     sourceAccountRequirements: ['600'],
+    // R7B: computeAmount netSales (income statement) bazlı — '600' bakiyesi yoksa
+    // KOBİ fallback olarak kabul et. A14/A21/A20 ile aynı patern.
+    allowComputedSource: true,
     producesLiquidity: true,
     liquidityImpactRatio: 0.60,
   },
