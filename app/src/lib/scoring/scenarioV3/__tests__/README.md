@@ -120,6 +120,60 @@ Test için doğrulanmış profiller:
 | ORGANIKA  | 102=960K, 300=22.8M, 780 yok             | A04 %15 guard + A14 KOBİ fallback|
 | DEKAM     | grossProfit=-22.5M, 340=15M, 780=5.37M  | A19 brüt zarar + A14 sektör altı |
 | iPOS      | 255=13.4M, 252=0                         | A09 prefix bug guard             |
+| İSRA      | TRADE, B, sentetik KOBİ                  | R8.1 baseline referans           |
+
+---
+
+## R8.1 Smoke Test Otomasyon
+
+5 firma × 3 hedef = 15 senaryo baseline testi.
+
+```bash
+# Sadece smoke testleri çalıştır:
+npm run test:smoke
+
+# veya doğrudan:
+npx jest --testPathPatterns=smokeTests --verbose
+```
+
+### Fixture Dosyaları
+
+- `fixtures/smoke/inputs.ts` — 5 firma `EngineInput` sabiti
+- `smokeTests.test.ts` — 15 test + universal invariant helper
+
+### Universal Invariantlar
+
+Her smoke senaryosunda otomatik çalışan `assertUniversalSmoke()`:
+
+```ts
+// 1 — A11 disable (özkaynak yanılgısı — R7B)
+expect(result.portfolio.find(a => a.actionId === 'A11_RETAIN_EARNINGS')).toBeUndefined()
+
+// 2 — 320 yasak (Satıcılar avans teslimatında kullanılmaz — R7B mini)
+const leg320 = allLegs.find(l => l.accountCode === '320')
+expect(leg320).toBeUndefined()
+
+// 3 — DEBIT == CREDIT (çift taraflı kayıt denkliği)
+expect(debit).toBe(credit)
+
+// 4 — amountTRY > 0 (negatif/sıfır aksiyon yok)
+expect(action.amountTRY).toBeGreaterThan(0)
+
+// 5 — 690 ↔ 590 profit transfer zinciri
+// 690 DEBIT varsa 590 CREDIT aynı tx'da olmalı
+expect(has590Credit).toBe(true)
+```
+
+### Senaryo Bazlı Guard'lar
+
+| Firma    | Aksiyon               | Beklenen   | Sebep                                    |
+|----------|-----------------------|------------|------------------------------------------|
+| DEKAM    | A19_ADVANCE_TO_REVENUE| DIŞARI     | baselineGrossProfit < 0 (brüt zarar)     |
+| DEKAM    | A14_FINANCE_COST_*    | DIŞARI     | 780/netSales=%1.64 < %5 CONSTRUCTION     |
+| ORGANIKA | A04_CASH_PAYDOWN_ST   | DIŞARI     | 102=960K → %4.2 < %15 nakit guard        |
+| ORGANIKA | A14_FINANCE_COST_*    | İÇERİDE    | KOBİ fallback %32 > %20 + allowComputed  |
+| ENES     | A04_CASH_PAYDOWN_ST   | DIŞARI     | 102=222 TL → nakitCap ≈ 0                |
+| iPOS     | A09_SALE_LEASEBACK    | DIŞARI     | bina(252)=0 → havuz=0 (R6 prefix fix)    |
 
 ---
 
