@@ -471,12 +471,19 @@ const MIZAN_IGNORE = new Set([
 ])
 
 // SPLIT: bakBorç → bb, bakAlacak → ba
-const MIZAN_SPLIT: Record<string, { bb: string; ba: string }> = {
+// R8.2 (Atakan keşfi + Codex tespit):
+// rawSide: ham hesap kodu verisinde hangi bakiye tarafının kullanılacağını belirtir.
+//   'bb' (borç bakiye) → aktif hesaplar (120, 131, 320, 329) — varsayılan
+//   'ba' (alacak bakiye) → pasif hesaplar (331 Ortaklara Borçlar KV)
+// Önceki: her zaman bb → 331 alacak bakiyeli ise rawAmount=0 → DB'de 331 oluşmaz → A15 reddi
+// NOT: 431 Ortaklara Borçlar UV MIZAN_MAP "_A" tarafında → zaten doğru (dokunulmadı)
+// NOT: 131/231 Ortaklardan Alacaklar → BORÇ bakiyeli aktif hesaplar → bb doğru (dokunulmadı)
+const MIZAN_SPLIT: Record<string, { bb: string; ba: string; rawSide?: 'bb' | 'ba' }> = {
   '120': { bb: 'tradeReceivables',  ba: 'advancesReceived' },
   '131': { bb: 'otherReceivables',  ba: 'otherShortTermPayables' },
   '320': { bb: 'prepaidSuppliers',  ba: 'tradePayables' },
   '329': { bb: 'prepaidSuppliers',  ba: 'otherShortTermPayables' },
-  '331': { bb: 'otherReceivables',  ba: 'otherShortTermPayables' },
+  '331': { bb: 'otherReceivables',  ba: 'otherShortTermPayables', rawSide: 'ba' },  // R8.2: pasif hesap → alacak bakiyesi
 }
 
 // MAP: suffix yok = bakBorç, _A = bakAlacak, _CA = -bakAlacak (contra), _CB = -bakBorç (contra)
@@ -633,11 +640,13 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     // rebuildAggregateFromAccounts() için 3-haneli kodların doğal bakiyeleri:
     //   _A / _CA → bakAlacak (alacak bakiyeli hesaplar)
     //   _CB / suffix yok → bakBorç (borç bakiyeli hesaplar)
-    //   MIZAN_SPLIT → bakBorç (ağırlıklı borç tarafı)
+    //   MIZAN_SPLIT → rawSide belirtilmişse o taraf; aksi hâlde bb (borç bakiye)
+    //   R8.2: 331 pasif hesap → rawSide:'ba' → ba kullanılır (alacak bakiye)
     if (nc.length === 3) {
       let rawAmount = 0
       if (MIZAN_SPLIT[nc]) {
-        rawAmount = bb
+        const splitDef = MIZAN_SPLIT[nc]
+        rawAmount = splitDef.rawSide === 'ba' ? ba : bb
       } else {
         const mapped = MIZAN_MAP[nc]
         if (mapped) {
