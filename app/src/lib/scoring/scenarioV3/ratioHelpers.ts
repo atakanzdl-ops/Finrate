@@ -517,6 +517,64 @@ export function getFinancialExpenseReductionTarget(
   }
 }
 
+// ─── getEquityInjectionTarget (R8.3) ─────────────────────────────────────────
+
+/**
+ * R8.3 — Özkaynak Enjeksiyon Hedefi (Half-gap)
+ *
+ * A10 (Nakit Sermaye Artırımı) ve A10B (Senetli Sermaye Artırımı) için
+ * rasyo bazlı tutar hesabı. R5 kararını tamamlar.
+ *
+ * Formül: Hem aktif hem özkaynak eş zamanlı artar.
+ *   (E + x) / (A + x) = hedefRatio   →   x = (hedefRatio × A − E) / (1 − hedefRatio)
+ *
+ * Half-gap hedef:   targetRatio = (currentRatio + sectorMedian) / 2
+ * Sektör medyanı:   1 − benchmark.debtToAssets (TCMB kaynağı)
+ *
+ * @returns null:
+ *   - totalAssets ≤ 0 (geçersiz bilanço)
+ *   - currentRatio ≥ sectorMedian (zaten iyi durumda)
+ *   - targetRatio ≥ 0.99 (sıfır-bölme savunması — gerçekte görülmez)
+ *   - hesaplanan tutar ≤ 0
+ */
+export function getEquityInjectionTarget(
+  ctx: FirmContext,
+  options?: { halfGap?: boolean }
+): number | null {
+  const halfGap = options?.halfGap ?? true
+
+  const totalAssets = ctx.totalAssets ?? 0
+  const totalEquity = ctx.totalEquity ?? 0
+
+  if (!Number.isFinite(totalAssets) || totalAssets <= 0) return null
+
+  // Mevcut özkaynak/aktif oranı
+  const currentRatio = totalEquity / totalAssets
+
+  // TCMB sektör kıyası: 1 − debtToAssets (buildEquityRatioTransparency:742 ile aynı pattern)
+  const bm = getBenchmarkValue(ctx.sector, 'debtToAssets')
+  const sectorDebtToAssets = bm?.value ?? 0.66
+  const sectorMedian = 1 - sectorDebtToAssets
+
+  // Guard 1: Zaten hedef üstünde → null
+  if (currentRatio >= sectorMedian) return null
+
+  // Half-gap hedef rasyo
+  const targetRatio = halfGap
+    ? (currentRatio + sectorMedian) / 2
+    : sectorMedian
+
+  // Guard 2: Sıfır-bölme savunması (teorik edge case)
+  if (targetRatio >= 0.99) return null
+
+  // Tutar: x = (targetRatio × A − E) / (1 − targetRatio)
+  const amount = (targetRatio * totalAssets - totalEquity) / (1 - targetRatio)
+
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  return amount
+}
+
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
 
 /**
@@ -804,8 +862,10 @@ export function buildActionRatioTransparency(
   ctx: FirmContext,
   amount: number
 ): RatioTransparency | null {
-  // ── Faz 7.3.11: A10 — Özkaynak/Aktif (ID-tabanlı; katalogda targetRatio yok) ──
-  if (action.id === 'A10_CASH_EQUITY_INJECTION') {
+  // ── Faz 7.3.11 + R8.3: A10/A10B — Özkaynak/Aktif transparency ──
+  // A10B de aynı özkaynak/aktif rasyosunu etkiler (121 ↑ / 500 ↑)
+  if (action.id === 'A10_CASH_EQUITY_INJECTION' ||
+      action.id === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION') {
     return buildEquityRatioTransparency(action, ctx, amount)
   }
 

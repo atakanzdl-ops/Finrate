@@ -53,6 +53,7 @@ import {
   getOperatingExpenseReductionTarget,       // R5: A21 azaltma hedefi
   getFinancialExpenses,                     // R5: A14 finansman gideri tespiti
   getFinancialExpenseReductionTarget,       // R5: A14 azaltma hedefi
+  getEquityInjectionTarget,                 // R8.3: A10/A10B özkaynak enjeksiyon hedefi
 } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
@@ -1071,6 +1072,12 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
     minSourceAmountTRY: 2_000_000,
   },
 
+  // R8.3: Rasyo bazlı tutar — half-gap özkaynak/aktif hedefi (R5 tamamlama)
+  // Formül: x = (targetRatio × A − E) / (1 − targetRatio)
+  // Guard: currentRatio ≥ sectorMedian → null (zaten iyi durumda)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx) => getEquityInjectionTarget(ctx, { halfGap: true }),
+
   qualityCoefficient: 1.00,
   sustainability: 'RECURRING',
 
@@ -1133,6 +1140,11 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
   },
 
   preconditions: { minSourceAmountTRY: 2_000_000 },
+
+  // R8.3: A10 ile aynı helper — formül aynı, yevmiye farklı (121 vs 102)
+  // qualityCoefficient 0.55 korunur (senetli = nakit kadar güçlü değil)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx) => getEquityInjectionTarget(ctx, { halfGap: true }),
 
   qualityCoefficient: 0.55,
   sustainability: 'SEMI_RECURRING',

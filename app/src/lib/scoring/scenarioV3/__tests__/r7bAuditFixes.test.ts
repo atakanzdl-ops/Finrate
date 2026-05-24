@@ -19,6 +19,7 @@ import { ACTION_CATALOG_V3 }            from '../actionCatalogV3'
 import { getOperatingExpenses, getOperatingExpensesDetail } from '../ratioHelpers'
 import { getMandatoryActionsForFirm }   from '../criticalIssues'
 import { runEngineV3 }                  from '../engineV3'
+import type { EngineInput }             from '../engineV3'
 
 const A11 = ACTION_CATALOG_V3['A11_RETAIN_EARNINGS']
 const A18 = ACTION_CATALOG_V3['A18_NET_SALES_GROWTH']
@@ -622,6 +623,149 @@ describe('R7B — Engine A18 rasyo bazlı portfolyo (entegrasyon)', () => {
     const a18 = result.portfolio.find(a => a.actionId === 'A18_NET_SALES_GROWTH')
     expect(a18).toBeDefined()
     expect(a18!.amountTRY).toBeGreaterThan(1_000_000)
+  })
+
+})
+
+// ─── R8.3 — A10/A10B Rasyo Bazlı (engine integration) ────────────────────────
+//
+// R5 kararı tamamlanıyor: özkaynak enjeksiyonu artık half-gap rasyo hedefine göre
+// hesaplanır. Sabit %2/%5/%12 aktif bazlı yüzde yerine hedefe ölçülü adım.
+//
+// MANUFACTURING sektörü: debtToAssets=0.48 → sectorMedian=0.52
+//
+// T_R83_1: Rasyo altı firma → A10 tutar üretir (rasyo bazlı seçilir)
+// T_R83_2: Rasyo üstü firma → A10 null → portfolyoda yok
+// T_R83_3: A10B rasyo altı firma → computeAmount üretir (aynı helper)
+// T_R83_4: A10 transparency → kind:'margin', current < sectorMedian (R8.3 sonrası)
+// T_R83_5: ORGANIKA (500=10M, assets≈26M) → A10 tutar mantıklı aralıkta
+
+// MANUFACTURING rasyo altı: 500=8M, aktif≈45M → %18 < %52
+const R83_LOW_EQUITY_INPUT: EngineInput = {
+  sector:        'MANUFACTURING',
+  currentRating: 'B',
+  accountBalances: {
+    '102':  3_000_000,   // Bankalar (current assets)
+    '120': 12_000_000,   // Ticari Alacaklar
+    '153': 10_000_000,   // Stok
+    '250': 20_000_000,   // MDV (fixed assets)
+    '300': 30_000_000,   // KV Borç
+    '400': 15_000_000,   // UV Borç
+    '500':  8_000_000,   // Özkaynak (8M/45M ≈ %18 < %52)
+  },
+  incomeStatement: {
+    netSales:        40_000_000,
+    costOfGoodsSold: 28_000_000,
+    grossProfit:     12_000_000,
+    operatingProfit:  6_000_000,
+    netIncome:        2_000_000,
+    interestExpense:  1_500_000,
+  },
+}
+
+// MANUFACTURING rasyo üstü: 500=35M, aktif≈50M → %70 > %52
+const R83_HIGH_EQUITY_INPUT: EngineInput = {
+  sector:        'MANUFACTURING',
+  currentRating: 'B',
+  accountBalances: {
+    '102':  5_000_000,
+    '120': 10_000_000,
+    '250': 35_000_000,
+    '300': 15_000_000,
+    '500': 35_000_000,   // Özkaynak (35M/50M = %70 > %52 → null guard)
+  },
+  incomeStatement: {
+    netSales:        30_000_000,
+    costOfGoodsSold: 20_000_000,
+    grossProfit:     10_000_000,
+    operatingProfit:  5_000_000,
+    netIncome:        2_000_000,
+    interestExpense:    500_000,
+  },
+}
+
+describe('R8.3 — A10/A10B rasyo bazlı engine entegrasyon', () => {
+
+  const a10  = ACTION_CATALOG_V3['A10_CASH_EQUITY_INJECTION']
+  const a10b = ACTION_CATALOG_V3['A10B_PROMISSORY_NOTE_EQUITY_INJECTION']
+
+  // Catalog erişim guard (README: named export yasak)
+  test('T_R83_0 — A10/A10B catalog erişim + computeAmount tanımlı (R8.3)', () => {
+    expect(a10).toBeDefined()
+    expect(a10b).toBeDefined()
+    // README: ?. operatörü tuzağı → ! kullan
+    expect(a10.computeAmount).toBeDefined()
+    expect(a10b.computeAmount).toBeDefined()
+    expect(a10.useRatioBasedAmount).toBe(true)
+    expect(a10b.useRatioBasedAmount).toBe(true)
+  })
+
+  // T_R83_1: Rasyo altı firma → A10 portfolyoda, tutar > 0
+  test('T_R83_1 — rasyo altı firma (%18 < %52) → A10 portfolyoda, tutar makul', () => {
+    const result = runEngineV3({
+      ...R83_LOW_EQUITY_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION'] },
+    })
+    const a10Result = result.portfolio.find(a => a.actionId === 'A10_CASH_EQUITY_INJECTION')
+    expect(a10Result).toBeDefined()
+    expect(a10Result!.amountTRY).toBeGreaterThan(2_000_000)
+    // Tutar mantıklı aralıkta (aktif=45M, half-gap → çok küçük veya büyük olmamalı)
+    expect(a10Result!.amountTRY).toBeLessThan(100_000_000)
+  })
+
+  // T_R83_2: Rasyo üstü firma → A10 portfolyoda YOK (null guard)
+  test('T_R83_2 — rasyo üstü firma (%70 > %52) → A10 portfolyoda yok (null guard)', () => {
+    const result = runEngineV3({
+      ...R83_HIGH_EQUITY_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION'] },
+    })
+    const a10Result = result.portfolio.find(a => a.actionId === 'A10_CASH_EQUITY_INJECTION')
+    expect(a10Result).toBeUndefined()
+  })
+
+  // T_R83_3: A10B rasyo altı firma → computeAmount aynı helper → tutar üretir
+  test('T_R83_3 — A10B rasyo altı firma → portfolyoda, A10 ile aynı computeAmount', () => {
+    const result = runEngineV3({
+      ...R83_LOW_EQUITY_INPUT,
+      options: { allowedActionIds: ['A10B_PROMISSORY_NOTE_EQUITY_INJECTION'] },
+    })
+    const a10bResult = result.portfolio.find(a => a.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION')
+    expect(a10bResult).toBeDefined()
+    expect(a10bResult!.amountTRY).toBeGreaterThan(2_000_000)
+    // A10B yevmiye: 121 DEBIT / 500 CREDIT (DOKUNULMAZ)
+    const legs = a10bResult!.transactions.flatMap(tx => tx.legs)
+    expect(legs.some(l => l.accountCode === '121' && l.side === 'DEBIT')).toBe(true)
+    expect(legs.some(l => l.accountCode === '500' && l.side === 'CREDIT')).toBe(true)
+  })
+
+  // T_R83_4: A10 transparency — kind:'margin', current < sectorMedian
+  test('T_R83_4 — A10 ratioTransparency: kind=margin, current < sectorMedian', () => {
+    const result = runEngineV3({
+      ...R83_LOW_EQUITY_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION'] },
+    })
+    const a10Result = result.portfolio.find(a => a.actionId === 'A10_CASH_EQUITY_INJECTION')
+    expect(a10Result).toBeDefined()
+    const rt = a10Result!.ratioTransparency
+    expect(rt).toBeDefined()
+    expect(rt!.kind).toBe('margin')
+    const marginRt = rt as any
+    // current < sectorMedian (%52) — rasyo altı firma
+    expect(marginRt.current).toBeLessThan(0.52)
+    expect(marginRt.current).toBeGreaterThan(0)
+  })
+
+  // T_R83_5: A10 yevmiye DOKUNULMAZ — 102 DEBIT / 500 CREDIT
+  test('T_R83_5 — A10 yevmiye DOKUNULMAZ: 102 DEBIT / 500 CREDIT', () => {
+    const result = runEngineV3({
+      ...R83_LOW_EQUITY_INPUT,
+      options: { allowedActionIds: ['A10_CASH_EQUITY_INJECTION'] },
+    })
+    const a10Result = result.portfolio.find(a => a.actionId === 'A10_CASH_EQUITY_INJECTION')
+    expect(a10Result).toBeDefined()
+    const legs = a10Result!.transactions.flatMap(tx => tx.legs)
+    expect(legs.some(l => l.accountCode === '102' && l.side === 'DEBIT')).toBe(true)
+    expect(legs.some(l => l.accountCode === '500' && l.side === 'CREDIT')).toBe(true)
   })
 
 })

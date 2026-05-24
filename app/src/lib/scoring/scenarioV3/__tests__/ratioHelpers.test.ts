@@ -8,7 +8,7 @@
  *   - default (A05 vb.) → mevcut buildRatioTransparency
  */
 
-import { buildActionRatioTransparency } from '../ratioHelpers'
+import { buildActionRatioTransparency, getEquityInjectionTarget } from '../ratioHelpers'
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
 import type { FirmContext } from '../contracts'
 
@@ -345,5 +345,92 @@ describe('buildActionRatioTransparency — A10 Özkaynak/Aktif (kind: margin)', 
     // formula mevcut
     expect(typeof r.formula.description).toBe('string')
     expect(r.formula.description.length).toBeGreaterThan(0)
+  })
+})
+
+// ─── R8.3 — getEquityInjectionTarget ─────────────────────────────────────────
+//
+// A10/A10B özkaynak enjeksiyon hedefi — half-gap formül.
+// Formül: x = (targetRatio × A − E) / (1 − targetRatio)
+// Half-gap: targetRatio = (currentRatio + sectorMedian) / 2
+// Sektör medyanı: 1 − TCMB debtToAssets
+//
+// T_EIT1: MANUFACTURING half-gap doğru hesaplama
+// T_EIT2: currentRatio ≥ sectorMedian → null (zaten iyi durumda)
+// T_EIT3: totalAssets = 0 → null (geçersiz bilanço)
+// T_EIT4: bilinmeyen sektör → fallback 0.66 → sectorMedian=0.34, tutar üretir
+// T_EIT5: halfGap:false → sectorMedian doğrudan hedef (daha büyük tutar)
+
+describe('R8.3 — getEquityInjectionTarget (half-gap özkaynak hedefi)', () => {
+
+  // T_EIT1: MANUFACTURING, 100M aktif, 20M özkaynak
+  // debtToAssets=0.48 → sectorMedian=0.52
+  // currentRatio = 0.20, halfGapTarget = (0.20+0.52)/2 = 0.36
+  // amount = (0.36×100M - 20M)/(1-0.36) = 16M/0.64 = 25M
+  test('T_EIT1 — MANUFACTURING half-gap tutar doğru (25M)', () => {
+    const ctx = makeCtx({
+      sector:      'MANUFACTURING',
+      totalAssets: 100_000_000,
+      totalEquity:  20_000_000,
+    })
+    const result = getEquityInjectionTarget(ctx, { halfGap: true })
+    expect(result).not.toBeNull()
+    // amount = 25M (±200K tolerans — benchmark yuvarlama)
+    expect(result!).toBeCloseTo(25_000_000, -5)
+    expect(result!).toBeGreaterThan(20_000_000)
+    expect(result!).toBeLessThan(35_000_000)
+  })
+
+  // T_EIT2: currentRatio (0.60) ≥ sectorMedian (0.52) → null
+  test('T_EIT2 — MANUFACTURING currentRatio(%60) ≥ sectorMedian(%52) → null', () => {
+    const ctx = makeCtx({
+      sector:      'MANUFACTURING',
+      totalAssets: 100_000_000,
+      totalEquity:  60_000_000,  // %60 > %52 → zaten iyi
+    })
+    const result = getEquityInjectionTarget(ctx)
+    expect(result).toBeNull()
+  })
+
+  // T_EIT3: totalAssets = 0 → null (geçersiz bilanço guard)
+  test('T_EIT3 — totalAssets=0 → null (geçersiz bilanço)', () => {
+    const ctx = makeCtx({
+      totalAssets: 0,
+      totalEquity: 0,
+    })
+    const result = getEquityInjectionTarget(ctx)
+    expect(result).toBeNull()
+  })
+
+  // T_EIT4: Bilinmeyen sektör → benchmark fallback → sectorMedian > 0 → tutar üretir
+  // Gerçek fallback değeri runtime'da belirlenir; sadece "tutar üretir" kontrol edilir
+  test('T_EIT4 — bilinmeyen sektör → benchmark fallback → currentRatio altında tutar üretir', () => {
+    const ctx = makeCtx({
+      sector:      'UNKNOWN_SECTOR' as any,
+      totalAssets: 100_000_000,
+      totalEquity:  10_000_000,  // %10 — düşük özkaynak, hemen hemen her sektörde altında
+    })
+    const result = getEquityInjectionTarget(ctx, { halfGap: true })
+    expect(result).not.toBeNull()
+    // Tutar pozitif ve makul aralıkta (0 < x < 100M)
+    expect(result!).toBeGreaterThan(0)
+    expect(result!).toBeLessThan(100_000_000)
+  })
+
+  // T_EIT5: halfGap:false → sectorMedian doğrudan hedef → daha büyük tutar
+  // MANUFACTURING: currentRatio=0.20, halfGapTarget=0.36 → amount≈25M
+  // sectorMedian target=0.52 → amount=(0.52×100M-20M)/(1-0.52)=32M/0.48≈66.7M
+  test('T_EIT5 — halfGap:false → sectorMedian doğrudan hedef → halfGap:true tutarından büyük', () => {
+    const ctx = makeCtx({
+      sector:      'MANUFACTURING',
+      totalAssets: 100_000_000,
+      totalEquity:  20_000_000,
+    })
+    const halfGapResult  = getEquityInjectionTarget(ctx, { halfGap: true  })
+    const fullGapResult  = getEquityInjectionTarget(ctx, { halfGap: false })
+    expect(halfGapResult).not.toBeNull()
+    expect(fullGapResult).not.toBeNull()
+    // Tam hedef = yarım hedeften büyük
+    expect(fullGapResult!).toBeGreaterThan(halfGapResult!)
   })
 })
