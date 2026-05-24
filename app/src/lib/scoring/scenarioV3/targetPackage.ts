@@ -42,6 +42,7 @@ import {
   type RatingGrade,
 } from './ratingReasoning'
 import { getCoveredGroups }                from './actionRatioGroupProfile'
+import { validatePortfolioResources }      from './portfolioResourceGuard'
 
 // ─── ÇIKTI TİPLERİ (sözleşme: değişmedi) ──────────────────────────────────────
 
@@ -462,6 +463,11 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
         const subset       = indices.map(i => fullPortfolio[i])
         const totalAmount  = subset.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
         const transactions = flattenTransactions(subset)
+
+        // R8.4: Kaynak guard — negatif bakiye oluşturan kombinasyonları filtrele
+        // (İSRA A18+A19 stok çakışması gibi feasible olmayan subset'leri atla)
+        const guardResult = validatePortfolioResources(transactions, params.initialBalances)
+        if (!guardResult.feasible) continue
 
         const validation = calculateActualPostActionRating({
           initialBalances:        params.initialBalances,

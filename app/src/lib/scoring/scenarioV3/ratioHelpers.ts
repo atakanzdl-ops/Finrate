@@ -575,6 +575,65 @@ export function getEquityInjectionTarget(
   return amount
 }
 
+// ─── getReceivableCollectionTarget (R8.4) ─────────────────────────────────────
+
+/**
+ * R8.4 — Alacak Tahsilat Hedefi (Half-gap DSO)
+ *
+ * A10 özkaynak yarım-boşluk formülünün alacak DSO uyarlaması.
+ * applyFeasibilityCap(%25) yerine yarım-boşluk DSO kullanılır:
+ *   halfGapDSO = (currentDSO + benchmarkDays) / 2
+ *   targetAR   = netSales × halfGapDSO / periodDays
+ *   amount     = currentAR − targetAR
+ *
+ * Null koşulları:
+ *   - AR veya netSales ≤ 0
+ *   - currentDSO ≤ benchmarkDays × 1.1 (zaten benchmark yakınında)
+ *   - Hesaplanan tutar ≤ 0 (sayısal güvenlik)
+ *   - Hesaplanan tutar ≤ 500.000 TL (mutlak materyal eşik)
+ *   - targetAR ≥ ar × 0.95 — nispi materyalite: %5'ten az iyileşme anlamsız
+ *     AR > 10M firmalarda 500K guard yetersiz kalır (İSRA: 5% × 129M = 6.45M).
+ */
+export function getReceivableCollectionTarget(
+  ctx: FirmContext,
+  options?: { halfGap?: boolean }
+): number | null {
+  const halfGap = options?.halfGap ?? true
+
+  const ar = (ctx.accountBalances?.['120'] ?? 0) + (ctx.accountBalances?.['121'] ?? 0)
+  const netSales = ctx.netSales ?? 0
+  if (ar <= 0 || netSales <= 0) return null
+
+  const { days: periodDays } = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+  const currentDSO = (ar / netSales) * periodDays
+
+  const bm = getBenchmarkValue(ctx.sector, 'receivablesDays')
+  const benchmarkDays = bm?.value ?? 90
+
+  // Guard 1: Zaten benchmark yakınında (1.1 tolerans)
+  if (currentDSO <= benchmarkDays * 1.1) return null
+
+  // Hedef DSO: yarım boşluk veya tam benchmark
+  const targetDSO = halfGap
+    ? (currentDSO + benchmarkDays) / 2
+    : benchmarkDays
+
+  // Hedef AR bakiyesi ve tahsilat tutarı
+  const targetAR = (netSales * targetDSO) / periodDays
+  const amount   = ar - targetAR
+
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  // Guard 2: Mutlak materyal eşik (500K minimum)
+  if (amount < 500_000) return null
+
+  // Guard 3: Nispi materyalite — %5'ten az iyileşme anlamsız öneri üretmez
+  // AR > 10M firmalarda 500K guard yetersizdir (İSRA: 5% × 129M = 6.45M).
+  if (targetAR >= ar * 0.95) return null
+
+  return amount
+}
+
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
 
 /**

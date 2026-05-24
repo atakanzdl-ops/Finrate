@@ -4,12 +4,16 @@
  * DEKAM firma verileri (Construction sektörü):
  *   currentAR    = 13,909,833 TL
  *   netSales     = 24,454,088 TL
- *   currentDSO   = (13.9M / 24.45M) × 365 = 207.7 gün
+ *   currentDSO   = (13.9M / 24.45M) × 365 ≈ 207.7 gün
  *   benchmark DSO (Construction) = 79 gün (TCMB_DIRECT)
- *   targetAR     = (24.45M × 79) / 365 = 5,291,044 TL
- *   desiredMove  = 13.9M - 5.29M = 8,618,789 TL
- *   cap (25%)    = 13.9M × 0.25 = 3,477,458 TL
- *   result       = min(8.62M, 3.48M) = 3,477,458 TL ≈ 3.48 Mn
+ *
+ * R8.4 — Half-gap DSO formülü (applyFeasibilityCap %25 kaldırıldı):
+ *   halfGapDSO  = (207.7 + 79) / 2 = 143.35 gün
+ *   halfGapAR   = (24.45M × 143.35) / 365 ≈ 9,601,318 TL
+ *   amount      = 13,909,833 − 9,601,318 ≈ 4,308,515 TL ≈ 4.31 Mn
+ *
+ * Eski (R8.4 öncesi, kaldırıldı):
+ *   desiredMove = 8,618,789 TL; cap(%25) = 3,477,458 TL
  */
 
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
@@ -36,10 +40,10 @@ describe('A05 computeAmount', () => {
     expect(a05.computeAmount).toBeDefined()
   })
 
-  it('DEKAM: cap 3.48 Mn dönmeli', () => {
+  it('DEKAM: R8.4 half-gap ~4.31 Mn dönmeli', () => {
     const result = a05?.computeAmount?.(baseCtx)
-    // 3,477,458 TL — ±1K tolerans
-    expect(result).toBeCloseTo(3_477_458, -3)
+    // R8.4 half-gap DSO: 4,308,515 TL — ±10K tolerans
+    expect(result).toBeCloseTo(4_308_515, -4)
   })
 
   it('DSO benchmark altındaysa null dönmeli', () => {
