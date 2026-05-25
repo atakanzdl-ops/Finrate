@@ -80,6 +80,8 @@ function fileIcon(name: string) {
 
 export function FileUpload({ entityId, onImported }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  // Kümülatif confirm birikimi — her entry için ayrı, retry'larda kaybolmaz
+  const entryConfirmsRef = useRef<Record<number, UploadOneOptions>>({})
   const [dragging, setDrag] = useState(false)
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [globalYear, setGlobalYear] = useState(CURRENT_YEAR - 1)
@@ -104,7 +106,16 @@ export function FileUpload({ entityId, onImported }: Props) {
   }
 
   function removeEntry(idx: number) {
+    delete entryConfirmsRef.current[idx]
     setEntries(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  /** Birden fazla 409 arasında geçişte confirm flag'lerini biriktirir */
+  function accumulateConfirm(idx: number, newOpts: UploadOneOptions): UploadOneOptions {
+    const current = entryConfirmsRef.current[idx] ?? {}
+    const merged = { ...current, ...newOpts }
+    entryConfirmsRef.current[idx] = merged
+    return merged
   }
 
   function updateEntry(idx: number, patch: Partial<FileEntry>) {
@@ -191,7 +202,8 @@ export function FileUpload({ entityId, onImported }: Props) {
     setConflictModal(null)
     const entry = entries[entryIdx]
     if (!entry) return
-    const ok = await uploadOne(entry, entryIdx, { overwrite: true })
+    const opts = accumulateConfirm(entryIdx, { overwrite: true })
+    const ok = await uploadOne(entry, entryIdx, opts)
     if (ok) onImported()
   }
 
@@ -201,7 +213,8 @@ export function FileUpload({ entityId, onImported }: Props) {
     setDetectionMissingModal(null)
     const entry = entries[entryIdx]
     if (!entry) return
-    const ok = await uploadOne(entry, entryIdx, { confirmDetectionMissing: true })
+    const opts = accumulateConfirm(entryIdx, { confirmDetectionMissing: true })
+    const ok = await uploadOne(entry, entryIdx, opts)
     if (ok) onImported()
   }
 
@@ -211,7 +224,8 @@ export function FileUpload({ entityId, onImported }: Props) {
     setEntitySoftModal(null)
     const entry = entries[entryIdx]
     if (!entry) return
-    const ok = await uploadOne(entry, entryIdx, { confirmEntityUnverified: true })
+    const opts = accumulateConfirm(entryIdx, { confirmEntityUnverified: true })
+    const ok = await uploadOne(entry, entryIdx, opts)
     if (ok) onImported()
   }
 
