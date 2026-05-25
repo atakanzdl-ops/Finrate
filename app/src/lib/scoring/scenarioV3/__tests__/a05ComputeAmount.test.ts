@@ -40,6 +40,12 @@ describe('A05 computeAmount', () => {
     expect(a05.computeAmount).toBeDefined()
   })
 
+  // R8.6 öne çekildi: bu flag olmadan computeAmount engine tarafından çağrılmaz.
+  // engineV3.ts: `if (useRatioBasedAmount && action.computeAmount)` — A05'te eksikti.
+  it('useRatioBasedAmount: true — engine activation flag mevcut olmalı', () => {
+    expect((a05 as any).useRatioBasedAmount).toBe(true)
+  })
+
   it('DEKAM: R8.4 half-gap ~4.31 Mn dönmeli', () => {
     const result = a05?.computeAmount?.(baseCtx)
     // R8.4 half-gap DSO: 4,308,515 TL — ±10K tolerans

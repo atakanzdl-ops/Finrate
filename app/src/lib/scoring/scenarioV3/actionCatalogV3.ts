@@ -514,6 +514,8 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
 
   // R8.4: applyFeasibilityCap(%25) yerine yarım-boşluk DSO hedefi
   // ENES A05 fix: 1.71M (eski cap) → 2.5M+ (half-gap), daha gerçekçi öneri
+  // R8.6 öne çekildi: useRatioBasedAmount eksikti → computeAmount ölü koddu (engine bypass)
+  useRatioBasedAmount: true,
   computeAmount: (ctx) => getReceivableCollectionTarget(ctx, { halfGap: true }),
 
   targetRatio: {
