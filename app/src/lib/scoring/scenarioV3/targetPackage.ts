@@ -366,21 +366,20 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
 
     // R8.4.2: Fallback guard — N > 12 olsa bile kaynak çakışması kontrolü yapılır.
     // Engine greedy sırasıyla seçer; son eklenenler en az kritik kabul edilir.
-    // Infeasible → workingPortfolio'dan aksiyon teker teker çıkarılır (max 5 deneme).
+    // R8.4.3 BUG 1: MAX_RETRY=5 sınırı kaldırıldı.
+    //   Önceki: 5 pop sonrası dur → A18/A19 portfolyonun ortasındaysa çıkmaz.
+    //   Sonra: workingPortfolio boşalana veya feasible olana kadar pop (sonsuz döngü yok).
     let workingPortfolio = [...fullPortfolio]
-    const MAX_FALLBACK_GUARD_RETRY = 5
-    let guardAttempts = 0
 
-    while (guardAttempts < MAX_FALLBACK_GUARD_RETRY && workingPortfolio.length > 0) {
+    while (workingPortfolio.length > 0) {
       const txsCheck = flattenTransactions(workingPortfolio)
       const guardCheck = validatePortfolioResources(txsCheck, params.initialBalances)
       if (guardCheck.feasible) break
       const removed = workingPortfolio.pop()
       warnings.push(
-        `R8.4.2: Kaynak çakışması (${guardCheck.reason ?? 'sebep belirsiz'}), ` +
+        `R8.4.3: Kaynak çakışması (${guardCheck.reason ?? 'sebep belirsiz'}), ` +
         `aksiyon çıkarıldı: ${removed?.actionId ?? 'bilinmeyen'}`,
       )
-      guardAttempts++
     }
 
     const workingAmountTRY   = workingPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
@@ -554,34 +553,55 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     }
   }
 
-  // ── EDGE: Hiçbir alt küme yeterli değil → tüm liste fallback ────────────────
+  // ── EDGE: Hiçbir alt küme yeterli değil → guard'lı tüm liste fallback ─────────
   // Not: arama k=N'a kadar gittiğinden lastValidation tüm portföye aittir.
+  // R8.4.3 BUG 2: NOT_REACHED yolunda da kaynak guard uygulanır.
+  //   Önceki: allFeasible boş → fullPortfolio GUARD'SIZ dönerdi.
+  //   Sonra: safePortfolio = pop-retry guard ile filtreleme (A18+A19 çakışması engellenir).
+  //   İSRA kanıtı: 9 aksiyon, A18+A19 subset guard'dan geçemez, BBB ulaşılamaz
+  //   → NOT_REACHED tetiklenir → fullPortfolio'da A18+A19 birlikte → 150 -0.1M.
   warnings.push(
-    'Mevcut aksiyonlarla hedef rating elde edilemiyor — tüm portföy gösteriliyor.',
+    'R8.4.3: NOT_REACHED — hedef rating ulaşılamadı, portföy kaynak guard ile filtreleniyor.',
   )
+
+  let safePortfolio = [...fullPortfolio]
+  while (safePortfolio.length > 0) {
+    const txsNR   = flattenTransactions(safePortfolio)
+    const guardNR = validatePortfolioResources(txsNR, params.initialBalances)
+    if (guardNR.feasible) break
+    const removedNR = safePortfolio.pop()
+    warnings.push(
+      `R8.4.3: NOT_REACHED guard — kaynak çakışması (${guardNR.reason ?? 'sebep belirsiz'}), ` +
+      `aksiyon çıkarıldı: ${removedNR?.actionId ?? 'bilinmeyen'}`,
+    )
+  }
+
   // TypeScript control-flow narrowing cannot track mutations done inside nested
   // function declarations (runSubsetSearch). Use optional-chaining cast to bypass.
   const lv = lastValidation as ActualRatingValidation | null
   const finalAchieved: RatingGrade =
     tryParseRating(lv?.postActualRating ?? '') ?? fallbackCurrent
 
+  const safeAmountTRY    = safePortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+  const safeDisplayCount = new Set(safePortfolio.map(a => getShortActionId(a.actionId))).size
+
   return {
-    selectedActions: fullPortfolio,
+    selectedActions: safePortfolio,
     validation: lv,
     meta: {
       status:                   'NOT_REACHED',
       reachedTarget:            false,
       achievedRating:           finalAchieved,
-      totalAmountTRY:           fullPortfolioAmountTRY,
-      selectedActionCount:      fullCount,
+      totalAmountTRY:           safeAmountTRY,
+      selectedActionCount:      safePortfolio.length,
       fullPortfolioActionCount: fullCount,
       fallback:                 true,
       warnings,
       coveredGroupCount:        0,
-      rawSelectedActionCount:   fullCount,
-      displayActionCount:       fullDisplayCount,
+      rawSelectedActionCount:   safePortfolio.length,
+      displayActionCount:       safeDisplayCount,
       fullPortfolioAmountTRY,
-      selectedPackageAmountTRY: fullPortfolioAmountTRY,
+      selectedPackageAmountTRY: safeAmountTRY,
     },
   }
 }

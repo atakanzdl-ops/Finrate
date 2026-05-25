@@ -310,7 +310,8 @@ describe('R8.4.2 — Fallback entegrasyon: N>12 yolu selectTargetPackage üzerin
     expect(result.meta.status).toBe('FALLBACK')
 
     // 2. Guard mesajı warnings'a yazıldı
-    const guardWarning = result.meta.warnings.find(w => w.includes('R8.4.2'))
+    // R8.4.3: FALLBACK guard prefix 'R8.4.2' → 'R8.4.3' olarak güncellendi
+    const guardWarning = result.meta.warnings.find(w => w.includes('R8.4.3'))
     expect(guardWarning).toBeTruthy()
 
     // 3. A19 çıkarıldı (çakışma kaynağı)
