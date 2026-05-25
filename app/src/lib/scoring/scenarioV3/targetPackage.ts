@@ -363,7 +363,29 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
       `Aksiyon sayısı (${fullCount}) alt küme arama eşiğini (${SUBSET_SEARCH_LIMIT}) aşıyor — ` +
       'optimal paket araması atlandı, tüm portföy gösteriliyor.',
     )
-    const transactions = flattenTransactions(fullPortfolio)
+
+    // R8.4.2: Fallback guard — N > 12 olsa bile kaynak çakışması kontrolü yapılır.
+    // Engine greedy sırasıyla seçer; son eklenenler en az kritik kabul edilir.
+    // Infeasible → workingPortfolio'dan aksiyon teker teker çıkarılır (max 5 deneme).
+    let workingPortfolio = [...fullPortfolio]
+    const MAX_FALLBACK_GUARD_RETRY = 5
+    let guardAttempts = 0
+
+    while (guardAttempts < MAX_FALLBACK_GUARD_RETRY && workingPortfolio.length > 0) {
+      const txsCheck = flattenTransactions(workingPortfolio)
+      const guardCheck = validatePortfolioResources(txsCheck, params.initialBalances)
+      if (guardCheck.feasible) break
+      const removed = workingPortfolio.pop()
+      warnings.push(
+        `R8.4.2: Kaynak çakışması (${guardCheck.reason ?? 'sebep belirsiz'}), ` +
+        `aksiyon çıkarıldı: ${removed?.actionId ?? 'bilinmeyen'}`,
+      )
+      guardAttempts++
+    }
+
+    const workingAmountTRY   = workingPortfolio.reduce((s, a) => s + (a.amountTRY ?? 0), 0)
+    const workingDisplayCount = new Set(workingPortfolio.map(a => getShortActionId(a.actionId))).size
+    const transactions = flattenTransactions(workingPortfolio)
     const validation = calculateActualPostActionRating({
       initialBalances:        params.initialBalances,
       transactions,
@@ -376,24 +398,24 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     })
     const achievedRating     = tryParseRating(validation.postActualRating) ?? fallbackCurrent
     const achievedIdx        = ratingToIndex(achievedRating)
-    const coveredGroupCount  = getCoveredGroups(fullPortfolio.map(a => a.actionId)).size
+    const coveredGroupCount  = getCoveredGroups(workingPortfolio.map(a => a.actionId)).size
     return {
-      selectedActions: fullPortfolio,
+      selectedActions: workingPortfolio,
       validation,
       meta: {
         status:                   'FALLBACK',
         reachedTarget:            achievedIdx >= targetIdx,
         achievedRating,
-        totalAmountTRY:           fullPortfolioAmountTRY,
-        selectedActionCount:      fullCount,
+        totalAmountTRY:           workingAmountTRY,
+        selectedActionCount:      workingPortfolio.length,
         fullPortfolioActionCount: fullCount,
         fallback:                 true,
         warnings,
         coveredGroupCount,
-        rawSelectedActionCount:   fullCount,
-        displayActionCount:       fullDisplayCount,
+        rawSelectedActionCount:   workingPortfolio.length,
+        displayActionCount:       workingDisplayCount,
         fullPortfolioAmountTRY,
-        selectedPackageAmountTRY: fullPortfolioAmountTRY,
+        selectedPackageAmountTRY: workingAmountTRY,
       },
     }
   }

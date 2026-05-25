@@ -600,7 +600,11 @@ export function getReceivableCollectionTarget(
 ): number | null {
   const halfGap = options?.halfGap ?? true
 
-  const ar = (ctx.accountBalances?.['120'] ?? 0) + (ctx.accountBalances?.['121'] ?? 0)
+  // R8.4.2: Sadece 120 (Alıcılar) kullanılır.
+  // 121 (Alacak Senetleri) vade gelmeden tahsil edilemez — faktoring/iskonto ayrı mekanizma (R9 notu).
+  // A05 yevmiyesi sadece 120 CREDIT eder; 120+121 toplamı kullanılırsa
+  // amount, 120 bakiyesini aşarak negatif bilançoya yol açar (İSRA: 120=129.3M, amount=270.1M → -140.8M).
+  const ar = ctx.accountBalances?.['120'] ?? 0
   const netSales = ctx.netSales ?? 0
   if (ar <= 0 || netSales <= 0) return null
 
