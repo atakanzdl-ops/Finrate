@@ -530,7 +530,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                   const newVal = parserProvidedKeys.has(k)
                     ? (row.fields as Record<string, unknown>)[k]
                     : null
-                  return [k, newVal != null ? newVal : v]
+                  // R8.4.5d: Parser key oluşturdu ama cleanup null yaptıysa (ör. 780→interestExpense),
+                  // spread'deki null beyanname değerini EZMESİN. existing'den geri al.
+                  // Eski: return [k, newVal != null ? newVal : v]  ← v = null (spread'den), existing kaybolur
+                  const existingVal = (existing as Record<string, unknown>)[k]
+                  return [k, newVal != null ? newVal : (existingVal ?? null)]
                 })
             )
         : row.fields
