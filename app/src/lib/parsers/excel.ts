@@ -524,6 +524,10 @@ const MIZAN_MAP: Record<string, string> = {
   '683': 'extraordinaryExpense',  '684': 'extraordinaryExpense',  '685': 'extraordinaryExpense',
   '686': 'extraordinaryExpense',  '687': 'extraordinaryExpense',  '688': 'extraordinaryExpense',
   '689': 'extraordinaryExpense',
+  // R8.4.5: 7xx Finansman Giderleri — DB'ye yazılır (suffix yok = bakBorç)
+  // getFinancialExpenses(ctx) → accountBalances['780'] okur.
+  // '7' prefix route.ts filter'e de eklendi → reupload'da 780 DB'de kalır.
+  '780': 'financialExpenses',  '781': 'financialExpenses',
   // Pasif – bakAlacak (_A)
   '103': 'cash_CA',
   '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',
@@ -543,6 +547,11 @@ const MIZAN_MAP: Record<string, string> = {
   '431': 'otherNonCurrentLiabilities_A', '432': 'otherNonCurrentLiabilities_A',
   '433': 'otherNonCurrentLiabilities_A', '436': 'otherNonCurrentLiabilities_A',
   '500': 'paidInCapital_A',
+  // R8.4.5: 501 Ödenmemiş Sermaye (kontra hesap, borç bakiyeli)
+  // _CB = -bakBorç → 501 tutarı paidInCapital'dan otomatik düşer
+  // Engine signedSumByCodes zaten 501'i deduction listesinde tutar; rawAccounts'ta
+  // 501 kaydedildiğinde balances['501'] dolu olur ve gerçek deduction çalışır.
+  '501': 'paidInCapital_CB',
   '502': 'capitalReserves_A',        // Sermaye Düzeltmesi → capitalReserves (NOT paidInCapital)
   // 52x — Sermaye Yedekleri alt kodlar → capitalReserves_A
   '520': 'capitalReserves_A', '521': 'capitalReserves_A', '522': 'capitalReserves_A',
