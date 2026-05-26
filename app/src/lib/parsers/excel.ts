@@ -524,12 +524,11 @@ const MIZAN_MAP: Record<string, string> = {
   '683': 'extraordinaryExpense',  '684': 'extraordinaryExpense',  '685': 'extraordinaryExpense',
   '686': 'extraordinaryExpense',  '687': 'extraordinaryExpense',  '688': 'extraordinaryExpense',
   '689': 'extraordinaryExpense',
-  // R8.4.5: 7xx Finansman Giderleri — DB'ye yazılır (suffix yok = bakBorç)
-  // getFinancialExpenses(ctx) → accountBalances['780'] okur.
-  // '7' prefix route.ts filter'e de eklendi → reupload'da 780 DB'de kalır.
-  // R8.4.5c: financialExpenses → interestExpense (şemada mevcut; MIZAN cleanup null eder ama
-  //   rawAccounts yolu devam eder — engine accountBalances['780'] okur, fields değil)
-  '780': 'interestExpense',  '781': 'interestExpense',
+  // R8.4.5 / R8.4.5e: 780/781 Finansman Giderleri MIZAN_MAP'ten çıkarıldı.
+  // MIZAN_RAW_ONLY set'e taşındı → rawAccounts'a yazar, fields'a YAZMAZ.
+  // Sebep: R8.4.5c'de 'interestExpense' olarak eklenince MIZAN cleanup null
+  // yaratıyor, merge spread beyanname değerini yok ediyordu (DEKAM B→BB).
+  // (R8.4.5c'de eklenmişti; R8.4.5e'de kaldırıldı)
   // Pasif – bakAlacak (_A)
   '103': 'cash_CA',
   '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',
@@ -583,6 +582,12 @@ const MAIN_ACCOUNT_CANONICAL: Record<string, string> = {
   '40': '400', '42': '429', '43': '436',
   '50': '500', '52': '529', '54': '549', '57': '570', '58': '580',
 }
+
+// R8.4.5e: Sadece rawAccounts'a yazılan, fields'a yazılmayan hesaplar.
+// 780/781 Finansman Giderleri → interestExpense field oluşturulmaz →
+// beyanname'den gelen interestExpense değeri korunur (null propagation engeli).
+// engine accountBalances['780'] okumaya devam eder (rawAccounts → DB yolu sağlam).
+const MIZAN_RAW_ONLY = new Set(['780', '781'])
 
 export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
   const header = findMizanHeader(rows)
@@ -661,13 +666,17 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
       if (MIZAN_SPLIT[nc]) {
         const splitDef = MIZAN_SPLIT[nc]
         rawAmount = splitDef.rawSide === 'ba' ? ba : bb
+      } else if (MIZAN_RAW_ONLY.has(nc)) {
+        // R8.4.5e: 780/781 → sadece rawAccounts, fields'a yazılmaz
+        // bb=0 (Logo yıl sonu kapanışı) → getNum('borc') dönem toplamı fallback (R8.4.5b)
+        rawAmount = bb === 0 ? getNum('borc') : bb
       } else {
         const mapped = MIZAN_MAP[nc]
         if (mapped) {
           if (mapped.endsWith('_A') || mapped.endsWith('_CA')) {
             rawAmount = ba
           } else if (nc.startsWith('7') && bb === 0) {
-            // R8.4.5b: Logo/iPOS yıl sonu kapatılmış 7xx (780/781 vb.)
+            // R8.4.5b: Logo/iPOS yıl sonu kapatılmış 7xx
             // "Bakiye Bor." = 0, "Toplam Bor." = gerçek dönem gideri
             rawAmount = getNum('borc')
           } else {
@@ -679,6 +688,7 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     }
 
     if (MIZAN_IGNORE.has(nc)) continue
+    if (MIZAN_RAW_ONLY.has(nc)) continue  // R8.4.5e: rawAccounts'ta — fields'a yazılmaz
 
     if (MIZAN_SPLIT[nc]) {
       if (bb > 0) add(MIZAN_SPLIT[nc].bb, bb)

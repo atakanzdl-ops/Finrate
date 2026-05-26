@@ -20,7 +20,8 @@
  *     - totalEquity şişiyordu
  *
  * Düzeltmeler:
- *   1. excel.ts MIZAN_MAP: '780': 'interestExpense', '781': 'interestExpense' eklendi (R8.4.5c: financialExpenses→interestExpense, Prisma şema fix)
+ *   1. excel.ts MIZAN_MAP: '780'/'781' R8.4.5c'de 'interestExpense' olarak eklendi; R8.4.5e'de
+ *      MIZAN_RAW_ONLY set'e taşındı (fields'a yazılmaz → beyanname interestExpense korunur)
  *   2. excel.ts MIZAN_MAP: '501': 'paidInCapital_CB' eklendi (_CB = -bakBorç = kontra)
  *   3. upload/route.ts: filter + deleteMany '7' prefix eklendi
  *   4. excel.ts rawAccounts: 7xx bakiye=0 → Dönem Toplamı fallback (R8.4.5b)
@@ -43,7 +44,7 @@
  *   T_INT_3      — parseMizanRows: '501' rawAccounts'a yazılıyor
  *   T_INT_4      — parseMizanRows: '780' Logo formatı (bakBorc=0) → rawAccounts push
  *   T_INT_5      — parseMizanRows: 501 paidInCapital aggregate
- *   T_INT_6      — parseMizanRows: 780 aggregate (non-Logo, bakBorc>0)
+ *   T_INT_6      — parseMizanRows: 780 rawAccounts (fields.interestExpense YOK — R8.4.5e)
  *   T_R8_4_5b_1  — 7xx bakiye=0, toplam>0 → rawAccounts push (Logo canlı senaryo)
  *   T_R8_4_5b_2  — 1xx-5xx bakiye=0 → push EDİLMEZ (regression koruma)
  *   T_R8_4_5b_3  — 7xx bakiye>0 → bakiye kullan (kapanmamış hesap)
@@ -318,20 +319,29 @@ describe('R8.4.5 — parseMizanRows: 501 + 780 rawAccounts (Integration)', () =>
     expect(fields['paidInCapital']).toBeCloseTo(51_000_000, 0)
   })
 
-  // T_INT_6: parseMizanRows — 780 fields.interestExpense'a yazılıyor (non-Logo, bakBorc>0)
-  // NOT: Logo formatında bakBorc=0 → aggregate'e yazılmaz (bb=0); rawAccounts yolu kullanılır.
-  // R8.4.5c: financialExpenses → interestExpense (Prisma şemada mevcut; MIZAN cleanup null eder)
-  test('T_INT_6 — 780 aggregate (non-Logo, bakBorc>0): fields.interestExpense = 17.9M', async () => {
+  // T_INT_6: parseMizanRows — 780 rawAccounts'a yazılıyor, fields'a YAZILMIYOR (R8.4.5e)
+  // Sebep: MIZAN_MAP'ten kaldırıldı → MIZAN_RAW_ONLY set'e taşındı →
+  //   fields'ta interestExpense key oluşmaz → MIZAN cleanup null yaratmaz →
+  //   merge spread beyanname değerini yok etmez (DEKAM B→BB hotfix).
+  // rawAccounts → DB accountBalances['780'] → engine A14 hesabı devam eder.
+  test('T_INT_6 — 780 rawAccounts (non-Logo, bakBorc>0): fields.interestExpense YOK, rawAccounts[780]=17.9M', async () => {
     const rows = makeMizanRows([
       ['500',           0, 100_000_000],  // 3. fields key garantisi
-      ['780',  17_900_000,  17_900_000],  // interestExpense → +bb → +17.9M
+      ['780',  17_900_000,  17_900_000],  // R8.4.5e: MIZAN_RAW_ONLY → sadece rawAccounts
     ])
 
     const parsed = await parseMizanRows(rows)
     expect(parsed.length).toBeGreaterThan(0)
 
+    // fields'ta interestExpense OLMAMALI (R8.4.5e: key oluşturulmaz → null propagation yok)
     const fields = parsed[0]?.fields ?? {}
-    expect(fields['interestExpense']).toBeCloseTo(17_900_000, 0)
+    expect(fields['interestExpense']).toBeUndefined()
+
+    // rawAccounts'ta 780 OLMALI (engine accountBalances['780'] okuyabilir)
+    const rawAccs = parsed[0]?.rawAccounts ?? []
+    const acc780 = rawAccs.find(a => a.code === '780')
+    expect(acc780).toBeDefined()
+    expect(acc780!.amount).toBeCloseTo(17_900_000, 0)
   })
 
 })
