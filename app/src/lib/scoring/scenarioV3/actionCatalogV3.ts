@@ -55,6 +55,7 @@ import {
   getFinancialExpenseReductionTarget,       // R5: A14 azaltma hedefi
   getEquityInjectionTarget,                 // R8.3: A10/A10B özkaynak enjeksiyon hedefi
   getReceivableCollectionTarget,            // R8.4: A05 yarım-boşluk DSO hedefi
+  getCurrentRatioTarget,                    // R8.5: A15B cari oran half-gap hedefi
 } from './ratioHelpers'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
@@ -1593,6 +1594,20 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
     'Ortak borçları yüksek şirketlerde en hızlı ve düşük maliyetli özkaynak artış yöntemi. Nakit gerektirmez, yalnızca ortakların kararı yeterlidir.',
   bankerPerspective:
     'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
+
+  // R8.5 — Rasyo bazlı tutar (getEquityInjectionTarget paylaşımı — A10/A10B ile aynı helper)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    // Özkaynak/aktif half-gap hedefi (A10 ile aynı formül, 331 kaynağı cap'ler)
+    const target = getEquityInjectionTarget(ctx, { halfGap: true })
+    if (!target) return null
+
+    // 331 bakiye cap — kaynak yetersizse önerilen tutarı kırp
+    const sourceBalance = ctx.accountBalances?.['331'] ?? 0
+    if (sourceBalance <= 0) return null
+
+    return Math.min(target, sourceBalance)
+  },
 }
 
 // ── A15B ─────────────────────────────────────────────────────────────────────
@@ -1659,6 +1674,20 @@ const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
     'Sermaye dönüşümü yapmadan vade yapısı düzeltilir. Kısa vadeli yükümlülük azaldığı için işletme sermayesi rahatlar. Özkaynak değişmez.',
   bankerPerspective:
     'Vade uzatımı kabul edilebilir ancak nakit yaratan bir hareket değildir. Cari oran ve likidite değerlendirmesinde olumlu yansır.',
+
+  // R8.5 — Rasyo bazlı tutar (getCurrentRatioTarget — cari oran half-gap)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    // Cari oran half-gap hedefi — 331 KV→UV taşıma ile gerekli reduction tutarı
+    const target = getCurrentRatioTarget(ctx)
+    if (!target) return null
+
+    // 331 bakiye cap — kaynak yetersizse önerilen tutarı kırp
+    const sourceBalance = ctx.accountBalances?.['331'] ?? 0
+    if (sourceBalance <= 0) return null
+
+    return Math.min(target, sourceBalance)
+  },
 }
 
 // ── A18 ──────────────────────────────────────────────────────────────────────

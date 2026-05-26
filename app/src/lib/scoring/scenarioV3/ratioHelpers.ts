@@ -638,6 +638,79 @@ export function getReceivableCollectionTarget(
   return amount
 }
 
+// ─── getCurrentRatioTarget (R8.5) ────────────────────────────────────────────
+
+/**
+ * R8.5 — Cari Oran Half-Gap Target
+ *
+ * A15B (Ortak Borcu UV'ye Aktarma) için rasyo bazlı tutar hesabı.
+ * KV ortak borcu (331) UV'ye (431) taşındığında cari oran iyileşir.
+ *
+ * Formül:
+ *   currentRatio  = currentAssets / currentLiabilities
+ *   sectorMedian  = TCMB benchmark currentRatio
+ *   halfGapRatio  = (currentRatio + sectorMedian) / 2
+ *   targetCL      = currentAssets / halfGapRatio
+ *   reductionAmt  = currentLiabilities − targetCL
+ *
+ * currentAssets ve currentLiabilities buildV3BalanceTotals mantığından türetilir.
+ * 331 (Ortaklara Borçlar KV) currentLiabilities içindedir — A15B bu hesabı azaltır.
+ * Circular import riski nedeniyle buildV3BalanceTotals import edilmez; mantık inline.
+ *
+ * @returns null:
+ *   - currentAssets ≤ 0 veya currentLiabilities ≤ 0 (geçersiz bilanço)
+ *   - currentRatio ≥ sectorMedian (zaten sektör üstünde)
+ *   - reductionAmount ≤ 0 (sayısal güvenlik)
+ */
+export function getCurrentRatioTarget(ctx: FirmContext): number | null {
+  const b = ctx.accountBalances ?? {}
+
+  // ─── Dönen Varlıklar (buildV3BalanceTotals mantığı) ─────────────────────
+  const cash     = sumByCodesPrefixNet(b, ['100','101','102','108'], ['103'])
+  const tradeRec = sumByCodesPrefixNet(b, ['120','121','126','127','128'], ['122','129'])
+  const otherRec = sumByCodesPrefixNet(b, ['131','132','133','135','136','138'], ['137','139'])
+  const inventory = sumByCodesPrefixNet(b, ['150','151','152','153','157'], ['158'])
+  const prepaid   = sumByCodesPrefix(b, ['159'])
+  const otherCA   = sumByCodesPrefix(b, ['180','181','190','191','193','195','196','197','198'])
+  const currentAssets = cash + tradeRec + otherRec + inventory + prepaid + otherCA
+
+  // ─── KV Yükümlülükler (buildV3BalanceTotals mantığı — 331 dahil) ────────
+  const stFinDebt     = sumByCodesPrefixNet(b, ['300','301','303','304','305','306','309'], ['302','308'])
+  const tradePay      = sumByCodesPrefixNet(b, ['320','321','326','329'], ['322'])
+  // otherShortTermPayables: 331 (Ortaklara Borçlar) burada — A15B azaltacak hesap
+  const otherStPay    = sumByCodesPrefixNet(b,
+    ['331','332','333','335','336','380','381','391','392','393','397','399'],
+    ['337'],
+  )
+  const advances      = sumByCodesPrefix(b, ['340','349'])
+  const constrBilling = sumByCodesPrefix(b, ['350','358'])
+  const taxPay        = sumByCodesPrefixNet(b,
+    ['360','361','368','369','370','372','373','379'],
+    ['371'],
+  )
+  const currentLiabilities = stFinDebt + tradePay + otherStPay
+    + advances + constrBilling + taxPay
+
+  if (currentAssets <= 0 || currentLiabilities <= 0) return null
+
+  const currentRatio = currentAssets / currentLiabilities
+
+  // TCMB benchmark — 'currentRatio' TCMB_DIRECT_FIELDS içinde
+  const bm = getBenchmarkValue(ctx.sector, 'currentRatio')
+  const sectorMedian = bm?.value ?? 1.5   // inşaat/imalat/ticaret genel default
+
+  // Guard: Zaten sektör medyanı üstünde
+  if (currentRatio >= sectorMedian) return null
+
+  const halfGapRatio   = (currentRatio + sectorMedian) / 2
+  const targetCL       = currentAssets / halfGapRatio
+  const reductionAmount = currentLiabilities - targetCL
+
+  if (!Number.isFinite(reductionAmount) || reductionAmount <= 0) return null
+
+  return reductionAmount
+}
+
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
 
 /**
