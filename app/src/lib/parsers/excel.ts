@@ -651,6 +651,9 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     //   _CB / suffix yok → bakBorç (borç bakiyeli hesaplar)
     //   MIZAN_SPLIT → rawSide belirtilmişse o taraf; aksi hâlde bb (borç bakiye)
     //   R8.2: 331 pasif hesap → rawSide:'ba' → ba kullanılır (alacak bakiye)
+    //   R8.4.5b: 7xx gider hesapları yıl sonu kapanışında bakiye=0 olur (690'a devredilir)
+    //   Bakiye=0 ise Dönem Toplamı (Toplam Bor. / borc sütunu) fallback.
+    //   1xx-5xx bilanço hesapları DOKUNULMAZ (bakiye = gerçek değer).
     if (nc.length === 3) {
       let rawAmount = 0
       if (MIZAN_SPLIT[nc]) {
@@ -659,8 +662,15 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
       } else {
         const mapped = MIZAN_MAP[nc]
         if (mapped) {
-          if (mapped.endsWith('_A') || mapped.endsWith('_CA')) rawAmount = ba
-          else rawAmount = bb
+          if (mapped.endsWith('_A') || mapped.endsWith('_CA')) {
+            rawAmount = ba
+          } else if (nc.startsWith('7') && bb === 0) {
+            // R8.4.5b: Logo/iPOS yıl sonu kapatılmış 7xx (780/781 vb.)
+            // "Bakiye Bor." = 0, "Toplam Bor." = gerçek dönem gideri
+            rawAmount = getNum('borc')
+          } else {
+            rawAmount = bb
+          }
         }
       }
       if (rawAmount !== 0) rawAccounts.push({ code: nc, amount: rawAmount })

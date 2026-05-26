@@ -1,11 +1,17 @@
 /**
- * R8.4.5 — Parser 7xx + 501 Ödenmemiş Sermaye Testleri
+ * R8.4.5 + R8.4.5b — Parser 7xx + 501 Ödenmemiş Sermaye Testleri
  *
  * Kapsam:
  *   BUG 2 — A14 780 Hesabı DB'ye Gitmiyordu:
  *     - excel.ts MIZAN_MAP'te '780' yoktu → rawAccounts'a hiç girmiyordu
  *     - route.ts filter sadece 1xx-5xx kabul ediyordu
  *     - A14 helper 780 bulamayınca fallback: borç × %25 = 'Tahmini'
+ *
+ *   BUG 2b — Logo Mizan Yıl Sonu Kapanışı (R8.4.5b):
+ *     - Logo/iPOS ACCLIST: "Bakiye Bor." = 0 (780 kapanmış), "Toplam Bor." = 17.9M
+ *     - getNum('bakBorc', 'borc'): cols['bakBorc'] TANIMLI → bakBorc = 0 okur
+ *     - Değer 0 olsa bile fallback tetiklenmez → rawAmount = 0 → push edilmiyordu
+ *     - R8.4.5 MIZAN_MAP eklemesi etkisizdi
  *
  *   BUG 3 — 501 Ödenmemiş Sermaye Parser'da Yoktu:
  *     - excel.ts MIZAN_MAP'te '501' eşleşmesi yoktu
@@ -17,6 +23,7 @@
  *   1. excel.ts MIZAN_MAP: '780': 'financialExpenses', '781': 'financialExpenses' eklendi
  *   2. excel.ts MIZAN_MAP: '501': 'paidInCapital_CB' eklendi (_CB = -bakBorç = kontra)
  *   3. upload/route.ts: filter + deleteMany '7' prefix eklendi
+ *   4. excel.ts rawAccounts: 7xx bakiye=0 → Dönem Toplamı fallback (R8.4.5b)
  *
  * README pattern (R6 + R7A dersleri):
  *   - Birim test + entegrasyon testi zorunlu
@@ -26,15 +33,21 @@
  *   - allowedActionIds ile izole test
  *
  * Sabitler:
- *   T_R845_1  — Filter: 7xx dahil edildi
- *   T_R845_2  — Filter: 6xx/8xx/9xx hâlâ dışarıda
- *   T_R845_3  — getFinancialExpenses: 780 varsa isEstimated=false
- *   T_R845_4  — getFinancialExpenses: 780 yoksa isEstimated=true (fallback)
- *   T_R845_5  — A14 unit: ctx'te 780 → computeAmount null değil
- *   T_INT_1   — Engine entegrasyon: 780 accountBalances'ta → A14 portfolio'da
- *   T_INT_2   — Engine entegrasyon: 501 etkisi — paidInCapital düşük
- *   T_INT_3   — parseMizanRows: '501' rawAccounts'a yazılıyor
- *   T_INT_4   — parseMizanRows: '780' rawAccounts'a yazılıyor
+ *   T_R845_1     — Filter: 7xx dahil edildi
+ *   T_R845_2     — Filter: 6xx/8xx/9xx hâlâ dışarıda
+ *   T_R845_3     — getFinancialExpenses: 780 varsa isEstimated=false
+ *   T_R845_4     — getFinancialExpenses: 780 yoksa isEstimated=true (fallback)
+ *   T_R845_5     — A14 unit: ctx'te 780 → computeAmount null değil
+ *   T_INT_1      — Engine entegrasyon: 780 accountBalances'ta → A14 portfolio'da
+ *   T_INT_2      — Engine entegrasyon: 501 etkisi — paidInCapital düşük
+ *   T_INT_3      — parseMizanRows: '501' rawAccounts'a yazılıyor
+ *   T_INT_4      — parseMizanRows: '780' Logo formatı (bakBorc=0) → rawAccounts push
+ *   T_INT_5      — parseMizanRows: 501 paidInCapital aggregate
+ *   T_INT_6      — parseMizanRows: 780 aggregate (non-Logo, bakBorc>0)
+ *   T_R8_4_5b_1  — 7xx bakiye=0, toplam>0 → rawAccounts push (Logo canlı senaryo)
+ *   T_R8_4_5b_2  — 1xx-5xx bakiye=0 → push EDİLMEZ (regression koruma)
+ *   T_R8_4_5b_3  — 7xx bakiye>0 → bakiye kullan (kapanmamış hesap)
+ *   T_R8_4_5b_4  — 7xx bakiye=0, toplam=0 → push EDİLMEZ (edge case)
  */
 
 import { getFinancialExpenses }       from '../ratioHelpers'
@@ -65,7 +78,9 @@ function makeCtx(overrides: Partial<FirmContext> = {}): FirmContext {
   }
 }
 
-/** Minimal mizan satır seti: header + 4 hesap kodu (≥3 fields garantisi) */
+/** Minimal mizan satır seti: header + base hesaplar (≥3 fields garantisi)
+ *  3-sütun format: [code, bakBorc, bakAlacak]
+ *  Bilanço testleri için (bakiye = gerçek değer). */
 function makeMizanRows(extraRows: unknown[][] = []): unknown[][] {
   return [
     // Header: 'Hesap Kodu' (isCodeHeaderCell), 'Bakiye Borç' (bakBorc), 'Bakiye Alacak' (bakAlacak)
@@ -74,6 +89,27 @@ function makeMizanRows(extraRows: unknown[][] = []): unknown[][] {
     ['120', 63_000_000,   0],
     // 300 Banka Kredileri (alacak bakiyeli)
     ['300',          0, 137_100_000],
+    ...extraRows,
+  ]
+}
+
+/** Logo/iPOS ACCLIST format: 5-sütun, yıl sonu kapanışlı mizan
+ *  Sütun sırası: [code, bakBorc, bakAlacak, borc, alacak]
+ *  - "Bakiye Bor." → cols['bakBorc'] (kapanmış 7xx hesaplar için = 0)
+ *  - "Bakiye Alac." → cols['bakAlacak']
+ *  - "Toplam Bor." → cols['borc']  (dönem toplamı = gerçek gider)
+ *  - "Toplam Alac." → cols['alacak']
+ *  R8.4.5b: 7xx bakBorc=0 → getNum('borc') dönem toplamı kullanılır. */
+function makeLogoMizanRows(extraRows: unknown[][] = []): unknown[][] {
+  return [
+    // Faz 7.3.22: iPOS Logo ACCLIST sütun isimleri
+    ['Hesap Kodu', 'Bakiye Bor.', 'Bakiye Alac.', 'Toplam Bor.', 'Toplam Alac.'],
+    // 120 Alıcılar: bakiye=63M (bilanço, kapatılmaz)
+    ['120', 63_000_000, 0, 63_000_000, 0],
+    // 300 Banka Kredileri: bakiye alacak=137.1M
+    ['300', 0, 137_100_000, 0, 137_100_000],
+    // 500 Sermaye: bakiye alacak=100M (3. fields key garantisi)
+    ['500', 0, 100_000_000, 0, 100_000_000],
     ...extraRows,
   ]
 }
@@ -247,13 +283,14 @@ describe('R8.4.5 — parseMizanRows: 501 + 780 rawAccounts (Integration)', () =>
     expect(entry501?.amount).toBe(49_000_000)
   })
 
-  // T_INT_4: parseMizanRows — 780 rawAccounts'a yazılıyor
-  test('T_INT_4 — 780 Finansman Giderleri rawAccounts\'ta (borç bakiyesi)', async () => {
-    // MIZAN_MAP['780'] = 'financialExpenses' (R8.4.5 eklendi)
-    // suffix yok → rawAmount = bb = 17.9M
-    const rows = makeMizanRows([
-      ['500',           0, 100_000_000],  // paidInCapital → fields'a
-      ['780',  17_900_000,  17_900_000],  // financialExpenses → bb = 17.9M
+  // T_INT_4: parseMizanRows — 780 rawAccounts'a yazılıyor (Logo yıl sonu formatı)
+  // R8.4.5b: iPOS Logo gerçek format — bakBorc=0 (kapanmış), Toplam Bor.=17.9M
+  test('T_INT_4 — 780 Logo formatı: bakBorc=0, Toplam Bor.=17.9M → rawAccounts push', async () => {
+    // Faz 7.3.22 iPOS canlı kanıtı:
+    //   780 MALY | Toplam Borç: 17,869,078.32 | Bakiye Borç: 0 (yıl sonu kapanışı)
+    // 5-sütun: [code, bakBorc, bakAlacak, borc, alacak]
+    const rows = makeLogoMizanRows([
+      ['780', 0, 0, 17_900_000, 17_900_000],  // R8.4.5b: bb=0 → getNum('borc')=17.9M
     ])
 
     const parsed = await parseMizanRows(rows)
@@ -281,8 +318,9 @@ describe('R8.4.5 — parseMizanRows: 501 + 780 rawAccounts (Integration)', () =>
     expect(fields['paidInCapital']).toBeCloseTo(51_000_000, 0)
   })
 
-  // T_INT_6: parseMizanRows — 780 fields.financialExpenses'a yazılıyor
-  test('T_INT_6 — 780 aggregate: fields.financialExpenses = 17.9M', async () => {
+  // T_INT_6: parseMizanRows — 780 fields.financialExpenses'a yazılıyor (non-Logo, bakBorc>0)
+  // NOT: Logo formatında bakBorc=0 → aggregate'e yazılmaz (bb=0); rawAccounts yolu kullanılır.
+  test('T_INT_6 — 780 aggregate (non-Logo, bakBorc>0): fields.financialExpenses = 17.9M', async () => {
     const rows = makeMizanRows([
       ['500',           0, 100_000_000],  // 3. fields key garantisi
       ['780',  17_900_000,  17_900_000],  // financialExpenses → +bb → +17.9M
@@ -293,6 +331,85 @@ describe('R8.4.5 — parseMizanRows: 501 + 780 rawAccounts (Integration)', () =>
 
     const fields = parsed[0]?.fields ?? {}
     expect(fields['financialExpenses']).toBeCloseTo(17_900_000, 0)
+  })
+
+})
+
+// ─── T_R8_4_5b — Logo Yıl Sonu Kapanışı Fallback Testleri ───────────────────
+
+describe('R8.4.5b — 7xx Bakiye=0 Dönem Toplamı Fallback (Integration)', () => {
+
+  // T_R8_4_5b_1: 7xx bakiye=0, toplam>0 → rawAccounts push (Logo canlı senaryo)
+  // iPOS 780 canlı kanıt: bakBorc=0, Toplam Bor.=17,869,078.32
+  test('T_R8_4_5b_1 — 7xx bakiye=0 + toplam>0 → rawAccounts push (17.9M)', async () => {
+    const rows = makeLogoMizanRows([
+      ['780', 0, 0, 17_900_000, 17_900_000],
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const raw = parsed[0]?.rawAccounts ?? []
+    const entry = raw.find(a => a.code === '780')
+
+    expect(entry).toBeDefined()
+    expect(entry!.amount).toBe(17_900_000)
+  })
+
+  // T_R8_4_5b_2: 1xx-5xx bakiye=0 → push EDİLMEZ (regression koruma)
+  // 1xx-5xx bilanço hesapları için bakiye=0 gerçek sıfır demektir
+  // nc.startsWith('7') koşulu sadece 7xx'e uygulanır
+  test('T_R8_4_5b_2 — 1xx-5xx bakiye=0 → push EDİLMEZ (regression)', async () => {
+    const rows = makeLogoMizanRows([
+      // 153 Ticaret Malı: bakiye=0, toplam=5M — bilanço hesabı, 7xx fallback UYGULANMAZ
+      ['153', 0, 0, 5_000_000, 5_000_000],
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const raw = parsed[0]?.rawAccounts ?? []
+    const entry153 = raw.find(a => a.code === '153')
+
+    // bakBorc=0, nc='153' (starts with '1'), fallback TETIKLENMEZ → rawAmount=0 → push yok
+    expect(entry153).toBeUndefined()
+  })
+
+  // T_R8_4_5b_3: 7xx bakiye>0 → bakiye kullan (yıl içi, kapanmamış hesap)
+  // Yıl içi mizan veya Q dönem mizan: bakiye = o ana kadar birikmiş gider
+  test('T_R8_4_5b_3 — 7xx bakiye>0 → bakiye kullan (kapanmamış)', async () => {
+    const rows = makeLogoMizanRows([
+      // 780: henüz kapanmamış, bakBorc>0
+      ['780', 10_000_000, 0, 10_000_000, 0],
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const raw = parsed[0]?.rawAccounts ?? []
+    const entry = raw.find(a => a.code === '780')
+
+    // bb=10M (bakBorc>0) → nc.startsWith('7') && bb===0 → FALSE → rawAmount=bb=10M
+    expect(entry).toBeDefined()
+    expect(entry!.amount).toBe(10_000_000)
+  })
+
+  // T_R8_4_5b_4: 7xx bakiye=0, toplam=0 → push EDİLMEZ (edge case)
+  // Hiç hareket görmemiş 7xx hesabı: ne bakiye ne toplam var
+  test('T_R8_4_5b_4 — 7xx bakiye=0 + toplam=0 → push EDİLMEZ (edge case)', async () => {
+    const rows = makeLogoMizanRows([
+      ['780', 0, 0, 0, 0],  // boş 780 hesabı — hem bakiye hem toplam 0
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    // fields sayısı zaten ≥3 (base rows: 120, 300, 500)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const raw = parsed[0]?.rawAccounts ?? []
+    const entry = raw.find(a => a.code === '780')
+
+    // getNum('borc') = 0 → rawAmount=0 → push yok
+    expect(entry).toBeUndefined()
   })
 
 })
