@@ -527,7 +527,9 @@ const MIZAN_MAP: Record<string, string> = {
   // R8.4.5: 7xx Finansman Giderleri — DB'ye yazılır (suffix yok = bakBorç)
   // getFinancialExpenses(ctx) → accountBalances['780'] okur.
   // '7' prefix route.ts filter'e de eklendi → reupload'da 780 DB'de kalır.
-  '780': 'financialExpenses',  '781': 'financialExpenses',
+  // R8.4.5c: financialExpenses → interestExpense (şemada mevcut; MIZAN cleanup null eder ama
+  //   rawAccounts yolu devam eder — engine accountBalances['780'] okur, fields değil)
+  '780': 'interestExpense',  '781': 'interestExpense',
   // Pasif – bakAlacak (_A)
   '103': 'cash_CA',
   '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',

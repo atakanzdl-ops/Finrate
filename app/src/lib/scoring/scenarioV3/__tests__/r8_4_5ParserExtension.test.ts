@@ -20,7 +20,7 @@
  *     - totalEquity şişiyordu
  *
  * Düzeltmeler:
- *   1. excel.ts MIZAN_MAP: '780': 'financialExpenses', '781': 'financialExpenses' eklendi
+ *   1. excel.ts MIZAN_MAP: '780': 'interestExpense', '781': 'interestExpense' eklendi (R8.4.5c: financialExpenses→interestExpense, Prisma şema fix)
  *   2. excel.ts MIZAN_MAP: '501': 'paidInCapital_CB' eklendi (_CB = -bakBorç = kontra)
  *   3. upload/route.ts: filter + deleteMany '7' prefix eklendi
  *   4. excel.ts rawAccounts: 7xx bakiye=0 → Dönem Toplamı fallback (R8.4.5b)
@@ -318,19 +318,20 @@ describe('R8.4.5 — parseMizanRows: 501 + 780 rawAccounts (Integration)', () =>
     expect(fields['paidInCapital']).toBeCloseTo(51_000_000, 0)
   })
 
-  // T_INT_6: parseMizanRows — 780 fields.financialExpenses'a yazılıyor (non-Logo, bakBorc>0)
+  // T_INT_6: parseMizanRows — 780 fields.interestExpense'a yazılıyor (non-Logo, bakBorc>0)
   // NOT: Logo formatında bakBorc=0 → aggregate'e yazılmaz (bb=0); rawAccounts yolu kullanılır.
-  test('T_INT_6 — 780 aggregate (non-Logo, bakBorc>0): fields.financialExpenses = 17.9M', async () => {
+  // R8.4.5c: financialExpenses → interestExpense (Prisma şemada mevcut; MIZAN cleanup null eder)
+  test('T_INT_6 — 780 aggregate (non-Logo, bakBorc>0): fields.interestExpense = 17.9M', async () => {
     const rows = makeMizanRows([
       ['500',           0, 100_000_000],  // 3. fields key garantisi
-      ['780',  17_900_000,  17_900_000],  // financialExpenses → +bb → +17.9M
+      ['780',  17_900_000,  17_900_000],  // interestExpense → +bb → +17.9M
     ])
 
     const parsed = await parseMizanRows(rows)
     expect(parsed.length).toBeGreaterThan(0)
 
     const fields = parsed[0]?.fields ?? {}
-    expect(fields['financialExpenses']).toBeCloseTo(17_900_000, 0)
+    expect(fields['interestExpense']).toBeCloseTo(17_900_000, 0)
   })
 
 })

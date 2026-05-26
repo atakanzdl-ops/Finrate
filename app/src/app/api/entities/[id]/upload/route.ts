@@ -782,9 +782,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    const stack = err instanceof Error ? err.stack : undefined
     const correlationId = crypto.randomUUID()
-    console.error('[upload] diagnostic:', { correlationId, error: msg, stack })
-    return jsonUtf8({ error: 'Dosya işlenirken hata oluştu.', correlationId, debugMessage: msg, debugStack: stack }, { status: 500 })
+    console.error('[upload] error:', { correlationId, error: msg })
+    return jsonUtf8({ error: 'Dosya işlenirken hata oluştu.', correlationId }, { status: 500 })
   }
 }
