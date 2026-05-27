@@ -494,7 +494,7 @@ const MIZAN_SPLIT: Record<string, { bb: string; ba: string; rawSide?: 'bb' | 'ba
 const MIZAN_MAP: Record<string, string> = {
   // Aktif – bakBorç
   '100': 'cash',             '101': 'cash',             '102': 'cash',             '108': 'cash',
-  '121': 'tradeReceivables', '126': 'tradeReceivables', '128': 'tradeReceivables', // Faz 7.3.25: 128 Şüpheli Ticari Alacaklar
+  '121': 'tradeReceivables', '126': 'tradeReceivables', '127': 'tradeReceivables', '128': 'tradeReceivables', // R9.1: 127 Diğer Ticari Alacaklar
   '136': 'otherReceivables',
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
   // '159' MIZAN_SPLIT'e taşındı (R9 — bb/ba ters bakiye)
@@ -535,7 +535,7 @@ const MIZAN_MAP: Record<string, string> = {
   // (R8.4.5c'de eklenmişti; R8.4.5e'de kaldırıldı)
   // Pasif – bakAlacak (_A)
   '103': 'cash_CA',
-  '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',
+  '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '303': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A', // R9.1: 303 UV Kredi KV Taksitleri
   '321': 'tradePayables_A',          '326': 'tradePayables_A',
   '335': 'otherShortTermPayables_A', '336': 'otherShortTermPayables_A',
   // '340' MIZAN_SPLIT'e taşındı (R9 — rawSide:'ba', ters bakiye → prepaidSuppliers)
@@ -543,7 +543,7 @@ const MIZAN_MAP: Record<string, string> = {
   // 44x — UV Alınan Avanslar → longTermAdvancesReceived_A (Faz 7.3.21)
   '440': 'longTermAdvancesReceived_A', '449': 'longTermAdvancesReceived_A',
   '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
-  '381': 'deferredRevenue_A',
+  '380': 'deferredRevenue_A', '381': 'deferredRevenue_A', // R9.1: 380 Gelecek Aylara Ait Gelirler
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
   // 42x — UV Ticari Borçlar → longTermTradePayables_A
   '420': 'longTermTradePayables_A',  '421': 'longTermTradePayables_A',

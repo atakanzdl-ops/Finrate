@@ -49,6 +49,9 @@
  *   T_R8_4_5b_2  — 1xx-5xx bakiye=0 → push EDİLMEZ (regression koruma)
  *   T_R8_4_5b_3  — 7xx bakiye>0 → bakiye kullan (kapanmamış hesap)
  *   T_R8_4_5b_4  — 7xx bakiye=0, toplam=0 → push EDİLMEZ (edge case)
+ *   T_R9_MAP_1   — 127 bb=14M → tradeReceivables=14M (R9.1: eksik hesap)
+ *   T_R9_MAP_2   — 303 ba=9.4M → shortTermFinancialDebt=9.4M (R9.1: eksik hesap)
+ *   T_R9_MAP_3   — 380 ba=39.8M → deferredRevenue=39.8M (R9.1: eksik hesap)
  */
 
 import { getFinancialExpenses }       from '../ratioHelpers'
@@ -529,6 +532,63 @@ describe('R9 Hotfix — Net Bakiye Mantığı: bb ve ba aynı anda > 0 (Integrat
     expect(fields['advancesReceived']).toBeCloseTo(5_000_000, 0)
     // tradeReceivables: sadece base row 120 (63M) — ters bakiye satırından 0 gelir
     expect(fields['tradeReceivables']).toBeCloseTo(63_000_000, 0)
+  })
+
+})
+
+// ─── T_R9_MAP — R9.1 Eksik Hesap Kodları (127/303/380) ───────────────────────
+
+describe('R9.1 — MIZAN_MAP Eksik Hesap Kodları: 127 / 303 / 380 (Integration)', () => {
+
+  // T_R9_MAP_1: 127 Diğer Ticari Alacaklar → tradeReceivables (aktif, borç bakiyeli, no suffix)
+  // İSRA 2025 mizanında 14M aktif eksiklik kaynağı
+  test('T_R9_MAP_1 — 127 bb=14M: tradeReceivables=14M', async () => {
+    const rows: unknown[][] = [
+      ['Hesap Kodu', 'Bakiye Borç', 'Bakiye Alacak'],
+      ['127',  14_000_000,           0],  // Diğer Ticari Alacaklar — bb
+      ['300',           0, 137_100_000],  // shortTermFinancialDebt (2. field)
+      ['500',           0, 100_000_000],  // paidInCapital (3. field)
+    ]
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['tradeReceivables']).toBeCloseTo(14_000_000, 0)
+  })
+
+  // T_R9_MAP_2: 303 UV Kredi KV Taksitleri → shortTermFinancialDebt (pasif, alacak bakiyeli, _A)
+  // İSRA 2025 mizanında 9.4M pasif eksiklik kaynağı
+  test('T_R9_MAP_2 — 303 ba=9.4M: shortTermFinancialDebt=9.4M', async () => {
+    const rows: unknown[][] = [
+      ['Hesap Kodu', 'Bakiye Borç', 'Bakiye Alacak'],
+      ['127',  14_000_000,          0],   // tradeReceivables (1. field)
+      ['303',           0,  9_400_000],   // UV Kredi KV Taksitleri — ba (_A)
+      ['500',           0, 100_000_000],  // paidInCapital (3. field)
+    ]
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['shortTermFinancialDebt']).toBeCloseTo(9_400_000, 0)
+  })
+
+  // T_R9_MAP_3: 380 Gelecek Aylara Ait Gelirler → deferredRevenue (pasif, alacak bakiyeli, _A)
+  // İSRA 2025 mizanında 39.8M pasif eksiklik kaynağı
+  test('T_R9_MAP_3 — 380 ba=39.8M: deferredRevenue=39.8M', async () => {
+    const rows: unknown[][] = [
+      ['Hesap Kodu', 'Bakiye Borç', 'Bakiye Alacak'],
+      ['127',  14_000_000,           0],  // tradeReceivables (1. field)
+      ['380',           0,  39_800_000],  // Gelecek Aylara Ait Gelirler — ba (_A)
+      ['500',           0, 100_000_000],  // paidInCapital (3. field)
+    ]
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['deferredRevenue']).toBeCloseTo(39_800_000, 0)
   })
 
 })
