@@ -695,8 +695,13 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     if (MIZAN_RAW_ONLY.has(nc)) continue  // R8.4.5e: rawAccounts'ta — fields'a yazılmaz
 
     if (MIZAN_SPLIT[nc]) {
-      if (bb > 0) add(MIZAN_SPLIT[nc].bb, bb)
-      if (ba > 0) add(MIZAN_SPLIT[nc].ba, ba)
+      // R9 Hotfix: Net bakiye — ters bakiye muhasebe kuralı
+      // Aktif hesaplar borç bakiyeli, pasif hesaplar alacak bakiyeli olur.
+      // bb ve ba aynı anda > 0 ise (dönem hareketi formatı vb.) net değer hesaplanır.
+      const net_bb = Math.max(0, bb - ba)  // net borç bakiyesi
+      const net_ba = Math.max(0, ba - bb)  // net alacak bakiyesi
+      if (net_bb > 0) add(MIZAN_SPLIT[nc].bb, net_bb)
+      if (net_ba > 0) add(MIZAN_SPLIT[nc].ba, net_ba)
       continue
     }
 

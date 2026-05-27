@@ -459,11 +459,11 @@ describe('R9 — MIZAN_SPLIT Ters Bakiye: 231 / 159 / 340 (Integration)', () => 
     expect(fields['prepaidSuppliers'] ?? 0).toBeCloseTo(0, 0)
   })
 
-  // T_R845_340_1: 340 bb>0 (ters bakiye) → prepaidSuppliers
-  // 340 Alınan Sipariş Avansları: normalde pasif (ba, rawSide:'ba'). Ters bakiye → verilen avans (aktif).
-  test('T_R845_340_1 — 340 bb>0: prepaidSuppliers = bb; advancesReceived = 0', async () => {
+  // T_R845_340_1: 340 bb>0 (ters bakiye, saf) → prepaidSuppliers = net_bb
+  // bb=8M, ba=0 → net_bb=8M, net_ba=0 → sadece prepaidSuppliers
+  test('T_R845_340_1 — 340 bb>0 ba=0: prepaidSuppliers = bb; advancesReceived = 0', async () => {
     const rows = makeMizanRows([
-      ['340', 8_000_000, 0],  // bb=8M, ba=0 → ters bakiye
+      ['340', 8_000_000, 0],  // bb=8M, ba=0 → net_bb=8M
     ])
 
     const parsed = await parseMizanRows(rows)
@@ -472,6 +472,63 @@ describe('R9 — MIZAN_SPLIT Ters Bakiye: 231 / 159 / 340 (Integration)', () => 
     const fields = parsed[0]?.fields ?? {}
     expect(fields['prepaidSuppliers']).toBeCloseTo(8_000_000, 0)
     expect(fields['advancesReceived'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+})
+
+// ─── T_R9_NET — R9 Hotfix: Net Bakiye Mantığı Testleri ───────────────────────
+
+describe('R9 Hotfix — Net Bakiye Mantığı: bb ve ba aynı anda > 0 (Integration)', () => {
+
+  // T_R9_NET_1: 340 İSRA senaryosu — dönem hareketi bb+ba
+  // ba=937M (alınan avanslar), bb=35M (teslim edilen/dönem borç) →
+  // net_ba=902M (pasife), net_bb=0 (aktife hayır)
+  test('T_R9_NET_1 — 340 bb=35M ba=937M: advancesReceived=902M, prepaidSuppliers=0', async () => {
+    const rows = makeMizanRows([
+      ['340', 35_000_000, 937_000_000],  // bb=35M, ba=937M → net_ba=902M
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['advancesReceived']).toBeCloseTo(902_000_000, 0)
+    expect(fields['prepaidSuppliers'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+  // T_R9_NET_2: 120 normal aktif bakiye — net_bb = bb
+  // bb=100M, ba=0 → net_bb=100M → tradeReceivables (mevcut davranış korunuyor)
+  // Bağımsız satır seti (makeMizanRows kullanılmaz) — ≥3 field garantisi için 500 eklendi
+  test('T_R9_NET_2 — 120 bb=100M ba=0: tradeReceivables=100M (normal aktif)', async () => {
+    const rows: unknown[][] = [
+      ['Hesap Kodu', 'Bakiye Borç', 'Bakiye Alacak'],
+      ['120', 100_000_000,           0],  // net_bb=100M → tradeReceivables
+      ['300',           0, 137_100_000],  // shortTermFinancialDebt
+      ['500',           0, 100_000_000],  // paidInCapital — 3. field garantisi
+    ]
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['tradeReceivables']).toBeCloseTo(100_000_000, 0)
+    expect(fields['advancesReceived'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+  // T_R9_NET_3: 120 ters bakiye — net_ba = ba
+  // bb=0, ba=5M → net_ba=5M → advancesReceived (alınan avans tarafı)
+  test('T_R9_NET_3 — 120 bb=0 ba=5M: advancesReceived=5M (ters bakiye)', async () => {
+    const rows = makeMizanRows([
+      ['120', 0, 5_000_000],  // bb=0, ba=5M → net_ba=5M
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['advancesReceived']).toBeCloseTo(5_000_000, 0)
+    // tradeReceivables: sadece base row 120 (63M) — ters bakiye satırından 0 gelir
+    expect(fields['tradeReceivables']).toBeCloseTo(63_000_000, 0)
   })
 
 })
