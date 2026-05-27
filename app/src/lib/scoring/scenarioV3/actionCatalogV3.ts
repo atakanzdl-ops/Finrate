@@ -155,7 +155,7 @@ function getNetCashBalance(analysis: unknown): number {
 // ── A01 ──────────────────────────────────────────────────────────────────────
 const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
   id: 'A01_ST_FIN_DEBT_TO_LT',
-  name: 'KV Finansal Borç → UV Yeniden Yapılandırma',
+  name: 'Finansal Borç Vade Uzatma',  // R8.7: 'KV Finansal Borç → UV Yeniden Yapılandırma' → sade
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_RECLASSIFICATION',
   horizons: ['medium', 'long'],
@@ -287,7 +287,7 @@ const A02_TRADE_PAYABLE_TO_LT: ActionTemplateV3 = {
 // ── A03 ──────────────────────────────────────────────────────────────────────
 const A03_ADVANCE_TO_LT: ActionTemplateV3 = {
   id: 'A03_ADVANCE_TO_LT',
-  name: 'KV Alınan Avans → UV Sınıflandırma',
+  name: 'Alınan Avans Vade Uzatma',  // R8.7: 'KV Alınan Avans → UV Sınıflandırma' → sade
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_RECLASSIFICATION',
   horizons: ['medium', 'long'],
@@ -894,7 +894,7 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
 // ── A09 ──────────────────────────────────────────────────────────────────────
 const A09_SALE_LEASEBACK: ActionTemplateV3 = {
   id: 'A09_SALE_LEASEBACK',
-  name: 'Sat-Geri Kirala (Sale & Leaseback)',
+  name: 'Sat ve Geri Kirala',  // R8.7: 'Sat-Geri Kirala (Sale & Leaseback)' → İngilizce kaldırıldı
   family: 'DEBT_STRUCTURE',
   semanticType: 'SALE_LEASEBACK',
   horizons: ['medium', 'long'],
@@ -1161,7 +1161,7 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
 // ── A11 ──────────────────────────────────────────────────────────────────────
 const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
   id: 'A11_RETAIN_EARNINGS',
-  name: 'Dönem Kârını Dağıtmayıp Özkaynakta Tutma',
+  name: 'Kârı Özkaynakta Tut',  // R8.7: 'Dönem Kârını Dağıtmayıp Özkaynakta Tutma' → sade
   family: 'EQUITY_PNL',
   semanticType: 'RETAINED_EARNINGS',
   horizons: ['medium', 'long'],
@@ -1966,7 +1966,7 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
 // ── A19 ──────────────────────────────────────────────────────────────────────
 const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   id: 'A19_ADVANCE_TO_REVENUE',
-  name: 'Alınan Avansın Hasılata Tanınması (Proje Teslimi)',
+  name: 'Alınan Avansların Teslimi',  // R8.7: 'Alınan Avansın Hasılata Tanınması (Proje Teslimi)' → sade
   family: 'EQUITY_PNL',
   semanticType: 'ADVANCE_TO_REVENUE',
   horizons: ['short', 'medium', 'long'],
@@ -2206,7 +2206,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
 // ── A20 ──────────────────────────────────────────────────────────────────────
 const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   id: 'A20_GROSS_MARGIN_REFORM',
-  name: 'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
+  name: 'Brüt Marj Reformu',  // R8.7: 'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)' → sade
   family: 'EQUITY_PNL',
   semanticType: 'OPERATIONAL_MARGIN',
   horizons: ['medium'],

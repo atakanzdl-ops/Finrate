@@ -17,20 +17,31 @@ const FAMILY_LABELS: Record<string, ActionFamilyTR> = {
 }
 
 const ACTION_NAMES: Record<string, string> = {
-  A01_ST_FIN_DEBT_TO_LT:         'Kısa Vadeli Finansal Borcu Uzun Vadeye Çevir',
-  A02_TRADE_PAYABLE_TO_LT:       'Ticari Borcu Uzun Vadeye Yeniden Sınıfla',
-  A03_ADVANCE_TO_LT:             'Alınan Avansları Uzun Vadeye Çevir',
-  A04_CASH_PAYDOWN_ST:           'Nakit ile KV Borç Kapat',
-  A05_RECEIVABLE_COLLECTION:     'Alacak Tahsili Hızlandır',
-  A06_INVENTORY_OPTIMIZATION:    'Stok Optimizasyonu',
-  A07_PREPAID_EXPENSE_RELEASE:   'Peşin Giderleri Serbest Bırak',
-  A08_FIXED_ASSET_DISPOSAL:      'Atıl Maddi Duran Varlık Satışı',
-  A09_SALE_LEASEBACK:            'Sat-Geri Kirala',
-  A10_EQUITY_INJECTION:          'Sermaye Artırımı',
-  A11_EARNINGS_RETENTION:        'Kârı Şirkette Tut',
-  A12_GROSS_MARGIN_IMPROVEMENT:  'Brüt Kâr Marjı İyileştir',
-  A13_OPEX_OPTIMIZATION:         'Faaliyet Giderlerini Düşür',
-  A14_FINANCE_COST_OPTIMIZATION: 'Finansman Giderini Düşür',
+  A01_ST_FIN_DEBT_TO_LT:                    'Kısa Vadeli Finansal Borcu Uzun Vadeye Çevir',
+  A02_TRADE_PAYABLE_TO_LT:                  'Ticari Borcu Uzun Vadeye Yeniden Sınıfla',
+  A03_ADVANCE_TO_LT:                        'Alınan Avansları Uzun Vadeye Çevir',
+  A04_CASH_PAYDOWN_ST:                      'Nakit ile KV Borç Kapat',
+  A05_RECEIVABLE_COLLECTION:                'Alacak Tahsili Hızlandır',
+  A06_INVENTORY_OPTIMIZATION:               'Stok Optimizasyonu',
+  A07_PREPAID_EXPENSE_RELEASE:              'Peşin Giderleri Serbest Bırak',
+  A08_FIXED_ASSET_DISPOSAL:                 'Atıl Maddi Duran Varlık Satışı',
+  A09_SALE_LEASEBACK:                       'Sat-Geri Kirala',
+  A10_EQUITY_INJECTION:                     'Sermaye Artırımı',
+  A11_EARNINGS_RETENTION:                   'Kârı Şirkette Tut',
+  A12_GROSS_MARGIN_IMPROVEMENT:             'Brüt Kâr Marjı İyileştir',
+  A13_OPEX_OPTIMIZATION:                    'Faaliyet Giderlerini Düşür',
+  A14_FINANCE_COST_OPTIMIZATION:            'Finansman Giderini Düşür',      // V2 legacy ID — korunuyor
+  // R8.7: V3 engine ID'leri eklendi — V2 panelde ham ID gösterilmemesi için
+  A14_FINANCE_COST_REDUCTION:               'Finansman Gideri Azaltma',
+  A10_CASH_EQUITY_INJECTION:                'Nakit Sermaye Artırımı',
+  A10B_PROMISSORY_NOTE_EQUITY_INJECTION:    'Senetli Sermaye Artırımı',
+  A11_RETAIN_EARNINGS:                      'Kârı Özkaynakta Tut',
+  A15_DEBT_TO_EQUITY_SWAP:                  'Ortak Borcu Sermayeye Çevir',
+  A15B_SHAREHOLDER_DEBT_TO_LT:              'Ortak Borcunu Uzun Vadeye Aktar',
+  A18_NET_SALES_GROWTH:                     'Net Satış Artışı',
+  A19_ADVANCE_TO_REVENUE:                   'Alınan Avansların Teslimi',
+  A20_GROSS_MARGIN_REFORM:                  'Brüt Marj Reformu',
+  A21_OPERATING_PROFIT_REFORM:              'Faaliyet Kârı Reformu',
 }
 
 // actionFamilies.ts ile birebir uyumlu

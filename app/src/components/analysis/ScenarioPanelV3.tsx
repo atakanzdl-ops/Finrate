@@ -398,10 +398,12 @@ function OzetTab({ result }: { result: any }) {
 
             {exec.confidence && (
               <div className="mt-4 pt-4 border-t border-white/10 text-sm text-white/80">
-                Güven:{' '}
-                <strong className="text-white">
-                  {exec.confidence === 'HIGH' ? 'Yüksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}
-                </strong>
+                {/* R8.8: 'Güven: Yüksek' → 'Analiz: Tamamlandı' — HIGH her zaman yanıltıcı */}
+                {exec.confidence === 'HIGH' ? (
+                  <>Analiz: <strong className="text-white">Tamamlandı</strong></>
+                ) : (
+                  <>Güven: <strong className="text-white">{exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}</strong></>
+                )}
               </div>
             )}
           </div>
@@ -486,11 +488,12 @@ function OzetTab({ result }: { result: any }) {
           <BankerMetric label="Likidite"          value={assessLiquidity(productivity)} />
           <BankerMetric label="Yapısal Risk"        value={assessStructuralRisk(productivity)} />
           <BankerMetric label="Aktif Verimliliği"  value={assessAssetEfficiency(productivity)} />
+          {/* R8.8: 'Rating Güveni: Yüksek' → 'Veri Kalitesi: Yeterli' — HIGH yanıltıcı */}
           <BankerMetric
-            label="Rating Güveni"
+            label={exec.confidence === 'HIGH' ? 'Veri Kalitesi' : 'Rating Güveni'}
             value={
-              exec.confidence === 'HIGH'   ? 'Yüksek' :
-              exec.confidence === 'MEDIUM' ? 'Orta'   :
+              exec.confidence === 'HIGH'   ? 'Yeterli' :
+              exec.confidence === 'MEDIUM' ? 'Orta'    :
               'Düşük'
             }
           />
@@ -926,7 +929,7 @@ function DetayTab({
                   {(() => {
                     const displayReason =
                       r.reasonDisplay ||
-                      'Bu aksiyon mevcut veriyle uygun görülmedi.'
+                      'Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.'  // R8.8
                     const reasons = toStringArray(displayReason)
                     if (reasons.length === 0) return null
                     return (

@@ -45,9 +45,9 @@ describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
       .toBe('Aksiyon koşulu sağlanmadı.')
   })
 
-  it('no valid amount candidates → Uygulanabilir tutar üretilemedi.', () => {
+  it('no valid amount candidates → açıklayıcı mesaj (R8.8)', () => {
     expect(toFriendlyRejectReason('no valid amount candidates for A05'))
-      .toBe('Uygulanabilir tutar üretilemedi.')
+      .toBe('Bu aksiyona uygun finansal büyüklük hesaplanamadı.')
   })
 
   it('Aggregate guardrail → Toplu kural nedeniyle uygun değil.', () => {
@@ -55,9 +55,9 @@ describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
       .toBe('Toplu kural nedeniyle uygun değil.')
   })
 
-  it('bilinmeyen gerekçe → fallback döner', () => {
+  it('bilinmeyen gerekçe → açıklayıcı fallback döner (R8.8)', () => {
     expect(toFriendlyRejectReason('tamamen bilinmeyen bir gerekçe'))
-      .toBe('Bu aksiyon mevcut veriyle uygun görülmedi.')
+      .toBe('Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.')
   })
 })
 

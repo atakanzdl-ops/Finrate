@@ -1107,12 +1107,14 @@ export function toFriendlyRejectReason(rawReason: string): string {
     return match ? match[1] : 'Aksiyon koşulu sağlanmadı.'
   }
   if (rawReason.includes('no valid amount candidates')) {
-    return 'Uygulanabilir tutar üretilemedi.'
+    // R8.8: 'Uygulanabilir tutar üretilemedi.' → daha açıklayıcı
+    return 'Bu aksiyona uygun finansal büyüklük hesaplanamadı.'
   }
   if (rawReason.includes('Aggregate guardrail')) {
     return 'Toplu kural nedeniyle uygun değil.'
   }
-  return 'Bu aksiyon mevcut veriyle uygun görülmedi.'
+  // R8.8: catch-all → daha açıklayıcı (jenerik 'mevcut veriyle uygun görülmedi' yerine)
+  return 'Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.'
 }
 
 // ─── BUILDER: REJECTED INSIGHTS ──────────────────────────────────────────────
