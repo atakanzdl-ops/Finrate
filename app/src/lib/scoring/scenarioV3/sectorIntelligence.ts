@@ -919,17 +919,15 @@ export function analyzeSectorIntelligence(
  * Sektör ve aksiyon için semantik imkânsızlık kontrolü.
  * Hard rule — sadece gerçek anlamda sektörde bulunmayan varlıklar.
  */
+// R10.1: A19 sektör guard kaldırıldı.
+// A19 = Avans (340) → Hasılat (600) — sektör bağımsız muhasebe işlemi.
+// İmalat dahil tüm sektörlerde sipariş avansı alınabilir.
+// ADVANCES_PRESSURE (340/KV > %40) rasyo bazlı tetikleyici yeterli.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function isActionSemanticallyImpossibleForSector(
-  actionId: string,
-  sector:   SectorCode,
+  _actionId: string,
+  _sector:   SectorCode,
 ): { impossible: boolean; reason?: string } {
-  if (actionId === 'A19_ADVANCE_TO_REVENUE' && sector !== 'CONSTRUCTION' && sector !== 'SERVICES') {
-    return {
-      impossible: true,
-      reason: 'Alınan avans → hasılat dönüşümü proje bazlı sektörlerde anlamlıdır',
-    }
-  }
-
   return { impossible: false }
 }
 
