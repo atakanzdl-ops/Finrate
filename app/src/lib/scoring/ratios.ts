@@ -179,7 +179,8 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   // İnşaata özgü ek metrikler: customerAdvanceDays & adjustedCashConversionCycle
   const _inv = n(d.inventory)
   const _ps  = n(d.prepaidSuppliers)
-  const inventory = (_inv != null || _ps != null) ? ((_inv ?? 0) + (_ps ?? 0)) : null
+  // R9: ters bakiye guard — _ps (159) ve _inv negatif olamaz
+  const inventory = (_inv != null || _ps != null) ? (Math.max(0, _inv ?? 0) + Math.max(0, _ps ?? 0)) : null
 
   // ─── LİKİDİTE ────────────────────────────────────────────────
   const currentRatio = safe(totalCurrentAssets, totalCurrentLiabilities)
@@ -426,7 +427,7 @@ export function getAccountTotals(
     sum(['110', '111', '112', '118'])   - sum(['119']) +
     sum(['120', '121', '126', '127', '128']) - sum(['122', '129']) +
     sum(['131', '132', '133', '135', '136', '138']) - sum(['137', '139']) +
-    sum(['150', '151', '152', '153', '157', '159']) - sum(['158']) +
+    sum(['150', '151', '152', '153', '157']) + Math.max(0, sum(['159'])) - sum(['158']) +  // R9: 159 ters bakiye guard
     sum(['170', '178']) +
     sum(['180', '181', '190', '191', '193', '195', '196', '197', '198'])
 
@@ -446,7 +447,7 @@ export function getAccountTotals(
     sum(['300', '301', '303', '304', '305', '306', '309']) - sum(['302', '308']) +
     sum(['320', '321', '326', '329'])   - sum(['322']) +
     sum(['331', '332', '333', '335', '336']) - sum(['337']) +
-    sum(['340', '349']) +
+    Math.max(0, sum(['340', '349'])) +  // R9: 340 ters bakiye guard
     sum(['350', '358']) +
     sum(['360', '361', '368', '369']) +
     sum(['370', '372', '373', '379'])   - sum(['371']) +

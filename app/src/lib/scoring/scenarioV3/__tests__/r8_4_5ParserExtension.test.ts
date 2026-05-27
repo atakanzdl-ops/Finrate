@@ -424,3 +424,54 @@ describe('R8.4.5b — 7xx Bakiye=0 Dönem Toplamı Fallback (Integration)', () =
   })
 
 })
+
+// ─── T_R845_231_1/159_1/340_1 — R9 Ters Bakiye Testleri ─────────────────────
+
+describe('R9 — MIZAN_SPLIT Ters Bakiye: 231 / 159 / 340 (Integration)', () => {
+
+  // T_R845_231_1: 231 ba>0 (ters bakiye) → longTermOtherPayables
+  // 231 Ortaklardan Alacaklar: normalde aktif (bb). Ters bakiye → UV pasif borç.
+  test('T_R845_231_1 — 231 ba>0: longTermOtherPayables = ba; longTermOtherReceivables = 0', async () => {
+    const rows = makeMizanRows([
+      ['231', 0, 5_000_000],  // bb=0, ba=5M → ters bakiye
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['longTermOtherPayables']).toBeCloseTo(5_000_000, 0)
+    expect(fields['longTermOtherReceivables'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+  // T_R845_159_1: 159 ba>0 (ters bakiye) → advancesReceived
+  // 159 Verilen Sipariş Avansları: normalde aktif (bb). Ters bakiye → alınan avans (pasif).
+  test('T_R845_159_1 — 159 ba>0: advancesReceived = ba; prepaidSuppliers = 0', async () => {
+    const rows = makeMizanRows([
+      ['159', 0, 3_000_000],  // bb=0, ba=3M → ters bakiye
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['advancesReceived']).toBeCloseTo(3_000_000, 0)
+    expect(fields['prepaidSuppliers'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+  // T_R845_340_1: 340 bb>0 (ters bakiye) → prepaidSuppliers
+  // 340 Alınan Sipariş Avansları: normalde pasif (ba, rawSide:'ba'). Ters bakiye → verilen avans (aktif).
+  test('T_R845_340_1 — 340 bb>0: prepaidSuppliers = bb; advancesReceived = 0', async () => {
+    const rows = makeMizanRows([
+      ['340', 8_000_000, 0],  // bb=8M, ba=0 → ters bakiye
+    ])
+
+    const parsed = await parseMizanRows(rows)
+    expect(parsed.length).toBeGreaterThan(0)
+
+    const fields = parsed[0]?.fields ?? {}
+    expect(fields['prepaidSuppliers']).toBeCloseTo(8_000_000, 0)
+    expect(fields['advancesReceived'] ?? 0).toBeCloseTo(0, 0)
+  })
+
+})
