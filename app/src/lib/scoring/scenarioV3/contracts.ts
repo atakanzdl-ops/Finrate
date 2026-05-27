@@ -337,6 +337,10 @@ export interface FirmContext {
   baselineAccountBalances?: Record<string, number>
   baselineGrossProfit?:     number
   baselineNetSales?:        number
+  /** R10 — Hesaplanmış rasyo sonuçları (mandatori kural değerlendirmesi için) */
+  ratios?:       import('../ratios').RatioResult
+  /** R10 — Bilanço/gelir tablosu input (ADVANCES_PRESSURE totalCurrentLiabilities için) */
+  financialData?: import('../ratios').FinancialInput
 }
 
 // ============ ACTION TEMPLATE V3 ============
@@ -786,10 +790,12 @@ export interface TargetGap {
  * ActionTemplateV3'ten bağımsız; engineV3 skoruna dahil değil.
  */
 export interface DecisionInsight {
-  insightId: 'A21_MATURITY_MISMATCH'
+  /** R10: genişletildi — yeni insight ID'leri eklendi */
+  insightId: string
   title: string
   message: string
-  severity: 'low' | 'medium' | 'high'
+  /** R10: 'critical' eklendi (currentRatio < 1.0 gibi yüksek öncelikli durumlar) */
+  severity: 'low' | 'medium' | 'high' | 'critical'
   ratio: number | null
   kvTotal: number
   uvTotal: number

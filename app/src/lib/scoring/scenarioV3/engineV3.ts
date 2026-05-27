@@ -311,6 +311,10 @@ interface FirmContext {
   baselineAccountBalances?: Record<string, number>
   baselineGrossProfit?:     number
   baselineNetSales?:        number
+  /** R10 — Hesaplanmış rasyo sonuçları (mandatori kural değerlendirmesi için) */
+  ratios?:       import('../ratios').RatioResult
+  /** R10 — Bilanço/gelir tablosu input (ADVANCES_PRESSURE totalCurrentLiabilities için) */
+  financialData?: import('../ratios').FinancialInput
 }
 
 interface AmountCandidate {

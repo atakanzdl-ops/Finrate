@@ -36,7 +36,15 @@ import type {
   SelectedAction,
   FeasibilityAssessment,
 } from './engineV3'
-import { buildMaturityMismatchInsight } from './insightCatalog'
+import {
+  buildMaturityMismatchInsight,
+  buildLiquidityInsight,
+  buildQuickRatioInsight,
+  buildInventoryTurnoverInsight,
+  buildAdvancesPressureInsight,
+  buildInterestCoverageInsight,
+  buildLeverageInsight,
+} from './insightCatalog'
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 import type { RatingGrade } from './ratingReasoning'
 import {
@@ -1539,6 +1547,11 @@ export function buildDecisionAnswer(
         netSales:        targetPackageContext.netSales,
         grossProfit:     targetPackageContext.grossProfit ?? 0,
         accountBalances: accountBalances as Record<string, number>,
+        // R10: rasyo bazlı mandatori kurallar için — runtime'da RatioResult olabilir
+        ratios:          ratios as import('../ratios').RatioResult | undefined,
+        // R10 AMEND: financialData v3 route'ta DB'den çekilmiyor (financialData OLMADAN yorumu).
+        // ADVANCES_PRESSURE koşulu accountBalances 3xx toplamına taşındı — bu alan undefined.
+        financialData:   undefined,
       })
       for (const actionId of mandatoryIds) {
         const alreadyIn = portfolioForUI.find(a => a.actionId === actionId)
@@ -1590,11 +1603,18 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
-  // Faz 7.3.7: vade uyumsuzluğu risk insight (7.3.7-FIX2: ratios.currentRatio direkt)
-  const maturityInsight = accountBalances
-    ? buildMaturityMismatchInsight(accountBalances, engineResult.sector, ratios)
-    : null
-  const riskInsights: DecisionInsight[] = maturityInsight ? [maturityInsight] : []
+  // Faz 7.3.7 + R10: risk insight'ları — vade uyumsuzluğu + rasyo bazlı 6 yeni kategori
+  // ratios runtime'da RatioResult olabilir; lokal tip dar olduğundan cast uygulanır.
+  const _r = ratios as import('../ratios').RatioResult | undefined
+  const riskInsights: DecisionInsight[] = [
+    accountBalances ? buildMaturityMismatchInsight(accountBalances, engineResult.sector, ratios) : null,
+    buildLiquidityInsight(engineResult.sector, _r),
+    buildQuickRatioInsight(_r),
+    buildInventoryTurnoverInsight(engineResult.sector, _r),
+    buildAdvancesPressureInsight(accountBalances),
+    buildInterestCoverageInsight(_r),
+    buildLeverageInsight(_r, accountBalances),
+  ].filter((x): x is DecisionInsight => x !== null)
 
   // PATCH 2: actionId → { debits, credits } gruplu lookup (mutation yok)
   const accountingLegsByAction: Record<string, { debits: AccountingImpactRow[]; credits: AccountingImpactRow[] }> = {}
