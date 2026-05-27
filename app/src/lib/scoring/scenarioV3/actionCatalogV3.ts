@@ -1533,7 +1533,7 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
 // ── A15 ──────────────────────────────────────────────────────────────────────
 const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   id: 'A15_DEBT_TO_EQUITY_SWAP',
-  name: 'Ortak Borcu Sermayeye Çevirme',
+  name: 'Ortaklara Borçlar Kalemini Sermayeye Çevirme',
   family: 'EQUITY_PNL',
   semanticType: 'DEBT_TO_EQUITY_SWAP',
   horizons: ['medium', 'long'],
@@ -1613,7 +1613,7 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
 // ── A15B ─────────────────────────────────────────────────────────────────────
 const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
   id: 'A15B_SHAREHOLDER_DEBT_TO_LT',
-  name: 'Ortak Borcunu Uzun Vadeye Aktarma',
+  name: 'Ortaklara Borçlar Kalemini Uzun Vadeye Aktarma',
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_EXTENSION',
   horizons: ['medium', 'long'],
@@ -2303,7 +2303,7 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   cfoRationale:
     'Maliyet yapısı iyileştirildiğinde her 1 puanlık brüt marj artışı net kâra doğrudan yansır. Nakit kanalı tedarikçi borç müzakeresi gerektirmez; operasyonel verimlilik, proses iyileştirme veya alternatif tedarik kanalı ile sağlanabilir.',
   bankerPerspective:
-    'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. A20, A12\'nin tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı versiyonudur.',
+    'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. Tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı bir maliyet optimizasyonudur.',
 }
 
 // ── A21 ──────────────────────────────────────────────────────────────────────
