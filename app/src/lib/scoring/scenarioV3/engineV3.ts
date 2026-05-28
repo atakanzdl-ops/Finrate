@@ -85,8 +85,15 @@ import type { PortfolioAction as SustPortfolioAction } from './sustainabilityEng
 import {
   analyzeSectorIntelligence,
   isActionSemanticallyImpossibleForSector,
+  resolveTcmbBenchmark,
 } from './sectorIntelligence'
 import type { SectorMetricKey } from './sectorIntelligence'
+
+import {
+  findWeakRatiosByCategory,
+  getCoverageActionIdsForRatio,
+} from './ratioCategoryRegistry'
+import type { RatioResult } from '../ratios'
 
 import {
   checkActionGuardrails,
@@ -181,6 +188,9 @@ export interface SelectedAction {
 
   /** R7B — criticalIssues: zorunlu aksiyon bayrağı (paket seçiminden bağımsız) */
   mandatory?:                 boolean
+
+  /** R12.1 — Zayıf rasyo kategorisi coverage zorunluluğuyla seçildi */
+  coverageMandatory?:         boolean
 }
 
 export interface HorizonPortfolio {
@@ -650,6 +660,62 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
     baselineAccountBalances: frozenBalances,
     baselineGrossProfit:     input.incomeStatement.grossProfit,
     baselineNetSales:        input.incomeStatement.netSales,
+  }
+}
+
+/**
+ * R12.1 — FirmContext'ten kısmi RatioResult hesaplar.
+ * findWeakRatiosByCategory için yeterli alan seti.
+ * Tüm null-safe; sıfır bölme korunuyor.
+ *
+ * FIX 6 — Hizalama:
+ *   - totalDebt = kv300 (30x) + uv400 (40x)   [impliedDebt = A−E YANLIŞ]
+ *   - debtToEquity / debtToAssets: totalFinDebt kullanır
+ *   - DSO / DIO: spot bakiye (önceki dönem verisi FirmContext'te yok)
+ */
+function computePartialRatiosFromContext(ctx: FirmContext): Partial<RatioResult> {
+  const safe = (a: number, b: number): number | null => (b !== 0 ? a / b : null)
+  const bal  = ctx.accountBalances ?? {}
+
+  // Hesap prefix toplamları
+  const sum1xx = Object.entries(bal).filter(([k]) => k.startsWith('1')).reduce((s,[,v]) => s + v, 0)
+  const sum3xx = Object.entries(bal).filter(([k]) => k.startsWith('3')).reduce((s,[,v]) => s + v, 0)
+  const kv300  = Object.entries(bal).filter(([k]) => k.startsWith('30')).reduce((s,[,v]) => s + v, 0)
+  const uv400  = Object.entries(bal).filter(([k]) => k.startsWith('40')).reduce((s,[,v]) => s + v, 0)
+  // FIX 6: Finansal borç = KV mali borç (300-304) + UV mali borç (400-404)
+  // (impliedDebt = totalAssets − totalEquity YANLIŞ: ticari borç ve diğer yükümlülükleri içerirdi)
+  const totalFinDebt = kv300 + uv400
+
+  const rec120  = (bal['120'] ?? 0) + (bal['121'] ?? 0)
+  const inv153  = (bal['153'] ?? 0) + (bal['150'] ?? 0) + (bal['151'] ?? 0) + (bal['152'] ?? 0)
+  const cogs    = ctx.costOfGoodsSold ?? (ctx.netSales - ctx.grossProfit)
+
+  return {
+    // Likidite
+    currentRatio:           safe(sum1xx, sum3xx),
+    cashRatio:              safe((bal['100'] ?? 0) + (bal['102'] ?? 0), sum3xx),
+    netWorkingCapitalRatio: ctx.totalAssets > 0 ? (sum1xx - sum3xx) / ctx.totalAssets : null,
+
+    // Kârlılık
+    grossMargin:            safe(ctx.grossProfit, ctx.netSales),
+    netProfitMargin:        safe(ctx.netIncome,   ctx.netSales),
+    roa:                    safe(ctx.netIncome,   ctx.totalAssets),
+    roe:                    safe(ctx.netIncome,   ctx.totalEquity),
+
+    // Kaldıraç — FIX 6: totalFinDebt (30x+40x) kullanılıyor
+    debtToEquity:           safe(totalFinDebt, ctx.totalEquity),
+    debtToAssets:           safe(totalFinDebt, ctx.totalAssets),
+    shortTermDebtRatio:     totalFinDebt > 0 ? kv300 / totalFinDebt : null,
+    interestCoverage:       ctx.interestExpense > 0 ? ctx.operatingProfit / ctx.interestExpense : null,
+
+    // Faaliyet — spot bakiye (önceki dönem FirmContext'te mevcut değil)
+    assetTurnover:           safe(ctx.netSales, ctx.totalAssets),
+    receivablesTurnoverDays: ctx.netSales > 0 ? (rec120 / ctx.netSales) * 365 : null,
+    inventoryTurnoverDays:   cogs > 0 ? (inv153 / cogs) * 365 : null,
+    operatingExpenseRatio:   safe(
+      (bal['630'] ?? 0) + (bal['631'] ?? 0) + (bal['632'] ?? 0) + (bal['633'] ?? 0),
+      ctx.netSales
+    ),
   }
 }
 
@@ -1954,6 +2020,120 @@ export function runEngineV3(input: EngineInput): EngineResult {
   }
 
   let fullPortfolio = [...shortActions, ...mediumActions, ...longActions]
+
+  // ── R12.1: Rasyo Kategori Coverage (FIX 3) ──────────────────────────────────
+  // Greedy seçim sonrası zayıf kategorileri kontrol et.
+  // Her zayıf kategori için (greedy'nin kaçırdığı) bir coverageMandatory aksiyon ekle.
+  // Dinamik eşleşme: targetRatio.metric üzerinden, kalite sıralı fallback destekli.
+  // Mevcut hedef-rating mantığı ve greedy sıralaması KORUNUR.
+  {
+    const partialRatios    = computePartialRatiosFromContext(baselineContext)
+    const sectorBenchmark  = resolveTcmbBenchmark(input.sector)
+    const weakByCategory   = findWeakRatiosByCategory(partialRatios, sectorBenchmark)
+    const catalogArray     = ACTION_LIST  // Object.values(ACTION_CATALOG_V3)
+
+    for (const [_cat, weakRatios] of Object.entries(weakByCategory)) {
+      if (!weakRatios || weakRatios.length === 0) continue
+
+      // Zayıf oranları worst-first sırayla tara; ilk uygulanabilir aksiyon seçilir
+      let covered = false
+
+      for (const gap of weakRatios) {
+        if (covered) break
+
+        const candidates = getCoverageActionIdsForRatio(gap.ratioField as string, catalogArray)
+
+        for (const actionId of candidates) {
+          if (fullPortfolio.some(a => a.actionId === actionId)) {
+            // Zaten portföyde → bu kategori kapsanmış sayılır
+            algorithmTrace.push(`[r12_coverage] ${actionId} already in portfolio — category covered`)
+            covered = true
+            break
+          }
+
+          const coverageAction = ACTION_CATALOG_V3[actionId]
+          if (!coverageAction) continue
+
+          const horizon: HorizonKey = (coverageAction.horizons[0] as HorizonKey) ?? 'medium'
+          const allIds = fullPortfolio.map(a => a.actionId)
+          const applicability = isActionApplicable(coverageAction, workingContext, horizon, allIds, baselineContext)
+          if (!applicability.applicable) {
+            algorithmTrace.push(`[r12_coverage] ${actionId} not applicable: ${applicability.reason}`)
+            continue
+          }
+
+          const amtCandidates = calculateAmountCandidates(coverageAction, workingContext, horizon)
+          const typical = amtCandidates.find(a => a.label === 'typical') ?? amtCandidates[0]
+          if (!typical || typical.amountTRY <= 0) {
+            algorithmTrace.push(`[r12_coverage] ${actionId} zero amount, skipped`)
+            continue
+          }
+
+          // R12.1-FIX3: Kaynak bakiye kontrolü — materyalite tabanı kaynağı aşıyorsa atla.
+          // MATERIALITY_BY_HORIZON taban değerleri bazen gerçek hesap bakiyesini aşar.
+          // Bu durumda buildGuardrailResults HARD_REJECT verir → SEMANTIC_GUARDRAIL CCC.
+          // A10/A10B: kaynak dış sermaye → source check bypass.
+          {
+            const depSpec = ACTION_DEPENDENCY_GRAPH[actionId]
+            if (depSpec?.sourceAccountRequirements &&
+                actionId !== 'A10_CASH_EQUITY_INJECTION' &&
+                actionId !== 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION') {
+              const totalSrc = depSpec.sourceAccountRequirements
+                .reduce((s, code) => s + Math.abs(workingContext.accountBalances[code] ?? 0), 0)
+              if (totalSrc < typical.amountTRY) {
+                algorithmTrace.push(`[r12_coverage] ${actionId} source ${(totalSrc/1e6).toFixed(1)}M < matTutar ${(typical.amountTRY/1e6).toFixed(1)}M — skipped (guardrail prevention)`)
+                continue
+              }
+            }
+          }
+
+          const coverageTxs = coverageAction.buildTransactions({
+            sector: workingContext.sector, horizon,
+            analysis: workingContext.accountBalances as unknown,
+            amount: typical.amountTRY, previousActions: allIds,
+            accountBalances: workingContext.accountBalances,
+            netSales: workingContext.netSales,
+            grossProfit: workingContext.grossProfit,
+            baselineAccountBalances: baselineContext.baselineAccountBalances,
+            baselineGrossProfit: baselineContext.baselineGrossProfit,
+            baselineNetSales: baselineContext.baselineNetSales,
+          })
+          if (coverageTxs.length === 0) {
+            algorithmTrace.push(`[r12_coverage] ${actionId} empty transactions, skipped`)
+            continue
+          }
+
+          const coverageQuality = calculateQuality({
+            template: coverageAction, transactions: coverageTxs,
+            sector: workingContext.sector, repeatIndex: 1, rawScoreDelta: 1.0,
+          })
+
+          fullPortfolio.push({
+            actionId:                   coverageAction.id,
+            actionName:                 coverageAction.name,
+            horizon,
+            amountTRY:                  typical.amountTRY,
+            transactions:               coverageTxs,
+            qualityScore:               coverageQuality.breakdown.finalQuality,
+            productivityRepairStrength: 'COVERAGE',
+            sustainability:             String(coverageAction.sustainability),
+            sectorCompatibility:        coverageAction.sectorCompatibility[workingContext.sector] === 'primary' ? 1.0 : 0.9,
+            guardrailSeverity:          'PASS',
+            estimatedNotchContribution: 0,
+            repeatDecayApplied:         1.0,
+            diversityPenaltyApplied:    0,
+            narrative:                  `[R12.1 Coverage] ${coverageAction.name}: ${gap.ratioField} zayıflığı kapsaması`,
+            coverageMandatory:          true,
+          })
+
+          workingContext = updateFirmContextFromTransactions(workingContext, coverageTxs)
+          algorithmTrace.push(`[r12_coverage] added ${actionId} via ${gap.ratioField} (${(typical.amountTRY/1e6).toFixed(1)}M TL) — coverageMandatory`)
+          covered = true
+          break  // Bu kategori için bir aksiyon yeterli
+        }
+      }
+    }
+  }
 
   // Faz 7.3.12-PRE: ratioTransparency.current = baseline değeri
   // Her aksiyonun "Bugünkü" değeri paket içi konumdan bağımsız, gerçek başlangıç.

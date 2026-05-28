@@ -431,6 +431,20 @@ export interface ActionTemplateV3 {
   useRatioBasedAmount?: boolean
 
   /**
+   * Bankacı güven seviyesi — UI metadatası, scoring'i etkilemez.
+   * 'high'   → TCMB/banka kesin kabul: teminat, borç kapatma, gerçek nakit
+   * 'medium' → Makul öneri ama sektörel bağımlılık var
+   * 'low'    → Spekülatif / yapısal: özkaynak dönüşümü, varlık satışı
+   */
+  bankerTrust?: 'high' | 'medium' | 'low'
+
+  /**
+   * true ise aksiyon fiziksel/operasyonel kanıt gerektirir (A18/A19 gibi).
+   * UI'da "Bu aksiyonun gerçekleşmesi operasyonel belge gerektirir" uyarısı gösterilir.
+   */
+  requiresOperationalProof?: boolean
+
+  /**
    * Opsiyonel TCMB benchmark hedef metadata.
    * UI transparency bloğunda "Hedef rasyo X gün, kaynak Y" gösterimi için.
    */
@@ -440,7 +454,7 @@ export interface ActionTemplateV3 {
     /** benchmarks.ts SectorBenchmark içindeki alan adı */
     benchmarkField: keyof SectorBenchmark
     /** Hangi gelir/aktif kalemine oranlanacak */
-    basis: 'netSales' | 'cogs' | 'totalAssets'
+    basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'
     /** TCMB hedef gün sayısı */
     targetDays?: number
     /** Benchmark bulunamazsa kullanılacak default */

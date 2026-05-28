@@ -80,18 +80,38 @@ export function buildRatioTransparency(
 
 function getBasisValueForTransparency(
   ctx: FirmContext,
-  basis: 'netSales' | 'cogs' | 'totalAssets'
+  basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'
 ): number | null {
-  if (basis === 'netSales') return (ctx as any).netSales ?? ctx.totalRevenue ?? null
-  if (basis === 'cogs') return getCogs(ctx)
-  if (basis === 'totalAssets') return ctx.totalAssets ?? null
+  if (basis === 'netSales')          return (ctx as any).netSales ?? ctx.totalRevenue ?? null
+  if (basis === 'cogs')              return getCogs(ctx)
+  if (basis === 'totalAssets')       return ctx.totalAssets ?? null
+  if (basis === 'equity')            return ctx.totalEquity ?? null
+  if (basis === 'interestExpense')   return ctx.interestExpense ?? null
+  if (basis === 'totalDebt') {
+    // 300+400 prefix toplam (finansal borç kısa ve uzun vade)
+    const bal = ctx.accountBalances ?? {}
+    const kv = Object.entries(bal).filter(([k]) => k.startsWith('30')).reduce((s,[,v]) => s + v, 0)
+    const uv = Object.entries(bal).filter(([k]) => k.startsWith('40')).reduce((s,[,v]) => s + v, 0)
+    const total = kv + uv
+    return total > 0 ? total : null
+  }
+  if (basis === 'currentLiabilities') {
+    // 3xx hesaplar toplamı (kısa vadeli yükümlülükler)
+    const bal = ctx.accountBalances ?? {}
+    const total = Object.entries(bal).filter(([k]) => k.startsWith('3')).reduce((s,[,v]) => s + v, 0)
+    return total > 0 ? total : null
+  }
   return null
 }
 
-function getBasisLabel(basis: 'netSales' | 'cogs' | 'totalAssets'): string {
-  if (basis === 'netSales') return 'Net Satış'
-  if (basis === 'cogs') return 'Satılan Mal Maliyeti'
-  if (basis === 'totalAssets') return 'Toplam Aktif'
+function getBasisLabel(basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'): string {
+  if (basis === 'netSales')           return 'Net Satış'
+  if (basis === 'cogs')               return 'Satılan Mal Maliyeti'
+  if (basis === 'totalAssets')        return 'Toplam Aktif'
+  if (basis === 'totalDebt')          return 'Toplam Finansal Borç'
+  if (basis === 'currentLiabilities') return 'Kısa Vadeli Yükümlülükler'
+  if (basis === 'equity')             return 'Özkaynak'
+  if (basis === 'interestExpense')    return 'Finansman Gideri'
   return basis
 }
 

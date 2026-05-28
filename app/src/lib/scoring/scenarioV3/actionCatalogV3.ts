@@ -216,6 +216,13 @@ const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
     'Acil likidite baskısını hafifletmek amacıyla finansal kuruluşlarla refinansman müzakeresi başlatılabilir. KV faiz yükü kısmen azalabilir; vade profili dengeli bir yapıya kavuşabilir.',
   bankerPerspective:
     'Yalnızca vade profili değişir; toplam borç tutarı azalmaz. Bu aksiyon likidite baskısını geçici olarak hafifletebildiğinden, operasyonel nakit üretimini güçlendiren aksiyonlarla birlikte uygulandığında daha kalıcı etki yaratabilir. Mevcut finansal kuruluşların mutabakatı süreci belirler.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A02 ──────────────────────────────────────────────────────────────────────
@@ -282,6 +289,13 @@ const A02_TRADE_PAYABLE_TO_LT: ActionTemplateV3 = {
     'Tedarikçilerle vade uzatma anlaşması KV baskısını azaltır. Tedarikçi ilişkileri güçlüyse düşük maliyetle uygulanabilir.',
   bankerPerspective:
     'Geçici bir likidite müdahalesidir; kalıcı finansal güçlenme anlamına gelmez. Tedarikçi ilişkilerinin sağlıklı tutulması hem vade uzatmanın sürdürülebilirliğini hem de tedarik sürekliliğini doğrudan etkiler. KV/UV dönüşüm oranı düzenli olarak izlenmelidir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A03 ──────────────────────────────────────────────────────────────────────
@@ -349,6 +363,13 @@ const A03_ADVANCE_TO_LT: ActionTemplateV3 = {
     'Proje teslim süreleri 12 ayı aşıyorsa UV sınıflandırma cari oranı iyileştirir ve gerçeği yansıtır.',
   bankerPerspective:
     'Ekonomik içerik sınırlıdır; bilanço içi sınıf değişikliği gerçek bir finansal güçlenme yaratmaz. Teslim takviminin gerçekçi biçimde belirlenmesi, sınıflandırmanın muhasebe doğruluğunu koruması açısından kritiktir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A04 ──────────────────────────────────────────────────────────────────────
@@ -446,6 +467,13 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
     'Fazla nakit varsa KV borcu kapatmak faiz yükünü azaltır, borçluluk oranını düşürür ve net borç pozisyonunu iyileştirir.',
   bankerPerspective:
     'Aktif ve pasif aynı anda azalır; bu yapı yeni bir finansman değil, disiplinli bilanço yönetiminin somut göstergesidir. Faiz yükü düşer, net borç pozisyonu iyileşir. Fazla nakdin borç ödemesinde kullanılması özkaynak/borç dengesini güçlü biçimde iyileştirebilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_ASSETS',
+    benchmarkField: 'debtToAssets',
+    basis:          'totalAssets',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A05 ──────────────────────────────────────────────────────────────────────
@@ -527,6 +555,7 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     reliability:     'TCMB_DIRECT',
     // targetDays omit edildi (opsiyonel, dinamik benchmark'tan gelecek)
   },
+  bankerTrust: 'high',
 }
 
 // ── A06 ──────────────────────────────────────────────────────────────────────
@@ -664,6 +693,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     'Şişkin stok pozisyonu (özellikle imalat/ticaret) hem dönen varlık kalitesini hem nakit akışını bozar. Stok devir hızı aktif verimliliğinin temel göstergesidir.',
   bankerPerspective:
     'Fazla stoku nakde çevirmek hem işletme sermayesini serbest bırakır hem de stok devir süresi (DIO) üzerinde ölçülebilir iyileşme sağlayabilir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire, eskime riski) aksiyonun gerçek etkisini doğrudan belirler.',
+  bankerTrust: 'high',
 }
 
 // ── A08 — Yerel ipotek flag helper (computeAmount ↔ buildTransactions senkron) ──
@@ -889,6 +919,13 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
     'Atıl varlıklar hem bakım maliyeti yaratır hem de sermayeyi bağlar. Satış nakit sağlar ve aktif verimliliğini (ROA) artırır.',
   bankerPerspective:
     'Tek seferlik nakit girişi sağlar; yinelenebilir bir kaynak değildir. Satış bedelinin net defter değerinin altında kalması dönem kârını olumsuz etkileyebilir. Atıl aktifin elden çıkarılması aktif verimliliğini (ROA) güçlendirir ve bilanço kompozisyonunu sadeleştirir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'FIXED_ASSET_TURNOVER',
+    benchmarkField: 'fixedAssetTurnover',
+    basis:          'netSales',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A09 ──────────────────────────────────────────────────────────────────────
@@ -1017,6 +1054,13 @@ const A09_SALE_LEASEBACK: ActionTemplateV3 = {
     'Kısa vadeli nakit ihtiyacını karşılar ve bilanço varlık ağırlığını azaltır. Ancak uzun vadeli kira yükümlülüğü borç yükü yaratır.',
   bankerPerspective:
     'Anlık nakit ihtiyacını karşılar; ancak bu yapı özünde gelecek nakit akışlarının peşin değere dönüştürülmesidir. Doğan kira yükümlülüğü bilanço kaldıracını yeniden artırabileceğinden, uzun vadeli maliyet-fayda dengesi dikkatle analiz edilmelidir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'FIXED_ASSET_TURNOVER',
+    benchmarkField: 'fixedAssetTurnover',
+    basis:          'netSales',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A10 ──────────────────────────────────────────────────────────────────────
@@ -1088,6 +1132,13 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
     'Nakit sermaye artırımı likidite, özkaynak oranı ve borçluluk rasyolarını eş zamanlı iyileştirebilecek önemli aksiyonlardan biridir. Kalite katsayısı 1.00 olmakla birlikte tutarın toplam aktife oranı belirleyicidir.',
   bankerPerspective:
     'Ortakların şirkete doğrudan nakit koyması taahhüt ve güven açısından güçlü bir sinyal taşır. Tutarın toplam aktife oranı kritik bir değişkendir: görece küçük bir sermaye enjeksiyonu tek başına çok kategorili bir iyileşmeyi desteklemeyebilir; operasyonel aksiyonlarla birlikte uygulandığında çarpan etkisi ortaya çıkabilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A10B ─────────────────────────────────────────────────────────────────────
@@ -1156,6 +1207,13 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
     'Nakit gerektirmeden özkaynak güçlendirilir. Alacak senedi vade sonunda nakde dönüşebilir. Likidite ve sermaye yapısı eş zamanlı iyileşir.',
   bankerPerspective:
     'Senet kalitesi ve ortak finansal gücü değerlendirilir. Nakit sermaye artırımına göre daha düşük kaliteli ama yine de sermaye artışı sayılır.',
+  bankerTrust: 'low',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A11 ──────────────────────────────────────────────────────────────────────
@@ -1216,6 +1274,7 @@ const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
     'Kâr dağıtımı yapmamak özkaynağı büyütür ve özkaynak oranını organik olarak iyileştirir. Ortakların kısa vadeli getiri beklentisini ertelemesi gerekir.',
   bankerPerspective:
     'Kâr tutma disiplini özkaynak yapısını organik olarak güçlendirir. Kâr kalitesi bu aksiyonun etkinliğini doğrudan belirler: yinelenen operasyonel faaliyetlerden gelen kâr, olağandışı gelirlerden gelen kâra kıyasla çok daha sağlam bir özkaynak tabanı oluşturur.',
+  bankerTrust: 'medium',
 }
 
 // ── A12 ──────────────────────────────────────────────────────────────────────
@@ -1339,6 +1398,7 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     'Brüt kâr marjındaki iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. ' +
     'FAVÖK marjı yükselişi ile birlikte rating değerlendirmesinde olumlu yansır. ' +
     'Tek seferlik avantajlardan ayrı, yapısal iyileşme aranır.',
+  bankerTrust: 'high',
 }
 
 // ── A13 ──────────────────────────────────────────────────────────────────────
@@ -1397,6 +1457,13 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
     'İşletme giderlerinde verimlilik artırımı (personel, kira, idari giderler). Yapısal tasarruf programları FAVÖK marjını kalıcı olarak iyileştirebilir.',
   bankerPerspective:
     'Yapısal tasarruf programları FAVÖK marjını kalıcı biçimde güçlendirebilir. Geçici kısıntı veya yatırım ertelemesinden kaynaklanan tasarrufu organik verimlilik artışından ayırt etmek kritiktir; yatırım dondurmak kısa vadeli kâr yaratırken uzun vadeli büyüme kapasitesini zayıflatabilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'OPEX_RATIO',
+    benchmarkField: 'operatingExpenseRatio',
+    basis:          'netSales',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A14 ──────────────────────────────────────────────────────────────────────
@@ -1528,6 +1595,13 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
     'Faiz maliyetinin azaltılması net kâr üzerinde olumlu etki yaratabilir. Refinansman veya borç azaltma yoluyla hayata geçirilebilir.',
   bankerPerspective:
     'Faiz karşılama oranı finansal sağlığın temel göstergelerinden biridir. Finansman giderinin düşürülmesi hem kârlılığı hem kaldıraç rasyolarını eş zamanlı güçlendirebilir. Refinansman olanakları ve mevcut piyasa faiz ortamı aksiyonun uygulanabilirliğini belirler.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'INTEREST_COVERAGE',
+    benchmarkField: 'interestCoverage',
+    basis:          'interestExpense',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A15 ──────────────────────────────────────────────────────────────────────
@@ -1594,6 +1668,13 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
     'Ortak borçları yüksek şirketlerde en hızlı ve düşük maliyetli özkaynak artış yöntemi. Nakit gerektirmez, yalnızca ortakların kararı yeterlidir.',
   bankerPerspective:
     'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'TCMB_DIRECT',
+  },
 
   // R8.5 — Rasyo bazlı tutar (getEquityInjectionTarget paylaşımı — A10/A10B ile aynı helper)
   useRatioBasedAmount: true,
@@ -1674,6 +1755,13 @@ const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
     'Sermaye dönüşümü yapmadan vade yapısı düzeltilir. Kısa vadeli yükümlülük azaldığı için işletme sermayesi rahatlar. Özkaynak değişmez.',
   bankerPerspective:
     'Vade uzatımı kabul edilebilir ancak nakit yaratan bir hareket değildir. Cari oran ve likidite değerlendirmesinde olumlu yansır.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 
   // R8.5 — Rasyo bazlı tutar (getCurrentRatioTarget — cari oran half-gap)
   useRatioBasedAmount: true,
@@ -1961,6 +2049,8 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
     'Güçlü büyüme kaynaklarından biridir. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşebilir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
   bankerPerspective:
     'Satış büyümesi yinelenen gelir tabanını güçlendirebilir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşebilir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
+  bankerTrust: 'high',
+  requiresOperationalProof: true,
 }
 
 // ── A19 ──────────────────────────────────────────────────────────────────────
@@ -2200,6 +2290,8 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     'Uyarı (R10.2): Firma brüt zararda ise kâr aktarımı (690→590) sıfır tutarla oluşturulmaz; sadece hasılat/maliyet kalemleri kaydedilir.',
   bankerPerspective:
     'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
+  bankerTrust: 'medium',
+  requiresOperationalProof: true,
 }
 
 // ── A20 ──────────────────────────────────────────────────────────────────────
@@ -2303,6 +2395,7 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
     'Maliyet yapısı iyileştirildiğinde her 1 puanlık brüt marj artışı net kâra doğrudan yansır. Nakit kanalı tedarikçi borç müzakeresi gerektirmez; operasyonel verimlilik, proses iyileştirme veya alternatif tedarik kanalı ile sağlanabilir.',
   bankerPerspective:
     'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. Tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı bir maliyet optimizasyonudur.',
+  bankerTrust: 'high',
 }
 
 // ── A21 ──────────────────────────────────────────────────────────────────────
@@ -2420,6 +2513,101 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
     'Faaliyet giderlerindeki yapısal azalma FAVÖK marjını kalıcı olarak güçlendirir. Nakit kanalı tasarrufu anında bilanço güçlenmesi olarak yansıtır.',
   bankerPerspective:
     'Operasyonel gider disiplini FAVÖK kalitesini artırır. A21, A13\'ün projeksiyon modeli yerine gerçek muhasebe kaydı ile somutlaştırılmış versiyonudur.',
+  bankerTrust: 'medium',
+}
+
+// ── A22 ──────────────────────────────────────────────────────────────────────
+const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
+  id: 'A22_SHAREHOLDER_RECEIVABLE_COLLECTION',
+  name: 'Ortaklardan Alacak Tahsilatı',
+  family: 'WC_COMPOSITION',
+  semanticType: 'RECEIVABLE_COLLECTION',
+  horizons: ['short', 'medium'],
+
+  // FIX 4: 131 VEYA 231'den tahsilat — önce KV (131), kalan UV (231)
+  // Toplam alacağın %50 kapı — sürdürülebilir ortak ilişkisi için koruma
+  buildTransactions: (context) => {
+    const bal131 = context.accountBalances?.['131'] ?? 0
+    const bal231 = context.accountBalances?.['231'] ?? 0
+    const total  = bal131 + bal231
+    if (total < 1_000_000) return []
+
+    // %50 tavan: ortak ilişkileri ve nakit akışı dengesi
+    const maxAmount = total * 0.50
+    const amount    = Math.min(context.amount, maxAmount)
+    if (amount <= 0) return []
+
+    // Önce 131 (KV alacak), kalan 231 (UV alacak)
+    const from131 = Math.min(amount, bal131)
+    const from231 = amount - from131
+
+    const legs: AccountingLeg[] = [
+      { accountCode: '102', accountName: 'Bankalar',                       side: 'DEBIT',  amount,   description: 'Ortak tahsilatı nakit girişi'        },
+      { accountCode: '131', accountName: 'Ortaklardan Alacaklar (KV)',     side: 'CREDIT', amount: from131, description: 'Kısa vadeli ortak alacağı tahsilatı' },
+    ]
+    if (from231 > 0) {
+      legs.push(
+        { accountCode: '231', accountName: 'Ortaklardan Alacaklar (UV)', side: 'CREDIT', amount: from231, description: 'Uzun vadeli ortak alacağı tahsilatı' }
+      )
+    }
+
+    return [makeBalancedTransaction('A22_MAIN', 'Ortaklardan alacak tahsilatı — 131/231 → 102', 'RECEIVABLE_COLLECTION', legs)]
+  },
+
+  // FIX 4: requiredAccountCodes kaldırıldı (AND yerine OR mantığı)
+  // Threshold 1M TL — customCheck'te doğrulanır
+  preconditions: {
+    minSourceAmountTRY: 1_000_000,
+    customCheck: (analysis) => {
+      const b131 = sumAccountsByPrefix(analysis, ['131'])
+      const b231 = sumAccountsByPrefix(analysis, ['231'])
+      const total = b131 + b231
+      if (total < 1_000_000) {
+        return {
+          pass: false,
+          reason: `Yetersiz ortak alacağı: ${total.toLocaleString('tr-TR')} TL < min 1.000.000 TL (131+231 hesapları)`,
+        }
+      }
+      return { pass: true }
+    },
+  },
+
+  qualityCoefficient: 0.65,
+  sustainability: 'ONE_OFF',
+
+  repeatDecay: { first: 1.00, second: 0.40, third: 0.15, maxRepeats: 1 },
+
+  suggestedAmount: {
+    basis: 'assets',
+    minPctOfBasis: 0.02,
+    typicalPctOfBasis: 0.05,
+    maxPctOfBasis: 0.10,
+    absoluteMinTRY: 1_000_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'primary',
+    MANUFACTURING: 'primary',
+    TRADE:         'primary',
+    RETAIL:        'applicable',
+    SERVICES:      'primary',
+    IT:            'primary',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        true,
+    strengthensOperations:  false,
+    realBalanceSheetGrowth: false,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Ortaklara (131 — kısa vadeli, 231 — uzun vadeli) verilen borçların tahsil edilerek nakde (102) dönüştürülmesi. İlişkili taraf alacak riskini azaltır, nakit pozisyonunu güçlendirir.',
+  cfoRationale:
+    'Ortak alacakları zaman zaman bilanço şişmesine neden olur ve tahsilat disiplinsizliğine işaret eder. Tahsilat nakit döngüsünü kısaltır ve ilişkili taraf riskini açık biçimde azaltır.',
+  bankerPerspective:
+    'Ortaklardan alacak tahsilatı hem nakit pozisyonunu hem ilişkili taraf risk profilini iyileştirir. Bankacı perspektifinden bu, ortak disiplininin ve kurumsal yönetim kalitesinin somut göstergesidir. Belgelenmiş tahsilat kararları kredi değerlendirmesinde pozitif sinyal oluşturur.',
+  bankerTrust: 'high',
 }
 
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────
@@ -2445,6 +2633,7 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A19_ADVANCE_TO_REVENUE,
   A20_GROSS_MARGIN_REFORM,
   A21_OPERATING_PROFIT_REFORM,
+  A22_SHAREHOLDER_RECEIVABLE_COLLECTION,
 }
 
 export const ACTION_IDS_V3 = Object.keys(ACTION_CATALOG_V3)
