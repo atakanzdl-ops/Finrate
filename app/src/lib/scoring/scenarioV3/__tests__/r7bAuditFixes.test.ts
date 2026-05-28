@@ -239,7 +239,8 @@ describe('R7B — A19 computeAmount (avans bazlı)', () => {
     expect(result).toBeNull()
   })
 
-  test('A19 computeAmount: brüt zarar varsa → null (baseline guard)', () => {
+  // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda da avans varsa tutar döner
+  test('A19 computeAmount: brüt zararda avans varsa → tutar döner (R10.2 fix)', () => {
     const result = A19.computeAmount!({
       sector:      'CONSTRUCTION',
       totalAssets: 100_000_000,
@@ -248,7 +249,9 @@ describe('R7B — A19 computeAmount (avans bazlı)', () => {
       baselineGrossProfit: -5_000_000,
       accountBalances: { '340': 15_000_000 },
     } as any)
-    expect(result).toBeNull()
+    // advanceConversionCap = 15M × 0.30 = 4.5M ≥ 1M → pozitif tutar
+    expect(result).not.toBeNull()
+    expect(result!).toBeGreaterThanOrEqual(1_000_000)
   })
 
 })

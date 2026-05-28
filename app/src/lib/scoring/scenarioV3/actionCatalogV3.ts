@@ -1984,9 +1984,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   useRatioBasedAmount: true,
 
   computeAmount: (ctx) => {
-    // R6 Hotfix 2: brüt zarar guard
-    const baselineGrossProfit = ctx.baselineGrossProfit ?? ctx.grossProfit ?? 0
-    if (baselineGrossProfit <= 0) return null
+    // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda da avans hasılata dönüşebilir
 
     // Avans bakiyesi
     const advance = ctx.accountBalances?.['340'] ?? 0
@@ -2017,17 +2015,15 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   },
 
   buildTransactions: (context) => {
-    // R6 Hotfix 2: Baseline brüt zarar guard — greedy loop A20 grossProfit'i şişirmiş olabilir
-    // Analiz başındaki gerçek grossProfit'i kontrol et
-    const baselineGrossProfit = context.baselineGrossProfit ?? context.grossProfit ?? 0
-    if (baselineGrossProfit <= 0) return []
+    // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda da avans hasılata dönüşebilir.
+    // profitAmount = grossMargin <= 0 ? 0 : hesaplanan kâr (kâr aktarımı brüt zararda sıfır)
 
     const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
-    if (netSales <= 0 || grossProfit <= 0) return []
+    if (netSales <= 0) return []
 
     const grossMargin = grossProfit / netSales
-    if (grossMargin <= 0 || grossMargin >= 1) return []
+    if (grossMargin >= 1) return []
 
     const balances       = context.accountBalances ?? {}
     const advanceBalance = balances['340'] ?? 0
@@ -2063,7 +2059,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
           : 'Satılan Mal Maliyeti'
         const costAmount   = Math.round(amount * (1 - grossMargin))
-        const profitAmount = amount - costAmount
+        const profitAmount = grossMargin <= 0 ? 0 : (amount - costAmount)
         return [
           makeBalancedTransaction(
             'A19_DELIVERY_REVENUE_AND_COST_FALLBACK',
@@ -2076,7 +2072,8 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
               { accountCode: '770',          accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount, description: 'Maliyet karşılığı (simülasyon)'        },
             ]
           ),
-          makeBalancedTransaction(
+          // R10.2: brüt zararda kâr aktarımı sıfır — işlem oluşturulmaz
+          ...(profitAmount > 0 ? [makeBalancedTransaction(
             'A19_PROFIT_TRANSFER',
             'Dönem kâr aktarımı',
             'ADVANCE_TO_REVENUE',
@@ -2084,7 +2081,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
               { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
               { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
             ]
-          ),
+          )] : []),
         ]
       }
 
@@ -2126,7 +2123,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     if (amount <= 0) return []
 
     const costAmount   = amount * (1 - grossMargin)
-    const profitAmount = amount * grossMargin
+    const profitAmount = grossMargin <= 0 ? 0 : (amount * grossMargin)
 
     // R8.1: İnşaat firmaları için 622 Hizmet Üretim Maliyeti (mali müşavir disiplini)
     // Sonnet + Codex ortak bulgu: inşaat proje teslimatında 621 (SMM) değil
@@ -2149,7 +2146,8 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           { accountCode: dominantStock.code, accountName: dominantStock.name,         side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'  },
         ]
       ),
-      makeBalancedTransaction(
+      // R10.2: brüt zararda kâr aktarımı sıfır — işlem oluşturulmaz
+      ...(profitAmount > 0 ? [makeBalancedTransaction(
         'A19_PROFIT_TRANSFER',
         'Dönem kâr aktarımı',
         'ADVANCE_TO_REVENUE',
@@ -2157,7 +2155,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
           { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
         ]
-      ),
+      )] : []),
     ]
   },
 
@@ -2198,7 +2196,8 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   description:
     'Müşteriden önceden alınan sipariş avanslarının (340) ürün/hizmet teslim edilmesiyle yurtiçi satışlara (600) dönüştürülmesi.',
   cfoRationale:
-    'Avans → hasılat dönüşümü üretim/teslimat hızlanmasıyla sağlanır. Proje portföyünü aktifleştirir ve gelir tablosunu güçlendirir.',
+    'Avans → hasılat dönüşümü üretim/teslimat hızlanmasıyla sağlanır. Proje portföyünü aktifleştirir ve gelir tablosunu güçlendirir. ' +
+    'Uyarı (R10.2): Firma brüt zararda ise kâr aktarımı (690→590) sıfır tutarla oluşturulmaz; sadece hasılat/maliyet kalemleri kaydedilir.',
   bankerPerspective:
     'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
 }

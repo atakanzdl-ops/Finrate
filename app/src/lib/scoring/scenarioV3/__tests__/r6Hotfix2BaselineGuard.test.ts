@@ -12,7 +12,7 @@
  *
  * ENES profili: 102=222 TL, 300=12M → A04 null (nakit yetersiz)
  * ORGANIKA profili: 102=960K, 300=22.8M → A04 null (%4.2 < %15)
- * DEKAM profili: grossProfit=-22.5M → A19 portfolio'ya girmemeli
+ * DEKAM profili: grossProfit=-22.5M → R10.2 sonrası: A19 artık portfolio'ya girer (guard kaldırıldı)
  *
  * Codex K6/K7 audit düzeltmeleri:
  *   - A20_STOCK_TO_SALES → A20_GROSS_MARGIN_REFORM (gerçek ID)
@@ -164,37 +164,38 @@ describe('R6 Hotfix 2 — A04 Baseline Guard', () => {
 
 })
 
-// ─── A19 Baseline Brüt Zarar Guard ───────────────────────────────────────────
+// ─── A19 Brüt Zarar — R10.2 Guard Kaldırıldı ────────────────────────────────
+// R10.2: baselineGrossProfit guard kaldırıldı. Avans teslimatı brüt zararda da
+// gerçekleşebilir; sadece profitAmount=0 (kâr aktarımı tx üretilmez).
 
-describe('R6 Hotfix 2 — A19 Baseline Brüt Zarar Guard', () => {
+describe('R10.2 — A19 Brüt Zarar Guard Kaldırıldı (regresyon)', () => {
 
-  // T5: DEKAM — grossProfit=-22.5M → A19 kesinlikle portfolio dışı
-  test('T5 — DEKAM: brüt zarar -22.5M → A19 portfolio dışı', () => {
+  // T5: DEKAM — grossProfit=-22.5M, 340=15M → R10.2: A19 artık portfolio'da
+  test('T5 — DEKAM: brüt zarar -22.5M, avans=15M → A19 portfolio içi (R10.2 fix)', () => {
     const result = runEngineV3(DEKAM_INPUT)
     const allActionIds = result.portfolio.map(a => a.actionId)
-    expect(allActionIds).not.toContain('A19_ADVANCE_TO_REVENUE')
+    expect(allActionIds).toContain('A19_ADVANCE_TO_REVENUE')
   })
 
-  // T6: DEKAM forced A19 — brüt zarar guard → hâlâ dışarıda
-  test('T6 — DEKAM forced A19: baseline brüt zarar → seçilmedi', () => {
+  // T6: DEKAM forced A19 — R10.2: guard kaldırıldı → seçildi
+  test('T6 — DEKAM forced A19: avans=15M → A19 seçildi (R10.2 fix)', () => {
     const result = runEngineV3({
       ...DEKAM_INPUT,
       options: { allowedActionIds: ['A19_ADVANCE_TO_REVENUE'] },
     })
     const a19 = result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')
-    expect(a19).toBeUndefined()
+    expect(a19).toBeDefined()
   })
 
-  // T7: DEKAM + A20_GROSS_MARGIN_REFORM önce → A19 hâlâ dışarıda
-  // A20 102 DEBIT yaparak nakit üretir ve 621 CREDIT ile grossProfit'i artırır.
-  // Baseline guard: baselineGrossProfit=-22.5M → A19 seçilmez.
-  test('T7 — DEKAM A20_GROSS_MARGIN_REFORM→A19 chain: A20 grossProfit şişirse bile A19 null', () => {
+  // T7: DEKAM + A20_GROSS_MARGIN_REFORM önce → R10.2: A19 de seçilebilir
+  // Artık baselineGrossProfit guard yok; avans teslimatı hasılata dönüşür, kâr tx=0.
+  test('T7 — DEKAM A20→A19 chain: R10.2 ile her ikisi de portfolio içi', () => {
     const result = runEngineV3({
       ...DEKAM_INPUT,
       options: { allowedActionIds: ['A20_GROSS_MARGIN_REFORM', 'A19_ADVANCE_TO_REVENUE'] },
     })
     const a19 = result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')
-    expect(a19).toBeUndefined()
+    expect(a19).toBeDefined()
   })
 
   // T8: Pozitif grossProfit + avans → A19 seçilebilir (false positive yok)

@@ -7,7 +7,7 @@
  *   Regresyon guard: R7B+ sonrası kritik davranışlar korunur.
  *
  * Firmalar:
- *   DEKAM    — CONSTRUCTION, BB, brüt zarar → A20 gerekli, A19/A14 dışarıda
+ *   DEKAM    — CONSTRUCTION, BB, brüt zarar → A19+A12+A20 portfolyoda, A14 dışarıda (R10.2)
  *   ORGANIKA — MANUFACTURING, B, KOBİ finans yükü → A14 portfolyoda, A04 dışarıda
  *   ENES     — MANUFACTURING, B, neredeyse sıfır nakit → A04 dışarıda
  *   iPOS     — IT, B, 255 demirbaş/0 bina → A09 dışarıda (prefix bug guard)
@@ -15,7 +15,7 @@
  *
  * Universal Invariantlar (15 senaryonun tümünde):
  *   ✓ A11_RETAIN_EARNINGS portfolyo dışı (özkaynak yanılgısı — R7B disable)
- *   ✓ 320 (Satıcılar) hiçbir transaction leg'inde kullanılmaz
+ *   ✓ 320 (Satıcılar) invariantı R10.2'de kaldırıldı (A12 meşru kullanım)
  *   ✓ Her transaction için DEBIT toplamı = CREDIT toplamı
  *   ✓ Portfolyodaki tüm amountTRY > 0
  *   ✓ 690 (Dönem K/Z) DEBIT içeren tx'da 590 (Dönem Net K/Z) CREDIT zorunlu
@@ -57,10 +57,13 @@ function expectAmountClose(actual: number, expected: number, label = ''): void {
  * Universal smoke invariantları — 15 senaryonun tümünde çalışır.
  *
  * 1. A11 portfolyo dışı (R7B disable)
- * 2. 320 yasak (hiçbir tx leg'inde)
- * 3. Tüm tx balanced (DEBIT == CREDIT)
- * 4. Tüm amountTRY > 0
- * 5. 690 ↔ 590 profit transfer zinciri
+ * 2. Tüm tx balanced (DEBIT == CREDIT)
+ * 3. Tüm amountTRY > 0
+ * 4. 690 ↔ 590 profit transfer zinciri
+ *
+ * R10.2 notu: 320 (Satıcılar) invariantı kaldırıldı.
+ * Artık A12_GROSS_MARGIN_IMPROVEMENT brüt zararlı firmalarda da seçilebilir
+ * (A19 600 hesabını açınca A12 customCheck geçiyor). 320 A12'de meşru bir kullanım.
  */
 function assertUniversalSmoke(result: EngineResult): void {
 
@@ -68,14 +71,10 @@ function assertUniversalSmoke(result: EngineResult): void {
   const a11 = result.portfolio.find(a => a.actionId === 'A11_RETAIN_EARNINGS')
   expect(a11).toBeUndefined()
 
-  // 2 — 320 (Satıcılar) hiçbir leg'de kullanılmaz
+  // 2 — Her transaction için DEBIT toplamı == CREDIT toplamı
   const allLegs = result.portfolio.flatMap(a =>
     a.transactions.flatMap((tx: AccountingTransaction) => tx.legs)
   )
-  const leg320 = allLegs.find(l => l.accountCode === '320')
-  expect(leg320).toBeUndefined()
-
-  // 3 — Her transaction için DEBIT toplamı == CREDIT toplamı
   for (const action of result.portfolio) {
     for (const tx of action.transactions as AccountingTransaction[]) {
       const debit  = tx.legs.filter(l => l.side === 'DEBIT' ).reduce((s, l) => s + l.amount, 0)
@@ -84,12 +83,12 @@ function assertUniversalSmoke(result: EngineResult): void {
     }
   }
 
-  // 4 — Tüm portfolio amountTRY > 0
+  // 3 — Tüm portfolio amountTRY > 0
   for (const action of result.portfolio) {
     expect(action.amountTRY).toBeGreaterThan(0)
   }
 
-  // 5 — 690 DEBIT içeren tx'da 590 CREDIT zorunlu (profit transfer zinciri)
+  // 4 — 690 DEBIT içeren tx'da 590 CREDIT zorunlu (profit transfer zinciri)
   for (const action of result.portfolio) {
     for (const tx of action.transactions as AccountingTransaction[]) {
       const has690Debit  = tx.legs.some(l => l.accountCode === '690' && l.side === 'DEBIT')
@@ -99,23 +98,29 @@ function assertUniversalSmoke(result: EngineResult): void {
       }
     }
   }
+
+  // Unused reference to prevent TS warning
+  void allLegs
 }
 
 // ─── DEKAM — CONSTRUCTION, BB ─────────────────────────────────────────────────
-// Beklentiler:
+// R10.2 Beklentiler:
+//   A19_ADVANCE_TO_REVENUE    portfolyoda (R10.2: brüt zarar guard kaldırıldı, 340=15M)
+//   A12_GROSS_MARGIN_IMPROVEMENT portfolyoda (A19 600 açar → A12 customCheck geçer, 320=71.9M)
 //   A20_GROSS_MARGIN_REFORM   portfolyoda (brüt zarar, büyük gap)
-//   A19_ADVANCE_TO_REVENUE    portfolyo DIŞI (baseline brüt zarar guard)
 //   A14_FINANCE_COST_REDUCTION portfolyo DIŞI (780/netSales=%1.64 < %5 sektör)
 //   A11_RETAIN_EARNINGS        portfolyo DIŞI (universal disable)
 
-describe('R8.1 Smoke — DEKAM (CONSTRUCTION, BB)', () => {
+describe('R10.2 Smoke — DEKAM (CONSTRUCTION, BB)', () => {
 
   test('DEKAM × BBB', () => {
     const result = runEngineV3({ ...DEKAM_INPUT, targetRating: 'BBB' })
     assertUniversalSmoke(result)
 
-    // A19 baseline brüt zarar guard
-    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeUndefined()
+    // R10.2: A19 brüt zararda da seçilir (340=15M avans mevcut)
+    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeDefined()
+    // R10.2: A19 600 açar → A12 customCheck geçer (320=71.9M, 621=350.5M)
+    expect(result.portfolio.find(a => a.actionId === 'A12_GROSS_MARGIN_IMPROVEMENT')).toBeDefined()
     // A14 sektör altı (1.64% < CONSTRUCTION %5)
     expect(result.portfolio.find(a => a.actionId === 'A14_FINANCE_COST_REDUCTION')).toBeUndefined()
   })
@@ -124,7 +129,8 @@ describe('R8.1 Smoke — DEKAM (CONSTRUCTION, BB)', () => {
     const result = runEngineV3({ ...DEKAM_INPUT, targetRating: 'A' })
     assertUniversalSmoke(result)
 
-    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeUndefined()
+    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeDefined()
+    expect(result.portfolio.find(a => a.actionId === 'A12_GROSS_MARGIN_IMPROVEMENT')).toBeDefined()
     expect(result.portfolio.find(a => a.actionId === 'A14_FINANCE_COST_REDUCTION')).toBeUndefined()
   })
 
@@ -132,7 +138,8 @@ describe('R8.1 Smoke — DEKAM (CONSTRUCTION, BB)', () => {
     const result = runEngineV3({ ...DEKAM_INPUT, targetRating: 'AA' })
     assertUniversalSmoke(result)
 
-    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeUndefined()
+    expect(result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')).toBeDefined()
+    expect(result.portfolio.find(a => a.actionId === 'A12_GROSS_MARGIN_IMPROVEMENT')).toBeDefined()
     expect(result.portfolio.find(a => a.actionId === 'A14_FINANCE_COST_REDUCTION')).toBeUndefined()
   })
 

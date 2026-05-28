@@ -195,10 +195,15 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs).toEqual([])
   })
 
-  test('A19 brüt kâr yoksa boş array döner', () => {
+  // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda hasılat+maliyet tx üretilir,
+  // ancak profitAmount=0 olduğundan kâr aktarımı (690→590) oluşturulmaz.
+  test('A19 brüt kâr sıfırsa hasılat+maliyet tx üretir, kâr aktarımı olmaz (R10.2)', () => {
     const txs = a19.buildTransactions(makeA19Context({ grossProfit: 0 }))
-
-    expect(txs).toEqual([])
+    // grossMargin=0 → stoklu yol: 1 tx (DELIVERY_REVENUE_AND_COST), profitAmount=0 → kâr tx yok
+    expect(txs.length).toBe(1)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT'  })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
   })
 
   test('A19 brüt marj yüzde 100 veya üstüyse boş array döner', () => {
@@ -276,6 +281,41 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs.length).toBe(2)
     expect(txs[0].legs.length).toBe(4)
     expect(txs[0].legs[3]).toMatchObject({ accountCode: '153', side: 'CREDIT' })
+  })
+
+  // ── R10.2 — Brüt Zarar profitAmount Guard ────────────────────────────────
+
+  // T_R102_NEW1: Brüt zararda profitAmount=0 — kâr aktarımı tx üretilmez
+  test('T_R102_NEW1 — A19 brüt zararda (grossProfit<0): 1 tx, kâr aktarımı yok (R10.2)', () => {
+    // grossMargin = -10M/100M = -0.10 → profitAmount = 0
+    // stoklu yol: dominant=153 (10M), hasılat+maliyet tx oluşur, kâr tx oluşmaz
+    const txs = a19.buildTransactions(makeA19Context({
+      grossProfit: -10_000_000,
+      accountBalances: { '340': 50_000_000, '153': 10_000_000 },
+    }))
+    expect(txs.length).toBe(1)
+    // Tek tx: DELIVERY_REVENUE_AND_COST (4 leg)
+    expect(txs[0].legs.length).toBe(4)
+    expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT' })
+    expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
+    // A19_PROFIT_TRANSFER tx yok
+    const profitTx = txs.find(tx => tx.id === 'A19_PROFIT_TRANSFER')
+    expect(profitTx).toBeUndefined()
+  })
+
+  // T_R102_NEW2: Pozitif marjda profitAmount=amount×grossMargin regression (R10.2 dokunmadı)
+  test('T_R102_NEW2 — A19 pozitif marjda profitAmount=amount×grossMargin korunuyor (regression)', () => {
+    // grossMargin = 30M/100M = 0.30, amount=20M → profitAmount=6M
+    // stoklu yol: 2 tx (DELIVERY_REVENUE_AND_COST + PROFIT_TRANSFER)
+    const txs = a19.buildTransactions(makeA19Context({
+      grossProfit: 30_000_000,
+      accountBalances: { '340': 50_000_000, '153': 30_000_000 },
+    }))
+    expect(txs.length).toBe(2)
+    // tx[1] = PROFIT_TRANSFER: profitAmount = 20M × 0.30 = 6M
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT' })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    expect(txs[1].legs[0].amount).toBeCloseTo(6_000_000, 0)
   })
 })
 

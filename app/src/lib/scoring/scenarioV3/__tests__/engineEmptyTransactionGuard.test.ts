@@ -4,11 +4,11 @@
  * Değişiklik: scoreCandidate() içinde buildTransactions().length === 0 kontrolü.
  * Yevmiyesi boş olan aksiyon artık portfolio'ya eklenmez (0 puan döner).
  *
- * Motivasyon: A19_ADVANCE_TO_REVENUE brüt zarar (grossProfit ≤ 0) ortamında
- * buildTransactions [] döner ama eski kodda engine bunu seçiyordu ("ghost aksiyon").
+ * R10.2 Güncelleme: A19 brüt zarar guard kaldırıldı. Brüt zararda artık
+ * buildTransactions [] dönmez — hasılat+maliyet tx üretir (profitAmount=0).
+ * Bu dosyadaki T1/T2 R10.2 ile güncellendi: A19 artık seçilebilir.
  *
- * Test stratejisi: runEngineV3 ile tam entegrasyon — A19 brüt zarar ortamında
- * portfolio'ya girmemeli.
+ * Test stratejisi: runEngineV3 ile tam entegrasyon.
  */
 
 import { runEngineV3 } from '../engineV3'
@@ -42,31 +42,29 @@ const GROSS_LOSS_INPUT: EngineInput = {
   },
 }
 
-describe('R6 — Engine Empty-Transaction Guard', () => {
+describe('R6/R10.2 — Engine Empty-Transaction Guard & A19 Brüt Zarar', () => {
 
-  // T1: Brüt zarar ortamında A19 portfolio'ya girmemeli
-  test('T1 — A19 brüt zarar: buildTransactions [] → portfolio dışı', () => {
+  // T1: R10.2: Brüt zarar + avans=15M → A19 artık hasılat+maliyet tx üretir → seçilir
+  test('T1 — A19 brüt zarar + avans=15M → 1 tx üretir, portfolio içi (R10.2 fix)', () => {
     const result = runEngineV3(GROSS_LOSS_INPUT)
 
     // result.portfolio tüm seçilen aksiyonlar (tüm horizon'lar)
     const allActionIds = result.portfolio.map(a => a.actionId)
 
-    // A19 brüt zarar ortamında seçilmemeli
-    expect(allActionIds).not.toContain('A19_ADVANCE_TO_REVENUE')
+    // R10.2: A19 brüt zararda da seçilmeli (hasılat+maliyet tx var, kâr tx=sıfır)
+    expect(allActionIds).toContain('A19_ADVANCE_TO_REVENUE')
   })
 
-  // T2: Aynı firma A19 görmeli miydik? Avans(340)=15M var ama grossProfit<0
-  // → Engine guard devreye girdi, 0 puan → seçilmedi
-  test('T2 — A19 aday ama puan sıfır → seçilmedi (engine guard aktif)', () => {
+  // T2: R10.2: forced A19 — avans=15M, brüt zarar → hasılat+maliyet tx → seçildi
+  test('T2 — A19 forced, brüt zarar + avans=15M → seçildi (R10.2 fix)', () => {
     const result = runEngineV3({
       ...GROSS_LOSS_INPUT,
       options: { allowedActionIds: ['A19_ADVANCE_TO_REVENUE'] },
     })
 
-    // allowedActionIds sadece A19 → ya seçilir ya da seçilmez (ama 0 puan ile seçilmemeli)
+    // R10.2: buildTransactions 1 tx döner → engine guard tetiklenmez → seçildi
     const a19Selected = result.portfolio.find(a => a.actionId === 'A19_ADVANCE_TO_REVENUE')
-    // Brüt zarar + grossProfit<0 → buildTransactions [] → 0 puan → not selected
-    expect(a19Selected).toBeUndefined()
+    expect(a19Selected).toBeDefined()
   })
 
   // T3: Pozitif grossProfit ortamında A19 seçilebilir (guard yanlış tetiklenmemeli)
