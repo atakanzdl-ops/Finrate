@@ -161,3 +161,33 @@ test('T8 — ACTION_CATALOG_V3: tüm aksiyonların bankerTrust tanımlı', () =>
   // En az 20 aksiyonun bankerTrust'ı olmalı (A01-A21 + A22)
   expect(withTrust.length).toBeGreaterThanOrEqual(20)
 })
+
+// ─── T_FIX2_INTEG: Sonuç rasyosu zayıfsa grup listesinden aksiyon eklenir ─────
+
+test('T_FIX2_INTEG: cashRatio çok düşük → LIQUIDITY_RESULT grubundan coverageMandatory aksiyon', () => {
+  // cashRatio ≈ 0.11 (100K+200K / 3.6M) << benchmark 0.14 → zayıf
+  // currentRatio = 2.1M/3.6M = 0.58 << benchmark 1.56 → zayıf
+  // getCoverageActionIdsForRatio('cashRatio') boş döner (girdi değil)
+  // → getResultGroupCandidates('cashRatio') → LIQUIDITY_RESULT listesi
+  // → A10 (dış sermaye, precondition yok) → coverage'a eklenir
+  const result = runEngineV3({
+    ...ISRA_INPUT,
+    targetRating: 'BB',
+    // Sadece A20'ye izin ver — greedy likiditeyi kapatamaz
+    options: { allowedActionIds: ['A20_GROSS_MARGIN_REFORM'] },
+  })
+
+  const coverageActions = result.portfolio.filter(a => a.coverageMandatory === true)
+  // Coverage en az 1 aksiyon eklemeli (likidite ve/veya kaldıraç zayıf)
+  expect(coverageActions.length).toBeGreaterThanOrEqual(1)
+
+  // Eklenen coverage aksiyonlarından en az biri LIQUIDITY_RESULT veya CAPITAL_RESULT listesinden
+  const { RESULT_GROUP_ACTION_IDS } = require('../ratioCategoryRegistry')
+  const allGroupIds = new Set([
+    ...RESULT_GROUP_ACTION_IDS.LIQUIDITY_RESULT,
+    ...RESULT_GROUP_ACTION_IDS.PROFIT_RESULT,
+    ...RESULT_GROUP_ACTION_IDS.CAPITAL_RESULT,
+  ])
+  const coverageFromGroup = coverageActions.filter(a => allGroupIds.has(a.actionId))
+  expect(coverageFromGroup.length).toBeGreaterThanOrEqual(1)
+})

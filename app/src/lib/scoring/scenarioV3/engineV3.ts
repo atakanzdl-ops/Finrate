@@ -92,6 +92,7 @@ import type { SectorMetricKey } from './sectorIntelligence'
 import {
   findWeakRatiosByCategory,
   getCoverageActionIdsForRatio,
+  getResultGroupCandidates,
 } from './ratioCategoryRegistry'
 import type { RatioResult } from '../ratios'
 
@@ -2041,7 +2042,14 @@ export function runEngineV3(input: EngineInput): EngineResult {
       for (const gap of weakRatios) {
         if (covered) break
 
-        const candidates = getCoverageActionIdsForRatio(gap.ratioField as string, catalogArray)
+        let candidates = getCoverageActionIdsForRatio(gap.ratioField as string, catalogArray)
+
+        // R12.1-FIX2: Girdi rasyosunda aday yoksa sonuç rasyosu olabilir
+        // (cashRatio, roic, debtToEbitda vb. → targetRatio.metric eşlemesi yok)
+        // → 3 grup listesinden fallback: mali etki gücüne göre sıralı
+        if (candidates.length === 0) {
+          candidates = getResultGroupCandidates(gap.ratioField as string)
+        }
 
         for (const actionId of candidates) {
           if (fullPortfolio.some(a => a.actionId === actionId)) {

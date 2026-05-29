@@ -21,6 +21,8 @@
 import {
   findWeakestRatioPerCategory,
   getCoverageActionIdsForRatio,
+  RATIO_TO_RESULT_GROUP,
+  getResultGroupCandidates,
 } from '../ratioCategoryRegistry'
 import type { RatioResult }    from '../../ratios'
 import type { SectorBenchmark } from '../../benchmarks'
@@ -201,4 +203,55 @@ test('T9 — logGap bazlı: daha büyük sapmalı oran seçilir', () => {
   expect(weak.liquidity).toBeDefined()
   expect(weak.liquidity!.ratioField).toBe('cashRatio')   // daha büyük logGap
   expect(weak.liquidity!.logGap).toBeGreaterThan(1.0)
+})
+
+// ─── R12.1-FIX2: 3 Grup Coverage testleri ────────────────────────────────────
+
+describe('R12.1-FIX2: Sonuç rasyoları 3 grup coverage', () => {
+
+  // T_FIX2_1: Likidite sonuç rasyosu → LIQUIDITY_RESULT grubu
+  test('T_FIX2_1: cashRatio LIQUIDITY_RESULT grubuna bağlanır', () => {
+    expect(RATIO_TO_RESULT_GROUP.cashRatio).toBe('LIQUIDITY_RESULT')
+    const candidates = getResultGroupCandidates('cashRatio')
+    // En güçlü etki: dış nakit → pay direkt artar
+    expect(candidates[0]).toBe('A10_CASH_EQUITY_INJECTION')
+    // A04 matematik: oran düşer → listede OLMAMALI
+    expect(candidates).not.toContain('A04_CASH_PAYDOWN_ST')
+  })
+
+  // T_FIX2_2: Kârlılık sonuç rasyosu → PROFIT_RESULT grubu
+  test('T_FIX2_2: roic PROFIT_RESULT grubuna bağlanır', () => {
+    expect(RATIO_TO_RESULT_GROUP.roic).toBe('PROFIT_RESULT')
+    const candidates = getResultGroupCandidates('roic')
+    expect(candidates[0]).toBe('A12_GROSS_MARGIN_IMPROVEMENT')
+    // A14 A13'ten önce: A13 kodda devre dışı (customCheck:false), sona alındı
+    expect(candidates.indexOf('A14_FINANCE_COST_REDUCTION'))
+      .toBeLessThan(candidates.indexOf('A13_OPEX_OPTIMIZATION'))
+  })
+
+  // T_FIX2_3: Sermaye sonuç rasyosu → CAPITAL_RESULT, A01/A02/A03 yok
+  test('T_FIX2_3: debtToEbitda CAPITAL_RESULT, A01/A02/A03 yok (matematik 0)', () => {
+    // equityRatio RATIO_SPEC'te yok → findWeakRatios atlar → tetiklenmez
+    // debtToEbitda RATIO_SPEC'te VAR → coverage tetiklenir
+    expect(RATIO_TO_RESULT_GROUP.debtToEbitda).toBe('CAPITAL_RESULT')
+    const candidates = getResultGroupCandidates('debtToEbitda')
+    // KV→UV reclass equityRatio/debtToEbitda etkisi sıfır → listede OLMAMALI
+    expect(candidates).not.toContain('A01_ST_FIN_DEBT_TO_LT')
+    expect(candidates).not.toContain('A02_TRADE_PAYABLE_TO_LT')
+    expect(candidates).not.toContain('A03_ADVANCE_TO_LT')
+    // A21 dahil: EBITDA artışı → debtToEbitda direkt düşer
+    expect(candidates).toContain('A21_OPERATING_PROFIT_REFORM')
+    // equityRatio listede ama tetiklenmez (zararsız)
+    expect(RATIO_TO_RESULT_GROUP.equityRatio).toBe('CAPITAL_RESULT')
+  })
+
+  // T_FIX2_4: Girdi rasyoları grup haritasında YOK
+  test('T_FIX2_4: Girdi rasyoları grup haritasında YOK', () => {
+    // Bu rasyolar RATIO_FIELD_TO_METRIC üzerinden kapsanır → ayrıca grup yok
+    expect(RATIO_TO_RESULT_GROUP.receivablesTurnoverDays).toBeUndefined()
+    expect(RATIO_TO_RESULT_GROUP.inventoryTurnoverDays).toBeUndefined()
+    expect(RATIO_TO_RESULT_GROUP.grossMargin).toBeUndefined()
+    expect(RATIO_TO_RESULT_GROUP.debtToEquity).toBeUndefined()
+    expect(getResultGroupCandidates('grossMargin')).toEqual([])
+  })
 })

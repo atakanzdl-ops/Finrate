@@ -282,3 +282,114 @@ export function findWeakestRatioPerCategory(
 
   return result
 }
+
+// ─── R12.1-FIX2: Sonuç Rasyoları — 3 Grup Coverage ──────────────────────────
+
+/**
+ * Sonuç rasyoları için 3 grup coverage (Atakan + Sonnet + Claude Code mutabakat).
+ *
+ * KÖK SEBEP: cashRatio, roic, equityRatio gibi rasyoların doğrudan
+ *   targetRatio.metric eşlemesi yoktur — çoklu hesabın türevi.
+ *   getCoverageActionIdsForRatio bu rasyolar için boş döner.
+ *
+ * ÇÖZÜM: Her sonuç rasyosu bir gruba atanır. Grup listesi mali etki
+ *   gücüne göre sıralı; isActionApplicable uygulanamaz adayları elee.
+ *
+ * MATEMATİKSEL KORUMALAR:
+ *   A04 LIQUIDITY_RESULT'ta YOK: cashRatio=X/Y, A04→(X-A)/(Y-A); Y>X ise
+ *     (likidite zayıfsa daima) oran DÜŞER.
+ *   A01/A02/A03 CAPITAL_RESULT'ta YOK: KV→UV reclass aktif/özkaynak
+ *     değiştirmez → equityRatio ve debtToEbitda etkisi SIFIR.
+ *   A13 PROFIT_RESULT'ta sonda: kodda devre dışı (customCheck pass:false).
+ *   A11 CAPITAL_RESULT'ta sonda: kodda devre dışı.
+ *   A21 CAPITAL_RESULT'ta dahil: EBITDA artışı → debtToEbitda direkt düşer.
+ *
+ * NOT: equityRatio RATIO_SPEC'te benchmark yok → findWeakRatiosByCategory
+ *   zaten atlar → CAPITAL_RESULT hiç tetiklenmez (zararsız liste girişi).
+ *   debtToEbitda RATIO_SPEC'te VAR → coverage tetiklenir.
+ */
+
+export type ResultGroup = 'LIQUIDITY_RESULT' | 'PROFIT_RESULT' | 'CAPITAL_RESULT'
+
+/**
+ * Sonuç rasyosu alanı → grup eşlemesi.
+ * Girdi rasyoları (grossMargin, debtToEquity, vb.) burada YOK —
+ *   onlar RATIO_FIELD_TO_METRIC üzerinden doğrudan kapsanır.
+ */
+export const RATIO_TO_RESULT_GROUP: Record<string, ResultGroup> = {
+  // Likidite sonuç rasyoları
+  currentRatio:           'LIQUIDITY_RESULT',
+  quickRatio:             'LIQUIDITY_RESULT',
+  cashRatio:              'LIQUIDITY_RESULT',
+  netWorkingCapitalRatio: 'LIQUIDITY_RESULT',
+  cashConversionCycle:    'LIQUIDITY_RESULT',
+
+  // Kârlılık sonuç rasyoları (grossMargin GİRDİ — hariç)
+  ebitdaMargin:           'PROFIT_RESULT',
+  ebitMargin:             'PROFIT_RESULT',
+  netProfitMargin:        'PROFIT_RESULT',
+  roa:                    'PROFIT_RESULT',
+  roe:                    'PROFIT_RESULT',
+  roic:                   'PROFIT_RESULT',
+  revenueGrowth:          'PROFIT_RESULT',  // RATIO_SPEC'te var → tetiklenebilir
+
+  // Kaldıraç sonuç rasyoları (D/E, D/A, KV Borç Oranı, Faiz Karş. GİRDİ — hariç)
+  equityRatio:            'CAPITAL_RESULT',  // RATIO_SPEC'te yok → tetiklenmez (zararsız)
+  debtToEbitda:           'CAPITAL_RESULT',  // RATIO_SPEC'te VAR → tetiklenir
+}
+
+/**
+ * Her grup için mali etki gücüne göre sıralı aksiyon ID listesi.
+ * isActionApplicable sonradan uygulanamaz adayları (devre dışı, precondition fail) elee.
+ */
+export const RESULT_GROUP_ACTION_IDS: Record<ResultGroup, string[]> = {
+  LIQUIDITY_RESULT: [
+    'A10_CASH_EQUITY_INJECTION',               // Dış nakit → pay direkt artar
+    'A05_RECEIVABLE_COLLECTION',               // Alacak → nakit → dönen artar
+    'A06_INVENTORY_MONETIZATION',              // Stok → nakit → CCC iyileşir
+    'A08_FIXED_ASSET_DISPOSAL',                // Duran varlık satışı → nakit
+    'A09_SALE_LEASEBACK',                      // Sat-geri kirala → nakit
+    'A22_SHAREHOLDER_RECEIVABLE_COLLECTION',   // Ortak alacak → nakit
+    'A02_TRADE_PAYABLE_TO_LT',                 // KV ticari borç UV → payda azalır
+    'A03_ADVANCE_TO_LT',                       // Avans UV → payda azalır
+    // A04 KASITLI OLARAK DIŞARIDA — matematik: Y>X iken (X-A)/(Y-A) < X/Y
+  ],
+
+  PROFIT_RESULT: [
+    'A12_GROSS_MARGIN_IMPROVEMENT',            // COGS düşer → EBITDA/EBIT/net hepsi
+    'A20_GROSS_MARGIN_REFORM',                 // Fiyat revizyonu → tüm marjlar
+    'A14_FINANCE_COST_REDUCTION',              // Faiz azalır → net marj, ROE
+    'A18_NET_SALES_GROWTH',                    // Gelir artışı → marj oranları
+    'A19_ADVANCE_TO_REVENUE',                  // Gelir öne çekme → tek seferlik
+    'A08_FIXED_ASSET_DISPOSAL',                // Varlık azalır → ROA payda küçülür
+    'A09_SALE_LEASEBACK',                      // Duran varlık → ROA/ROIC dolaylı
+    'A13_OPEX_OPTIMIZATION',                   // Kodda devre dışı (customCheck:false) — sona
+  ],
+
+  CAPITAL_RESULT: [
+    'A10_CASH_EQUITY_INJECTION',               // Özkaynak artar → equityRatio güçlü
+    'A15_DEBT_TO_EQUITY_SWAP',                 // Borç azalır + özkaynak artar → çift etki
+    'A04_CASH_PAYDOWN_ST',                     // Toplam borç azalır → D/EBITDA düşer
+    'A21_OPERATING_PROFIT_REFORM',             // EBITDA artar → debtToEbitda direkt
+    'A14_FINANCE_COST_REDUCTION',              // EBITDA etkisiz ama finansman yükü azalır
+    'A18_NET_SALES_GROWTH',                    // EBITDA büyür → D/EBITDA iyileşir
+    'A10B_PROMISSORY_NOTE_EQUITY_INJECTION',   // Senetli sermaye → equityRatio sınırlı
+    'A11_RETAIN_EARNINGS',                     // Kodda devre dışı (customCheck:false) — sona
+    // A01/A02/A03 KASITLI OLARAK DIŞARIDA — KV→UV reclass equityRatio/debtToEbitda etkisi 0
+  ],
+}
+
+/**
+ * Sonuç rasyosu için sıralı grup aday ID'lerini döner.
+ *
+ * getCoverageActionIdsForRatio boş döndüğünde çağrılır (girdi rasyosu değil).
+ * isActionApplicable sonradan devre dışı/uygulanamaz aksiyonları elee.
+ *
+ * @param ratioField  RatioResult alan adı (ör. 'cashRatio', 'roic')
+ * @returns Grup listesi (sıralı, boş array = girdi rasyosu veya eşleşme yok)
+ */
+export function getResultGroupCandidates(ratioField: string): string[] {
+  const group = RATIO_TO_RESULT_GROUP[ratioField]
+  if (!group) return []
+  return RESULT_GROUP_ACTION_IDS[group]
+}
