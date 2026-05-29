@@ -95,6 +95,7 @@ import {
   getResultGroupCandidates,
 } from './ratioCategoryRegistry'
 import type { RatioResult } from '../ratios'
+import { CORPORATE_TAX_RATE } from '../ratios'
 
 import {
   checkActionGuardrails,
@@ -691,9 +692,36 @@ function computePartialRatiosFromContext(ctx: FirmContext): Partial<RatioResult>
   const inv153  = (bal['153'] ?? 0) + (bal['150'] ?? 0) + (bal['151'] ?? 0) + (bal['152'] ?? 0)
   const cogs    = ctx.costOfGoodsSold ?? (ctx.netSales - ctx.grossProfit)
 
+  // R12.1-FIX3-FIX: Eksik sonuç rasyoları — ANA ratios.ts ile BİREBİR AYNI formüller
+  // (Codex audit sonrası 3 sapma düzeltildi: 159, 101+108, shortTermInv)
+
+  // quickRatio = (dönen varlık - stok) / KV yükümlülük
+  // Ana ratios.ts: inventory = _inv(150-153) + _ps(159); safe(quickAssets, KV)
+  // FIX: 159 (prepaidSuppliers) inventory'ye EKLENDİ (ADIM 1'de tespit edildi)
+  const inv159        = Math.max(0, bal['159'] ?? 0)                // prepaidSuppliers (R9: negatif olamaz)
+  const inventoryFull = inv153 + inv159                              // ana: _inv + _ps (159 dahil)
+  const quickAssets   = sum1xx - inventoryFull                       // ana: totalCurrentAssets - inventory
+  const quickRatio: number | null = sum3xx > 0 ? quickAssets / sum3xx : null
+
+  // roic = NOPAT / yatırılan sermaye
+  // Ana ratios.ts: nopat = ebit * (1-TAX); ebit = faaliyet karı = ctx.operatingProfit (aynı kavram)
+  //   investedCapital = totalEquity + netFinancialDebt
+  //   netFinancialDebt = totalFinDebt − cash(100+101+102+108) − shortTermInv(11x)
+  // FIX: cash 101+108 EKLENDİ; shortTermInvestments (11x) EKLENDİ (ADIM 1'de tespit edildi)
+  const cashFull    = (bal['100'] ?? 0) + (bal['101'] ?? 0)
+                    + (bal['102'] ?? 0) + (bal['108'] ?? 0)          // ana: d.cash = 100+101+102+108
+  const stInvest    = Object.entries(bal)
+    .filter(([k]) => k.startsWith('11'))
+    .reduce((s, [, v]) => s + Math.abs(v), 0)                        // ana: d.shortTermInvestments = 11x
+  const netFinDebt  = totalFinDebt - cashFull - stInvest             // ana: totalFinDebt − cash − STI
+  const investedCap = ctx.totalEquity + netFinDebt                   // ana: totalEquity + netFinancialDebt
+  const nopat       = ctx.operatingProfit * (1 - CORPORATE_TAX_RATE) // ana: ebit(=faaliyet karı) * (1-TAX)
+  const roic: number | null = investedCap !== 0 ? nopat / investedCap : null
+
   return {
     // Likidite
     currentRatio:           safe(sum1xx, sum3xx),
+    quickRatio,                                                      // R12.1-FIX3
     cashRatio:              safe((bal['100'] ?? 0) + (bal['102'] ?? 0), sum3xx),
     netWorkingCapitalRatio: ctx.totalAssets > 0 ? (sum1xx - sum3xx) / ctx.totalAssets : null,
 
@@ -702,6 +730,7 @@ function computePartialRatiosFromContext(ctx: FirmContext): Partial<RatioResult>
     netProfitMargin:        safe(ctx.netIncome,   ctx.netSales),
     roa:                    safe(ctx.netIncome,   ctx.totalAssets),
     roe:                    safe(ctx.netIncome,   ctx.totalEquity),
+    roic,                                                            // R12.1-FIX3
 
     // Kaldıraç — FIX 6: totalFinDebt (30x+40x) kullanılıyor
     debtToEquity:           safe(totalFinDebt, ctx.totalEquity),
