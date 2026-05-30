@@ -2524,17 +2524,17 @@ const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
   semanticType: 'RECEIVABLE_COLLECTION',
   horizons: ['short', 'medium'],
 
-  // FIX 4: 131 VEYA 231'den tahsilat — önce KV (131), kalan UV (231)
-  // Toplam alacağın %50 kapı — sürdürülebilir ortak ilişkisi için koruma
+  // R12.1-FIX4: 131 VEYA 231'den tahsilat — önce KV (131), kalan UV (231)
+  // Atakan mali kuralı: 131/231 = şirketin içinin boşaltılması, banka kırmızı bayrak.
+  // TAMAMI tahsil edilmeli — %50 cap KALDIRILDI (yarısı bırakmak mali olarak anlamsız).
   buildTransactions: (context) => {
     const bal131 = context.accountBalances?.['131'] ?? 0
     const bal231 = context.accountBalances?.['231'] ?? 0
     const total  = bal131 + bal231
     if (total < 1_000_000) return []
 
-    // %50 tavan: ortak ilişkileri ve nakit akışı dengesi
-    const maxAmount = total * 0.50
-    const amount    = Math.min(context.amount, maxAmount)
+    // Cap yok — 131+231 TAMAMI tahsil edilir (en kısa sürede tam kapanma)
+    const amount = total
     if (amount <= 0) return []
 
     // Önce 131 (KV alacak), kalan 231 (UV alacak)
@@ -2542,16 +2542,16 @@ const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     const from231 = amount - from131
 
     const legs: AccountingLeg[] = [
-      { accountCode: '102', accountName: 'Bankalar',                       side: 'DEBIT',  amount,   description: 'Ortak tahsilatı nakit girişi'        },
-      { accountCode: '131', accountName: 'Ortaklardan Alacaklar (KV)',     side: 'CREDIT', amount: from131, description: 'Kısa vadeli ortak alacağı tahsilatı' },
+      { accountCode: '102', accountName: 'Bankalar', side: 'DEBIT', amount, description: 'Ortak tahsilatı nakit girişi — tam kapanma' },
     ]
+    if (from131 > 0) {
+      legs.push({ accountCode: '131', accountName: 'Ortaklardan Alacaklar (KV)', side: 'CREDIT', amount: from131, description: 'KV ortak alacağı tam tahsilatı' })
+    }
     if (from231 > 0) {
-      legs.push(
-        { accountCode: '231', accountName: 'Ortaklardan Alacaklar (UV)', side: 'CREDIT', amount: from231, description: 'Uzun vadeli ortak alacağı tahsilatı' }
-      )
+      legs.push({ accountCode: '231', accountName: 'Ortaklardan Alacaklar (UV)', side: 'CREDIT', amount: from231, description: 'UV ortak alacağı tam tahsilatı' })
     }
 
-    return [makeBalancedTransaction('A22_MAIN', 'Ortaklardan alacak tahsilatı — 131/231 → 102', 'RECEIVABLE_COLLECTION', legs)]
+    return [makeBalancedTransaction('A22_MAIN', 'Ortaklardan alacak tahsilatı — 131/231 → 102 (tam kapanma)', 'RECEIVABLE_COLLECTION', legs)]
   },
 
   // FIX 4: requiredAccountCodes kaldırıldı (AND yerine OR mantığı)
@@ -2572,6 +2572,18 @@ const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     },
   },
 
+  // R12.1-FIX4: amountTRY tutarlılığı — suggestedAmount yerine computeAmount
+  // computeAmount = 131+231 tamamı → greedy/coverage amountTRY = transaction tutarıyla eşleşir
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    const bal = ctx.accountBalances as Record<string, number>
+    const b131 = bal?.['131'] ?? 0
+    const b231 = bal?.['231'] ?? 0
+    const total = b131 + b231
+    if (total < 1_000_000) return null  // 1M eşik — precondition ile tutarlı
+    return total  // tam kapanma
+  },
+
   qualityCoefficient: 0.65,
   sustainability: 'ONE_OFF',
 
@@ -2581,7 +2593,7 @@ const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     basis: 'assets',
     minPctOfBasis: 0.02,
     typicalPctOfBasis: 0.05,
-    maxPctOfBasis: 0.10,
+    maxPctOfBasis: 1.0,          // R12.1-FIX4: tam kapanma — üst sınır yoktur (100%)
     absoluteMinTRY: 1_000_000,
   },
 

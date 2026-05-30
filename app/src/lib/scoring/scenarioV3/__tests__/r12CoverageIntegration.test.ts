@@ -124,14 +124,16 @@ test('T6 — A22_SHAREHOLDER_RECEIVABLE_COLLECTION katalogda tanımlı', () => {
 
 // ─── T7: A22 buildTransactions doğrulama ─────────────────────────────────────
 
-test('T7 — A22: buildTransactions 102 DEBIT + 131 CREDIT balanced döner', () => {
+test('T7 — A22: buildTransactions 102 DEBIT + 131 CREDIT balanced döner (TAM KAPANMA)', () => {
+  // R12.1-FIX4: cap kaldırıldı → amount = total (131+231 tamamı)
+  // context.amount artık dikkate alınmaz — tam kapanma zorunlu
   const { ACTION_CATALOG_V3 } = require('../actionCatalogV3')
   const a22 = ACTION_CATALOG_V3['A22_SHAREHOLDER_RECEIVABLE_COLLECTION']
   expect(a22).toBeDefined()
 
   const txs = a22.buildTransactions({
     sector: 'TRADE', horizon: 'short',
-    analysis: {}, amount: 2_000_000,
+    analysis: {}, amount: 2_000_000,   // context.amount → artık dikkate alınmıyor
     previousActions: [],
     accountBalances: { '131': 5_000_000, '102': 1_000_000 },
     netSales: 10_000_000, grossProfit: 3_000_000,
@@ -142,7 +144,8 @@ test('T7 — A22: buildTransactions 102 DEBIT + 131 CREDIT balanced döner', () 
   const debit  = legs.filter((l: any) => l.side === 'DEBIT' ).reduce((s: number, l: any) => s + l.amount, 0)
   const credit = legs.filter((l: any) => l.side === 'CREDIT').reduce((s: number, l: any) => s + l.amount, 0)
   expect(debit).toBe(credit)
-  expect(debit).toBe(2_000_000)
+  // FIX4: tam kapanma → 5M (131 tamamı), context.amount=2M artık cap değil
+  expect(debit).toBe(5_000_000)
 
   const debitLeg  = legs.find((l: any) => l.side === 'DEBIT')
   const creditLeg = legs.find((l: any) => l.side === 'CREDIT')
@@ -332,4 +335,115 @@ test('T_FIX3_TUTARLILIK: quickRatio ve roic hesapları ana ratios.ts ile tutarl�
   // (T_FIX3_QUICK zaten bunu doğruluyor — bu test formula tutarlılığını doğrular)
   expect(typeof anaResult.quickRatio).toBe('number')
   expect(anaResult.quickRatio).toBeLessThan(0.88)  // ana formül de ZAYIF görüyor
+})
+
+// ─── T_FIX4: A22 tam kapanma testleri ────────────────────────────────────────
+
+describe('R12.1-FIX4: A22 tam kapanma (cap kaldırıldı)', () => {
+
+  test('T_FIX4_A22_FULL: A22 131+231 tamamını kapatır', () => {
+    // DEKAM benzeri: 131 = 28.3M → tam tahsilat = 28.3M (eski: 14.15M)
+    const { ACTION_CATALOG_V3 } = require('../actionCatalogV3')
+    const a22 = ACTION_CATALOG_V3['A22_SHAREHOLDER_RECEIVABLE_COLLECTION']
+
+    const txs = a22.buildTransactions({
+      sector: 'TRADE', horizon: 'short',
+      analysis: {}, amount: 10_000_000,   // context.amount küçük olsa bile
+      previousActions: [],
+      accountBalances: { '131': 28_300_000, '102': 1_000_000 },
+      netSales: 50_000_000, grossProfit: 10_000_000,
+    })
+    expect(txs.length).toBe(1)
+
+    const legs = txs[0].legs
+    const debit  = legs.filter((l: any) => l.side === 'DEBIT' ).reduce((s: number, l: any) => s + l.amount, 0)
+    const credit = legs.filter((l: any) => l.side === 'CREDIT').reduce((s: number, l: any) => s + l.amount, 0)
+
+    // Muhasebe dengesi
+    expect(debit).toBe(credit)
+    // Tam kapanma: 28.3M (context.amount = 10M görmezden gelindi)
+    expect(debit).toBe(28_300_000)
+
+    // 102 DEBIT, 131 CREDIT (231 yok bu fixture'da)
+    const debitLeg = legs.find((l: any) => l.side === 'DEBIT')
+    expect(debitLeg!.accountCode).toBe('102')
+    expect(legs.filter((l: any) => l.side === 'CREDIT').map((l: any) => l.accountCode))
+      .toContain('131')
+  })
+
+  test('T_FIX4_A22_BOTH: 131+231 her ikisi de tam kapanır', () => {
+    // 131 = 10M, 231 = 5M → toplam 15M, hepsi tahsil edilmeli
+    const { ACTION_CATALOG_V3 } = require('../actionCatalogV3')
+    const a22 = ACTION_CATALOG_V3['A22_SHAREHOLDER_RECEIVABLE_COLLECTION']
+
+    const txs = a22.buildTransactions({
+      sector: 'TRADE', horizon: 'short',
+      analysis: {}, amount: 5_000_000,
+      previousActions: [],
+      accountBalances: { '131': 10_000_000, '231': 5_000_000, '102': 2_000_000 },
+      netSales: 30_000_000, grossProfit: 8_000_000,
+    })
+    expect(txs.length).toBe(1)
+
+    const legs = txs[0].legs
+    const debit  = legs.filter((l: any) => l.side === 'DEBIT' ).reduce((s: number, l: any) => s + l.amount, 0)
+    const credit = legs.filter((l: any) => l.side === 'CREDIT').reduce((s: number, l: any) => s + l.amount, 0)
+
+    // Tam 15M — 131+231 hepsi
+    expect(debit).toBe(credit)
+    expect(debit).toBe(15_000_000)
+
+    // Hem 131 hem 231 leg'i olmalı
+    const creditCodes = legs.filter((l: any) => l.side === 'CREDIT').map((l: any) => l.accountCode)
+    expect(creditCodes).toContain('131')
+    expect(creditCodes).toContain('231')
+
+    // 131 = 10M, 231 = 5M dağılımı
+    const leg131 = legs.find((l: any) => l.accountCode === '131')
+    const leg231 = legs.find((l: any) => l.accountCode === '231')
+    expect(leg131!.amount).toBe(10_000_000)
+    expect(leg231!.amount).toBe(5_000_000)
+  })
+
+  test('T_FIX4_A22_ESIK: 1M altı A22 atlar', () => {
+    // Eşik korundu — küçük bakiye atlama
+    const { ACTION_CATALOG_V3 } = require('../actionCatalogV3')
+    const a22 = ACTION_CATALOG_V3['A22_SHAREHOLDER_RECEIVABLE_COLLECTION']
+
+    const txs = a22.buildTransactions({
+      sector: 'TRADE', horizon: 'short',
+      analysis: {}, amount: 500_000,
+      previousActions: [],
+      accountBalances: { '131': 500_000, '102': 1_000_000 },
+      netSales: 10_000_000, grossProfit: 3_000_000,
+    })
+    // 500K < 1M eşik → boş dönmeli
+    expect(txs).toHaveLength(0)
+  })
+
+  test('T_FIX4_A22_SADECE231: sadece 231 varsa tam tahsilat', () => {
+    // 131 = 0, 231 = 3M → from231 = 3M, from131 = 0 (131 leg yok)
+    const { ACTION_CATALOG_V3 } = require('../actionCatalogV3')
+    const a22 = ACTION_CATALOG_V3['A22_SHAREHOLDER_RECEIVABLE_COLLECTION']
+
+    const txs = a22.buildTransactions({
+      sector: 'TRADE', horizon: 'short',
+      analysis: {}, amount: 1_000_000,
+      previousActions: [],
+      accountBalances: { '231': 3_000_000, '102': 500_000 },
+      netSales: 10_000_000, grossProfit: 3_000_000,
+    })
+    expect(txs.length).toBe(1)
+
+    const legs = txs[0].legs
+    const debit  = legs.filter((l: any) => l.side === 'DEBIT' ).reduce((s: number, l: any) => s + l.amount, 0)
+    const credit = legs.filter((l: any) => l.side === 'CREDIT').reduce((s: number, l: any) => s + l.amount, 0)
+    expect(debit).toBe(credit)
+    expect(debit).toBe(3_000_000)
+
+    // 131 leg olmamalı (sıfır değil, yok olmalı)
+    const creditCodes = legs.filter((l: any) => l.side === 'CREDIT').map((l: any) => l.accountCode)
+    expect(creditCodes).not.toContain('131')
+    expect(creditCodes).toContain('231')
+  })
 })
