@@ -117,6 +117,12 @@ import {
 } from './ratingReasoning'
 import type { RatingGrade } from './ratingReasoning'
 
+import {
+  getPrimaryCoveredGroups,
+  getPrimaryActionsForGroup,
+} from './actionRatioGroupProfile'
+import type { RatioGroup } from './actionRatioGroupProfile'
+
 // Unused imports - imported for type completeness but not referenced directly
 void 0 as unknown as typeof ratingToIndex
 
@@ -299,6 +305,8 @@ export interface EngineResult {
     rejectedCandidates: Array<{ actionId: string; reason: string }>
     ledgerChangeLog:    unknown[]
     algorithmTrace:     string[]
+    /** R12.1-FIX5: Uygulanabilir primary aksiyon bulunamayan zayıf yapılar */
+    primaryCoverageUnmet?: Array<{ group: string; reason: string }>
   }
 }
 
@@ -2051,6 +2059,9 @@ export function runEngineV3(input: EngineInput): EngineResult {
 
   let fullPortfolio = [...shortActions, ...mediumActions, ...longActions]
 
+  // R12.1-FIX5: Uygulanabilir primary aksiyon bulunamayan yapılar (debug)
+  const primaryCoverageUnmetOut: Array<{ group: string; reason: string }> = []
+
   // ── R12.1: Rasyo Kategori Coverage (FIX 3) ──────────────────────────────────
   // Greedy seçim sonrası zayıf kategorileri kontrol et.
   // Her zayıf kategori için (greedy'nin kaçırdığı) bir coverageMandatory aksiyon ekle.
@@ -2170,6 +2181,151 @@ export function runEngineV3(input: EngineInput): EngineResult {
         }
       }
     }
+
+    // ── R12.1-FIX5: Her zayıf yapı kendi PRIMARY aksiyonunu almalı ────────────
+    // Yan etki (secondary) COVERED saymaz. Örn: A14 primary=PROFITABILITY,
+    // secondary=LEVERAGE → kaldıraç primary olmadan covered sayılmamalı.
+    //
+    // 1. Zayıf yapılar: weakByCategory kategorileri (yukarıdaki blokta hesaplandı)
+    // 2. Primary kapsanan yapılar: portfolio'da primary === grup olan aksiyonlar
+    // 3. Zayıf AMA primary kapsanmamış → o yapının primary havuzundan ekle
+    // 4. Uygulanabilir yoksa → debug.primaryCoverageUnmet (zorlamaz)
+    {
+      // RatioCategory (lowercase) → RatioGroup (uppercase) dönüşümü
+      const catToGroup: Record<string, RatioGroup> = {
+        liquidity:     'LIQUIDITY',
+        profitability: 'PROFITABILITY',
+        leverage:      'LEVERAGE',
+        activity:      'ACTIVITY',
+      }
+
+      const weakGroupSet = new Set<RatioGroup>(
+        Object.keys(weakByCategory)
+          .filter(c => (weakByCategory[c as keyof typeof weakByCategory]?.length ?? 0) > 0)
+          .map(c => catToGroup[c])
+          .filter((g): g is RatioGroup => g !== undefined)
+      )
+
+      const currentPortfolioIds = fullPortfolio.map(a => a.actionId)
+      const primaryCoveredSet   = getPrimaryCoveredGroups(currentPortfolioIds)
+
+      const primaryCoverageUnmet = primaryCoverageUnmetOut  // outer scope'a bağla
+
+      for (const group of weakGroupSet) {
+        if (primaryCoveredSet.has(group)) {
+          algorithmTrace.push(`[r12_fix5] ${group}: primary covered ✓`)
+          continue
+        }
+
+        // Bu yapının primary aksiyon havuzu — qualityCoefficient azalan sıra
+        const primaryCandidateIds = getPrimaryActionsForGroup(group)
+          .filter(id => !fullPortfolio.some(a => a.actionId === id))  // portföyde olmayanlar
+          .sort((a, b) => {
+            const qa = ACTION_CATALOG_V3[a]?.qualityCoefficient ?? 0
+            const qb = ACTION_CATALOG_V3[b]?.qualityCoefficient ?? 0
+            return qb - qa
+          })
+
+        algorithmTrace.push(`[r12_fix5] ${group}: primary NOT covered — candidates: ${primaryCandidateIds.join(', ')}`)
+
+        let fixAdded = false
+        for (const candidateId of primaryCandidateIds) {
+          const candidateAction = ACTION_CATALOG_V3[candidateId]
+          if (!candidateAction) continue
+
+          const horizon: HorizonKey = (candidateAction.horizons[0] as HorizonKey) ?? 'medium'
+          const allIds = fullPortfolio.map(a => a.actionId)
+
+          // ADIM 1 (isActionApplicable) — mevcut coverage pattern birebir
+          const applicability = isActionApplicable(candidateAction, workingContext, horizon, allIds, baselineContext)
+          if (!applicability.applicable) {
+            algorithmTrace.push(`[r12_fix5] ${candidateId} not applicable: ${applicability.reason}`)
+            continue
+          }
+
+          // ADIM 2 (amount candidates) — mevcut coverage pattern BİREBİR (satır 2102-2103)
+          const amtCandidates = calculateAmountCandidates(candidateAction, workingContext, horizon)
+          const typical = amtCandidates.find(a => a.label === 'typical') ?? amtCandidates[0]
+          if (!typical || typical.amountTRY <= 0) {
+            algorithmTrace.push(`[r12_fix5] ${candidateId} zero amount, skipped`)
+            continue
+          }
+
+          // ADIM 3 (source/materiality check) — mevcut coverage pattern birebir
+          {
+            const depSpec = ACTION_DEPENDENCY_GRAPH[candidateId]
+            if (depSpec?.sourceAccountRequirements &&
+                candidateId !== 'A10_CASH_EQUITY_INJECTION' &&
+                candidateId !== 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION') {
+              const totalSrc = depSpec.sourceAccountRequirements
+                .reduce((s, code) => s + Math.abs(workingContext.accountBalances[code] ?? 0), 0)
+              if (totalSrc < typical.amountTRY) {
+                algorithmTrace.push(`[r12_fix5] ${candidateId} source ${(totalSrc/1e6).toFixed(1)}M < matTutar ${(typical.amountTRY/1e6).toFixed(1)}M — skipped`)
+                continue
+              }
+            }
+          }
+
+          // ADIM 4 (build transactions + empty guard) — mevcut coverage pattern birebir
+          const fixTxs = candidateAction.buildTransactions({
+            sector: workingContext.sector, horizon,
+            analysis: workingContext.accountBalances as unknown,
+            amount: typical.amountTRY, previousActions: allIds,
+            accountBalances: workingContext.accountBalances,
+            netSales: workingContext.netSales,
+            grossProfit: workingContext.grossProfit,
+            baselineAccountBalances: baselineContext.baselineAccountBalances,
+            baselineGrossProfit: baselineContext.baselineGrossProfit,
+            baselineNetSales: baselineContext.baselineNetSales,
+          })
+          if (fixTxs.length === 0) {
+            algorithmTrace.push(`[r12_fix5] ${candidateId} empty transactions, skipped`)
+            continue
+          }
+
+          const fixQuality = calculateQuality({
+            template: candidateAction, transactions: fixTxs,
+            sector: workingContext.sector, repeatIndex: 1, rawScoreDelta: 1.0,
+          })
+
+          fullPortfolio.push({
+            actionId:                   candidateAction.id,
+            actionName:                 candidateAction.name,
+            horizon,
+            amountTRY:                  typical.amountTRY,
+            transactions:               fixTxs,
+            qualityScore:               fixQuality.breakdown.finalQuality,
+            productivityRepairStrength: 'COVERAGE',
+            sustainability:             String(candidateAction.sustainability),
+            sectorCompatibility:        candidateAction.sectorCompatibility[workingContext.sector] === 'primary' ? 1.0 : 0.9,
+            guardrailSeverity:          'PASS',
+            estimatedNotchContribution: 0,
+            repeatDecayApplied:         1.0,
+            diversityPenaltyApplied:    0,
+            narrative:                  `[R12.1-FIX5 Primary] ${candidateAction.name}: ${group} yapısı için primary kapsama`,
+            coverageMandatory:          true,
+          })
+
+          workingContext = updateFirmContextFromTransactions(workingContext, fixTxs)
+          algorithmTrace.push(`[r12_fix5] added ${candidateId} as primary for ${group} (${(typical.amountTRY/1e6).toFixed(1)}M TL)`)
+          fixAdded = true
+          break
+        }
+
+        if (!fixAdded) {
+          const reason = `${group} için uygulanabilir primary aksiyon bulunamadı`
+          algorithmTrace.push(`[r12_fix5] ${group}: UNMET — ${reason}`)
+          primaryCoverageUnmet.push({ group, reason })
+        }
+      }
+
+      // debug'a yaz (olmayan parayla aksiyon icat etme — sadece raporla)
+      if (primaryCoverageUnmet.length > 0) {
+        // debug object is built later in the return statement — store in trace
+        algorithmTrace.push(`[r12_fix5] primaryCoverageUnmet: ${primaryCoverageUnmet.map(u => u.group).join(', ')}`)
+      }
+    }
+    // ── R12.1-FIX5 END ────────────────────────────────────────────────────────
   }
 
   // Faz 7.3.12-PRE: ratioTransparency.current = baseline değeri
@@ -2327,10 +2483,11 @@ export function runEngineV3(input: EngineInput): EngineResult {
     },
     decisionTrace,
     debug: {
-      iterations:         algorithmTrace.length,
+      iterations:            algorithmTrace.length,
       rejectedCandidates,
-      ledgerChangeLog:    [],
+      ledgerChangeLog:       [],
       algorithmTrace,
+      primaryCoverageUnmet:  primaryCoverageUnmetOut.length > 0 ? primaryCoverageUnmetOut : undefined,
     },
   }
 }

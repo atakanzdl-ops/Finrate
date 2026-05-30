@@ -447,3 +447,96 @@ describe('R12.1-FIX4: A22 tam kapanma (cap kaldırıldı)', () => {
     expect(creditCodes).toContain('231')
   })
 })
+
+// ─── T_FIX5: Primary garanti pass testleri ───────────────────────────────────
+
+describe('R12.1-FIX5: Her zayıf yapı kendi primary aksiyonunu alır', () => {
+
+  test('T_FIX5_PROFILE: A05 primary ACTIVITY, A19 primary ACTIVITY, A22 primary LIQUIDITY', () => {
+    const { ACTION_RATIO_GROUP_PROFILE } = require('../actionRatioGroupProfile')
+    expect(ACTION_RATIO_GROUP_PROFILE['A05_RECEIVABLE_COLLECTION'].primary).toBe('ACTIVITY')
+    expect(ACTION_RATIO_GROUP_PROFILE['A05_RECEIVABLE_COLLECTION'].secondary).toBe('LIQUIDITY')
+    expect(ACTION_RATIO_GROUP_PROFILE['A19_ADVANCE_TO_REVENUE'].primary).toBe('ACTIVITY')
+    expect(ACTION_RATIO_GROUP_PROFILE['A19_ADVANCE_TO_REVENUE'].secondary).toBe('PROFITABILITY')
+    expect(ACTION_RATIO_GROUP_PROFILE['A22_SHAREHOLDER_RECEIVABLE_COLLECTION'].primary).toBe('LIQUIDITY')
+    expect(ACTION_RATIO_GROUP_PROFILE['A22_SHAREHOLDER_RECEIVABLE_COLLECTION'].secondary).toBe('LEVERAGE')
+  })
+
+  test('T_FIX5_PRIMARY_HELPER: getPrimaryCoveredGroups yan etki saymaz', () => {
+    const { getPrimaryCoveredGroups } = require('../actionRatioGroupProfile')
+    // A14: primary=PROFITABILITY, secondary=LEVERAGE
+    const covered = getPrimaryCoveredGroups(['A14_FINANCE_COST_REDUCTION'])
+    expect(covered.has('PROFITABILITY')).toBe(true)
+    expect(covered.has('LEVERAGE')).toBe(false)   // secondary → SAYILMAZ
+  })
+
+  test('T_FIX5_LEVERAGE: kaldıraç zayıf + primary yoksa primary eklenir', () => {
+    // iPOS-benzeri: interestCoverage düşük (A14 çeker primary=PROFITABILITY),
+    // debtToEquity yüksek, debtToAssets yüksek
+    // Greedy: A14 seçer → primary PROFITABILITY covered
+    // FIX5: kaldıraç primary YOKSA → LEVERAGE primary havuzundan ekler
+    //
+    // Sadece A14 + A21 izin ver → greedy yalnızca kârlılık aksiyonu seçebilir
+    // Kaldıraç primary (A01/A10/A15...) greedy'de olmamalı
+    const result = runEngineV3({
+      ...ISRA_INPUT,
+      targetRating: 'BB',
+      options: { allowedActionIds: ['A14_FINANCE_COST_REDUCTION', 'A21_OPERATING_PROFIT_REFORM'] },
+    })
+
+    // FIX5: kaldıraç primary aksiyonu coverageMandatory=true ile portföyde olmalı
+    // ISRA: debtToEquity=18M/5M=3.6 >> benchmark 1.51 → kaldıraç ZAYIF
+    // A14 primary=PROFITABILITY → kaldıraç primary kapsanmamış
+    // FIX5 pass: LEVERAGE primary havuzundan (A01/A10/A15...) uygulanabilir ekler
+    const leveragePrimary = result.portfolio.filter(a => {
+      const { ACTION_RATIO_GROUP_PROFILE } = require('../actionRatioGroupProfile')
+      return a.coverageMandatory && ACTION_RATIO_GROUP_PROFILE[a.actionId]?.primary === 'LEVERAGE'
+    })
+    expect(leveragePrimary.length).toBeGreaterThanOrEqual(1)
+  })
+
+  test('T_FIX5_UNMET: uygulanabilir primary yoksa debug.primaryCoverageUnmet kaydı', () => {
+    // Likidite zayıf (cashRatio çok düşük) + primary LIQUIDITY aksiyonları uygulanamaz:
+    //   A03: 340 hesabı yok → not applicable
+    //   A22: 131/231 hesabı yok → not applicable
+    // → FIX5 LIQUIDITY için primary bulamaz → primaryCoverageUnmet = [{group:'LIQUIDITY'}]
+    //
+    // Fixture:
+    //   cashRatio = 100K / 10M = 0.01 << 0.14 benchmark → LİKİDİTE ZAYIF
+    //   debtToEquity = 10M / 5M = 2.0 > 1.51 → KALDIRAC ZAYIF (A10 ile kapanır)
+    //   DSO = 5M/20M*365 = 91 > 37 → FAALİYET ZAYIF (A05 ile kapanır)
+    //   340 YOK → A03 applicable değil
+    //   131/231 YOK → A22 applicable değil
+    //   → LİKİDİTE primary KARŞILANAMAZ → unmet
+    const result = runEngineV3({
+      sector: 'TRADE',
+      currentRating: 'B',
+      accountBalances: {
+        '102':   100_000,    // çok az nakit — cashRatio zayıf
+        '120': 5_000_000,    // alacaklar — DSO zayıf
+        '300': 10_000_000,   // KV finansal borç — D/E zayıf
+        '500':  5_000_000,   // özkaynak
+        // 340 YOK → A03 applicable değil
+        // 131/231 YOK → A22 applicable değil
+      },
+      incomeStatement: {
+        netSales:        20_000_000,
+        costOfGoodsSold: 15_000_000,
+        grossProfit:      5_000_000,   // 25% > 14% → GÜÇLÜ (kârlılık primary gerekmez)
+        operatingProfit:  2_000_000,
+        netIncome:          500_000,
+        interestExpense:  1_000_000,
+      },
+      options: { allowedActionIds: [] },  // greedy boş → hiçbir primary seçilmedi
+    })
+
+    // Engine crash etmememeli
+    expect(result.portfolio).toBeDefined()
+
+    // LİKİDİTE primary kapsanamamış → debug.primaryCoverageUnmet tanımlı ve en az 1 kayıt
+    const unmet = result.debug?.primaryCoverageUnmet
+    expect(unmet).toBeDefined()
+    expect(unmet!.length).toBeGreaterThanOrEqual(1)
+    expect(unmet!.some(u => u.group === 'LIQUIDITY')).toBe(true)
+  })
+})
