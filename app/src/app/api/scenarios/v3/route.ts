@@ -6,6 +6,7 @@ import { formatScenariosForResponse, buildEngineResultDto } from '@/lib/scoring/
 import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
 import type { EngineResult }               from '@/lib/scoring/scenarioV3/engineV3'
 import { calculateRatiosFromAccounts }        from '@/lib/scoring/ratios'
+import { rebuildAggregateFromAccounts }       from '@/lib/scoring/accountMapper'
 import { calculateScore, scoreToRating }      from '@/lib/scoring/score'
 import { combineScores, calcSubjectiveScore }  from '@/lib/scoring/subjective'
 import { calculateActualPostActionRating }    from '@/lib/scoring/scenarioV3/postActionRating'
@@ -389,6 +390,15 @@ export async function POST(req: NextRequest) {
 
       // Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için
       currentAccountBalances: balances,
+
+      // R11: Kritik uyarı kartları için ratios + totalEquity expose
+      // ratios.grossMargin / interestCoverage zaten calculateRatiosFromAccounts'tan geliyor.
+      // totalEquity rebuildAggregateFromAccounts ile aynı zincir (accountMapper) — engine ile tutarlı.
+      ratios: {
+        grossMargin:      ratios.grossMargin,
+        interestCoverage: ratios.interestCoverage,
+      },
+      totalEquity: rebuildAggregateFromAccounts(analysis.financialAccounts).totalEquity ?? null,
 
       // Opsiyonel V2 karsilastirma -- henuz desteklenmiyor bu route'ta
       v2Comparison: includeV2Comparison

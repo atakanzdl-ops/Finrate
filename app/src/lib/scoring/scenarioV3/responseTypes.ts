@@ -89,4 +89,11 @@ export interface ScenarioV3ApiResponse {
   v2Comparison?:  V2ComparisonDto
   /** Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için */
   currentAccountBalances?: Record<string, number>
+  /** R11: Kritik uyarı kartları için hesaplanmış rasyolar */
+  ratios?: {
+    grossMargin?:        number | null   // NOT: grossMargin (grossProfitMargin DEGIL)
+    interestCoverage?:   number | null
+  }
+  /** R11: Kritik uyarı kartları için özkaynak tutarı */
+  totalEquity?: number | null
 }

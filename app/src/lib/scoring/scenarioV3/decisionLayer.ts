@@ -987,13 +987,13 @@ function buildTargetFeasibilityExplanation(
 
   if (targetAchieved) {
     parts.push(
-      `${currentRating} → ${requestedTarget} geçişi mümkün görünüyor. ` +
-      `${notchesGained} kategori iyileşme, güven: ${confidenceToDisplay(confidence)} ` +
-      `(%${(confidenceModifier * 100).toFixed(0)}).`
+      `${currentRating} → ${requestedTarget} hedefine ulaşılabilir görünüyor. ` +
+      `${notchesGained} kategori iyileşme.`
     )
   } else {
     parts.push(
-      `${requestedTarget} hedefine ulaşılamıyor — ulaşılabilir maksimum: ${finalTargetRating}. ` +
+      `${requestedTarget} hedefine bu dönemde ulaşılamıyor. ` +
+      `Mevcut koşullarda ulaşılabilecek en yüksek seviye: ${finalTargetRating}. ` +
       `${notchesGained} kategori iyileşme mümkün.`
     )
   }
@@ -1334,8 +1334,6 @@ function buildConsultantNarrative(
   const blockedByCapacity  = transition?.blockedByPortfolioCapacity ?? false
   const capacityNotches    = transition?.achievableByPortfolio ?? notchesGained
   const rawCapacity        = transition?.portfolioNotchCapacity ?? Infinity
-  const confidenceLabel    = confidence === 'HIGH' ? 'yüksek güvenle' : confidence === 'MEDIUM' ? 'orta güvenle' : 'düşük güvenle'
-
   let bankerView: string
 
   if (blockedByCapacity) {
@@ -1347,24 +1345,22 @@ function buildConsultantNarrative(
       `Daha yüksek bir hedefe ulaşmak için portföyün yapısal aksiyonlarla genişletilmesi gerekiyor. ` +
       `Likidite iyileşmesi tek başına yeterli değildir; aktif verimlilik ve gelir kalitesinin de güçlenmesi gerekir.`
   } else if (notchesGained === 0) {
-    // Faz 7.3.31: bankerSummary referansı kaldırıldı (teknik sızıntı riski)
     bankerView =
       `Mevcut yapıda anlamlı rating iyileşmesi sağlanamıyor. ` +
       `Köklü operasyonel değişim ve finansal yeniden yapılandırma gerekiyor.`
+  } else if (confidence === 'LOW') {
+    bankerView =
+      `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
+      `önerilen aksiyonlarla destekleniyor. ` +
+      `Bilanço düzenlemeleri tek başına yeterli değil; kalıcı operasyonel dönüşüm gerekiyor. ` +
+      `Teminat yapısı ve nakit üretim kapasitesi finansal sağlığın temel göstergeleridir.`
   } else {
     bankerView =
       `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
-      `${confidenceLabel} destekleniyor. `
-
-    if (confidence === 'HIGH') {
-      bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa iyileşme kalıcı olur.'
-    } else if (confidence === 'MEDIUM') {
-      bankerView += 'Orta güven — uygulama riski var, ilerlemenin düzenli izlenmesi önemli.'
-    } else {
-      bankerView +=
-        'Düşük güven — bilanço düzenlemeleri tek başına yeterli değil, kalıcı operasyonel dönüşüm gerekiyor. ' +
-        'Teminat yapısı ve nakit üretim kapasitesi finansal sağlığın temel göstergeleridir.'
-    }
+      `önerilen aksiyonlarla destekleniyor. ` +
+      (confidence === 'MEDIUM'
+        ? 'Uygulama sürecinde ilerlemenin düzenli izlenmesi önemli.'
+        : 'Bu yol haritası tutarlı biçimde uygulanırsa iyileşme kalıcı olur.')
   }
 
   return {

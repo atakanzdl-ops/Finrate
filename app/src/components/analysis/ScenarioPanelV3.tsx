@@ -396,21 +396,72 @@ function OzetTab({ result }: { result: any }) {
 
             <div className="text-lg leading-relaxed mt-2">{heroMsg}</div>
 
-            {exec.confidence && (
-              <div className="mt-4 pt-4 border-t border-white/10 text-sm text-white/80">
-                {/* R8.8: 'Güven: Yüksek' → 'Analiz: Tamamlandı' — HIGH her zaman yanıltıcı */}
-                {exec.confidence === 'HIGH' ? (
-                  <>Analiz: <strong className="text-white">Tamamlandı</strong></>
-                ) : (
-                  <>Güven: <strong className="text-white">{exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}</strong></>
-                )}
-              </div>
-            )}
+            {/* R11: 'Güven: Yüksek / Analiz: Tamamlandı' rozetleri KALDIRILDI — yapay kesinlik */}
           </div>
         )
       })()}
 
       {/* B. CAPACITY WARNING — Faz 7.3.37: tavan jargonu kaldırıldı */}
+
+      {/* B2. R11 KRİTİK UYARI KARTLARI — yapay güven yerine somut riskler */}
+      {(() => {
+        const r        = (result as { ratios?: { grossMargin?: number | null; interestCoverage?: number | null } }).ratios
+        const eq       = (result as { totalEquity?: number | null }).totalEquity
+        const portfolio = (da.whatCompanyShouldDo ?? []) as Array<{ actionId?: string; amount?: number; amountTRY?: number }>
+
+        const alerts: Array<{ message: string }> = []
+
+        // K1: Negatif brüt marj — sadece result.ratios.grossMargin (ana zincir)
+        if (r?.grossMargin != null && r.grossMargin < 0) {
+          alerts.push({ message: 'Temel faaliyet sürdürülebilir kâr üretmiyor' })
+        }
+
+        // K2: Faiz karşılama < 1.5 (Atakan kararı — erken uyarı)
+        if (r?.interestCoverage != null && r.interestCoverage < 1.5) {
+          alerts.push({ message: 'Faiz ödeme kapasitesi zayıf' })
+        }
+
+        // K3: 3+ not sıçraması (mevcut → istenen)
+        const reqStr = exec?.requestedTarget as string | undefined
+        const curStr = exec?.currentRating as string | undefined
+        if (curStr && reqStr) {
+          const notchGap = ratingToIndex(reqStr) - ratingToIndex(curStr)
+          if (notchGap >= 3) {
+            alerts.push({ message: 'Hedef rating mevcut finansal yapıdan çok uzak' })
+          }
+        }
+
+        // K4: Önerilen sermaye desteği > mevcut özkaynak
+        // SADECE A10/A10B (yeni nakit sermaye) — A15/A15B HARİÇ (swap/vade, sermaye değil)
+        if (eq != null && eq > 0 && portfolio.length > 0) {
+          const capitalActions = portfolio.filter(a =>
+            a.actionId === 'A10_CASH_EQUITY_INJECTION' ||
+            a.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION'
+          )
+          const totalCapitalNeed = capitalActions.reduce(
+            (s, a) => s + (a.amountTRY ?? a.amount ?? 0),
+            0,
+          )
+          if (totalCapitalNeed > eq) {
+            alerts.push({ message: 'Önerilen sermaye desteği mevcut özkaynağın üzerinde' })
+          }
+        }
+
+        if (alerts.length === 0) return null
+        return (
+          <div className="space-y-2">
+            {alerts.map((a, i) => (
+              <div
+                key={i}
+                className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 flex items-start gap-2"
+              >
+                <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+                <span>{a.message}</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* C. DATA QUALITY WARNING */}
       {da.dataQualityWarning && (
@@ -488,15 +539,7 @@ function OzetTab({ result }: { result: any }) {
           <BankerMetric label="Likidite"          value={assessLiquidity(productivity)} />
           <BankerMetric label="Yapısal Risk"        value={assessStructuralRisk(productivity)} />
           <BankerMetric label="Aktif Verimliliği"  value={assessAssetEfficiency(productivity)} />
-          {/* R8.8: 'Rating Güveni: Yüksek' → 'Veri Kalitesi: Yeterli' — HIGH yanıltıcı */}
-          <BankerMetric
-            label={exec.confidence === 'HIGH' ? 'Veri Kalitesi' : 'Rating Güveni'}
-            value={
-              exec.confidence === 'HIGH'   ? 'Yeterli' :
-              exec.confidence === 'MEDIUM' ? 'Orta'    :
-              'Düşük'
-            }
-          />
+          {/* R11: 'Rating Güveni / Veri Kalitesi' rozeti KALDIRILDI — yapay kesinlik */}
         </div>
       </div>
 
