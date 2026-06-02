@@ -311,6 +311,11 @@ export interface DecisionAnswer {
    * Üretim: buildDecisionAnswer içindeki buildCanonicalOutcome.
    */
   canonicalOutcome: CanonicalOutcome
+  /**
+   * R12.2A-FIX: UI'da gösterilen FINAL portföy (subset + mandatory injection).
+   * Route.ts'te projeksiyon hesabı için kullanılır — UI'a gönderilmez.
+   */
+  _filteredPortfolio?: SelectedAction[]
 }
 
 // ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
@@ -1665,5 +1670,6 @@ export function buildDecisionAnswer(
     rejectedInsightCount,
     diagnostics,
     canonicalOutcome,
+    _filteredPortfolio: portfolioForUI,  // R12.2A-FIX: route.ts projection hesabı için
   }
 }

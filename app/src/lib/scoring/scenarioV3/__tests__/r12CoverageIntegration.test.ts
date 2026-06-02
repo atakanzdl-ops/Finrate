@@ -540,3 +540,56 @@ describe('R12.1-FIX5: Her zayıf yapı kendi primary aksiyonunu alır', () => {
     expect(unmet!.some(u => u.group === 'LIQUIDITY')).toBe(true)
   })
 })
+
+// ─── T_R12_2A_FIX: Projection UI final portföy ile hesaplanır ────────────────
+
+test('T_R12_2A_FIX: calculateProjectedRatiosFromPortfolio subset vs full farklı sonuç üretir', () => {
+  // 2 aksiyon: A05 (alacak→nakit) + A01 (KV borç→UV)
+  // Subset: sadece A05
+  // Full: A05 + A01
+  // İkisi farklı bilanço etkisi yaratır → farklı rasyolar
+  const { calculateProjectedRatiosFromPortfolio } = require('../engineV3')
+
+  const baseline: Record<string, number> = {
+    '102':  2_000_000,    // nakit
+    '120': 10_000_000,    // alacaklar
+    '153':  5_000_000,    // stok
+    '300':  8_000_000,    // KV finansal borç
+    '500':  5_000_000,    // sermaye
+    '600': 20_000_000,    // satışlar
+    '620': 14_000_000,    // COGS
+  }
+
+  // A05: 120 CREDIT 3M, 102 DEBIT 3M (alacak→nakit)
+  const txA05 = [{ description: 'A05', legs: [
+    { accountCode: '120', side: 'CREDIT' as const, amount: 3_000_000 },
+    { accountCode: '102', side: 'DEBIT'  as const, amount: 3_000_000 },
+  ]}]
+
+  // A01: 300 DEBIT 4M, 400 CREDIT 4M (KV→UV reclass)
+  const txA01 = [{ description: 'A01', legs: [
+    { accountCode: '300', side: 'DEBIT'  as const, amount: 4_000_000 },
+    { accountCode: '400', side: 'CREDIT' as const, amount: 4_000_000 },
+  ]}]
+
+  const fullPortfolio = [
+    { transactions: txA05 },
+    { transactions: txA01 },
+  ]
+  const subsetPortfolio = [
+    { transactions: txA05 },
+  ]
+
+  const fullProjection = calculateProjectedRatiosFromPortfolio(baseline, fullPortfolio)
+  const subsetProjection = calculateProjectedRatiosFromPortfolio(baseline, subsetPortfolio)
+
+  // Her ikisi de null olmamalı (transaction var)
+  expect(fullProjection).not.toBeNull()
+  expect(subsetProjection).not.toBeNull()
+
+  // A01 KV→UV reclass currentRatio'yu etkiler (KV borç azalır)
+  // Full: 300=4M (8M-4M), subset: 300=8M (değişmez)
+  // sum1xx aynı (her ikisinde de A05 uygulanmış), sum3xx farklı
+  // → currentRatio farklı olmalı
+  expect(fullProjection!.currentRatio).not.toBe(subsetProjection!.currentRatio)
+})

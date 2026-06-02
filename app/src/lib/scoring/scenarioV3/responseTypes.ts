@@ -89,10 +89,32 @@ export interface ScenarioV3ApiResponse {
   v2Comparison?:  V2ComparisonDto
   /** Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için */
   currentAccountBalances?: Record<string, number>
-  /** R11: Kritik uyarı kartları için hesaplanmış rasyolar */
+  /** R11: Kritik uyarı kartları için hesaplanmış rasyolar + R12.2A: projeksiyon */
   ratios?: {
-    grossMargin?:        number | null   // NOT: grossMargin (grossProfitMargin DEGIL)
+    // R11 (geriye uyumlu — ScenarioPanelV3 okuyor):
+    grossMargin?:        number | null
     interestCoverage?:   number | null
+    // R12.2A: 8 bankacı rasyosu — bugünkü ve projeksiyon
+    current?: {
+      currentRatio?:      number | null
+      quickRatio?:        number | null
+      debtToEquity?:      number | null
+      interestCoverage?:  number | null
+      grossMargin?:       number | null
+      roic?:              number | null
+      ebitdaMargin?:      number | null
+      debtToEbitda?:      number | null
+    }
+    projected?: {
+      currentRatio?:      number | null
+      quickRatio?:        number | null
+      debtToEquity?:      number | null
+      interestCoverage?:  number | null
+      grossMargin?:       number | null
+      roic?:              number | null
+      ebitdaMargin?:      number | null
+      debtToEbitda?:      number | null
+    } | null
   }
   /** R11: Kritik uyarı kartları için özkaynak tutarı */
   totalEquity?: number | null

@@ -822,6 +822,54 @@ function AksiyonPlaniTab({
         </div>
       </div>
 
+      {/* R12.2A: Portföy Sonrası Rasyo Projeksiyonu */}
+      {(() => {
+        const cur = (result as { ratios?: { current?: Record<string, number | null> } }).ratios?.current
+        const prj = (result as { ratios?: { projected?: Record<string, number | null> | null } }).ratios?.projected
+        if (!prj) return null
+
+        const fmtR = (v: number | null | undefined) => v == null ? '—' : v.toFixed(2)
+        const fmtP = (v: number | null | undefined) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
+
+        const rows = [
+          { label: 'Cari Oran',        k: 'currentRatio',     fmt: fmtR },
+          { label: 'Asit-Test',         k: 'quickRatio',       fmt: fmtR },
+          { label: 'Borç/Özkaynak',     k: 'debtToEquity',     fmt: fmtR },
+          { label: 'Faiz Karşılama',    k: 'interestCoverage', fmt: fmtR },
+          { label: 'Brüt Marj',         k: 'grossMargin',      fmt: fmtP },
+          { label: 'ROIC',              k: 'roic',              fmt: fmtP },
+          { label: 'EBITDA Marjı',      k: 'ebitdaMargin',     fmt: fmtP },
+          { label: 'Borç/EBITDA',       k: 'debtToEbitda',     fmt: fmtR },
+        ]
+
+        return (
+          <div className="rounded-[12px] border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold text-sm mb-3">
+              <TrendingDown size={16} />
+              Aksiyon Sonrası Rasyo Projeksiyonu
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2 font-medium text-slate-500 text-xs">Rasyo</th>
+                  <th className="text-right py-2 font-medium text-slate-500 text-xs">Bugünkü</th>
+                  <th className="text-right py-2 font-medium text-slate-500 text-xs">Projeksiyon</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.k} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 text-slate-700">{r.label}</td>
+                    <td className="py-2 text-right text-slate-600">{r.fmt(cur?.[r.k] as number | null | undefined)}</td>
+                    <td className="py-2 text-right text-[#0B3C5D] font-medium">{r.fmt(prj?.[r.k] as number | null | undefined)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
+
       {/* B. WHY CAPITAL ALONE IS NOT ENOUGH */}
       {da.whyCapitalAloneIsNotEnough && (
         <div className="bg-[#0B3C5D]/5 border border-[#0B3C5D]/20 rounded-[12px] p-6">

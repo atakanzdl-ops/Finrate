@@ -230,6 +230,7 @@ export function adaptScenariosV3ToEngineResult(
       ledgerChangeLog: [],
       algorithmTrace: ['Adapted from scenarioGenerator output'],
     },
+    projectedRatios: null,  // R12.2A: V2 adaptör projections desteklemez
   }
 }
 

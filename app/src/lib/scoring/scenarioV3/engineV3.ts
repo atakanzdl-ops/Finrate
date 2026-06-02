@@ -95,7 +95,7 @@ import {
   getResultGroupCandidates,
 } from './ratioCategoryRegistry'
 import type { RatioResult } from '../ratios'
-import { CORPORATE_TAX_RATE } from '../ratios'
+import { CORPORATE_TAX_RATE, calculateRatiosFromAccounts } from '../ratios'
 
 import {
   checkActionGuardrails,
@@ -308,6 +308,9 @@ export interface EngineResult {
     /** R12.1-FIX5: Uygulanabilir primary aksiyon bulunamayan zayıf yapılar */
     primaryCoverageUnmet?: Array<{ group: string; reason: string }>
   }
+
+  /** R12.2A: Portföy sonrası rasyo projeksiyonu (typical plan için) */
+  projectedRatios?: RatioResult | null
 }
 
 // ─── INTERNAL TYPES ───────────────────────────────────────────────────────────
@@ -824,6 +827,32 @@ export function buildIncomeStatementDeltas(transactions: AccountingTransaction[]
     operatingProfitDelta,
     netIncomeDelta,
     costOfGoodsSoldDelta,
+  }
+}
+
+/**
+ * R12.2A-FIX: Belirli bir portföy için rasyo projeksiyonu hesaplar.
+ * UI'da gösterilen FINAL aksiyon seti (subset + mandatory injection) ile çağrılır.
+ * R6 baseline guard'a dokunmaz — sadece response hesabı.
+ *
+ * @param baselineBalances  Firma başlangıç hesap bakiyeleri (Record format)
+ * @param portfolio         Aksiyon listesi (her birinde transactions mevcut)
+ * @returns RatioResult veya null (boş portföy / hata)
+ */
+export function calculateProjectedRatiosFromPortfolio(
+  baselineBalances: Record<string, number>,
+  portfolio:        Array<{ transactions?: unknown }>,
+): RatioResult | null {
+  if (!portfolio || portfolio.length === 0) return null
+  try {
+    const allTxs = portfolio.flatMap(a => (a.transactions ?? []) as AccountingTransaction[])
+    if (allTxs.length === 0) return null
+    const baselineBalArr = recordToAccountBalances(baselineBalances)
+    const ledgerResult   = applyTransactions(allTxs, baselineBalArr)
+    if (!ledgerResult.allApplied) return null
+    return calculateRatiosFromAccounts(ledgerResult.finalBalances)
+  } catch {
+    return null
   }
 }
 
@@ -2452,6 +2481,13 @@ export function runEngineV3(input: EngineInput): EngineResult {
     ` confidence: ${reasoning.transition.confidence}`
   )
 
+  // ── R12.2A: Post-portfolio rasyo projeksiyonu ──────────────────────────────
+  // SADECE response için hesaplanır — karar motoruna (runLocalRepair,
+  // isActionApplicable, currentContext) DOKUNMAZ. A04 baseline guard KORUNUR.
+  const projectedRatios = calculateProjectedRatiosFromPortfolio(
+    baselineContext.accountBalances, fullPortfolio,
+  )
+
   return {
     version:             'v3',
     sector:              input.sector,
@@ -2489,6 +2525,7 @@ export function runEngineV3(input: EngineInput): EngineResult {
       algorithmTrace,
       primaryCoverageUnmet:  primaryCoverageUnmetOut.length > 0 ? primaryCoverageUnmetOut : undefined,
     },
+    projectedRatios,
   }
 }
 
