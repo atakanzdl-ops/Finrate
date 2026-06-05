@@ -842,11 +842,11 @@ function AksiyonPlaniTab({
 
         const fmtR = (v: number | null | undefined) => v == null ? '—' : v.toFixed(2)
         const fmtP = (v: number | null | undefined) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
-        // R12.2D: Net Borç/FAVÖK negatifse "net nakit pozisyonu" notu
+        // R12.2D+E: Net Borç/FAVÖK negatifse "güçlü likidite" notu
         const fmtNetDebt = (v: number | null | undefined) => {
           if (v == null) return '—'
           const s = v.toFixed(2) + 'x'
-          return v < 0 ? `${s} (Net nakit pozisyonu)` : s
+          return v < 0 ? `${s} (Net nakit fazlası — güçlü likidite)` : s
         }
 
         const rows = [
@@ -875,13 +875,21 @@ function AksiyonPlaniTab({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={r.k} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 text-slate-700">{r.label}</td>
-                    <td className="py-2 text-right text-slate-600">{r.fmt(cur?.[r.k] as number | null | undefined)}</td>
-                    <td className="py-2 text-right text-[#0B3C5D] font-medium">{r.fmt(prj?.[r.k] as number | null | undefined)}</td>
-                  </tr>
-                ))}
+                {rows.map(r => {
+                  const curVal = cur?.[r.k] as number | null | undefined
+                  const prjVal = prj?.[r.k] as number | null | undefined
+                  // R12.2E: Net Borç/FAVÖK negatif = yeşil (güçlü likidite)
+                  const isNetDebtNeg = r.k === 'debtToEbitda'
+                  const curColor = isNetDebtNeg && curVal != null && curVal < 0 ? 'text-emerald-700' : 'text-slate-600'
+                  const prjColor = isNetDebtNeg && prjVal != null && prjVal < 0 ? 'text-emerald-700 font-medium' : 'text-[#0B3C5D] font-medium'
+                  return (
+                    <tr key={r.k} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 text-slate-700">{r.label}</td>
+                      <td className={`py-2 text-right ${curColor}`}>{r.fmt(curVal)}</td>
+                      <td className={`py-2 text-right ${prjColor}`}>{r.fmt(prjVal)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
