@@ -842,6 +842,12 @@ function AksiyonPlaniTab({
 
         const fmtR = (v: number | null | undefined) => v == null ? '—' : v.toFixed(2)
         const fmtP = (v: number | null | undefined) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
+        // R12.2D: Net Borç/FAVÖK negatifse "net nakit pozisyonu" notu
+        const fmtNetDebt = (v: number | null | undefined) => {
+          if (v == null) return '—'
+          const s = v.toFixed(2) + 'x'
+          return v < 0 ? `${s} (Net nakit pozisyonu)` : s
+        }
 
         const rows = [
           { label: 'Cari Oran',        k: 'currentRatio',     fmt: fmtR },
@@ -850,8 +856,8 @@ function AksiyonPlaniTab({
           { label: 'Faiz Karşılama',    k: 'interestCoverage', fmt: fmtR },
           { label: 'Brüt Marj',         k: 'grossMargin',      fmt: fmtP },
           { label: 'ROIC',              k: 'roic',              fmt: fmtP },
-          { label: 'EBITDA Marjı',      k: 'ebitdaMargin',     fmt: fmtP },
-          { label: 'Borç/EBITDA',       k: 'debtToEbitda',     fmt: fmtR },
+          { label: 'FAVÖK Marjı',       k: 'ebitdaMargin',     fmt: fmtP },
+          { label: 'Net Borç/FAVÖK',    k: 'debtToEbitda',     fmt: fmtNetDebt },
         ]
 
         return (
