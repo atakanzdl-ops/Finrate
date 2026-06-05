@@ -368,7 +368,7 @@ export function calculateRatios(d: FinancialInput): RatioResult {
 
 // ─── HESAP KODU BAZLI FONKSIYONLAR ───────────────────────────────────────────
 
-import { rebuildAggregateFromAccounts } from './accountMapper'
+import { adaptAggregateForScoring, rebuildAggregateFromAccounts } from './accountMapper'
 import { Prisma } from '@prisma/client'
 
 /**
@@ -380,11 +380,13 @@ export function calculateRatiosFromAccounts(
   accounts:          { accountCode: string; amount: Prisma.Decimal | number }[],
   previousAccounts?: { accountCode: string; amount: Prisma.Decimal | number }[],
 ): RatioResult {
-  const aggregate = rebuildAggregateFromAccounts(accounts) as FinancialInput
+  const aggregate = adaptAggregateForScoring(
+    rebuildAggregateFromAccounts(accounts),
+  ) as FinancialInput
 
   // Önceki dönem verisi varsa prevRevenue / prevInventory vb. alanlarını doldur
   if (previousAccounts) {
-    const prev = rebuildAggregateFromAccounts(previousAccounts)
+    const prev = adaptAggregateForScoring(rebuildAggregateFromAccounts(previousAccounts))
     aggregate.prevRevenue          = prev.revenue          ?? undefined
     aggregate.prevInventory        = prev.inventory        ?? undefined
     aggregate.prevTradeReceivables = prev.tradeReceivables ?? undefined
