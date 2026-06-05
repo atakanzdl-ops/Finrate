@@ -146,6 +146,8 @@ export interface ActionPlanRow {
   bankerPerspective: string
   /** UI transparency bloku — sadece computeAmount aktif aksiyonlarda dolu */
   ratioTransparency?: import('./contracts').RatioTransparency
+  /** R12.2B: Gerçek nakit etkisi bayrağı — undefined: katalogda yok, true: nakit yaratır, false: yaratmaz */
+  realLiquidityImpact?: boolean
 }
 
 // ─── NOTCH PLAN ──────────────────────────────────────────────────────────────
@@ -767,6 +769,8 @@ function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
       cfoRationale:             template?.cfoRationale ?? action.narrative,
       bankerPerspective:        template?.bankerPerspective ?? '',
       ratioTransparency:        action.ratioTransparency,
+      // R12.2B: NESTED yoldan oku — ?? false KULLANMA (Codex: undefined bırak)
+      realLiquidityImpact:      template?.expectedEconomicImpact?.createsRealCash,
     })
   })
 

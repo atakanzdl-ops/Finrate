@@ -747,9 +747,21 @@ function AksiyonPlaniTab({
                   >
                     {action.priority ?? idx + 1}
                   </div>
-                  {/* Aksiyon adı + hesap özeti (Faz 7.3.48) */}
+                  {/* Aksiyon adı + R12.2B nakit etkisi badge + hesap özeti (Faz 7.3.48) */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[#1E293B]">{action.actionName}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-[#1E293B]">{action.actionName}</span>
+                      {action.realLiquidityImpact === true && (
+                        <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                          Gerçek nakit etkisi var
+                        </span>
+                      )}
+                      {action.realLiquidityImpact === false && (
+                        <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-slate-50 text-slate-500 border border-slate-200 whitespace-nowrap">
+                          Nakit yaratmaz
+                        </span>
+                      )}
+                    </div>
                     {_accountCount > 0 ? (
                       <div className="text-xs text-[#64748B] mt-0.5">
                         {_accountCount} hesap etkileniyor · Δ {formatTRY(_delta)}
