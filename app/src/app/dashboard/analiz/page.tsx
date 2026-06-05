@@ -1035,7 +1035,7 @@ function AnalizPageContent() {
                             </div>
                           </div>
                           <div className="score-meta">
-                            <span className="score-grade" style={{ color: RATING_COLOR[cr] ?? '#2dd4bf', fontSize:18 }}>{cr}</span>
+                            <span className="score-grade" style={{ color: RATING_COLOR[cr] ?? '#2dd4bf', fontSize:32 }}>{cr}</span>
                             <span className="score-label">{RATING_LABEL[cr] ?? 'Kredi Notu'}</span>
                           </div>
                         </div>
