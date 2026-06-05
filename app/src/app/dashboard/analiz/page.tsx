@@ -1009,9 +1009,7 @@ function AnalizPageContent() {
                       <div className={clsx('kpi-card kpi-score', cs < 60 && 'kpi-card-warning')}>
                         <div className="kpi-header">
                           <span className="kpi-label">Finrate Skoru</span>
-                          <span className={clsx('kpi-badge', cs >= 60 ? 'badge-up' : 'badge-down')}>
-                            {cr}
-                          </span>
+                          {/* R12.2E-FIX: sağ üst rating rozeti kaldırıldı — orta büyük yazıyla duplikasyon */}
                         </div>
                         <div className="kpi-body-score">
                           <div className="score-ring-wrap" style={{ width:80, height:80 }}>
