@@ -143,15 +143,15 @@ describe('R5 — A21_OPERATING_PROFIT_REFORM computeAmount (operatingExpenseRati
 
 })
 
-describe('R5 — A21_OPERATING_PROFIT_REFORM buildTransactions (2 tx, kar zinciri)', () => {
+describe('R5 — A21_OPERATING_PROFIT_REFORM buildTransactions (3 tx, R17.1 vergi)', () => {
 
-  // T9: 2 transaction döner
-  test('T9 — buildTransactions: 2 tx döner (R5)', () => {
+  // T9: 3 transaction döner (R17.1: op + vergi + net)
+  test('T9 — buildTransactions: 3 tx döner (R17.1)', () => {
     const txs = a21.buildTransactions(makeBuildCtx())
-    expect(txs).toHaveLength(2)
+    expect(txs).toHaveLength(3)
   })
 
-  // T10: tx[0] denklik — 102/632
+  // T10: tx[0] denklik — 102/632 (KORUNDU)
   test('T10 — tx[0]: 102 DEBIT = 632 CREDIT (nakit kanal)', () => {
     const txs = a21.buildTransactions(makeBuildCtx())
     const tx0 = txs[0]
@@ -163,24 +163,34 @@ describe('R5 — A21_OPERATING_PROFIT_REFORM buildTransactions (2 tx, kar zincir
     expect(debit).toBe(credit)
   })
 
-  // T11: tx[1] denklik — 690/590 (kar zinciri)
-  test('T11 — tx[1]: 690 DEBIT = 590 CREDIT (kar zinciri)', () => {
+  // T11: tx[1] vergi provizyonu — 691/370 (R17.1)
+  test('T11 — tx[1]: 691 DEBIT = 370 CREDIT (vergi provizyonu R17.1)', () => {
     const txs = a21.buildTransactions(makeBuildCtx())
     const tx1 = txs[1]
-    expect(tx1.legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
-    expect(tx1.legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
-    // Denklik
+    expect(tx1.legs[0]).toMatchObject({ accountCode: '691', side: 'DEBIT'  })
+    expect(tx1.legs[1]).toMatchObject({ accountCode: '370', side: 'CREDIT' })
     const debit  = tx1.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
     const credit = tx1.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
     expect(debit).toBe(credit)
   })
 
-  // T12: Vergi hesabı (691) YOK — kar zincirinde kurumlar vergisi kaydı yok (R5)
-  test('T12 — Vergi hesabı 691 YOK (R5 — R4 pattern)', () => {
+  // T11b: tx[2] net kâr transferi — 690/590 NET (R17.1)
+  test('T11b — tx[2]: 690 DEBIT = 590 CREDIT NET (R17.1)', () => {
+    const txs = a21.buildTransactions(makeBuildCtx())
+    const tx2 = txs[2]
+    expect(tx2.legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(tx2.legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    const debit  = tx2.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const credit = tx2.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debit).toBe(credit)
+  })
+
+  // T12: Vergi hesabı (691) VAR (R17.1)
+  test('T12 — Vergi hesabı 691 VAR (R17.1)', () => {
     const txs = a21.buildTransactions(makeBuildCtx())
     const allLegs = txs.flatMap(tx => tx.legs)
     const has691 = allLegs.some(leg => leg.accountCode === '691')
-    expect(has691).toBe(false)
+    expect(has691).toBe(true)
   })
 
   // T13: amount = 0 → boş array

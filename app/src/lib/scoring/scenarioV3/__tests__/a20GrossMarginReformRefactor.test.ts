@@ -99,18 +99,22 @@ describe('R4 — A20_GROSS_MARGIN_REFORM refactor testleri', () => {
     expect(result).toBeCloseTo(41_800_000, 0)
   })
 
-  // A20-R4-6: buildTransactions — 2 tx (R4 kar zinciri)
-  test('A20-R4-6 — buildTransactions: tx[0] 102/621 + tx[1] 690/590 (R4)', () => {
+  // A20-R4-6: buildTransactions — 3 tx (R17.1: op + vergi + net)
+  test('A20-R4-6 — buildTransactions: tx[0] 102/621 + tx[1] 691/370 vergi + tx[2] 690/590 NET (R17.1)', () => {
     const txs = a20.buildTransactions(makeBuildCtx({ amount: 5_000_000 }))
-    expect(txs).toHaveLength(2)
-    // tx[0]: nakit kanal maliyet düşüşü
+    expect(txs).toHaveLength(3)
+    // tx[0]: nakit kanal maliyet düşüşü (KORUNDU)
     expect(txs[0].legs).toHaveLength(2)
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '102', side: 'DEBIT',  amount: 5_000_000 })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '621', side: 'CREDIT', amount: 5_000_000 })
-    // tx[1]: kar zinciri (R4, vergi YOK — A12 pattern)
+    // tx[1]: R17.1 vergi provizyonu (%25)
     expect(txs[1].legs).toHaveLength(2)
-    expect(txs[1].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 5_000_000 })
-    expect(txs[1].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 5_000_000 })
+    expect(txs[1].legs[0]).toMatchObject({ accountCode: '691', side: 'DEBIT',  amount: 1_250_000 })
+    expect(txs[1].legs[1]).toMatchObject({ accountCode: '370', side: 'CREDIT', amount: 1_250_000 })
+    // tx[2]: net kâr transferi (vergi sonrası)
+    expect(txs[2].legs).toHaveLength(2)
+    expect(txs[2].legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT',  amount: 3_750_000 })
+    expect(txs[2].legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT', amount: 3_750_000 })
   })
 
   // A20-R4-7: CONSTRUCTION R4 benchmark %18 validasyonu

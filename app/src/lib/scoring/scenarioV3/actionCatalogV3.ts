@@ -58,6 +58,11 @@ import {
   getCurrentRatioTarget,                    // R8.5: A15B cari oran half-gap hedefi
 } from './ratioHelpers'
 
+import {
+  buildTaxProvisionTransaction,
+  buildNetProfitTransferTransaction,
+} from './taxHelper'
+
 // ─── Helper Types ─────────────────────────────────────────────────────────────
 
 interface RawAccount {
@@ -1327,7 +1332,10 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     const amount = Math.min(requestedAmount, supplierBalance, cogsBalance)
     if (amount <= 0) return []
 
-    return [
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: tedarikçi iskonto (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
         'A12_SUPPLIER_DISCOUNT',
         'Tedarikçi iskonto/indirim — 320 borcu düşer, 621 maliyet azalır',
@@ -1336,17 +1344,19 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
           { accountCode: '320', accountName: 'Satıcılar',               side: 'DEBIT',  amount, description: 'Ticari borç azalışı' },
           { accountCode: '621', accountName: 'Satılan Mal Maliyeti',    side: 'CREDIT', amount, description: 'Maliyet azalışı'     },
         ]
-      ),
-      makeBalancedTransaction(
-        'A12_PROFIT_TRANSFER',
-        'Tasarruf dönem kârına yansır — 690 kapanır, 590 artar',
-        'OPERATIONAL_MARGIN',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
-        ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A12', 'OPERATIONAL_MARGIN')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A12', 'OPERATIONAL_MARGIN')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -1510,8 +1520,10 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
       ? 'Kısa Vadeli Borçlanma Maliyeti (Tahmini)'
       : 'Finansman Giderleri'
 
-    return [
-      // 1. Operasyonel: nakit artar, finansman gideri azalır
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: nakit artar, finansman gideri azalır (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
         'A14_FINEXP_REDUCTION',
         isEstimated
@@ -1538,20 +1550,19 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
               : 'Finansman gideri azalışı',
           },
         ]
-      ),
-      // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)
-      makeBalancedTransaction(
-        'A14_PROFIT_TRANSFER',
-        isEstimated
-          ? 'Finansman Gideri Azaltma — Kar Aktarımı (tahmini)'
-          : 'Finansman Gideri Azaltma — Kar Aktarımı',
-        'FINANCE_COST_REDUCTION',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı'  },
-        ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A14', 'FINANCE_COST_REDUCTION')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A14', 'FINANCE_COST_REDUCTION')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -2150,7 +2161,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           : 'Satılan Mal Maliyeti'
         const costAmount   = Math.round(amount * (1 - grossMargin))
         const profitAmount = grossMargin <= 0 ? 0 : (amount - costAmount)
-        return [
+        const txs: AccountingTransaction[] = [
           makeBalancedTransaction(
             'A19_DELIVERY_REVENUE_AND_COST_FALLBACK',
             `Alınan avans teslimatla hasılata dönüşür + sektör marj COGS (${costAccountCode}+770)`,
@@ -2162,21 +2173,17 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
               { accountCode: '770',          accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount, description: 'Maliyet karşılığı (simülasyon)'        },
             ]
           ),
-          // R10.2: brüt zararda kâr aktarımı sıfır — işlem oluşturulmaz
-          ...(profitAmount > 0 ? [makeBalancedTransaction(
-            'A19_PROFIT_TRANSFER',
-            'Dönem kâr aktarımı',
-            'ADVANCE_TO_REVENUE',
-            [
-              { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
-              { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
-            ]
-          )] : []),
         ]
+        // R17.1: %25 kurumlar vergisi — profitAmount üzerinden (R10.2 guard: profitAmount<=0 → null)
+        const taxTxFb = buildTaxProvisionTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+        if (taxTxFb) txs.push(taxTxFb)
+        const netTxFb = buildNetProfitTransferTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+        if (netTxFb) txs.push(netTxFb)
+        return txs
       }
 
       // Hizmet/bilişim: tam hasılat = tam kâr (avans çözülmesi — maliyet yok)
-      return [
+      const txsSvc: AccountingTransaction[] = [
         makeBalancedTransaction(
           'A19_DELIVERY_REVENUE_ONLY',
           'Alınan avans hizmet/proje teslimatı ile hasılata dönüşür',
@@ -2186,16 +2193,13 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
             { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
           ]
         ),
-        makeBalancedTransaction(
-          'A19_PROFIT_TRANSFER',
-          'Dönem kâr aktarımı',
-          'ADVANCE_TO_REVENUE',
-          [
-            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
-          ]
-        ),
       ]
+      // R17.1: %25 kurumlar vergisi — hizmette profitAmount = amount (tam kâr)
+      const taxTxSvc = buildTaxProvisionTransaction(amount, 'A19', 'ADVANCE_TO_REVENUE')
+      if (taxTxSvc) txsSvc.push(taxTxSvc)
+      const netTxSvc = buildNetProfitTransferTransaction(amount, 'A19', 'ADVANCE_TO_REVENUE')
+      if (netTxSvc) txsSvc.push(netTxSvc)
+      return txsSvc
     }
 
     // Dominant stok hesabı (en büyük bakiyeli)
@@ -2224,7 +2228,7 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
       ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
       : 'Satılan Mal Maliyeti'
 
-    return [
+    const txsStk: AccountingTransaction[] = [
       makeBalancedTransaction(
         'A19_DELIVERY_REVENUE_AND_COST',
         'Alınan avans teslimatla satışa dönüşür, ilgili stok maliyeti gelir tablosuna alınır',
@@ -2236,17 +2240,13 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
           { accountCode: dominantStock.code, accountName: dominantStock.name,         side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'  },
         ]
       ),
-      // R10.2: brüt zararda kâr aktarımı sıfır — işlem oluşturulmaz
-      ...(profitAmount > 0 ? [makeBalancedTransaction(
-        'A19_PROFIT_TRANSFER',
-        'Dönem kâr aktarımı',
-        'ADVANCE_TO_REVENUE',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
-        ]
-      )] : []),
     ]
+    // R17.1: %25 kurumlar vergisi — profitAmount üzerinden (R10.2 guard: profitAmount<=0 → null)
+    const taxTxStk = buildTaxProvisionTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+    if (taxTxStk) txsStk.push(taxTxStk)
+    const netTxStk = buildNetProfitTransferTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+    if (netTxStk) txsStk.push(netTxStk)
+    return txsStk
   },
 
   preconditions: {
@@ -2330,8 +2330,11 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   buildTransactions: (context) => {
     const amount = context.amount ?? 0
     if (amount <= 0) return []
-    return [
-      // 1. Operasyonel etki: nakit artar, maliyet azalır
+
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel etki: nakit artar, maliyet azalır (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
         'A20_REFORM_NAKİT',
         'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
@@ -2340,20 +2343,19 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
           { accountCode: '102', accountName: 'Bankalar',             side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
           { accountCode: '621', accountName: 'Satılan Mal Maliyeti', side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
         ]
-      ),
-      // 2. R4 — Kar zinciri (A12 pattern, vergi YOK — A12/A18/A19 ile tutarlı)
-      // SONNET NOTU: 690/590 dönem sonu kar transferi simülasyonudur;
-      //              anlık yevmiye değil. Sistemin "ne yapmalı" gösterimi için.
-      makeBalancedTransaction(
-        'A20_PROFIT_TRANSFER',
-        'Brüt Marj Reformu — Kar Aktarımı',
-        'OPERATIONAL_MARGIN',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
-        ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A20', 'OPERATIONAL_MARGIN')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A20', 'OPERATIONAL_MARGIN')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -2450,8 +2452,10 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
       ? 'Faaliyet gideri azalışı (KOBİ tahmin — detay hesap yok)'
       : 'Faaliyet gideri azalışı'
 
-    return [
-      // 1. Operasyonel: nakit artar, en yüklü faaliyet gideri azalır
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: nakit artar, en yüklü faaliyet gideri azalır (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
         'A21_OPEX_REDUCTION',
         'Faaliyet Kârı Reformu — Gider Optimizasyonu (Nakit Kanal)',
@@ -2460,18 +2464,19 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
           { accountCode: '102',      accountName: 'Bankalar', side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
           { accountCode: creditCode, accountName: creditName,  side: 'CREDIT', amount, description: opexDesc                       },
         ]
-      ),
-      // 2. Kar zinciri (R5 — R4 pattern, vergi 691 YOK)
-      makeBalancedTransaction(
-        'A21_PROFIT_TRANSFER',
-        'Faaliyet Kârı Reformu — Kar Aktarımı',
-        'OPEX_REDUCTION',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı'  },
-        ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A21', 'OPEX_REDUCTION')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A21', 'OPEX_REDUCTION')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {

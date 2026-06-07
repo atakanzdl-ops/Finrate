@@ -95,10 +95,10 @@ describe('R4 — DEKAM -%6.86 Brüt Marj Entegrasyon Testleri (328M / CONSTRUCTI
     expect(result!).toBeLessThan(43_000_000)
   })
 
-  // T3: A20 DEKAM buildTransactions → 2 tx
-  test('T3 — DEKAM A20 buildTransactions: 2 transaction döner (R4)', () => {
+  // T3: A20 DEKAM buildTransactions → 3 tx (R17.1: op + vergi + net)
+  test('T3 — DEKAM A20 buildTransactions: 3 transaction döner (R17.1)', () => {
     const txs = a20.buildTransactions(makeDekamBuildCtx())
-    expect(txs).toHaveLength(2)
+    expect(txs).toHaveLength(3)
   })
 
   // T4: A20 DEKAM tx[0] denklik — 102/621
@@ -113,16 +113,25 @@ describe('R4 — DEKAM -%6.86 Brüt Marj Entegrasyon Testleri (328M / CONSTRUCTI
     expect(debit).toBe(credit)
   })
 
-  // T5: A20 DEKAM tx[1] denklik — 690/590
-  test('T5 — DEKAM A20 tx[1] denklik: 690 DEBIT = 590 CREDIT', () => {
+  // T5: A20 DEKAM tx[1] vergi + tx[2] net kâr (R17.1)
+  test('T5 — DEKAM A20 tx[1] 691/370 vergi + tx[2] 690/590 NET (R17.1)', () => {
     const txs = a20.buildTransactions(makeDekamBuildCtx())
+    // tx[1]: vergi provizyonu — 691 DR / 370 CR
     const tx1 = txs[1]
-    expect(tx1.legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
-    expect(tx1.legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
-    // Denklik
-    const debit  = tx1.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
-    const credit = tx1.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
-    expect(debit).toBe(credit)
+    expect(tx1.legs[0]).toMatchObject({ accountCode: '691', side: 'DEBIT'  })
+    expect(tx1.legs[1]).toMatchObject({ accountCode: '370', side: 'CREDIT' })
+    const debit1  = tx1.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const credit1 = tx1.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debit1).toBe(credit1)
+    // tx[2]: net kâr transferi — 690 DR / 590 CR (NET)
+    const tx2 = txs[2]
+    expect(tx2.legs[0]).toMatchObject({ accountCode: '690', side: 'DEBIT'  })
+    expect(tx2.legs[1]).toMatchObject({ accountCode: '590', side: 'CREDIT' })
+    const debit2  = tx2.legs.filter(l => l.side === 'DEBIT').reduce((s, l)  => s + l.amount, 0)
+    const credit2 = tx2.legs.filter(l => l.side === 'CREDIT').reduce((s, l) => s + l.amount, 0)
+    expect(debit2).toBe(credit2)
+    // NET < BRÜT
+    expect(tx2.legs[0].amount).toBeLessThan(txs[0].legs[0].amount)
   })
 
   // T6: A12 DEKAM → tutar döner (brüt zarar desteği R4)
