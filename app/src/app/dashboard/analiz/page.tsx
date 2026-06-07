@@ -987,7 +987,7 @@ function AnalizPageContent() {
                   const crStatus    = crRatio < 1 ? 'warning' : 'normal'
 
                   const activeRating = cr.replace(/[+\-]/g, '')
-                  const RATING_SCALE = ['AAA','AA','A','BBB','BB','B','CCC']
+                  const RATING_SCALE = ['AAA','AA','A','BBB','BB','B','CCC','CC','C','D']
                   const RISK_LABEL: Record<string,string> = {
                     AAA:'Çok Düşük', AA:'Düşük', A:'Düşük', BBB:'Orta',
                     BB:'Orta-Yüksek', B:'Yüksek', CCC:'Çok Yüksek', CC:'Kritik', C:'Kritik', D:'İflas',
