@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q DESIGN – Dış Cephe Giydirme Konseptleri</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #05090f;
+      color: #fff;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #0a1520, #0d1f35);
+      border-bottom: 2px solid #ff6b00;
+      padding: 22px 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header .brand { font-size: 1.6rem; font-weight: 900; letter-spacing: 3px; }
+    header .brand span { color: #ff6b00; }
+    header .subtitle { color: #7a9ab8; font-size: 0.9rem; letter-spacing: 2px; }
+
+    .page-title {
+      text-align: center;
+      padding: 50px 20px 20px;
+    }
+    .page-title h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; }
+    .page-title h1 span { color: #ff6b00; }
+    .page-title p { color: #6a8aaa; margin-top: 8px; letter-spacing: 1px; font-size: 0.95rem; }
+
+    .concepts {
+      display: flex;
+      flex-direction: column;
+      gap: 80px;
+      padding: 40px 30px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .concept-block {
+      background: #0d1a28;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #1a3050;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    }
+    .concept-label {
+      padding: 20px 30px;
+      background: #091422;
+      border-bottom: 1px solid #1a3050;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .concept-label .badge {
+      background: #ff6b00;
+      color: #000;
+      font-weight: 800;
+      font-size: 0.8rem;
+      padding: 4px 14px;
+      border-radius: 20px;
+      letter-spacing: 2px;
+    }
+    .concept-label h2 { font-size: 1.1rem; font-weight: 600; }
+    .concept-label p { color: #6a8aaa; font-size: 0.85rem; margin-top: 2px; }
+
+    .facade-wrap { padding: 30px; }
+    .facade-wrap svg { width: 100%; height: auto; border-radius: 10px; }
+
+    .concept-notes {
+      padding: 20px 30px 25px;
+      border-top: 1px solid #1a3050;
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    .note-item { display: flex; align-items: flex-start; gap: 10px; }
+    .note-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff6b00; margin-top: 6px; flex-shrink: 0; }
+    .note-item p { font-size: 0.85rem; color: #8aa8c4; line-height: 1.5; }
+    .note-item strong { color: #c0d8f0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand"><span>Q</span> DESIGN</div>
+    <div class="subtitle">KURUMSAL KİMLİK SİSTEMİ</div>
+  </div>
+  <div style="color:#6a8aaa; font-size:0.85rem; text-align:right;">
+    Egemen Sanayi Sitesi C18<br>Tuzla / İstanbul
+  </div>
+</header>
+
+<div class="page-title">
+  <h1>DIŞ CEPHE <span>GİYDİRME</span> KONSEPTLERİ</h1>
+  <p>3 farklı tasarım alternatifi · Q Design kurumsal kimliği esas alınmıştır</p>
+</div>
+
+<div class="concepts">
+
+  <!-- ===================== KONSEPT A ===================== -->
+  <div class="concept-block">
+    <div class="concept-label">
+      <div>
+        <div class="badge">KONSEPT A</div>
+      </div>
+      <div>
+        <h2>Tam Cephe Sarma — Geometrik Güç</h2>
+        <p>Sol ve sağ panellerde 3D elmas desen · Büyük Q logo merkez üst · Koyu lacivert zemin</p>
+      </div>
+    </div>
+    <div class="facade-wrap">
+      <!-- KONSEPT A SVG -->
+      <svg viewBox="0 0 1100 580" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bgA" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0d1b2e"/>
+            <stop offset="100%" stop-color="#070f1a"/>
+          </linearGradient>
+          <linearGradient id="orangeGradA" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff9a30"/>
+            <stop offset="40%" stop-color="#e05a00"/>
+            <stop offset="100%" stop-color="#ff6a00"/>
+          </linearGradient>
+          <linearGradient id="accentA" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ff6b00"/>
+            <stop offset="100%" stop-color="#e04500"/>
+          </linearGradient>
+          <filter id="shadowA">
+            <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.8"/>
+          </filter>
+          <filter id="glowA">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Bina şekli / arka fon -->
+        <rect x="0" y="0" width="1100" height="580" rx="8" fill="#b0b4ba"/>
+
+        <!-- Üst bant (bina üstü açık alan) -->
+        <rect x="0" y="0" width="1100" height="100" rx="8" fill="#c8ccd2"/>
+        <rect x="0" y="95" width="1100" height="8" fill="#a0a4aa"/>
+
+        <!-- ÜST CEPHE GİYDİRME - Tam lacivert zemin -->
+        <rect x="20" y="105" width="1060" height="240" rx="4" fill="url(#bgA)"/>
+
+        <!-- Sol geometrik desen alanı -->
+        <g clip-path="url(#clipLeft)">
+          <clipPath id="clipLeft">
+            <rect x="20" y="105" width="320" height="240"/>
+          </clipPath>
+          <!-- Tekrar eden üçgen desen -->
+          <g>
+            <polygon points="80,115 130,160 80,205 30,160" fill="#112240"/>
+            <polygon points="80,115 130,160 80,160" fill="#1a3555"/>
+            <polygon points="130,160 80,205 80,160" fill="#091828"/>
+            <polygon points="30,160 80,205 80,160" fill="#0f2040"/>
+            <polygon points="80,115 130,160 80,160" fill="#e06000" opacity="0.7"/>
+
+            <polygon points="190,115 240,160 190,205 140,160" fill="#112240"/>
+            <polygon points="190,115 240,160 190,160" fill="#1a3555"/>
+            <polygon points="240,160 190,205 190,160" fill="#091828"/>
+            <polygon points="140,160 190,205 190,160" fill="#0f2040"/>
+
+            <polygon points="300,115 350,160 300,205 250,160" fill="#112240"/>
+            <polygon points="300,115 350,160 300,160" fill="#1a3555"/>
+            <polygon points="350,160 300,205 300,160" fill="#091828"/>
+            <polygon points="250,160 300,205 300,160" fill="#0f2040"/>
+            <polygon points="300,115 350,160 300,160" fill="#e06000" opacity="0.7"/>
+
+            <polygon points="80,205 130,250 80,295 30,250" fill="#112240"/>
+            <polygon points="80,205 130,250 80,250" fill="#1a3555"/>
+            <polygon points="130,250 80,295 80,250" fill="#091828"/>
+            <polygon points="30,250 80,295 80,250" fill="#0f2040"/>
+
+            <polygon points="190,205 240,250 190,295 140,250" fill="#112240"/>
+            <polygon points="190,205 240,250 190,250" fill="#1a3555"/>
+            <polygon points="240,250 190,295 190,250" fill="#091828"/>
+            <polygon points="140,250 190,295 190,250" fill="#0f2040"/>
+            <polygon points="190,205 240,250 190,250" fill="#e06000" opacity="0.7"/>
+
+            <polygon points="300,205 350,250 300,295 250,250" fill="#112240"/>
+            <polygon points="300,205 350,250 300,250" fill="#1a3555"/>
+            <polygon points="350,250 300,295 300,250" fill="#091828"/>
+            <polygon points="250,250 300,295 300,250" fill="#0f2040"/>
+          </g>
+        </g>
+
+        <!-- Sağ geometrik desen alanı -->
+        <g clip-path="url(#clipRight)">
+          <clipPath id="clipRight">
+            <rect x="760" y="105" width="320" height="240"/>
+          </clipPath>
+          <polygon points="820,115 870,160 820,205 770,160" fill="#112240"/>
+          <polygon points="820,115 870,160 820,160" fill="#1a3555"/>
+          <polygon points="870,160 820,205 820,160" fill="#091828"/>
+          <polygon points="770,160 820,205 820,160" fill="#0f2040"/>
+          <polygon points="820,115 870,160 820,160" fill="#e06000" opacity="0.7"/>
+
+          <polygon points="930,115 980,160 930,205 880,160" fill="#112240"/>
+          <polygon points="930,115 980,160 930,160" fill="#1a3555"/>
+          <polygon points="980,160 930,205 930,160" fill="#091828"/>
+          <polygon points="880,160 930,205 930,160" fill="#0f2040"/>
+
+          <polygon points="1040,115 1090,160 1040,205 990,160" fill="#112240"/>
+          <polygon points="1040,115 1090,160 1040,160" fill="#1a3555"/>
+          <polygon points="1090,160 1040,205 1040,160" fill="#091828"/>
+          <polygon points="990,160 1040,205 1040,160" fill="#0f2040"/>
+          <polygon points="1040,115 1090,160 1040,160" fill="#e06000" opacity="0.7"/>
+
+          <polygon points="820,205 870,250 820,295 770,250" fill="#112240"/>
+          <polygon points="820,205 870,250 820,250" fill="#1a3555"/>
+          <polygon points="870,250 820,295 820,250" fill="#091828"/>
+          <polygon points="770,250 820,295 820,250" fill="#0f2040"/>
+          <polygon points="820,205 870,250 820,250" fill="#e06000" opacity="0.7"/>
+
+          <polygon points="930,205 980,250 930,295 880,250" fill="#112240"/>
+          <polygon points="930,205 980,250 930,250" fill="#1a3555"/>
+          <polygon points="980,250 930,295 930,250" fill="#091828"/>
+          <polygon points="880,250 930,295 930,250" fill="#0f2040"/>
+
+          <polygon points="1040,205 1090,250 1040,295 990,250" fill="#112240"/>
+          <polygon points="1040,205 1090,250 1040,250" fill="#1a3555"/>
+          <polygon points="1090,250 1040,295 1040,250" fill="#091828"/>
+          <polygon points="990,250 1040,295 1040,250" fill="#0f2040"/>
+          <polygon points="1040,205 1090,250 1040,250" fill="#e06000" opacity="0.7"/>
+        </g>
+
+        <!-- Merkez Q logo büyük -->
+        <g transform="translate(550, 170)" filter="url(#shadowA)">
+          <path d="M 90,0 C 90,-55 50,-90 0,-90 C -50,-90 -90,-55 -90,0 C -90,55 -50,90 0,90 C 22,90 42,83 58,71 L 95,110 L 128,77 L 92,41 C 89,33 90,17 90,0 Z
+                   M 0,55 C -30,55 -54,30 -54,0 C -54,-30 -30,-55 0,-55 C 30,-55 54,-30 54,0 C 54,10 51,19 46,27 L 20,0 L -12,32 L 16,60 C 10,63 5,65 0,65 Z"
+                fill="url(#orangeGradA)"/>
+          <path d="M 90,0 C 90,-55 50,-90 0,-90 C -20,-90 -38,-84 -53,-73 C -36,-83 -19,-88 0,-88 C 49,-88 88,-53 88,0 Z" fill="#ffb060" opacity="0.4"/>
+        </g>
+
+        <!-- Merkez metin -->
+        <text x="550" y="298" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="36" font-weight="900" fill="#ffffff" letter-spacing="6" filter="url(#glowA)">Q DESIGN</text>
+        <text x="550" y="322" text-anchor="middle" font-family="Arial" font-size="14" fill="#7a9ab8" letter-spacing="6">DAHA İYİSİ MÜMKÜN</text>
+        <rect x="500" y="328" width="100" height="2" rx="1" fill="url(#accentA)"/>
+
+        <!-- AMBALAJ TASARIM ÜRETİM ÇÖZÜM -->
+        <text x="550" y="348" text-anchor="middle" font-family="Arial" font-size="11" fill="#4a6a8a" letter-spacing="3">AMBALAJ  ·  TASARIM  ·  ÜRETİM  ·  ÇÖZÜM</text>
+
+        <!-- Üst turuncu şerit -->
+        <rect x="20" y="105" width="1060" height="5" rx="0" fill="url(#accentA)"/>
+        <!-- Alt turuncu şerit -->
+        <rect x="20" y="340" width="1060" height="5" rx="0" fill="url(#accentA)"/>
+
+        <!-- Kenar sol turuncu çizgi -->
+        <rect x="20" y="105" width="4" height="240" fill="#ff6b00" opacity="0.6"/>
+        <!-- Kenar sağ turuncu çizgi -->
+        <rect x="1076" y="105" width="4" height="240" fill="#ff6b00" opacity="0.6"/>
+
+        <!-- Sol bölüm - pencere alanı -->
+        <rect x="20" y="350" width="280" height="210" rx="0" fill="#141414"/>
+        <!-- Pencere -->
+        <rect x="60" y="370" width="100" height="80" rx="3" fill="#1e2a38"/>
+        <rect x="62" y="372" width="47" height="76" rx="2" fill="#253545"/>
+        <rect x="111" y="372" width="47" height="76" rx="2" fill="#253545"/>
+        <!-- Küçük kapı -->
+        <rect x="175" y="410" width="60" height="140" rx="3" fill="#1a1a1a"/>
+        <rect x="220" y="475" width="8" height="8" rx="4" fill="#ff6b00" opacity="0.6"/>
+
+        <!-- Sol alt giydirme şeridi -->
+        <rect x="20" y="350" width="280" height="8" fill="url(#accentA)" opacity="0.7"/>
+
+        <!-- Merkez kapı alanı -->
+        <rect x="300" y="350" width="500" height="210" rx="0" fill="#0d0d0d"/>
+        <!-- Büyük kapı -->
+        <rect x="310" y="360" width="480" height="200" rx="4" fill="#181818"/>
+        <rect x="320" y="370" width="228" height="188" rx="3" fill="#1e1e1e"/>
+        <rect x="552" y="370" width="228" height="188" rx="3" fill="#1e1e1e"/>
+        <!-- Kapı ortası çizgi -->
+        <line x1="550" y1="370" x2="550" y2="558" stroke="#333" stroke-width="2"/>
+        <!-- Kapı üst şerit turuncu -->
+        <rect x="310" y="360" width="480" height="6" fill="url(#accentA)"/>
+
+        <!-- Sağ bölüm - pencere alanı -->
+        <rect x="800" y="350" width="280" height="210" rx="0" fill="#141414"/>
+        <!-- Pencere -->
+        <rect x="840" y="370" width="100" height="80" rx="3" fill="#1e2a38"/>
+        <rect x="842" y="372" width="47" height="76" rx="2" fill="#253545"/>
+        <rect x="891" y="372" width="47" height="76" rx="2" fill="#253545"/>
+
+        <!-- Sağ alt giydirme şeridi -->
+        <rect x="800" y="350" width="280" height="8" fill="url(#accentA)" opacity="0.7"/>
+
+        <!-- C 18 numarası (bina numarası stili) -->
+        <text x="40" y="380" font-family="'Arial Black', sans-serif" font-size="16" fill="#ff6b00" opacity="0.8" letter-spacing="2">C 18</text>
+
+        <!-- Yan panel sol - Q UICK Q UALITY Q UEST -->
+        <text x="55" y="430" font-family="'Arial Black', sans-serif" font-size="13" fill="#ff6b00">Q</text>
+        <text x="74" y="430" font-family="Arial" font-size="12" fill="#5a7a9a"> UICK</text>
+        <text x="55" y="450" font-family="'Arial Black', sans-serif" font-size="13" fill="#ff6b00">Q</text>
+        <text x="74" y="450" font-family="Arial" font-size="12" fill="#5a7a9a"> UALITY</text>
+        <text x="55" y="470" font-family="'Arial Black', sans-serif" font-size="13" fill="#ff6b00">Q</text>
+        <text x="74" y="470" font-family="Arial" font-size="12" fill="#5a7a9a"> UEST</text>
+        <rect x="55" y="478" width="40" height="1.5" fill="#ff6b00"/>
+
+        <!-- www -->
+        <text x="550" y="545" text-anchor="middle" font-family="Arial" font-size="14" fill="#4a6a8a" letter-spacing="2">www.q-design.com.tr</text>
+      </svg>
+    </div>
+    <div class="concept-notes">
+      <div class="note-item"><div class="dot"></div><p><strong>Malzeme:</strong> Branda baskı (510gr PVC) veya kompozit panel giydirme</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Üst cephe:</strong> Lacivert zemin + 3D elmas desen + büyük Q logo</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Şeritler:</strong> Turuncu LED ışıklı alüminyum profil çıta (gece görünürlüğü)</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Etkisi:</strong> Güçlü, kurumsal, bütünsel kimlik — uzaktan tanınabilir</p></div>
+    </div>
+  </div>
+
+  <!-- ===================== KONSEPT B ===================== -->
+  <div class="concept-block">
+    <div class="concept-label">
+      <div>
+        <div class="badge">KONSEPT B</div>
+      </div>
+      <div>
+        <h2>Dikey Şerit Sistem — Modern & Minimal</h2>
+        <p>Sol ve sağ kenar dikey turuncu bantlar · Üst bant yatay kimlik yazısı · Temiz görünüm</p>
+      </div>
+    </div>
+    <div class="facade-wrap">
+      <svg viewBox="0 0 1100 580" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#050d18"/>
+            <stop offset="100%" stop-color="#0a1628"/>
+          </linearGradient>
+          <linearGradient id="orangeGB" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff9a30"/>
+            <stop offset="60%" stop-color="#e05a00"/>
+            <stop offset="100%" stop-color="#ff6a00"/>
+          </linearGradient>
+          <linearGradient id="sideStripB" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff8c00"/>
+            <stop offset="50%" stop-color="#ff6b00"/>
+            <stop offset="100%" stop-color="#cc4400"/>
+          </linearGradient>
+          <filter id="shadowB">
+            <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.8"/>
+          </filter>
+        </defs>
+
+        <!-- Bina arka fon -->
+        <rect x="0" y="0" width="1100" height="580" rx="8" fill="#c0c4ca"/>
+        <rect x="0" y="0" width="1100" height="100" rx="8" fill="#d0d4da"/>
+        <rect x="0" y="95" width="1100" height="8" fill="#aaa"/>
+
+        <!-- Üst ana giydirme bandı -->
+        <rect x="20" y="105" width="1060" height="240" rx="4" fill="url(#bgB)"/>
+
+        <!-- Sol dikey turuncu şerit (geniş) -->
+        <rect x="20" y="105" width="80" height="240" fill="url(#sideStripB)"/>
+        <!-- Sol şerit içi Q yazısı -->
+        <text x="60" y="230" text-anchor="middle" font-family="'Arial Black', sans-serif"
+              font-size="48" font-weight="900" fill="rgba(0,0,0,0.25)" transform="rotate(-90,60,230)">Q DESIGN</text>
+
+        <!-- Sağ dikey turuncu şerit (geniş) -->
+        <rect x="1000" y="105" width="80" height="240" fill="url(#sideStripB)"/>
+        <text x="1040" y="230" text-anchor="middle" font-family="'Arial Black', sans-serif"
+              font-size="48" font-weight="900" fill="rgba(0,0,0,0.25)" transform="rotate(90,1040,230)">Q DESIGN</text>
+
+        <!-- Merkez içerik alanı -->
+        <!-- Q logo orta -->
+        <g transform="translate(550, 200)" filter="url(#shadowB)">
+          <path d="M 70,0 C 70,-43 39,-70 0,-70 C -39,-70 -70,-43 -70,0 C -70,43 -39,70 0,70 C 17,70 32,64 45,55 L 74,86 L 100,60 L 72,32 C 69,26 70,13 70,0 Z
+                   M 0,43 C -24,43 -42,24 -42,0 C -42,-24 -24,-43 0,-43 C 24,-43 42,-24 42,0 C 42,8 40,15 36,21 L 16,0 L -9,25 L 12,47 C 8,49 4,51 0,51 Z"
+                fill="url(#orangeGB)"/>
+        </g>
+
+        <!-- Merkez metin -->
+        <text x="550" y="295" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="40" font-weight="900" fill="#ffffff" letter-spacing="8">Q DESIGN</text>
+        <text x="550" y="322" text-anchor="middle" font-family="Arial" font-size="15" fill="#6a8aaa" letter-spacing="8">AMBALAJ · TASARIM · ÜRETİM · ÇÖZÜM</text>
+
+        <!-- Alt turuncu şerit -->
+        <rect x="20" y="338" width="1060" height="7" fill="#ff6b00" opacity="0.9"/>
+
+        <!-- Sol bölüm alt -->
+        <rect x="20" y="350" width="280" height="210" fill="#181818"/>
+        <rect x="20" y="350" width="80" height="210" fill="url(#sideStripB)" opacity="0.85"/>
+        <rect x="60" y="370" width="180" height="80" rx="3" fill="#1e2a38"/>
+        <rect x="175" y="420" width="60" height="138" rx="3" fill="#111"/>
+        <rect x="218" y="482" width="8" height="8" rx="4" fill="#ff6b00"/>
+
+        <!-- Merkez kapı -->
+        <rect x="300" y="350" width="500" height="210" fill="#0f0f0f"/>
+        <rect x="310" y="358" width="480" height="202" rx="3" fill="#1a1a1a"/>
+        <rect x="320" y="366" width="228" height="190" rx="2" fill="#222"/>
+        <rect x="552" y="366" width="228" height="190" rx="2" fill="#222"/>
+        <rect x="310" y="358" width="480" height="6" fill="#ff6b00"/>
+        <line x1="550" y1="366" x2="550" y2="558" stroke="#333" stroke-width="2"/>
+
+        <!-- Sağ bölüm alt -->
+        <rect x="800" y="350" width="280" height="210" fill="#181818"/>
+        <rect x="1000" y="350" width="80" height="210" fill="url(#sideStripB)" opacity="0.85"/>
+        <rect x="860" y="370" width="180" height="80" rx="3" fill="#1e2a38"/>
+
+        <!-- Üst turuncu şerit -->
+        <rect x="20" y="105" width="1060" height="6" fill="#ff6b00"/>
+
+        <!-- Web adresi -->
+        <text x="550" y="550" text-anchor="middle" font-family="Arial" font-size="14" fill="#3a5a7a" letter-spacing="2">www.q-design.com.tr · 0507 977 98 44</text>
+      </svg>
+    </div>
+    <div class="concept-notes">
+      <div class="note-item"><div class="dot"></div><p><strong>Malzeme:</strong> Alüminyum Dibond panel (3mm) veya yüksek basınçlı baskı PVC</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Şeritler:</strong> Sol/sağ geniş turuncu dikey bantlar — LED profil arkası aydınlatmalı</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Merkez:</strong> Büyük Q logosu + Spot UV kaplama (parlak metalik etki)</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Etkisi:</strong> Simetrik, çarpıcı, gece de güçlü görünen tasarım</p></div>
+    </div>
+  </div>
+
+  <!-- ===================== KONSEPT C ===================== -->
+  <div class="concept-block">
+    <div class="concept-label">
+      <div>
+        <div class="badge">KONSEPT C</div>
+      </div>
+      <div>
+        <h2>Dev Q — Signature Konsept</h2>
+        <p>Cepheye büyük devasa Q logosu · Şeffaf cam filmi + opak bölümler · En çarpıcı seçenek</p>
+      </div>
+    </div>
+    <div class="facade-wrap">
+      <svg viewBox="0 0 1100 580" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bgC" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#07111e"/>
+            <stop offset="100%" stop-color="#0a1828"/>
+          </linearGradient>
+          <linearGradient id="orangeGC" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffaa40"/>
+            <stop offset="30%" stop-color="#ff7000"/>
+            <stop offset="70%" stop-color="#e05000"/>
+            <stop offset="100%" stop-color="#ff6a00"/>
+          </linearGradient>
+          <linearGradient id="topBandC" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ff6b00"/>
+            <stop offset="50%" stop-color="#ff8c20"/>
+            <stop offset="100%" stop-color="#e05000"/>
+          </linearGradient>
+          <radialGradient id="qGlowC" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="shadowC" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="15" flood-color="#ff4400" flood-opacity="0.4"/>
+          </filter>
+          <filter id="shadowC2">
+            <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.9"/>
+          </filter>
+        </defs>
+
+        <!-- Bina arka fon -->
+        <rect x="0" y="0" width="1100" height="580" rx="8" fill="#b8bcc2"/>
+        <rect x="0" y="0" width="1100" height="100" rx="8" fill="#c8ccd2"/>
+        <rect x="0" y="95" width="1100" height="8" fill="#aaa"/>
+
+        <!-- Tam cephe lacivert zemin -->
+        <rect x="20" y="105" width="1060" height="450" rx="4" fill="url(#bgC)"/>
+
+        <!-- Üst turuncu şerit bant -->
+        <rect x="20" y="105" width="1060" height="55" rx="0" fill="url(#topBandC)"/>
+        <!-- Üst şerit metin -->
+        <text x="80" y="144" font-family="'Arial Black', sans-serif" font-size="26" font-weight="900" fill="rgba(0,0,0,0.5)" letter-spacing="4">AMBALAJ</text>
+        <text x="270" y="144" font-family="Arial" font-size="22" fill="rgba(0,0,0,0.4)">·</text>
+        <text x="295" y="144" font-family="'Arial Black', sans-serif" font-size="26" font-weight="900" fill="rgba(0,0,0,0.5)" letter-spacing="4">TASARIM</text>
+        <text x="500" y="144" font-family="Arial" font-size="22" fill="rgba(0,0,0,0.4)">·</text>
+        <text x="525" y="144" font-family="'Arial Black', sans-serif" font-size="26" font-weight="900" fill="rgba(0,0,0,0.5)" letter-spacing="4">ÜRETİM</text>
+        <text x="715" y="144" font-family="Arial" font-size="22" fill="rgba(0,0,0,0.4)">·</text>
+        <text x="740" y="144" font-family="'Arial Black', sans-serif" font-size="26" font-weight="900" fill="rgba(0,0,0,0.5)" letter-spacing="4">ÇÖZÜM</text>
+
+        <!-- Turuncu alt şerit (üst bandın altı) -->
+        <rect x="20" y="160" width="1060" height="4" fill="rgba(0,0,0,0.3)"/>
+
+        <!-- DEV Q LOGO - çok büyük, tüm cepheye yayılan -->
+        <!-- Q hale/glow -->
+        <ellipse cx="550" cy="320" rx="260" ry="240" fill="url(#qGlowC)"/>
+        <!-- Q logo ana gövde -->
+        <g transform="translate(550, 320)" filter="url(#shadowC)">
+          <path d="M 190,0 C 190,-115 110,-185 0,-185 C -110,-185 -190,-115 -190,0 C -190,115 -110,185 0,185 C 55,185 105,165 142,130 L 210,200 L 275,135 L 207,67 C 200,50 190,27 190,0 Z
+                   M 0,115 C -62,115 -115,63 -115,0 C -115,-63 -62,-115 0,-115 C 62,-115 115,-63 115,0 C 115,24 107,46 92,63 L 38,-5 L -28,65 L 32,127 C 20,133 10,137 0,137 Z"
+                fill="url(#orangeGC)"/>
+          <!-- Q highlight (parlak kenar) -->
+          <path d="M 190,0 C 190,-115 110,-185 0,-185 C -45,-185 -86,-170 -118,-143 C -84,-169 -44,-183 0,-183 C 108,-183 188,-114 188,0 Z"
+                fill="#ffcc80" opacity="0.35"/>
+        </g>
+
+        <!-- Sol üst - Q UICK / Q UALITY / Q UEST (üst sol köşe) -->
+        <g transform="translate(55, 185)">
+          <text x="0" y="0" font-family="'Arial Black', sans-serif" font-size="20" fill="#ff6b00">Q</text>
+          <text x="26" y="0" font-family="Arial" font-size="18" fill="#4a6a8a"> UICK</text>
+          <text x="0" y="30" font-family="'Arial Black', sans-serif" font-size="20" fill="#ff6b00">Q</text>
+          <text x="26" y="30" font-family="Arial" font-size="18" fill="#4a6a8a"> UALITY</text>
+          <text x="0" y="60" font-family="'Arial Black', sans-serif" font-size="20" fill="#ff6b00">Q</text>
+          <text x="26" y="60" font-family="Arial" font-size="18" fill="#4a6a8a"> UEST</text>
+          <rect x="0" y="70" width="55" height="2" fill="#ff6b00"/>
+        </g>
+
+        <!-- Sağ üst - iletişim -->
+        <text x="1000" y="210" text-anchor="end" font-family="Arial" font-size="14" fill="#4a6a8a" letter-spacing="1">0507 977 98 44</text>
+        <text x="1000" y="232" text-anchor="end" font-family="Arial" font-size="14" fill="#4a6a8a" letter-spacing="1">ugur@q-design.com.tr</text>
+        <text x="1000" y="254" text-anchor="end" font-family="Arial" font-size="14" fill="#4a6a8a" letter-spacing="1">www.q-design.com.tr</text>
+
+        <!-- Alt metin - Q DESIGN büyük yazı -->
+        <text x="550" y="475" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="52" font-weight="900" fill="rgba(255,255,255,0.08)" letter-spacing="15">Q DESIGN</text>
+        <text x="550" y="498" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="52" font-weight="900" fill="rgba(255,255,255,0.06)" letter-spacing="20">DAHA İYİSİ MÜMKÜN</text>
+
+        <!-- Zemin ortası beton yüzey çizgisi -->
+        <rect x="20" y="548" width="1060" height="4" fill="#ff6b00" opacity="0.5"/>
+
+        <!-- Kapı (alt merkez) -->
+        <rect x="320" y="390" width="460" height="158" rx="4" fill="#0a0a0a"/>
+        <rect x="330" y="400" width="218" height="145" rx="2" fill="#141414"/>
+        <rect x="552" y="400" width="218" height="145" rx="2" fill="#141414"/>
+        <line x1="550" y1="400" x2="550" y2="548" stroke="#222" stroke-width="2"/>
+        <rect x="320" y="390" width="460" height="5" fill="#ff6b00" opacity="0.7"/>
+
+        <!-- Sol pencere -->
+        <rect x="70" y="380" width="130" height="90" rx="3" fill="#0e1e30" opacity="0.9"/>
+        <rect x="73" y="383" width="60" height="84" rx="2" fill="#122030"/>
+        <rect x="137" y="383" width="60" height="84" rx="2" fill="#122030"/>
+        <!-- Küçük kapı sol -->
+        <rect x="215" y="420" width="55" height="127" rx="2" fill="#0a0a0a"/>
+        <rect x="257" y="478" width="7" height="7" rx="3.5" fill="#ff6b00" opacity="0.7"/>
+
+        <!-- Sağ pencere -->
+        <rect x="900" y="380" width="130" height="90" rx="3" fill="#0e1e30" opacity="0.9"/>
+        <rect x="903" y="383" width="60" height="84" rx="2" fill="#122030"/>
+        <rect x="967" y="383" width="60" height="84" rx="2" fill="#122030"/>
+
+        <!-- Sol / Sağ dar dikey turuncu çizgiler (cephe detay) -->
+        <rect x="20" y="160" width="3" height="388" fill="#ff6b00" opacity="0.5"/>
+        <rect x="1077" y="160" width="3" height="388" fill="#ff6b00" opacity="0.5"/>
+
+        <!-- Adres / alt bar -->
+        <text x="550" y="540" text-anchor="middle" font-family="Arial" font-size="12" fill="#2a4a6a" letter-spacing="2">Egemen Sanayi Sitesi C18 · Tuzla / İstanbul</text>
+      </svg>
+    </div>
+    <div class="concept-notes">
+      <div class="note-item"><div class="dot"></div><p><strong>Malzeme:</strong> Yüksek çözünürlük dijital baskı + Parlak laminasyon</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Dev Q logo:</strong> Cepheye tam oturan metalik turuncu folyo kaplama veya ışıklı kutu harf</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Üst bant:</strong> Hizmetler yazıları — kalıcı alüminyum profil sistem</p></div>
+      <div class="note-item"><div class="dot"></div><p><strong>Etkisi:</strong> Uzaktan çok güçlü fark edilebilirlik · "Signature" kurumsal kimlik ifadesi</p></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
