@@ -82,7 +82,7 @@ export function FileUpload({ entityId, onImported }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDrag] = useState(false)
   const [entries, setEntries] = useState<FileEntry[]>([])
-  const [globalYear, setGlobalYear] = useState(CURRENT_YEAR - 1)
+  const [globalYear, setGlobalYear] = useState(CURRENT_YEAR)
   const [globalPeriod, setGlobalPeriod] = useState('ANNUAL')
   const [conflictModal, setConflictModal] = useState<ConflictModal | null>(null)
   const [mismatchModal, setMismatchModal] = useState<MismatchModal | null>(null)
@@ -136,8 +136,18 @@ export function FileUpload({ entityId, onImported }: Props) {
           updateEntry(idx, { status: 'pending', error: undefined })
           return false
         }
-        // 422 — Yıl/dönem uyuşmazlığı → bilgi modalı
+        // 422 — Yıl/dönem uyuşmazlığı → otomatik düzelt ve tekrar dene
         if (res.status === 422 && (d.error === 'YEAR_MISMATCH' || d.error === 'PERIOD_MISMATCH')) {
+          const detYear = d.detected?.year as number | undefined
+          const detPeriod = d.detected?.period as string | undefined
+          if (detYear || detPeriod) {
+            const patch: Partial<FileEntry> = { status: 'pending' as const }
+            if (detYear) patch.year = detYear
+            if (detPeriod) patch.period = detPeriod
+            updateEntry(idx, patch)
+            const corrected = { ...entry, ...patch }
+            return uploadOne(corrected, idx, opts)
+          }
           setMismatchModal({ message: d.message ?? 'Dosya yılı/dönemi formda seçilenle uyuşmuyor.' })
           updateEntry(idx, { status: 'error', error: d.message })
           return false
@@ -363,10 +373,18 @@ export function FileUpload({ entityId, onImported }: Props) {
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
           <p className="text-xs text-slate-400">Varsayılan dönem (her dosya için ayrıca değiştirilebilir)</p>
           <div className="flex gap-2 flex-wrap">
-            <select value={globalYear} onChange={(e) => setGlobalYear(Number(e.target.value))} className={selectClass}>
+            <select value={globalYear} onChange={(e) => {
+              const y = Number(e.target.value)
+              setGlobalYear(y)
+              setEntries(prev => prev.map(en => en.status === 'pending' || en.status === 'error' ? { ...en, year: y } : en))
+            }} className={selectClass}>
               {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <select value={globalPeriod} onChange={(e) => setGlobalPeriod(e.target.value)} className={`flex-1 min-w-[140px] ${selectClass}`}>
+            <select value={globalPeriod} onChange={(e) => {
+              const p = e.target.value
+              setGlobalPeriod(p)
+              setEntries(prev => prev.map(en => en.status === 'pending' || en.status === 'error' ? { ...en, period: p } : en))
+            }} className={`flex-1 min-w-[140px] ${selectClass}`}>
               {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
