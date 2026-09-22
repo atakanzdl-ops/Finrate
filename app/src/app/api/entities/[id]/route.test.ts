@@ -88,7 +88,9 @@ function setupMocks(opts: {
         findFirst: jest.fn(() => Promise.resolve(null)), // prevYear → null
       },
       analysis: {
-        update: analysisUpdateMock,
+        update:     analysisUpdateMock,
+        // Faz 7.3.60.1: roadmapSnapshot invalidation
+        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
       },
     },
   }))
