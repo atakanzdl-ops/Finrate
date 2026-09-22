@@ -219,7 +219,7 @@
     gap: var(--gap-lg);
 }
 
-.nav-link {
+.topnav .nav-link {
     text-decoration: none;
     color: var(--text-on-dark-muted);
     font-size: 13.5px;
@@ -229,7 +229,7 @@
     transition: all var(--duration-fast) ease;
 }
 
-.nav-link:hover {
+.topnav .nav-link:hover {
     color: var(--text-on-dark);
 }
 

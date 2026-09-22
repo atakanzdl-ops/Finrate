@@ -403,29 +403,55 @@ function detectMizanFormat(rows: unknown[][]): boolean {
   return false
 }
 
+function classifyMizanHeaderCells(cells: unknown[]): Record<string, number> {
+  const cols: Record<string, number> = {}
+  cells.forEach((cell, idx) => {
+    const n = norm(cell)
+    if (isCodeHeaderCell(cell)) { cols['code'] = idx; return }
+    // bakBorc: hücre hem "bak" hem "bor" içeriyorsa
+    if (n.includes('bak') && n.includes('bor'))     { cols['bakBorc'] = idx;   return }
+    // bakAlacak: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Bakiye Alac." eşleşir
+    if (n.includes('bak') && (n.includes('alacak') || n.includes('alac'))) { cols['bakAlacak'] = idx; return }
+    // sadece bor veya alacak (bakiyesiz sütunlar)
+    if (n.includes('bor') && cols['borc'] === undefined)         { cols['borc'] = idx }
+    // alacak fallback: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Toplam Alac." eşleşir
+    if ((n.includes('alacak') || n.includes('alac')) && cols['alacak'] === undefined) { cols['alacak'] = idx }
+  })
+  return cols
+}
+
 function findMizanHeader(rows: unknown[][]): { headerIdx: number; cols: Record<string, number> } | null {
   for (let i = 0; i < Math.min(12, rows.length); i++) {
     const row = rows[i] as (unknown)[]
     if (!row.some(c => isCodeHeaderCell(c))) continue
 
-    const cols: Record<string, number> = {}
-    row.forEach((cell, idx) => {
-      const n = norm(cell)
-      if (isCodeHeaderCell(cell)) { cols['code'] = idx; return }
-      // bakBorc: hücre hem "bak" hem "bor" içeriyorsa
-      if (n.includes('bak') && n.includes('bor'))     { cols['bakBorc'] = idx;   return }
-      // bakAlacak: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Bakiye Alac." eşleşir
-      if (n.includes('bak') && (n.includes('alacak') || n.includes('alac'))) { cols['bakAlacak'] = idx; return }
-      // sadece bor veya alacak (bakiyesiz sütunlar)
-      if (n.includes('bor') && cols['borc'] === undefined)         { cols['borc'] = idx }
-      // alacak fallback: "alacak" veya kısa "alac." — Faz 7.3.22: İPOS "Toplam Alac." eşleşir
-      if ((n.includes('alacak') || n.includes('alac')) && cols['alacak'] === undefined) { cols['alacak'] = idx }
-    })
-
+    const cols = classifyMizanHeaderCells(row)
     console.log('[HEADER] row', i, JSON.stringify(cols))
     if ('code' in cols && ('borc' in cols || 'bakBorc' in cols)) return { headerIdx: i, cols }
+
+    // İki satırlı başlık: üst satır "Hesap Kod | Kümülatif | Kümülatif...",
+    // alt satır "Borç | Alacak | Borç Bak. | Alac Bak." → hücreleri sütun bazında birleştir
+    const next = rows[i + 1] as unknown[] | undefined
+    if (!next) continue
+    const width = Math.max(row.length, next.length)
+    const merged: unknown[] = []
+    for (let c = 0; c < width; c++) {
+      const top = row[c]
+      if (isCodeHeaderCell(top)) { merged.push(top); continue }
+      merged.push(`${String(top ?? '')} ${String(next[c] ?? '')}`.trim())
+    }
+    const mergedCols = classifyMizanHeaderCells(merged)
+    console.log('[HEADER] rows', i, '+', i + 1, JSON.stringify(mergedCols))
+    if ('code' in mergedCols && ('borc' in mergedCols || 'bakBorc' in mergedCols)) {
+      return { headerIdx: i + 1, cols: mergedCols }
+    }
   }
   return null
+}
+
+const TR_MONTHS: Record<string, number> = {
+  ocak: 1, subat: 2, mart: 3, nisan: 4, mayis: 5, haziran: 6,
+  temmuz: 7, agustos: 8, eylul: 9, ekim: 10, kasim: 11, aralik: 12,
 }
 
 function extractMizanYear(rows: unknown[][]): { year: number | null; period: string } {
@@ -459,7 +485,20 @@ function extractMizanYear(rows: unknown[][]): { year: number | null; period: str
     }
   }
 
-  return tarihAraligiResult ?? donemResult ?? fallbackResult ?? { year: null, period: 'ANNUAL' }
+  const dateRangeResult = tarihAraligiResult ?? donemResult ?? fallbackResult
+  if (dateRangeResult) return dateRangeResult
+
+  // "Haziran/2026-MİZAN", "Aralık /2025" gibi ay adı + yıl başlıkları
+  for (let i = 0; i < Math.min(6, rows.length); i++) {
+    const rowText = norm((rows[i] as unknown[]).join(' '))
+    const m = rowText.match(/\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\s*\/\s*(20\d{2})\b/)
+    if (!m) continue
+    const month  = TR_MONTHS[m[1]]
+    const period = month <= 3 ? 'Q1' : month <= 6 ? 'Q2' : month <= 9 ? 'Q3' : 'ANNUAL'
+    return { year: parseInt(m[2]), period }
+  }
+
+  return { year: null, period: 'ANNUAL' }
 }
 
 // ─── Mizan satır eşlemesi ─────────────────────────────────────────────────────
