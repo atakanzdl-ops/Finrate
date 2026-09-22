@@ -89,6 +89,50 @@ export function computeDelta(
   return Math.max(sumDebit, sumCredit)
 }
 
+/**
+ * Finansal etki tonu: firma için olumlu mu, olumsuz mu?
+ *
+ * Akış (INCOME/EXPENSE):
+ *   Gelir artışı (INCOME+CREDIT)  → positive
+ *   Gelir azalışı (INCOME+DEBIT)  → negative
+ *   Gider artışı (EXPENSE+DEBIT)  → negative  (691 vergi dahil)
+ *   Gider azalışı (EXPENSE+CREDIT)→ positive  (621 maliyet düşüşü)
+ *
+ * Bilanço (ASSET/LIABILITY/EQUITY):
+ *   Varlık artışı   → positive    |  Varlık azalışı    → negative
+ *   Borç artışı     → negative    |  Borç azalışı      → positive
+ *   Özkaynak artışı  → positive    |  Özkaynak azalışı   → negative
+ */
+export function getImpactTone(
+  side:    'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE',
+  delta:   number,
+): 'positive' | 'negative' | 'neutral' {
+  if (delta === 0) return 'neutral'
+  const increases = delta > 0
+  switch (side) {
+    case 'ASSET':
+    case 'EQUITY':
+      return increases ? 'positive' : 'negative'
+    case 'LIABILITY':
+      return increases ? 'negative' : 'positive'
+    case 'INCOME':
+      return increases ? 'positive' : 'negative'
+    case 'EXPENSE':
+      return increases ? 'negative' : 'positive'
+  }
+}
+
+export function getToneColors(tone: 'positive' | 'negative' | 'neutral') {
+  switch (tone) {
+    case 'positive':
+      return { bg: '#F0FDFA', text: '#0F766E', label: '#115E59' }
+    case 'negative':
+      return { bg: '#FEF2F2', text: '#B91C1C', label: '#991B1B' }
+    case 'neutral':
+      return { bg: '#F8FAFC', text: '#64748B', label: '#64748B' }
+  }
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -163,7 +207,8 @@ export function AccountImpactTable({ legs, currentBalances }: Props) {
             const current  = currentBalances[leg.accountCode] ?? 0
             const proposed = getProposedBalance(current, leg.legSide, side, leg.amountTRY)
             const delta    = proposed - current
-            const isPos    = delta >= 0
+            const tone     = getImpactTone(side, delta)
+            const colors   = getToneColors(tone)
 
             return (
               <div
@@ -172,7 +217,7 @@ export function AccountImpactTable({ legs, currentBalances }: Props) {
                   display:             'grid',
                   gridTemplateColumns: '56px 1fr 80px 80px 64px',
                   gap:                 6,
-                  background:          isPos ? '#F0FDFA' : '#FEF2F2',
+                  background:          colors.bg,
                   borderRadius:        6,
                   padding:             '7px 10px',
                   marginBottom:        4,
@@ -194,9 +239,9 @@ export function AccountImpactTable({ legs, currentBalances }: Props) {
                 <span style={{
                   textAlign:  'right' as const,
                   fontWeight: 700,
-                  color:      isPos ? '#0F766E' : '#B91C1C',
+                  color:      colors.text,
                 }}>
-                  {isPos ? '+' : ''}{formatTRY(delta)}
+                  {delta >= 0 ? '+' : ''}{formatTRY(delta)}
                 </span>
               </div>
             )
@@ -219,16 +264,21 @@ export function AccountImpactTable({ legs, currentBalances }: Props) {
           </p>
 
           {flowLegs.map((leg, i) => {
-            const side       = getAccountSide(leg.accountCode)
-            const isIncrease =
-              (side === 'INCOME'  && leg.legSide === 'CREDIT') ||
-              (side === 'EXPENSE' && leg.legSide === 'DEBIT')
+            const side  = getAccountSide(leg.accountCode)
+            // Akış delta: hesap bakiyesi değişim yönü (TDHP doğal tarafı)
+            // INCOME doğal: CREDIT → artış(+), DEBIT → azalış(-)
+            // EXPENSE doğal: DEBIT → artış(+), CREDIT → azalış(-)
+            const delta = side === 'INCOME'
+              ? (leg.legSide === 'CREDIT' ? leg.amountTRY : -leg.amountTRY)
+              : (leg.legSide === 'DEBIT'  ? leg.amountTRY : -leg.amountTRY)
+            const tone   = getImpactTone(side, delta)
+            const colors = getToneColors(tone)
 
             return (
               <div
                 key={i}
                 style={{
-                  background:     isIncrease ? '#F0FDFA' : '#FEF2F2',
+                  background:     colors.bg,
                   borderRadius:   6,
                   padding:        '7px 10px',
                   marginBottom:   4,
@@ -241,16 +291,16 @@ export function AccountImpactTable({ legs, currentBalances }: Props) {
                   <span style={{ fontFamily: 'monospace', color: '#94A3B8', fontSize: 11, marginRight: 6 }}>
                     {leg.accountCode}
                   </span>
-                  <span style={{ color: isIncrease ? '#115E59' : '#991B1B', fontWeight: 500 }}>
+                  <span style={{ color: colors.label, fontWeight: 500 }}>
                     {leg.accountName}
                   </span>
                 </div>
                 <span style={{
                   fontWeight:  600,
-                  color:       isIncrease ? '#0F766E' : '#B91C1C',
+                  color:       colors.text,
                   whiteSpace:  'nowrap' as const,
                 }}>
-                  {isIncrease ? '+' : '−'}{formatTRY(leg.amountTRY)}
+                  {delta >= 0 ? '+' : '−'}{formatTRY(leg.amountTRY)}
                 </span>
               </div>
             )

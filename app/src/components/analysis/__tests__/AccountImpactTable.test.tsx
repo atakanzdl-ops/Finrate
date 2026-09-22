@@ -16,6 +16,8 @@ import {
   getAccountSide,
   getProposedBalance,
   computeDelta,
+  getImpactTone,
+  getToneColors,
   AccountImpactTable,
 } from '../AccountImpactTable'
 import type { AccountingImpactRow } from '@/lib/scoring/scenarioV3/decisionLayer'
@@ -136,6 +138,105 @@ describe('computeDelta', () => {
     // max(200K, 200K) = 200K, ASLA 400K değil
     expect(computeDelta(legs)).toBe(200_000)
     expect(computeDelta(legs)).not.toBe(400_000)
+  })
+})
+
+// ─── getImpactTone (R14b) ─────────────────────────────────────────────────────
+
+describe('getImpactTone (R14b — finansal renk semantiği)', () => {
+  test('T16 — ASSET artışı → positive', () => {
+    expect(getImpactTone('ASSET', 50_000)).toBe('positive')
+  })
+
+  test('T17 — ASSET azalışı → negative', () => {
+    expect(getImpactTone('ASSET', -50_000)).toBe('negative')
+  })
+
+  test('T18 — LIABILITY artışı → negative (borç artışı kötü)', () => {
+    expect(getImpactTone('LIABILITY', 80_000)).toBe('negative')
+  })
+
+  test('T19 — LIABILITY azalışı → positive (borç azalışı iyi)', () => {
+    expect(getImpactTone('LIABILITY', -80_000)).toBe('positive')
+  })
+
+  test('T20 — EQUITY artışı → positive', () => {
+    expect(getImpactTone('EQUITY', 100_000)).toBe('positive')
+  })
+
+  test('T21 — EXPENSE artışı → negative (691 vergi dahil)', () => {
+    expect(getImpactTone('EXPENSE', -10_000)).toBe('positive')
+    expect(getImpactTone('EXPENSE', 10_000)).toBe('negative')
+  })
+
+  test('T22 — INCOME artışı → positive, azalışı → negative', () => {
+    expect(getImpactTone('INCOME', 50_000)).toBe('positive')
+    expect(getImpactTone('INCOME', -50_000)).toBe('negative')
+  })
+
+  test('T23 — delta = 0 → neutral', () => {
+    expect(getImpactTone('ASSET', 0)).toBe('neutral')
+    expect(getImpactTone('LIABILITY', 0)).toBe('neutral')
+    expect(getImpactTone('EXPENSE', 0)).toBe('neutral')
+  })
+})
+
+// ─── getToneColors (R14b) ─────────────────────────────────────────────────────
+
+describe('getToneColors (R14b)', () => {
+  test('T24 — positive → yeşil tonları', () => {
+    const c = getToneColors('positive')
+    expect(c.bg).toBe('#F0FDFA')
+    expect(c.text).toBe('#0F766E')
+  })
+
+  test('T25 — negative → kırmızı tonları', () => {
+    const c = getToneColors('negative')
+    expect(c.bg).toBe('#FEF2F2')
+    expect(c.text).toBe('#B91C1C')
+  })
+
+  test('T26 — neutral → gri tonları', () => {
+    const c = getToneColors('neutral')
+    expect(c.bg).toBe('#F8FAFC')
+    expect(c.text).toBe('#64748B')
+  })
+})
+
+// ─── R14b render semantik doğrulama ──────────────────────────────────────────
+
+describe('R14b render — renk semantiği doğrulama', () => {
+  test('T27 — 691 gider artışı (DEBIT) → kırmızı arka plan (#FEF2F2)', () => {
+    const legs: AccountingImpactRow[] = [
+      makeLeg({ accountCode: '691', accountName: 'Dönem Kârı Vergi Karş.', legSide: 'DEBIT', amountTRY: 1_000_000 }),
+    ]
+    const html = renderToStaticMarkup(
+      AccountImpactTable({ legs, currentBalances: {}, actionAmountTRY: undefined })
+    )
+    expect(html).toContain('#FEF2F2')
+    expect(html).toContain('#B91C1C')
+  })
+
+  test('T28 — 621 maliyet azalışı (CREDIT) → yeşil arka plan (#F0FDFA)', () => {
+    const legs: AccountingImpactRow[] = [
+      makeLeg({ accountCode: '621', accountName: 'SMM', legSide: 'CREDIT', amountTRY: 5_000_000 }),
+    ]
+    const html = renderToStaticMarkup(
+      AccountImpactTable({ legs, currentBalances: {}, actionAmountTRY: undefined })
+    )
+    expect(html).toContain('#F0FDFA')
+    expect(html).toContain('#0F766E')
+  })
+
+  test('T29 — 370 borç artışı (LIABILITY CREDIT) → kırmızı arka plan', () => {
+    const legs: AccountingImpactRow[] = [
+      makeLeg({ accountCode: '370', accountName: 'Vergi Yükümlülükleri', legSide: 'CREDIT', amountTRY: 1_000_000 }),
+    ]
+    const html = renderToStaticMarkup(
+      AccountImpactTable({ legs, currentBalances: { '370': 500_000 }, actionAmountTRY: undefined })
+    )
+    expect(html).toContain('#FEF2F2')
+    expect(html).toContain('#B91C1C')
   })
 })
 

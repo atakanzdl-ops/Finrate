@@ -26,6 +26,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: amount,
       operatingProfitDelta: amount,
       netIncomeDelta: amount,
+      costOfGoodsSoldDelta: 0,  // 600 COGS hesabı değil
     })
   })
 
@@ -43,6 +44,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: -amount,
       operatingProfitDelta: -amount,
       netIncomeDelta: -amount,
+      costOfGoodsSoldDelta: amount,  // 621 DEBIT → COGS artar
     })
   })
 
@@ -60,6 +62,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: amount,
       operatingProfitDelta: amount,
       netIncomeDelta: amount,
+      costOfGoodsSoldDelta: -amount,  // 621 CREDIT → COGS azalır
     })
   })
 
@@ -77,6 +80,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: 0,
       operatingProfitDelta: -amount,
       netIncomeDelta: -amount,
+      costOfGoodsSoldDelta: 0,  // 632 COGS hesabı değil
     })
   })
 
@@ -94,6 +98,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: 0,
       operatingProfitDelta: 0,
       netIncomeDelta: -amount,
+      costOfGoodsSoldDelta: 0,  // 660 COGS hesabı değil
     })
   })
 
@@ -111,6 +116,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: 0,
       operatingProfitDelta: 0,
       netIncomeDelta: 0,
+      costOfGoodsSoldDelta: 0,  // 102/120 bilanço hesabı, COGS değil
     })
   })
 
@@ -128,6 +134,7 @@ describe('buildIncomeStatementDeltas', () => {
       grossProfitDelta: 0,
       operatingProfitDelta: 0,
       netIncomeDelta: 0,
+      costOfGoodsSoldDelta: 0,  // 690/590 kapanış hesabı, COGS değil
     })
   })
 })

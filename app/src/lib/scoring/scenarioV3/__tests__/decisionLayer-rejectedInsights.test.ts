@@ -13,7 +13,9 @@ import { toFriendlyRejectReason, buildDecisionAnswer } from '../decisionLayer'
 // ─── toFriendlyRejectReason ───────────────────────────────────────────────────
 
 describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
-  it('Horizon short desteklenmiyor → Bu vade için uygun değil.', () => {
+  // R3 ADIM 4: engineV3 horizon hard-reject kaldirildi; bu reason artik ulasilamaz.
+  // Geriye donuk uyumluluk icin toFriendlyRejectReason dal'i korunuyor — test gecmeye devam eder.
+  it('Horizon short desteklenmiyor → Bu vade için uygun değil. [R3: unreachable branch, kept for compat]', () => {
     expect(toFriendlyRejectReason('Horizon short desteklenmiyor'))
       .toBe('Bu vade için uygun değil.')
   })
@@ -43,9 +45,9 @@ describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
       .toBe('Aksiyon koşulu sağlanmadı.')
   })
 
-  it('no valid amount candidates → Uygulanabilir tutar üretilemedi.', () => {
+  it('no valid amount candidates → açıklayıcı mesaj (R8.8)', () => {
     expect(toFriendlyRejectReason('no valid amount candidates for A05'))
-      .toBe('Uygulanabilir tutar üretilemedi.')
+      .toBe('Bu aksiyona uygun finansal büyüklük hesaplanamadı.')
   })
 
   it('Aggregate guardrail → Toplu kural nedeniyle uygun değil.', () => {
@@ -53,9 +55,9 @@ describe('toFriendlyRejectReason — raw → friendly eşleme', () => {
       .toBe('Toplu kural nedeniyle uygun değil.')
   })
 
-  it('bilinmeyen gerekçe → fallback döner', () => {
+  it('bilinmeyen gerekçe → açıklayıcı fallback döner (R8.8)', () => {
     expect(toFriendlyRejectReason('tamamen bilinmeyen bir gerekçe'))
-      .toBe('Bu aksiyon mevcut veriyle uygun görülmedi.')
+      .toBe('Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.')
   })
 })
 
@@ -163,7 +165,7 @@ describe('buildDecisionAnswer — enginePortfolioCount / rejectedInsightCount (F
       portfolio: [],
       rejectedCandidates: [
         { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Kaynak bakiye yetersiz — min 1.000.000 TL' },
-        { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Horizon short desteklenmiyor' },  // aynı actionId → gruplanır
+        { actionId: 'A01_ST_FIN_DEBT_TO_LT', reason: 'Horizon short desteklenmiyor' },  // aynı actionId → gruplanır (R3: bu reason artık üretilmez, gruplama mantığı test amaçlı korunuyor)
         { actionId: 'A05_RECEIVABLE_COLLECTION', reason: 'sektoru icin uygulanamaz' },   // farklı actionId → ayrı insight
       ],
     })

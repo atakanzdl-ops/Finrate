@@ -48,9 +48,10 @@ export const ACTION_RATIO_GROUP_PROFILE: Record<string, ActionRatioGroupProfile>
   'A04_CASH_PAYDOWN_ST':                   { primary: 'LEVERAGE', secondary: 'LIQUIDITY' },
 
   // ── Dönen Varlık Optimizasyonu ─────────────────────────────────────────────
-  // Alacak → nakit: DSO ↓ (ACTIVITY), cari oran ↑ (LIQUIDITY)
-  'A05_RECEIVABLE_COLLECTION':             { primary: 'LIQUIDITY', secondary: 'ACTIVITY' },
-  // Stok → nakit: DIO ↓ (ACTIVITY), cari oran ↑↑ (LIQUIDITY dominant — Faz 2 snapshot)
+  // Alacak → nakit: DSO ↓ (ACTIVITY primary), cari oran ↑ (LIQUIDITY secondary)
+  // R12.1-FIX5: primary ACTIVITY — DSO bir faaliyet metrigi, rasyo bazlı sınıflandırma
+  'A05_RECEIVABLE_COLLECTION':             { primary: 'ACTIVITY', secondary: 'LIQUIDITY' },
+  // Stok → nakit: DIO ↓ (ACTIVITY primary), cari oran ↑ (LIQUIDITY secondary)
   'A06_INVENTORY_MONETIZATION':            { primary: 'ACTIVITY', secondary: 'LIQUIDITY' },
 
   // ── Duran Varlık Satışı ────────────────────────────────────────────────────
@@ -80,14 +81,20 @@ export const ACTION_RATIO_GROUP_PROFILE: Record<string, ActionRatioGroupProfile>
   // ── Hasılat / Büyüme ──────────────────────────────────────────────────────
   // Satış ↑ → kârlılık ↑ (PROFITABILITY), aktif devir hızı ↑ (ACTIVITY)
   'A18_NET_SALES_GROWTH':                  { primary: 'PROFITABILITY', secondary: 'ACTIVITY' },
-  // Avans → hasılat: kârlılık ↑ (PROFITABILITY), likit pasif ↓ (LIQUIDITY secondary)
-  'A19_ADVANCE_TO_REVENUE':                { primary: 'PROFITABILITY', secondary: 'LIQUIDITY' },
+  // Avans → hasılat: teslim/faaliyet etkinliği (ACTIVITY primary), kârlılık ↑ (PROFITABILITY)
+  // R12.1-FIX5: primary ACTIVITY — avans tahsilatı bir faaliyet aksiyonu (teslim döngüsü)
+  'A19_ADVANCE_TO_REVENUE':                { primary: 'ACTIVITY', secondary: 'PROFITABILITY' },
 
   // ── Kârlılık Reformu (Nakit Kanal) ────────────────────────────────────────
   // Brüt marj ↑ → kârlılık ↑ (PROFITABILITY); tedarikçisiz maliyet optimizasyonu
   'A20_GROSS_MARGIN_REFORM':               { primary: 'PROFITABILITY' },
   // Faaliyet kârı ↑ → kârlılık ↑ (PROFITABILITY); gider optimizasyonu nakit kanal
   'A21_OPERATING_PROFIT_REFORM':           { primary: 'PROFITABILITY' },
+
+  // ── Ortaklardan Alacak Tahsilatı ──────────────────────────────────────────
+  // 131/231 tahsil: nakit ↑ (LIQUIDITY primary), bilanço kalitesi ↑ (LEVERAGE secondary)
+  // R12.1-FIX5: A22 profile'a eklendi — primary LIQUIDITY
+  'A22_SHAREHOLDER_RECEIVABLE_COLLECTION': { primary: 'LIQUIDITY', secondary: 'LEVERAGE' },
 }
 
 /**
@@ -114,4 +121,39 @@ export function getCoveredGroups(actionIds: string[]): Set<RatioGroup> {
     if (profile.secondary) covered.add(profile.secondary)
   }
   return covered
+}
+
+/**
+ * R12.1-FIX5: Sadece PRIMARY kapsanan yapılar.
+ * Yan etki (secondary) COVERED saymaz — her zayıf yapı kendi primary
+ * aksiyonunu almalı.
+ *
+ * @example
+ *   getPrimaryCoveredGroups(['A14_FINANCE_COST_REDUCTION'])
+ *   // → Set { 'PROFITABILITY' }  (LEVERAGE secondary → sayılmaz!)
+ *
+ *   getPrimaryCoveredGroups(['A10_CASH_EQUITY_INJECTION', 'A05_RECEIVABLE_COLLECTION'])
+ *   // → Set { 'LEVERAGE', 'ACTIVITY' }
+ */
+export function getPrimaryCoveredGroups(actionIds: string[]): Set<RatioGroup> {
+  const covered = new Set<RatioGroup>()
+  for (const id of actionIds) {
+    const profile = ACTION_RATIO_GROUP_PROFILE[id]
+    if (profile?.primary) covered.add(profile.primary)
+  }
+  return covered
+}
+
+/**
+ * Belirli bir yapının (RatioGroup) PRIMARY aksiyon havuzunu döndürür.
+ * ACTION_RATIO_GROUP_PROFILE'da primary === group olan tüm aksiyon ID'leri.
+ * Quality sıralaması için catalogArray ile birlikte kullanılır.
+ *
+ * @param group  Hedef rasyo grubu
+ * @returns Aksiyon ID listesi (profil sırası — qualityCoefficient sort engineV3'te yapılır)
+ */
+export function getPrimaryActionsForGroup(group: RatioGroup): string[] {
+  return Object.entries(ACTION_RATIO_GROUP_PROFILE)
+    .filter(([, p]) => p.primary === group)
+    .map(([id]) => id)
 }

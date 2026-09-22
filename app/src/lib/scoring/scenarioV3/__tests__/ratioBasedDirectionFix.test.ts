@@ -225,7 +225,10 @@ describe('T8 — DEKAM regression: yüksek brüt marj → A12 portfolio dışı'
 
 describe('T9-T11 — Non-regression: GÜN 1-2 sizing değerleri korundu', () => {
 
-  test('T9: A06 GÜN 1 sizing — min %2, typical %4, max %10', () => {
+  // NOT: A06 artık computeAmount (DIO) kullanır. Bu test suggestedAmount
+  // field'larının tip uyumu için var olduğunu doğrular.
+  // Yeni davranış: a06DIORefactor.test.ts
+  test('T9: A06 suggestedAmount fields preserved (DIO refactor sonrası)', () => {
     const sa = ACTION_CATALOG_V3['A06_INVENTORY_MONETIZATION']!.suggestedAmount
     expect(sa.minPctOfBasis).toBe(0.02)
     expect(sa.typicalPctOfBasis).toBe(0.04)

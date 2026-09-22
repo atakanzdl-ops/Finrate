@@ -308,15 +308,22 @@ export function checkBalance(
  * Mevcut değer varsa (sıfırdan farklı) korunur — override yapmaz.
  */
 export function adaptAggregateForScoring(
-  agg: Record<string, number>,
-): Record<string, number> {
+  agg: Record<string, number | null | undefined>,
+): Record<string, number | null | undefined> {
   const revenue           = agg.revenue           ?? 0
   const cogs              = agg.cogs              ?? 0
   const operatingExpenses = agg.operatingExpenses ?? 0
+  const ebit              = agg.ebit || (revenue - cogs - operatingExpenses)
+  const depreciation      = agg.depreciation ?? null
+  const ebitda            = agg.ebitda ?? (
+    ebit != null && depreciation != null ? ebit + depreciation : ebit
+  )
 
   return {
     ...agg,
     grossProfit: agg.grossProfit || (revenue - cogs),
-    ebit:        agg.ebit        || (revenue - cogs - operatingExpenses),
+    ebit,
+    depreciation,
+    ebitda,
   }
 }

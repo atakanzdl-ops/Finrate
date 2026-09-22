@@ -510,22 +510,33 @@ const MIZAN_IGNORE = new Set([
 ])
 
 // SPLIT: bakBorç → bb, bakAlacak → ba
-const MIZAN_SPLIT: Record<string, { bb: string; ba: string }> = {
-  '120': { bb: 'tradeReceivables',  ba: 'advancesReceived' },
-  '131': { bb: 'otherReceivables',  ba: 'otherShortTermPayables' },
-  '320': { bb: 'prepaidSuppliers',  ba: 'tradePayables' },
-  '329': { bb: 'prepaidSuppliers',  ba: 'otherShortTermPayables' },
-  '331': { bb: 'otherReceivables',  ba: 'otherShortTermPayables' },
+// R8.2 (Atakan keşfi + Codex tespit):
+// rawSide: ham hesap kodu verisinde hangi bakiye tarafının kullanılacağını belirtir.
+//   'bb' (borç bakiye) → aktif hesaplar (120, 131, 320, 329) — varsayılan
+//   'ba' (alacak bakiye) → pasif hesaplar (331 Ortaklara Borçlar KV)
+// Önceki: her zaman bb → 331 alacak bakiyeli ise rawAmount=0 → DB'de 331 oluşmaz → A15 reddi
+// NOT: 431 Ortaklara Borçlar UV MIZAN_MAP "_A" tarafında → zaten doğru (dokunulmadı)
+// R9: 231 MIZAN_SPLIT'e eklendi (bb: longTermOtherReceivables, ba: longTermOtherPayables)
+// R9: 159 + 340 MIZAN_MAP'ten MIZAN_SPLIT'e taşındı (bb/ba ters bakiye mantığı)
+const MIZAN_SPLIT: Record<string, { bb: string; ba: string; rawSide?: 'bb' | 'ba' }> = {
+  '120': { bb: 'tradeReceivables',        ba: 'advancesReceived' },
+  '131': { bb: 'otherReceivables',        ba: 'otherShortTermPayables' },
+  '159': { bb: 'prepaidSuppliers',        ba: 'advancesReceived' },             // R9: ters bakiye → advancesReceived
+  '231': { bb: 'longTermOtherReceivables', ba: 'longTermOtherPayables' },       // R9: UV ortaklardan alacaklar
+  '320': { bb: 'prepaidSuppliers',        ba: 'tradePayables' },
+  '329': { bb: 'prepaidSuppliers',        ba: 'otherShortTermPayables' },
+  '331': { bb: 'otherReceivables',        ba: 'otherShortTermPayables', rawSide: 'ba' },  // R8.2
+  '340': { bb: 'prepaidSuppliers',        ba: 'advancesReceived',       rawSide: 'ba' },  // R9: pasif, ters bakiye → prepaidSuppliers
 }
 
 // MAP: suffix yok = bakBorç, _A = bakAlacak, _CA = -bakAlacak (contra), _CB = -bakBorç (contra)
 const MIZAN_MAP: Record<string, string> = {
   // Aktif – bakBorç
   '100': 'cash',             '101': 'cash',             '102': 'cash',             '108': 'cash',
-  '121': 'tradeReceivables', '126': 'tradeReceivables', '128': 'tradeReceivables', // Faz 7.3.25: 128 Şüpheli Ticari Alacaklar
+  '121': 'tradeReceivables', '126': 'tradeReceivables', '127': 'tradeReceivables', '128': 'tradeReceivables', // R9.1: 127 Diğer Ticari Alacaklar
   '136': 'otherReceivables',
   '150': 'inventory',        '151': 'inventory',        '152': 'inventory',  '153': 'inventory',
-  '159': 'prepaidSuppliers',
+  // '159' MIZAN_SPLIT'e taşındı (R9 — bb/ba ters bakiye)
   '170': 'constructionCosts', '178': 'constructionCosts',  // Faz 7.3.21: YİYY İnşaat Maliyeti
   '180': 'prepaidExpenses',
   '190': 'otherCurrentAssets', '191': 'otherCurrentAssets', '192': 'otherCurrentAssets', '193': 'otherCurrentAssets', // Faz 7.3.25: 192 Diğer KDV
@@ -556,17 +567,22 @@ const MIZAN_MAP: Record<string, string> = {
   '683': 'extraordinaryExpense',  '684': 'extraordinaryExpense',  '685': 'extraordinaryExpense',
   '686': 'extraordinaryExpense',  '687': 'extraordinaryExpense',  '688': 'extraordinaryExpense',
   '689': 'extraordinaryExpense',
+  // R8.4.5 / R8.4.5e: 780/781 Finansman Giderleri MIZAN_MAP'ten çıkarıldı.
+  // MIZAN_RAW_ONLY set'e taşındı → rawAccounts'a yazar, fields'a YAZMAZ.
+  // Sebep: R8.4.5c'de 'interestExpense' olarak eklenince MIZAN cleanup null
+  // yaratıyor, merge spread beyanname değerini yok ediyordu (DEKAM B→BB).
+  // (R8.4.5c'de eklenmişti; R8.4.5e'de kaldırıldı)
   // Pasif – bakAlacak (_A)
   '103': 'cash_CA',
-  '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A',
+  '300': 'shortTermFinancialDebt_A', '301': 'shortTermFinancialDebt_A', '303': 'shortTermFinancialDebt_A', '309': 'shortTermFinancialDebt_A', // R9.1: 303 UV Kredi KV Taksitleri
   '321': 'tradePayables_A',          '326': 'tradePayables_A',
   '335': 'otherShortTermPayables_A', '336': 'otherShortTermPayables_A',
-  '340': 'advancesReceived_A',
+  // '340' MIZAN_SPLIT'e taşındı (R9 — rawSide:'ba', ters bakiye → prepaidSuppliers)
   '350': 'constructionProgress_A', '358': 'constructionProgress_A',  // Faz 7.3.21: 350 eklendi
   // 44x — UV Alınan Avanslar → longTermAdvancesReceived_A (Faz 7.3.21)
   '440': 'longTermAdvancesReceived_A', '449': 'longTermAdvancesReceived_A',
   '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
-  '381': 'deferredRevenue_A',
+  '380': 'deferredRevenue_A', '381': 'deferredRevenue_A', // R9.1: 380 Gelecek Aylara Ait Gelirler
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
   // 42x — UV Ticari Borçlar → longTermTradePayables_A
   '420': 'longTermTradePayables_A',  '421': 'longTermTradePayables_A',
@@ -575,6 +591,11 @@ const MIZAN_MAP: Record<string, string> = {
   '431': 'otherNonCurrentLiabilities_A', '432': 'otherNonCurrentLiabilities_A',
   '433': 'otherNonCurrentLiabilities_A', '436': 'otherNonCurrentLiabilities_A',
   '500': 'paidInCapital_A',
+  // R8.4.5: 501 Ödenmemiş Sermaye (kontra hesap, borç bakiyeli)
+  // _CB = -bakBorç → 501 tutarı paidInCapital'dan otomatik düşer
+  // Engine signedSumByCodes zaten 501'i deduction listesinde tutar; rawAccounts'ta
+  // 501 kaydedildiğinde balances['501'] dolu olur ve gerçek deduction çalışır.
+  '501': 'paidInCapital_CB',
   '502': 'capitalReserves_A',        // Sermaye Düzeltmesi → capitalReserves (NOT paidInCapital)
   // 52x — Sermaye Yedekleri alt kodlar → capitalReserves_A
   '520': 'capitalReserves_A', '521': 'capitalReserves_A', '522': 'capitalReserves_A',
@@ -604,6 +625,12 @@ const MAIN_ACCOUNT_CANONICAL: Record<string, string> = {
   '40': '400', '42': '429', '43': '436',
   '50': '500', '52': '529', '54': '549', '57': '570', '58': '580',
 }
+
+// R8.4.5e: Sadece rawAccounts'a yazılan, fields'a yazılmayan hesaplar.
+// 780/781 Finansman Giderleri → interestExpense field oluşturulmaz →
+// beyanname'den gelen interestExpense değeri korunur (null propagation engeli).
+// engine accountBalances['780'] okumaya devam eder (rawAccounts → DB yolu sağlam).
+const MIZAN_RAW_ONLY = new Set(['780', '781'])
 
 export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
   const header = findMizanHeader(rows)
@@ -672,26 +699,48 @@ export async function parseMizanRows(rows: unknown[][]): Promise<ParsedRow[]> {
     // rebuildAggregateFromAccounts() için 3-haneli kodların doğal bakiyeleri:
     //   _A / _CA → bakAlacak (alacak bakiyeli hesaplar)
     //   _CB / suffix yok → bakBorç (borç bakiyeli hesaplar)
-    //   MIZAN_SPLIT → bakBorç (ağırlıklı borç tarafı)
+    //   MIZAN_SPLIT → rawSide belirtilmişse o taraf; aksi hâlde bb (borç bakiye)
+    //   R8.2: 331 pasif hesap → rawSide:'ba' → ba kullanılır (alacak bakiye)
+    //   R8.4.5b: 7xx gider hesapları yıl sonu kapanışında bakiye=0 olur (690'a devredilir)
+    //   Bakiye=0 ise Dönem Toplamı (Toplam Bor. / borc sütunu) fallback.
+    //   1xx-5xx bilanço hesapları DOKUNULMAZ (bakiye = gerçek değer).
     if (nc.length === 3) {
       let rawAmount = 0
       if (MIZAN_SPLIT[nc]) {
-        rawAmount = bb
+        const splitDef = MIZAN_SPLIT[nc]
+        rawAmount = splitDef.rawSide === 'ba' ? ba : bb
+      } else if (MIZAN_RAW_ONLY.has(nc)) {
+        // R8.4.5e: 780/781 → sadece rawAccounts, fields'a yazılmaz
+        // bb=0 (Logo yıl sonu kapanışı) → getNum('borc') dönem toplamı fallback (R8.4.5b)
+        rawAmount = bb === 0 ? getNum('borc') : bb
       } else {
         const mapped = MIZAN_MAP[nc]
         if (mapped) {
-          if (mapped.endsWith('_A') || mapped.endsWith('_CA')) rawAmount = ba
-          else rawAmount = bb
+          if (mapped.endsWith('_A') || mapped.endsWith('_CA')) {
+            rawAmount = ba
+          } else if (nc.startsWith('7') && bb === 0) {
+            // R8.4.5b: Logo/iPOS yıl sonu kapatılmış 7xx
+            // "Bakiye Bor." = 0, "Toplam Bor." = gerçek dönem gideri
+            rawAmount = getNum('borc')
+          } else {
+            rawAmount = bb
+          }
         }
       }
       if (rawAmount !== 0) rawAccounts.push({ code: nc, amount: rawAmount })
     }
 
     if (MIZAN_IGNORE.has(nc)) continue
+    if (MIZAN_RAW_ONLY.has(nc)) continue  // R8.4.5e: rawAccounts'ta — fields'a yazılmaz
 
     if (MIZAN_SPLIT[nc]) {
-      if (bb > 0) add(MIZAN_SPLIT[nc].bb, bb)
-      if (ba > 0) add(MIZAN_SPLIT[nc].ba, ba)
+      // R9 Hotfix: Net bakiye — ters bakiye muhasebe kuralı
+      // Aktif hesaplar borç bakiyeli, pasif hesaplar alacak bakiyeli olur.
+      // bb ve ba aynı anda > 0 ise (dönem hareketi formatı vb.) net değer hesaplanır.
+      const net_bb = Math.max(0, bb - ba)  // net borç bakiyesi
+      const net_ba = Math.max(0, ba - bb)  // net alacak bakiyesi
+      if (net_bb > 0) add(MIZAN_SPLIT[nc].bb, net_bb)
+      if (net_ba > 0) add(MIZAN_SPLIT[nc].ba, net_ba)
       continue
     }
 

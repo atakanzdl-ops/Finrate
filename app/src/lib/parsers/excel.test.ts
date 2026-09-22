@@ -634,3 +634,79 @@ describe('parseExcelIdentity (Faz 7.3.50A.3)', () => {
     expect(result.sourceConfidence).toBe('HIGH')
   })
 })
+
+// ─── R8.2 — MIZAN_SPLIT rawSide: 331 Ortaklara Borçlar pasif hesap ───────────
+//
+// Kök neden: MIZAN_SPLIT her zaman bb (borç bakiye) kullanıyordu.
+// 331 Ortaklara Borçlar pasif (alacak bakiyeli) hesap olduğu için
+//   bb = 0 → rawAmount = 0 → rawAccounts'a eklenmiyor → A15 reddi.
+// R8.2 fix: rawSide:'ba' → rawAmount = ba → rawAccounts'a 29.8M ekleniyor.
+//
+// T_R82_1: primary    — 331 alacak bakiyeli (ba=29.8M) → rawAccounts yakalanır
+// T_R82_2: edge       — 331 borç bakiyeli (bb=5M, ba=0) → rawAmount=0 → eklenmez
+// T_R82_3: negatif    — 331 hiç yok → rawAccounts'da '331' kodu yok
+// T_R82_4: 320 reg.   — rawSide tanımsız → bb davranışı değişmedi
+// T_R82_5: ORGANIKA   — 331=29.8M alacak; otherShortTermPayables doğru; A15 erişilebilir
+
+describe('R8.2 — MIZAN_SPLIT rawSide: 331 Ortaklara Borçlar pasif hesap', () => {
+
+  // T_R82_1: 331 alacak bakiyeli → rawAccounts {code:'331', amount:29_800_000}
+  test('T_R82_1 — 331 bakAlacak:29.8M → rawAccounts[331]=29.8M (R8.2 primary)', async () => {
+    const rows = makeMizanRows([{ code: '331', bakAlacak: 29_800_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+    const entry = result[0]?.rawAccounts?.find(r => r.code === '331')
+    expect(entry).toBeDefined()
+    expect(entry?.amount).toBe(29_800_000)
+    // fields tarafı da doğru eşlenmeli
+    expect(result[0]?.fields?.otherShortTermPayables).toBeGreaterThanOrEqual(29_800_000)
+  })
+
+  // T_R82_2: 331 borç bakiyeli (bb>0, ba=0) → rawSide:'ba' → rawAmount=0 → eklenmez
+  test('T_R82_2 — 331 bakBorc:5M (pasife borç=edge) → rawAccounts[331] yok (rawAmount=ba=0)', async () => {
+    const rows = makeMizanRows([{ code: '331', bakBorc: 5_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+    const entry = result[0]?.rawAccounts?.find(r => r.code === '331')
+    expect(entry).toBeUndefined()
+    // bb tarafı yine de fields.otherReceivables'a yansır (MIZAN_SPLIT davranışı)
+    expect(result[0]?.fields?.otherReceivables).toBeGreaterThanOrEqual(5_000_000)
+  })
+
+  // T_R82_3: 331 hiç yok → rawAccounts'da '331' kodu bulunmamalı
+  test('T_R82_3 — 331 yoksa rawAccounts[331] tanımsız (negatif guard)', async () => {
+    const rows = makeMizanRows([{ code: '100', bakBorc: 500_000 }])
+    const result = await parseMizanRows(rows)
+    const entry = result[0]?.rawAccounts?.find(r => r.code === '331')
+    expect(entry).toBeUndefined()
+  })
+
+  // T_R82_4: 320 regresyon — rawSide yok → bb davranışı korunur
+  test('T_R82_4 — 320 bakBorc:8M → rawAccounts[320]=8M (rawSide:bb regresyon)', async () => {
+    const rows = makeMizanRows([{ code: '320', bakBorc: 8_000_000 }])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+    const entry = result[0]?.rawAccounts?.find(r => r.code === '320')
+    expect(entry).toBeDefined()
+    expect(entry?.amount).toBe(8_000_000)
+  })
+
+  // T_R82_5: ORGANIKA simülasyonu — 331=29.8M + 300=22.8M → rawAccounts ve fields doğru
+  // A15 Ortak Borcu Sermayeye Çevirme için rawAccounts[331] gereklidir.
+  test('T_R82_5 — ORGANIKA: 331=29.8M alacak bakiye → rawAccounts yakalanır, A15 erişilebilir', async () => {
+    const rows = makeMizanRows([
+      { code: '331', bakAlacak: 29_800_000 },  // Ortaklara Borçlar — pasif → ba
+      { code: '300', bakAlacak: 22_800_000 },  // KV Mali Borç — pasif
+    ])
+    const result = await parseMizanRows(rows)
+    expect(result.length).toBeGreaterThan(0)
+
+    // rawAccounts: 331 → 29.8M (R8.2 fix sayesinde)
+    const entry331 = result[0]?.rawAccounts?.find(r => r.code === '331')
+    expect(entry331).toBeDefined()
+    expect(entry331?.amount).toBe(29_800_000)
+
+    // fields: otherShortTermPayables ≥ 29.8M (331 ba tarafı doğru eşleniyor)
+    expect(result[0]?.fields?.otherShortTermPayables).toBeGreaterThanOrEqual(29_800_000)
+  })
+})

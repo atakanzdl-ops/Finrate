@@ -29,17 +29,17 @@ exports[`Test 12 — Snapshot DEKAM target=A snapshot (Faz 5.2) 1`] = `
   {
     "actionCount": 1,
     "actions": [
-      "A18",
+      "A05",
     ],
-    "label": "Kârlılık odaklı senaryo (A18)",
+    "label": "Faaliyet odaklı senaryo (A05)",
     "targetReached": false,
   },
   {
     "actionCount": 1,
     "actions": [
-      "A05",
+      "A18",
     ],
-    "label": "Faaliyet odaklı senaryo (A05)",
+    "label": "Kârlılık odaklı senaryo (A18)",
     "targetReached": false,
   },
   {

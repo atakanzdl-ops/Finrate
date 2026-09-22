@@ -19,9 +19,49 @@ import {
   AccountingLeg,
   SectorCode,
   SemanticType,
+  FirmContext,
 } from './contracts'
 
-import { getPeriodDays, getBenchmarkValue, applyFeasibilityCap } from './ratioHelpers'
+import {
+  getPeriodDays,
+  getBenchmarkValue,
+  applyFeasibilityCap,
+  getInventoryBalance,
+  getCogs,
+  computeDIO,
+  sumByCodesPrefix,
+  sumByCodesPrefixNet,
+  getNetFixedAssets,
+  getGrossFixedAssets,
+  getConstructionSafeFixedAssets,
+  isIdleAssetCandidate,
+  getFixedAssetRatioBenchmark,
+  selectIdleAssetAccount,
+  getCashBalance,
+  getShortTermFinancialDebt,
+  getShortTermTradeDebt,
+  getLongTermFinancialDebt,
+  getTradeReceivables,
+  getAccumulatedDepreciation,
+  getRevaluationReserve,
+  getCurrentRatio,
+  getNetWorkingCapital,
+  getIdleAssetPoolBalance,
+  getGrossMarginReductionTarget,            // R4: A12+A20 ortak helper
+  getOperatingExpenses,                     // R5: A21 faaliyet gideri tespiti
+  getOperatingExpensesDetail,               // R7B: A21 build için isEstimated bilgisi
+  getOperatingExpenseReductionTarget,       // R5: A21 azaltma hedefi
+  getFinancialExpenses,                     // R5: A14 finansman gideri tespiti
+  getFinancialExpenseReductionTarget,       // R5: A14 azaltma hedefi
+  getEquityInjectionTarget,                 // R8.3: A10/A10B özkaynak enjeksiyon hedefi
+  getReceivableCollectionTarget,            // R8.4: A05 yarım-boşluk DSO hedefi
+  getCurrentRatioTarget,                    // R8.5: A15B cari oran half-gap hedefi
+} from './ratioHelpers'
+
+import {
+  buildTaxProvisionTransaction,
+  buildNetProfitTransferTransaction,
+} from './taxHelper'
 
 // ─── Helper Types ─────────────────────────────────────────────────────────────
 
@@ -120,7 +160,7 @@ function getNetCashBalance(analysis: unknown): number {
 // ── A01 ──────────────────────────────────────────────────────────────────────
 const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
   id: 'A01_ST_FIN_DEBT_TO_LT',
-  name: 'KV Finansal Borç → UV Yeniden Yapılandırma',
+  name: 'Finansal Borç Vade Uzatma',  // R8.7: 'KV Finansal Borç → UV Yeniden Yapılandırma' → sade
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_RECLASSIFICATION',
   horizons: ['medium', 'long'],
@@ -181,6 +221,13 @@ const A01_ST_FIN_DEBT_TO_LT: ActionTemplateV3 = {
     'Acil likidite baskısını hafifletmek amacıyla finansal kuruluşlarla refinansman müzakeresi başlatılabilir. KV faiz yükü kısmen azalabilir; vade profili dengeli bir yapıya kavuşabilir.',
   bankerPerspective:
     'Yalnızca vade profili değişir; toplam borç tutarı azalmaz. Bu aksiyon likidite baskısını geçici olarak hafifletebildiğinden, operasyonel nakit üretimini güçlendiren aksiyonlarla birlikte uygulandığında daha kalıcı etki yaratabilir. Mevcut finansal kuruluşların mutabakatı süreci belirler.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A02 ──────────────────────────────────────────────────────────────────────
@@ -247,12 +294,19 @@ const A02_TRADE_PAYABLE_TO_LT: ActionTemplateV3 = {
     'Tedarikçilerle vade uzatma anlaşması KV baskısını azaltır. Tedarikçi ilişkileri güçlüyse düşük maliyetle uygulanabilir.',
   bankerPerspective:
     'Geçici bir likidite müdahalesidir; kalıcı finansal güçlenme anlamına gelmez. Tedarikçi ilişkilerinin sağlıklı tutulması hem vade uzatmanın sürdürülebilirliğini hem de tedarik sürekliliğini doğrudan etkiler. KV/UV dönüşüm oranı düzenli olarak izlenmelidir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A03 ──────────────────────────────────────────────────────────────────────
 const A03_ADVANCE_TO_LT: ActionTemplateV3 = {
   id: 'A03_ADVANCE_TO_LT',
-  name: 'KV Alınan Avans → UV Sınıflandırma',
+  name: 'Alınan Avans Vade Uzatma',  // R8.7: 'KV Alınan Avans → UV Sınıflandırma' → sade
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_RECLASSIFICATION',
   horizons: ['medium', 'long'],
@@ -314,6 +368,13 @@ const A03_ADVANCE_TO_LT: ActionTemplateV3 = {
     'Proje teslim süreleri 12 ayı aşıyorsa UV sınıflandırma cari oranı iyileştirir ve gerçeği yansıtır.',
   bankerPerspective:
     'Ekonomik içerik sınırlıdır; bilanço içi sınıf değişikliği gerçek bir finansal güçlenme yaratmaz. Teslim takviminin gerçekçi biçimde belirlenmesi, sınıflandırmanın muhasebe doğruluğunu koruması açısından kritiktir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A04 ──────────────────────────────────────────────────────────────────────
@@ -323,6 +384,29 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_REPAYMENT',
   horizons: ['short', 'medium'],
+
+  // R6 — computeAmount: nakit %80 / borç %30, %15 anlamlı etki, 500K min
+  // R6 Hotfix 2: baseline kullan — greedy loop önceki A20 nakitini şişirmiş olabilir
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    // R6 Hotfix 2: baselineAccountBalances kullan (greedy simulation'dan etkilenmez)
+    const baseline   = ctx.baselineAccountBalances ?? ctx.accountBalances ?? {}
+    const mevcutNakit = baseline['102'] ?? 0
+    const kvBorç      = baseline['300'] ?? 0
+
+    if (mevcutNakit <= 0) return null
+    if (kvBorç <= 0)      return null
+
+    const nakitCap  = mevcutNakit * 0.80   // mevcut nakitin en fazla %80'ini kullan
+    const borçHedef = kvBorç * 0.30        // KV borcun %30'unu kapat
+    const oneri     = Math.min(nakitCap, borçHedef)
+
+    if (oneri < 500_000) return null
+    // Atakan Karar 5: %15 anlamlı etki — öneri / kvBorç < %15 → sembolik → elensin
+    if (oneri / kvBorç < 0.15) return null
+
+    return oneri
+  },
 
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 500_000)
@@ -388,6 +472,13 @@ const A04_CASH_PAYDOWN_ST: ActionTemplateV3 = {
     'Fazla nakit varsa KV borcu kapatmak faiz yükünü azaltır, borçluluk oranını düşürür ve net borç pozisyonunu iyileştirir.',
   bankerPerspective:
     'Aktif ve pasif aynı anda azalır; bu yapı yeni bir finansman değil, disiplinli bilanço yönetiminin somut göstergesidir. Faiz yükü düşer, net borç pozisyonu iyileşir. Fazla nakdin borç ödemesinde kullanılması özkaynak/borç dengesini güçlü biçimde iyileştirebilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_ASSETS',
+    benchmarkField: 'debtToAssets',
+    basis:          'totalAssets',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A05 ──────────────────────────────────────────────────────────────────────
@@ -455,38 +546,11 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
   bankerPerspective:
     'Gerçek nakit yaratır. Alacak tahsil süresi (DSO) kısaldıkça işletme sermayesi döngüsü hızlanır ve finansal esneklik artar. Alacak kalitesi — özellikle gecikme profili — bu aksiyonun sürdürülebilirlik boyutunu belirleyen kilit göstergedir.',
 
-  computeAmount: (ctx) => {
-    // 1. Gerekli verileri al
-    const ar = (ctx.accountBalances['120'] ?? 0) + (ctx.accountBalances['121'] ?? 0)
-    const netSales = ctx.netSales
-    if (ar <= 0 || netSales <= 0) return null
-
-    // 2. Period gün sayısı (Durum C: ctx.period alanından)
-    const { days: periodDays } = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
-
-    // 3. Benchmark DSO
-    const bm = getBenchmarkValue(ctx.sector, 'receivablesDays')
-    const targetDays = bm?.value ?? 90  // fallback 90
-
-    // 4. Applicability check
-    // 1.1 tolerans: Benchmark'ın hafif üzerindeki firmalarda
-    // gereksiz aksiyon önerilmesini engellemek için kullanılıyor.
-    // Hard scientific threshold değil — pragmatik tampon.
-    // Örn: DSO 85 olan firma (benchmark 79), 79 × 1.1 = 86.9
-    // altında olduğu için aksiyon önerilmez. 6 günlük iyileştirme
-    // önermek gürültü yaratır.
-    const currentDSO = (ar / netSales) * periodDays
-    if (currentDSO <= targetDays * 1.1) return null
-
-    // 5. Hedef bakiye
-    const targetAR = (netSales * targetDays) / periodDays
-
-    // 6. Feasibility cap (%25)
-    const result = applyFeasibilityCap(ar, targetAR, 0.25)
-
-    // 7. null/0 koruması → fallback'e geç
-    return result > 0 ? result : null
-  },
+  // R8.4: applyFeasibilityCap(%25) yerine yarım-boşluk DSO hedefi
+  // ENES A05 fix: 1.71M (eski cap) → 2.5M+ (half-gap), daha gerçekçi öneri
+  // R8.6 öne çekildi: useRatioBasedAmount eksikti → computeAmount ölü koddu (engine bypass)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx) => getReceivableCollectionTarget(ctx, { halfGap: true }),
 
   targetRatio: {
     metric:          'DSO',
@@ -496,6 +560,7 @@ const A05_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
     reliability:     'TCMB_DIRECT',
     // targetDays omit edildi (opsiyonel, dinamik benchmark'tan gelecek)
   },
+  bankerTrust: 'high',
 }
 
 // ── A06 ──────────────────────────────────────────────────────────────────────
@@ -558,13 +623,50 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   preconditions: {
     requiredAccountCodes: ['150', '151', '152', '153'],
     minSourceAmountTRY: 2_000_000,
-    sectorMustExclude: ['IT', 'SERVICES'],
+    sectorMustExclude: ['IT', 'SERVICES', 'CONSTRUCTION'],  // CONSTRUCTION eklendi
   },
 
   qualityCoefficient: 0.85,
   sustainability: 'SEMI_RECURRING',
 
   repeatDecay: { first: 1.00, second: 0.70, third: 0.45, maxRepeats: 3 },
+
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx: FirmContext): number | null => {
+    // CONSTRUCTION guard (defensive, sectorMustExclude zaten kontrol ediyor)
+    if (ctx.sector === 'CONSTRUCTION') return null
+
+    // 1. Stok bakiyesi (prefix-safe, alt hesaplar dahil)
+    const stockBalance = getInventoryBalance(ctx)
+    if (stockBalance <= 0) return null
+
+    // 2. COGS
+    const cogs = getCogs(ctx)
+    if (cogs == null || cogs <= 0) return null
+
+    // 3. Period days (Türk muhasebe kümülatif: Q1=90, Q4=ANNUAL=365)
+    const periodDays = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' }).days
+
+    // 4. Mevcut DIO
+    const currentDIO = computeDIO(stockBalance, cogs, periodDays)
+    if (currentDIO == null) return null
+
+    // 5. Sektör hedef DIO
+    const sectorBench = getBenchmarkValue(ctx.sector, 'inventoryDays')
+    const sectorDIO = sectorBench?.value ?? 90
+
+    // 6. Zaten sektör hedefine yakınsa öneri yok
+    if (currentDIO <= sectorDIO * 1.10) return null
+
+    // 7. Hedef stok
+    const targetStock = (cogs * sectorDIO) / periodDays
+
+    // 8. Feasibility cap %25 (büyük tek seferlik azalış riskli)
+    const cappedDelta = applyFeasibilityCap(stockBalance, targetStock, 0.25)
+
+    return cappedDelta > 0 ? cappedDelta : null
+  },
 
   suggestedAmount: {
     basis: 'source_account',
@@ -575,7 +677,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
   },
 
   sectorCompatibility: {
-    CONSTRUCTION:  'applicable',
+    CONSTRUCTION:  'not_applicable',  // İnşaat stoğu = proje maliyeti, A06 geçerli değil
     MANUFACTURING: 'primary',
     TRADE:         'primary',
     RETAIL:        'primary',
@@ -596,6 +698,33 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     'Şişkin stok pozisyonu (özellikle imalat/ticaret) hem dönen varlık kalitesini hem nakit akışını bozar. Stok devir hızı aktif verimliliğinin temel göstergesidir.',
   bankerPerspective:
     'Fazla stoku nakde çevirmek hem işletme sermayesini serbest bırakır hem de stok devir süresi (DIO) üzerinde ölçülebilir iyileşme sağlayabilir. Stok değerleme yöntemi (FIFO/WAC) ve stok kalitesi (fire, eskime riski) aksiyonun gerçek etkisini doğrudan belirler.',
+  bankerTrust: 'high',
+}
+
+// ── A08 — Yerel ipotek flag helper (computeAmount ↔ buildTransactions senkron) ──
+/**
+ * A08 için ipotek flag hesabı.
+ * computeAmount ve buildTransactions'ın AYNI MDV bazı ve UV borç formülünü
+ * kullanmasını garanti eder.
+ *
+ * MDV bazı: getNetFixedAssets ile birebir aynı
+ *   Pozitif: 250+251+252+253+254+255+256+258+259
+ *   Negatif: 257
+ *
+ * İpotek koşulu: UV Mali Borç / Net MDV > 0.40
+ */
+function _a08IpotekFlag(balances: Record<string, number>): boolean {
+  const mdvNet = sumByCodesPrefixNet(
+    balances,
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257']
+  )
+  const uvDebt = sumByCodesPrefixNet(
+    balances,
+    ['400', '401', '405', '407', '409'],
+    ['402', '408']
+  )
+  return mdvNet > 0 && uvDebt / mdvNet > 0.40
 }
 
 // ── A08 ──────────────────────────────────────────────────────────────────────
@@ -607,19 +736,151 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   horizons: ['medium', 'long'],
 
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
+    const amount = context.amount
     if (amount <= 0) return []
+
+    const balances = context.accountBalances ?? {}
+
+    // computeAmount ile AYNI helper → ipotek flag senkron
+    const isIpotekli = _a08IpotekFlag(balances)
+
+    const selected = selectIdleAssetAccount(
+      { sector: context.sector, accountBalances: balances },
+      amount,
+      isIpotekli
+    )
+
+    // selectIdleAssetAccount null dönerse → boş aksiyon
+    if (!selected) return []
+
+    const finalAmount = selected.usableAmount
+    if (finalAmount < 1_000_000) return []
+
     return [
       makeBalancedTransaction(
         'A08_MAIN',
-        'Atıl maddi duran varlık satışı (253 → 102)',
+        `Atıl maddi duran varlık satışı (${selected.code} → 102)`,
         'ASSET_DISPOSAL',
         [
-          { accountCode: '102', accountName: 'Bankalar',                      side: 'DEBIT',  amount, description: 'Varlık satış geliri'                     },
-          { accountCode: '253', accountName: 'Tesis, Makine ve Cihazlar',     side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri)'  },
+          {
+            accountCode: '102',
+            accountName: 'Bankalar',
+            side:        'DEBIT',
+            amount:      finalAmount,
+            description: 'Varlık satış geliri',
+          },
+          {
+            accountCode: selected.code,
+            accountName: selected.name,
+            side:        'CREDIT',
+            amount:      finalAmount,
+            description: `${selected.name} (net defter değeri)`,
+          },
         ]
       ),
     ]
+  },
+
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx: FirmContext): number | null => {
+    const balances = ctx.accountBalances ?? {}
+
+    // ====================================================================
+    // GUARD 1 — Yeniden Değerleme Şişkinliği (Gemini)
+    // (522 Fonu / Net MDV) > 0.30 → MDV fiktif şişkin, satış yanlış sinyal
+    // ====================================================================
+    const mdvNet   = getNetFixedAssets(ctx)
+    const reval522 = getRevaluationReserve(ctx)
+    if (mdvNet > 0 && reval522 / mdvNet > 0.30) return null
+
+    // ====================================================================
+    // GUARD 2 — Yeni Yatırım (Gemini)
+    // (257 Birikmiş Amortisman / Brüt MDV) < 0.15 → varlık çok yeni
+    // ====================================================================
+    const mdvGross  = getGrossFixedAssets(ctx)
+    const accDep257 = getAccumulatedDepreciation(ctx)
+    if (mdvGross > 0 && accDep257 / mdvGross < 0.15) return null
+
+    // ====================================================================
+    // GUARD 3 — İpotek Tespiti (Gemini)
+    // (UV Mali Borç / Net MDV) > 0.40 → 250+252 muhtemelen rehinli
+    // buildTransactions ile AYNI helper → senkron garantisi
+    // ====================================================================
+    const isIpotekli = _a08IpotekFlag(balances)
+
+    // ====================================================================
+    // EŞİK 1 — Likidite Stresi
+    // En az bir kriter sağlanmalı
+    // ====================================================================
+    const currentRatio  = getCurrentRatio(ctx)
+    const nwc           = getNetWorkingCapital(ctx)
+    const cashBalance   = getCashBalance(ctx)
+    const receivables   = getTradeReceivables(ctx)
+
+    let likiditeStres = false
+
+    if (currentRatio !== null && currentRatio < 1.2) likiditeStres = true
+    if (nwc < ctx.totalAssets * 0.10)                likiditeStres = true
+    if (cashBalance <= 0) {
+      likiditeStres = true
+    } else {
+      const kvBorc      = getShortTermFinancialDebt(ctx) + getShortTermTradeDebt(ctx)
+      const denominator = cashBalance + receivables
+      if (denominator > 0 && kvBorc / denominator > 5) likiditeStres = true
+    }
+
+    if (!likiditeStres) return null
+
+    // ====================================================================
+    // EŞİK 2 — Verimsizlik (çift koşul güçlendirildi)
+    // ====================================================================
+    const benchmarkRatio = getFixedAssetRatioBenchmark(ctx.sector)
+    const mdvAktifOrani  = mdvNet / Math.max(ctx.totalAssets, 1)
+    const assetTurnover  = ctx.netSales / Math.max(ctx.totalAssets, 1)
+    const sectorATBench  = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    const sectorAT       = sectorATBench?.value ?? 0.80
+
+    let verimsiz = false
+    if (assetTurnover < sectorAT * 0.85 && mdvAktifOrani > benchmarkRatio * 1.10) verimsiz = true
+    if (mdvAktifOrani > benchmarkRatio * 1.20) verimsiz = true
+
+    if (!verimsiz) return null
+
+    // ====================================================================
+    // EŞİK 3 — Satılabilir Pool Minimum (%5 aktif)
+    // ====================================================================
+    const pool = getIdleAssetPoolBalance(ctx, { isIpotekli })
+    if (pool < ctx.totalAssets * 0.05) return null
+
+    // ====================================================================
+    // CAP HESAPLAMA — min(Cap1, Cap2, Cap3)
+    // ====================================================================
+    const fazlaMDV   = Math.max(mdvNet - ctx.totalAssets * benchmarkRatio, 0)
+    const stPressure = getShortTermFinancialDebt(ctx) + getShortTermTradeDebt(ctx) - cashBalance
+
+    const cap1 = pool * 0.30
+    const cap2 = fazlaMDV * 0.25
+    const cap3 = Math.max(stPressure * 0.50, 0)
+
+    const rawAmount = Math.min(cap1, cap2, cap3)
+    if (rawAmount < 1_000_000) return null
+
+    // ====================================================================
+    // SENKRONİZASYON FIX (Gemini)
+    // computeAmount → selectIdleAssetAccount → usableAmount döner
+    // buildTransactions ayni selected.usableAmount'u kullanır
+    // ====================================================================
+    const selected = selectIdleAssetAccount(
+      { sector: ctx.sector, accountBalances: balances },
+      rawAmount,
+      isIpotekli
+    )
+
+    if (!selected) return null
+
+    // %90 cap uygulanmış final tutarı dön
+    return selected.usableAmount
   },
 
   preconditions: {
@@ -642,10 +903,10 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
   },
 
   sectorCompatibility: {
-    CONSTRUCTION:  'primary',
-    MANUFACTURING: 'primary',
-    TRADE:         'applicable',
-    RETAIL:        'applicable',
+    CONSTRUCTION:  'applicable',   // Proje varlıkları hariç, güvenli alt-küme kullanılır
+    MANUFACTURING: 'applicable',   // primary → applicable (Gemini: imalat makinesi korunmalı)
+    TRADE:         'primary',
+    RETAIL:        'primary',
     SERVICES:      'not_applicable',
     IT:            'not_applicable',
   },
@@ -663,38 +924,104 @@ const A08_FIXED_ASSET_DISPOSAL: ActionTemplateV3 = {
     'Atıl varlıklar hem bakım maliyeti yaratır hem de sermayeyi bağlar. Satış nakit sağlar ve aktif verimliliğini (ROA) artırır.',
   bankerPerspective:
     'Tek seferlik nakit girişi sağlar; yinelenebilir bir kaynak değildir. Satış bedelinin net defter değerinin altında kalması dönem kârını olumsuz etkileyebilir. Atıl aktifin elden çıkarılması aktif verimliliğini (ROA) güçlendirir ve bilanço kompozisyonunu sadeleştirir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'FIXED_ASSET_TURNOVER',
+    benchmarkField: 'fixedAssetTurnover',
+    basis:          'netSales',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A09 ──────────────────────────────────────────────────────────────────────
 const A09_SALE_LEASEBACK: ActionTemplateV3 = {
   id: 'A09_SALE_LEASEBACK',
-  name: 'Sat-Geri Kirala (Sale & Leaseback)',
+  name: 'Sat ve Geri Kirala',  // R8.7: 'Sat-Geri Kirala (Sale & Leaseback)' → İngilizce kaldırıldı
   family: 'DEBT_STRUCTURE',
   semanticType: 'SALE_LEASEBACK',
   horizons: ['medium', 'long'],
 
+  // R6 — computeAmount: arsa(250)+bina(252) havuzu, 3 guard + %40 cap
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    const accountBalances = ctx.accountBalances ?? {}
+
+    const arsa = accountBalances['250'] ?? 0
+    const bina = accountBalances['252'] ?? 0
+    const realEstatePool = arsa + bina
+
+    // GUARD 1: Minimum 5M TL gayrimenkul havuzu
+    if (realEstatePool < 5_000_000) return null
+
+    // GUARD 2: Yeniden değerleme şişkinliği — 522/bina > %30 → fiktif değer
+    const reval522 = accountBalances['522'] ?? 0
+    if (bina > 0 && reval522 / bina > 0.30) return null
+
+    // GUARD 3: Gayrimenkul/aktif oranı — < %10 → sat-leaseback için yetersiz
+    const toplamAktif = ctx.totalAssets ?? 0
+    if (toplamAktif <= 0) return null
+    if (realEstatePool / toplamAktif < 0.10) return null
+
+    // Sonnet Düzeltme 7: Arsa için sat-leaseback tutarsız (geri kira yok)
+    // Sadece bina varsa öneri yap
+    if (bina <= 0) return null
+
+    // R6 HOTFIX (Codex K8): Cap SADECE bina bazlı
+    // Önceki: realEstatePool × 0.40 → arsa büyükse 252 negatife düşüyordu
+    // (250=90M, 252=10M → önceki öneri 40M → 252 bakiyesi -30M HATA)
+    const oneri = bina * 0.40   // CAP %40 — sadece satılan varlık (bina)
+    if (oneri < 1_000_000) return null
+    return oneri
+  },
+
+  // R6 — buildTransactions: dynamic (bina yoksa boş dizi → engine guard devreye girer)
   buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 5_000_000)
+    const { amount } = context
     if (amount <= 0) return []
-    // Simplified model: Varlık satış etkisi. TFRS 16 kullanım hakkı varlığı
-    // ve kira yükümlülüğü bu katalog aşamasında tam modellenmemiştir.
+
+    const balances = context.accountBalances ?? {}
+    const bina = balances['252'] ?? 0
+    // Sonnet Düzeltme 7: Arsa (250) için geri kira tutarsız → sadece bina varsa yevmiye
+    if (bina <= 0) return []
+
     return [
       makeBalancedTransaction(
-        'A09_SALE',
-        'Maddi duran varlık satışı — Simplified (TFRS 16 kira yükümlülüğü ayrıca izlenmeli)',
+        'A09_SALE_LEASEBACK',
+        'Bina sat-geri kirala — Simplified (TFRS 16 kira yükümlülüğü ayrıca izlenmeli)',
         'SALE_LEASEBACK',
         [
-          { accountCode: '102', accountName: 'Bankalar',  side: 'DEBIT',  amount, description: 'Satış bedeli nakit girişi'                    },
-          { accountCode: '252', accountName: 'Binalar',   side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri, simplified)' },
+          { accountCode: '102', accountName: 'Bankalar', side: 'DEBIT',  amount, description: 'Satış bedeli nakit girişi'                              },
+          { accountCode: '252', accountName: 'Binalar',  side: 'CREDIT', amount, description: 'Duran varlık çıkışı (net defter değeri, simplified)' },
         ]
       ),
     ]
   },
 
   preconditions: {
-    requiredAccountCodes: ['252', '253', '254'],
+    // R6: sadece arsa(250) ve bina(252) — 253/254 prefix bug düzeltildi
+    requiredAccountCodes: ['250', '252'],
     minSourceAmountTRY: 5_000_000,
     sectorMustExclude: ['IT', 'SERVICES', 'RETAIL'],
+    // R6 HOTFIX (Codex K9): A08 _a08IpotekFlag pattern'e yaklaştır
+    // Önceki: sadece 400+401; şimdi 400+401+405+407+409 (tüm UV finansal borç)
+    // + 257 amortisman netleme (net MDV için)
+    customCheck: (analysis) => {
+      // UV finansal borç (A08 pattern: 400/401/405/407/409)
+      const uvBorç = sumAccountsByPrefix(analysis, ['400', '401', '405', '407', '409'])
+      // Gross gayrimenkul
+      const bina        = sumAccountsByPrefix(analysis, ['252'])
+      const arsa        = sumAccountsByPrefix(analysis, ['250'])
+      // 257 birikmiş amortisman netleme (A08 pattern)
+      const amortisman  = sumAccountsByPrefix(analysis, ['257'])
+      const netMDV      = (bina + arsa) - amortisman
+      if (netMDV > 0 && uvBorç / netMDV > 0.40) {
+        return {
+          pass:   false,
+          reason: 'Gayrimenkul üzerinde yüksek ipotek riski tespit edildi (UV borç oranı). Sat-geri kirala için danışman incelemesi gerekir.',
+        }
+      }
+      return { pass: true }
+    },
   },
 
   qualityCoefficient: 0.50,
@@ -732,6 +1059,13 @@ const A09_SALE_LEASEBACK: ActionTemplateV3 = {
     'Kısa vadeli nakit ihtiyacını karşılar ve bilanço varlık ağırlığını azaltır. Ancak uzun vadeli kira yükümlülüğü borç yükü yaratır.',
   bankerPerspective:
     'Anlık nakit ihtiyacını karşılar; ancak bu yapı özünde gelecek nakit akışlarının peşin değere dönüştürülmesidir. Doğan kira yükümlülüğü bilanço kaldıracını yeniden artırabileceğinden, uzun vadeli maliyet-fayda dengesi dikkatle analiz edilmelidir.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'FIXED_ASSET_TURNOVER',
+    benchmarkField: 'fixedAssetTurnover',
+    basis:          'netSales',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A10 ──────────────────────────────────────────────────────────────────────
@@ -761,6 +1095,12 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
   preconditions: {
     minSourceAmountTRY: 2_000_000,
   },
+
+  // R8.3: Rasyo bazlı tutar — half-gap özkaynak/aktif hedefi (R5 tamamlama)
+  // Formül: x = (targetRatio × A − E) / (1 − targetRatio)
+  // Guard: currentRatio ≥ sectorMedian → null (zaten iyi durumda)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx) => getEquityInjectionTarget(ctx, { halfGap: true }),
 
   qualityCoefficient: 1.00,
   sustainability: 'RECURRING',
@@ -797,6 +1137,13 @@ const A10_CASH_EQUITY_INJECTION: ActionTemplateV3 = {
     'Nakit sermaye artırımı likidite, özkaynak oranı ve borçluluk rasyolarını eş zamanlı iyileştirebilecek önemli aksiyonlardan biridir. Kalite katsayısı 1.00 olmakla birlikte tutarın toplam aktife oranı belirleyicidir.',
   bankerPerspective:
     'Ortakların şirkete doğrudan nakit koyması taahhüt ve güven açısından güçlü bir sinyal taşır. Tutarın toplam aktife oranı kritik bir değişkendir: görece küçük bir sermaye enjeksiyonu tek başına çok kategorili bir iyileşmeyi desteklemeyebilir; operasyonel aksiyonlarla birlikte uygulandığında çarpan etkisi ortaya çıkabilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A10B ─────────────────────────────────────────────────────────────────────
@@ -824,6 +1171,11 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
   },
 
   preconditions: { minSourceAmountTRY: 2_000_000 },
+
+  // R8.3: A10 ile aynı helper — formül aynı, yevmiye farklı (121 vs 102)
+  // qualityCoefficient 0.55 korunur (senetli = nakit kadar güçlü değil)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx) => getEquityInjectionTarget(ctx, { halfGap: true }),
 
   qualityCoefficient: 0.55,
   sustainability: 'SEMI_RECURRING',
@@ -860,40 +1212,36 @@ const A10B_PROMISSORY_NOTE_EQUITY_INJECTION: ActionTemplateV3 = {
     'Nakit gerektirmeden özkaynak güçlendirilir. Alacak senedi vade sonunda nakde dönüşebilir. Likidite ve sermaye yapısı eş zamanlı iyileşir.',
   bankerPerspective:
     'Senet kalitesi ve ortak finansal gücü değerlendirilir. Nakit sermaye artırımına göre daha düşük kaliteli ama yine de sermaye artışı sayılır.',
+  bankerTrust: 'low',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A11 ──────────────────────────────────────────────────────────────────────
 const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
   id: 'A11_RETAIN_EARNINGS',
-  name: 'Dönem Kârını Dağıtmayıp Özkaynakta Tutma',
+  name: 'Kârı Özkaynakta Tut',  // R8.7: 'Dönem Kârını Dağıtmayıp Özkaynakta Tutma' → sade
   family: 'EQUITY_PNL',
   semanticType: 'RETAINED_EARNINGS',
   horizons: ['medium', 'long'],
 
-  buildTransactions: (context) => {
-    const amount = clampAmount(context.amount, 1_000_000)
-    if (amount <= 0) return []
-    return [
-      makeBalancedTransaction(
-        'A11_MAIN',
-        'Dönem net kârı dağıtılmayıp geçmiş yıllar kârına aktarılıyor (590 → 570)',
-        'RETAINED_EARNINGS',
-        [
-          { accountCode: '590', accountName: 'Dönem Net Kârı',          side: 'DEBIT',  amount, description: 'Dönem kârı transferi'     },
-          { accountCode: '570', accountName: 'Geçmiş Yıllar Kârları',   side: 'CREDIT', amount, description: 'Birikmiş kâr artışı'       },
-        ]
-      ),
-    ]
-  },
+  // R7B — A11 disable (A13 patern)
+  // 590 → 570 özkaynak içi transfer: toplam özkaynak değişmez, rating etkisi sıfır.
+  // Atakan canlı tespiti: A11 önerildiğinde özkaynak toplamı artmıyor.
+  buildTransactions: () => [],
 
   preconditions: {
-    requiredAccountCodes: ['590'],
     minSourceAmountTRY: 1_000_000,
-    customCheck: (analysis) => {
-      const netProfit = sumAccountsByPrefix(analysis, ['590'])
-      if (netProfit <= 0) return { pass: false, reason: 'Dönem net kârı pozitif değil — kâr tutma uygulanamaz' }
-      return { pass: true }
-    },
+    // R7B — A11 devre dışı (A13 patern)
+    // DB backward compat için id korunur (roadmapSnapshot referansları bozulmasın).
+    customCheck: () => ({
+      pass: false,
+      reason: 'Dönem kârı özkaynakta zaten yer almaktadır; 590 → 570 transferi özkaynak toplamını değiştirmez ve rating üzerinde ek etki yaratmaz.',
+    }),
   },
 
   qualityCoefficient: 0.65,
@@ -931,6 +1279,7 @@ const A11_RETAIN_EARNINGS: ActionTemplateV3 = {
     'Kâr dağıtımı yapmamak özkaynağı büyütür ve özkaynak oranını organik olarak iyileştirir. Ortakların kısa vadeli getiri beklentisini ertelemesi gerekir.',
   bankerPerspective:
     'Kâr tutma disiplini özkaynak yapısını organik olarak güçlendirir. Kâr kalitesi bu aksiyonun etkinliğini doğrudan belirler: yinelenen operasyonel faaliyetlerden gelen kâr, olağandışı gelirlerden gelen kâra kıyasla çok daha sağlam bir özkaynak tabanı oluşturur.',
+  bankerTrust: 'medium',
 }
 
 // ── A12 ──────────────────────────────────────────────────────────────────────
@@ -953,33 +1302,22 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
   },
 
   computeAmount: (ctx) => {
-    const netSales    = ctx.netSales    ?? 0
-    const grossProfit = ctx.grossProfit ?? 0
-    if (netSales <= 0 || grossProfit < 0) return null
+    // R4 — Brüt zarar guard kaldırıldı; ortak helper kullanılıyor
+    const baseReduction = getGrossMarginReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = grossProfit / netSales
+    const accountBalances = ctx.accountBalances ?? {}
+    const supplier320     = accountBalances['320'] ?? 0
+    const cogs621         = accountBalances['621'] ?? 0
 
-    // TCMB sektör hedef brüt marjı
-    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
-    const targetMargin = bm?.value ?? 0.30
+    // R4 KONSERVATİF cap'ler (eski %50'den daha sıkı — mali müşavir kararı)
+    // Tedarikçi kanal: max %30, COGS kanal: max %20
+    const maxFromSupplier = supplier320 * 0.30
+    const maxFromCogs     = cogs621     * 0.20
 
-    // Mevcut marj zaten hedefte (5% tolerans) → aksiyon gereksiz
-    if (currentMargin >= targetMargin * 1.05) return null
+    if (maxFromSupplier <= 0) return null  // tedarikçi kanal şart (A12 320 kanalı)
 
-    // Hedef marjа ulaşmak için gereken maliyet azaltımı
-    const requiredImprovement = (targetMargin - currentMargin) * netSales
-
-    // Bilanço sınırları
-    const balances        = ctx.accountBalances ?? {}
-    const supplierBalance = balances['320'] ?? 0
-    const cogsBalance     = balances['621'] ?? 0
-
-    // Yıllık tedarikçi pazarlık üst sınırı (%50 — B3a-CAP hotfix)
-    const cap             = 0.50
-    const maxFromSupplier = supplierBalance * cap
-    const maxFromCogs     = cogsBalance     * cap
-
-    const result = Math.min(requiredImprovement, maxFromSupplier, maxFromCogs)
+    const result = Math.min(baseReduction, maxFromSupplier, maxFromCogs)
     return result > 0 ? result : null
   },
 
@@ -994,7 +1332,10 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     const amount = Math.min(requestedAmount, supplierBalance, cogsBalance)
     if (amount <= 0) return []
 
-    return [
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: tedarikçi iskonto (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
         'A12_SUPPLIER_DISCOUNT',
         'Tedarikçi iskonto/indirim — 320 borcu düşer, 621 maliyet azalır',
@@ -1003,17 +1344,19 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
           { accountCode: '320', accountName: 'Satıcılar',               side: 'DEBIT',  amount, description: 'Ticari borç azalışı' },
           { accountCode: '621', accountName: 'Satılan Mal Maliyeti',    side: 'CREDIT', amount, description: 'Maliyet azalışı'     },
         ]
-      ),
-      makeBalancedTransaction(
-        'A12_PROFIT_TRANSFER',
-        'Tasarruf dönem kârına yansır — 690 kapanır, 590 artar',
-        'OPERATIONAL_MARGIN',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
-        ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A12', 'OPERATIONAL_MARGIN')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A12', 'OPERATIONAL_MARGIN')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -1065,6 +1408,7 @@ const A12_GROSS_MARGIN_IMPROVEMENT: ActionTemplateV3 = {
     'Brüt kâr marjındaki iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. ' +
     'FAVÖK marjı yükselişi ile birlikte rating değerlendirmesinde olumlu yansır. ' +
     'Tek seferlik avantajlardan ayrı, yapısal iyileşme aranır.',
+  bankerTrust: 'high',
 }
 
 // ── A13 ──────────────────────────────────────────────────────────────────────
@@ -1080,11 +1424,12 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
 
   preconditions: {
     minSourceAmountTRY: 300_000,
-    customCheck: (analysis) => {
-      const opex = sumAccountsByPrefix(analysis, ['630', '631', '632', '633', '660'])
-      if (opex <= 0) return { pass: false, reason: 'Faaliyet gideri (630-633) bulunamadı' }
-      return { pass: true }
-    },
+    // R6 — A13 devre dışı: işlevselliği A21_OPERATING_PROFIT_REFORM'a taşındı.
+    // DB backward compat için id korundu (roadmapSnapshot JSON referansları bozulmasın).
+    customCheck: () => ({
+      pass: false,
+      reason: 'Bu aksiyon güncellenmiş yöntemle (Faaliyet Karı Reformu) değerlendirilmektedir.',
+    }),
   },
 
   qualityCoefficient: 0.70,
@@ -1122,6 +1467,13 @@ const A13_OPEX_OPTIMIZATION: ActionTemplateV3 = {
     'İşletme giderlerinde verimlilik artırımı (personel, kira, idari giderler). Yapısal tasarruf programları FAVÖK marjını kalıcı olarak iyileştirebilir.',
   bankerPerspective:
     'Yapısal tasarruf programları FAVÖK marjını kalıcı biçimde güçlendirebilir. Geçici kısıntı veya yatırım ertelemesinden kaynaklanan tasarrufu organik verimlilik artışından ayırt etmek kritiktir; yatırım dondurmak kısa vadeli kâr yaratırken uzun vadeli büyüme kapasitesini zayıflatabilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'OPEX_RATIO',
+    benchmarkField: 'operatingExpenseRatio',
+    basis:          'netSales',
+    reliability:    'FINRATE_ESTIMATE',
+  },
 }
 
 // ── A14 ──────────────────────────────────────────────────────────────────────
@@ -1132,11 +1484,90 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
   semanticType: 'FINANCE_COST_REDUCTION',
   horizons: ['medium', 'long'],
 
-  // Faz 7.3.6A1: Projeksiyon aksiyonu — buildTransactions boş array döner.
-  buildTransactions: () => [],
+  // R5 — computeAmount EKLENDİ (önceden yoktu)
+  computeAmount: (ctx) => {
+    // Atakan Karar 1: A14 güncellendi (id korundu, computeAmount eklendi)
+    // Finansman gideri rasyo bazlı (financialExpenseRatio hedef)
+    const result = getFinancialExpenseReductionTarget(ctx)
+    if (result === null) return null
+
+    // Cap: finExp × %30
+    const finResult = getFinancialExpenses(ctx)
+    if (finResult.amount === null || finResult.amount <= 0) return null
+
+    const cap = finResult.amount * 0.30
+    return Math.min(result.amount, cap)
+  },
+
+  useRatioBasedAmount: true,
+
+  // R5 — buildTransactions fiş üretiyor (eskiden boş array döndürüyordu)
+  // R7A Mini (Sonnet BLOCKER 1): isEstimated:true → 660 kullan (780 değil)
+  // 780 hesabı olmayan KOBİ'lerde 780'i negatife düşürmemek için.
+  buildTransactions: (context) => {
+    const amount = context.amount ?? 0
+    if (amount <= 0) return []
+
+    // 780/781 yoksa tutar borç × %25 tahmininden geliyor → isEstimated:true
+    const fin780 = (context.accountBalances?.['780'] ?? 0)
+    const fin781 = (context.accountBalances?.['781'] ?? 0)
+    const isEstimated = (fin780 + fin781) === 0
+
+    // R7A Mini: KOBİ (isEstimated:true) → 660 Kısa Vadeli Borçlanma Maliyeti
+    // Gerçek 780 varsa → 780 Finansman Giderleri (mevcut davranış)
+    const creditAccountCode = isEstimated ? '660' : '780'
+    const creditAccountName = isEstimated
+      ? 'Kısa Vadeli Borçlanma Maliyeti (Tahmini)'
+      : 'Finansman Giderleri'
+
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: nakit artar, finansman gideri azalır (KORUNDU)
+    transactions.push(
+      makeBalancedTransaction(
+        'A14_FINEXP_REDUCTION',
+        isEstimated
+          ? 'Finansman Gideri Azaltma — Tahmini faiz oranına (%25) dayalı hesaplama'
+          : 'Finansman Gideri Azaltma — Kredi Yeniden Yapılandırma',
+        'FINANCE_COST_REDUCTION',
+        [
+          {
+            accountCode: '102',
+            accountName: 'Bankalar',
+            side: 'DEBIT',
+            amount,
+            description: isEstimated
+              ? 'Tahmini finansman gideri azalışı (borç × %25) — Simülasyon'
+              : 'Finansman gideri azalışı nakit etkisi',
+          },
+          {
+            accountCode: creditAccountCode,
+            accountName: creditAccountName,
+            side: 'CREDIT',
+            amount,
+            description: isEstimated
+              ? 'Tahmini finansman gideri üzerinden simülasyon (780 mevcut değil)'
+              : 'Finansman gideri azalışı',
+          },
+        ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A14', 'FINANCE_COST_REDUCTION')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A14', 'FINANCE_COST_REDUCTION')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
+  },
 
   preconditions: {
-    requiredAccountCodes: ['660', '661', '780'],
+    // R5 — requiredAccountCodes ['660','661','780'] KALDIRILDI
+    // Eligibility: 780 OR borç > 0 → computeAmount içinde kontrol edilir
     minSourceAmountTRY: 200_000,
   },
 
@@ -1175,12 +1606,19 @@ const A14_FINANCE_COST_REDUCTION: ActionTemplateV3 = {
     'Faiz maliyetinin azaltılması net kâr üzerinde olumlu etki yaratabilir. Refinansman veya borç azaltma yoluyla hayata geçirilebilir.',
   bankerPerspective:
     'Faiz karşılama oranı finansal sağlığın temel göstergelerinden biridir. Finansman giderinin düşürülmesi hem kârlılığı hem kaldıraç rasyolarını eş zamanlı güçlendirebilir. Refinansman olanakları ve mevcut piyasa faiz ortamı aksiyonun uygulanabilirliğini belirler.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'INTEREST_COVERAGE',
+    benchmarkField: 'interestCoverage',
+    basis:          'interestExpense',
+    reliability:    'TCMB_DIRECT',
+  },
 }
 
 // ── A15 ──────────────────────────────────────────────────────────────────────
 const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   id: 'A15_DEBT_TO_EQUITY_SWAP',
-  name: 'Ortak Borcu Sermayeye Çevirme',
+  name: 'Ortaklara Borçlar Kalemini Sermayeye Çevirme',
   family: 'EQUITY_PNL',
   semanticType: 'DEBT_TO_EQUITY_SWAP',
   horizons: ['medium', 'long'],
@@ -1241,12 +1679,33 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
     'Ortak borçları yüksek şirketlerde en hızlı ve düşük maliyetli özkaynak artış yöntemi. Nakit gerektirmez, yalnızca ortakların kararı yeterlidir.',
   bankerPerspective:
     'Nakit hareketi içermez; bilanço içi sınıf değişimidir. Borç/özkaynak oranını iyileştirmesi somut bir finansal katkıdır. Nakit sermaye artırımına kıyasla daha sınırlı kalitede görülmekle birlikte, portföy içinde tamamlayıcı bir rol üstlenebilir.',
+  bankerTrust: 'high',
+  targetRatio: {
+    metric:         'DEBT_TO_EQUITY',
+    benchmarkField: 'debtToEquity',
+    basis:          'equity',
+    reliability:    'TCMB_DIRECT',
+  },
+
+  // R8.5 — Rasyo bazlı tutar (getEquityInjectionTarget paylaşımı — A10/A10B ile aynı helper)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    // Özkaynak/aktif half-gap hedefi (A10 ile aynı formül, 331 kaynağı cap'ler)
+    const target = getEquityInjectionTarget(ctx, { halfGap: true })
+    if (!target) return null
+
+    // 331 bakiye cap — kaynak yetersizse önerilen tutarı kırp
+    const sourceBalance = ctx.accountBalances?.['331'] ?? 0
+    if (sourceBalance <= 0) return null
+
+    return Math.min(target, sourceBalance)
+  },
 }
 
 // ── A15B ─────────────────────────────────────────────────────────────────────
 const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
   id: 'A15B_SHAREHOLDER_DEBT_TO_LT',
-  name: 'Ortak Borcunu Uzun Vadeye Aktarma',
+  name: 'Ortaklara Borçlar Kalemini Uzun Vadeye Aktarma',
   family: 'DEBT_STRUCTURE',
   semanticType: 'DEBT_EXTENSION',
   horizons: ['medium', 'long'],
@@ -1307,6 +1766,27 @@ const A15B_SHAREHOLDER_DEBT_TO_LT: ActionTemplateV3 = {
     'Sermaye dönüşümü yapmadan vade yapısı düzeltilir. Kısa vadeli yükümlülük azaldığı için işletme sermayesi rahatlar. Özkaynak değişmez.',
   bankerPerspective:
     'Vade uzatımı kabul edilebilir ancak nakit yaratan bir hareket değildir. Cari oran ve likidite değerlendirmesinde olumlu yansır.',
+  bankerTrust: 'medium',
+  targetRatio: {
+    metric:         'SHORT_TERM_DEBT_RATIO',
+    benchmarkField: 'shortTermDebtRatio',
+    basis:          'totalDebt',
+    reliability:    'FINRATE_ESTIMATE',
+  },
+
+  // R8.5 — Rasyo bazlı tutar (getCurrentRatioTarget — cari oran half-gap)
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    // Cari oran half-gap hedefi — 331 KV→UV taşıma ile gerekli reduction tutarı
+    const target = getCurrentRatioTarget(ctx)
+    if (!target) return null
+
+    // 331 bakiye cap — kaynak yetersizse önerilen tutarı kırp
+    const sourceBalance = ctx.accountBalances?.['331'] ?? 0
+    if (sourceBalance <= 0) return null
+
+    return Math.min(target, sourceBalance)
+  },
 }
 
 // ── A18 ──────────────────────────────────────────────────────────────────────
@@ -1323,6 +1803,40 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
     basis:          'totalAssets',
     fallback:       1.0,
     reliability:    'TCMB_DIRECT',
+  },
+
+  // R7B — Rasyo bazlı (R5 kararı uygulanma)
+  // Hedef: sektör asset turnover benchmark'ına doğru satış büyümesi
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    const baselineAssets = ctx.totalAssets ?? 0
+    if (baselineAssets <= 0) return null
+
+    const baselineRevenue = ctx.baselineNetSales ?? ctx.netSales ?? 0
+    if (baselineRevenue <= 0) return null
+
+    // Brüt zarar guard: negatif marjda satış artışı zarar büyütür
+    const baselineGrossProfit = ctx.baselineGrossProfit ?? ctx.grossProfit ?? 0
+    if (baselineGrossProfit <= 0) return null
+
+    // Sektör asset turnover benchmark
+    const sectorTurnover = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    if (!sectorTurnover) return null
+
+    const currentTurnover = baselineRevenue / baselineAssets
+    if (currentTurnover >= sectorTurnover.value) return null  // Hedef üstünde
+
+    // Hedef satış = sektör benchmark × mevcut aktifler
+    const targetRevenue = sectorTurnover.value * baselineAssets
+    const revenueGap    = targetRevenue - baselineRevenue
+
+    // Gerçekçi cap: mevcut satışın %50'si kadar artış
+    const realisticCap = baselineRevenue * 0.50
+    const amount = Math.min(revenueGap, realisticCap)
+
+    if (amount < 1_000_000) return null
+    return amount
   },
 
   buildTransactions: (context) => {
@@ -1353,19 +1867,58 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: 2 leg + Tx2 (hizmet/bilişim modeli veya stoksuz satış)
-    // Stoksuzda maliyet yok → profitAmount = amount (tam ciro kâr)
+    // Stok yoksa — sektöre göre ayrı yol
     if (totalStock <= 0) {
       const amount = clampAmount(context.amount, 1_000_000)
       if (amount <= 0) return []
+
+      if (isServiceLike(context.sector)) {
+        // Hizmet/bilişim: maliyet yok → tam ciro kâr (mevcut davranış)
+        return [
+          makeBalancedTransaction(
+            'A18_REVENUE_ONLY',
+            `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+            'OPERATIONAL_REVENUE',
+            [
+              { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+              { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+            ]
+          ),
+          makeBalancedTransaction(
+            'A18_PROFIT_TRANSFER',
+            'Dönem kâr aktarımı',
+            'OPERATIONAL_REVENUE',
+            [
+              { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
+              { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
+            ]
+          ),
+        ]
+      }
+
+      // R7B — İmalat/ticaret/inşaat: stok yoksa sektör marj fallback ile COGS tanı
+      // (Stoksuz imalat/ticaret: mizan eksik — tam ciro = tam kâr saçma)
+      const baselineSales = context.baselineNetSales ?? netSales
+      const baselineGP    = context.baselineGrossProfit ?? grossProfit
+      const sectorMarginFallback =
+        context.sector === 'TRADE' ? 0.25
+        : context.sector === 'CONSTRUCTION' ? 0.15
+        : 0.20  // MANUFACTURING default
+      const currentMargin = baselineSales > 0
+        ? Math.max(baselineGP / baselineSales, 0.05)
+        : sectorMarginFallback
+      const costAmount   = Math.round(amount * (1 - currentMargin))
+      const profitAmount = amount - costAmount
       return [
         makeBalancedTransaction(
-          'A18_REVENUE_ONLY',
-          `Net satış artışı — ${useCash ? 'nakit' : 'alacak'} bazlı model (${debitCode} + 600)`,
+          'A18_REVENUE_AND_COST_FALLBACK',
+          `Net satış artışı + sektör marj fallback (${debitCode} + 600 / 621 + 770)`,
           'OPERATIONAL_REVENUE',
           [
-            { accountCode: debitCode, accountName: debitName,          side: 'DEBIT',  amount, description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
-            { accountCode: '600',     accountName: 'Yurtiçi Satışlar', side: 'CREDIT', amount, description: 'Net satış artışı'                                       },
+            { accountCode: debitCode, accountName: debitName,                  side: 'DEBIT',  amount,      description: `Satıştan ${useCash ? 'nakit girişi' : 'alacak artışı'}` },
+            { accountCode: '600',     accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,      description: 'Net satış artışı'                                       },
+            { accountCode: '621',     accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount,   description: 'Maliyet artışı (sektör marj fallback)'         },
+            { accountCode: '770',     accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount,   description: 'Maliyet karşılığı (simülasyon)'                },
           ]
         ),
         makeBalancedTransaction(
@@ -1373,8 +1926,8 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
           'Dönem kâr aktarımı',
           'OPERATIONAL_REVENUE',
           [
-            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
+            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
+            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
           ]
         ),
       ]
@@ -1440,7 +1993,7 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
         return { pass: false, reason: 'Brüt zarar — düşük marjda satış artışı zarar büyütür' }
       }
 
-      const bm = getBenchmarkValue(sector, 'grossMargin')
+      const bm = sector ? getBenchmarkValue(sector, 'grossMargin') : null
       const targetMargin = bm?.value
 
       if (!targetMargin) {
@@ -1507,12 +2060,14 @@ const A18_NET_SALES_GROWTH: ActionTemplateV3 = {
     'Güçlü büyüme kaynaklarından biridir. Hacim artışı ve fiyat gücünün birlikte uygulandığı senaryolarda tüm finansal rasyolar organik olarak iyileşebilir. Aktif devir hızı düşük şirketlerde satış büyümesi portföyün öncelikli aksiyonu olabilir.',
   bankerPerspective:
     'Satış büyümesi yinelenen gelir tabanını güçlendirebilir; aktif verimliliği (aktif devir hızı) ve kaldıraç rasyoları organik biçimde iyileşebilir. Büyümenin sürdürülebilirliği ve finansman yapısı — özkaynak mı, işletme nakit akışı mı — aksiyonun uzun vadeli kalitesini belirler.',
+  bankerTrust: 'high',
+  requiresOperationalProof: true,
 }
 
 // ── A19 ──────────────────────────────────────────────────────────────────────
 const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   id: 'A19_ADVANCE_TO_REVENUE',
-  name: 'Alınan Avansın Hasılata Tanınması (Proje Teslimi)',
+  name: 'Alınan Avansların Teslimi',  // R8.7: 'Alınan Avansın Hasılata Tanınması (Proje Teslimi)' → sade
   family: 'EQUITY_PNL',
   semanticType: 'ADVANCE_TO_REVENUE',
   horizons: ['short', 'medium', 'long'],
@@ -1525,13 +2080,51 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     reliability:    'TCMB_DIRECT',
   },
 
+  // R7B — Rasyo bazlı (R5 kararı uygulanma)
+  // Avans tutarı: 340 × %10-60 pct yerine avans bazlı + asset turnover hedefi
+  useRatioBasedAmount: true,
+
+  computeAmount: (ctx) => {
+    // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda da avans hasılata dönüşebilir
+
+    // Avans bakiyesi
+    const advance = ctx.accountBalances?.['340'] ?? 0
+    if (advance <= 0) return null
+
+    // Asset turnover hedefi
+    const sectorTurnover = getBenchmarkValue(ctx.sector, 'assetTurnover')
+    if (!sectorTurnover) return null
+
+    const baselineAssets  = ctx.totalAssets ?? 0
+    if (baselineAssets <= 0) return null
+
+    const baselineRevenue = ctx.baselineNetSales ?? ctx.netSales ?? 0
+
+    // Avans dönüşüm cap: 340 × %30 (tek dönem gerçekçi sınır)
+    const advanceConversionCap = advance * 0.30
+
+    // Asset turnover gap
+    const targetRevenue = sectorTurnover.value * baselineAssets
+    const revenueGap    = Math.max(targetRevenue - baselineRevenue, 0)
+
+    // Her iki cap'in min'i — avans yoksa büyük bir tutar üretmez
+    const gapCap = revenueGap > 0 ? revenueGap : advanceConversionCap
+    const amount = Math.min(advanceConversionCap, gapCap, advance)
+
+    if (amount < 1_000_000) return null
+    return amount
+  },
+
   buildTransactions: (context) => {
+    // R10.2: baselineGrossProfit guard kaldırıldı — brüt zararda da avans hasılata dönüşebilir.
+    // profitAmount = grossMargin <= 0 ? 0 : hesaplanan kâr (kâr aktarımı brüt zararda sıfır)
+
     const netSales    = context.netSales    ?? 0
     const grossProfit = context.grossProfit ?? 0
-    if (netSales <= 0 || grossProfit <= 0) return []
+    if (netSales <= 0) return []
 
     const grossMargin = grossProfit / netSales
-    if (grossMargin <= 0 || grossMargin >= 1) return []
+    if (grossMargin >= 1) return []
 
     const balances       = context.accountBalances ?? {}
     const advanceBalance = balances['340'] ?? 0
@@ -1551,15 +2144,46 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
       0
     )
 
-    // Stok yoksa: 2 leg + Tx2 (340 / 600 + 690 / 590)
-    // Stoksuzda maliyet yok → profitAmount = amount (tam avans tutarı kâr)
+    // Stok yoksa: sektöre göre ayrı yol
     if (totalStock <= 0) {
       const amount = clampAmount(
         Math.min(context.amount, advanceBalance),
         1_000_000
       )
       if (amount <= 0) return []
-      return [
+
+      if (!isServiceLike(context.sector)) {
+        // R7B mini — İmalat/ticaret/inşaat stoksuz: sektör marj fallback COGS (CODEX audit)
+        // Avansın yarattığı hasılata gerçekçi maliyet eklenir; tam hasılat = tam kâr saçma
+        const costAccountCode = context.sector === 'CONSTRUCTION' ? '622' : '621'
+        const costAccountName = context.sector === 'CONSTRUCTION'
+          ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
+          : 'Satılan Mal Maliyeti'
+        const costAmount   = Math.round(amount * (1 - grossMargin))
+        const profitAmount = grossMargin <= 0 ? 0 : (amount - costAmount)
+        const txs: AccountingTransaction[] = [
+          makeBalancedTransaction(
+            'A19_DELIVERY_REVENUE_AND_COST_FALLBACK',
+            `Alınan avans teslimatla hasılata dönüşür + sektör marj COGS (${costAccountCode}+770)`,
+            'ADVANCE_TO_REVENUE',
+            [
+              { accountCode: '340',          accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount,           description: 'Avans çözülmesi' },
+              { accountCode: '600',          accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,           description: 'Hasılat artışı'  },
+              { accountCode: costAccountCode, accountName: costAccountName,            side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı (sektör marj fallback)' },
+              { accountCode: '770',          accountName: 'Genel Yönetim Giderleri', side: 'CREDIT', amount: costAmount, description: 'Maliyet karşılığı (simülasyon)'        },
+            ]
+          ),
+        ]
+        // R17.1: %25 kurumlar vergisi — profitAmount üzerinden (R10.2 guard: profitAmount<=0 → null)
+        const taxTxFb = buildTaxProvisionTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+        if (taxTxFb) txs.push(taxTxFb)
+        const netTxFb = buildNetProfitTransferTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+        if (netTxFb) txs.push(netTxFb)
+        return txs
+      }
+
+      // Hizmet/bilişim: tam hasılat = tam kâr (avans çözülmesi — maliyet yok)
+      const txsSvc: AccountingTransaction[] = [
         makeBalancedTransaction(
           'A19_DELIVERY_REVENUE_ONLY',
           'Alınan avans hizmet/proje teslimatı ile hasılata dönüşür',
@@ -1569,16 +2193,13 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
             { accountCode: '600', accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount, description: 'Hasılat artışı' },
           ]
         ),
-        makeBalancedTransaction(
-          'A19_PROFIT_TRANSFER',
-          'Dönem kâr aktarımı',
-          'ADVANCE_TO_REVENUE',
-          [
-            { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount, description: 'Sonuç hesabı aktarımı' },
-            { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount, description: 'Dönem net kârı artışı' },
-          ]
-        ),
       ]
+      // R17.1: %25 kurumlar vergisi — hizmette profitAmount = amount (tam kâr)
+      const taxTxSvc = buildTaxProvisionTransaction(amount, 'A19', 'ADVANCE_TO_REVENUE')
+      if (taxTxSvc) txsSvc.push(taxTxSvc)
+      const netTxSvc = buildNetProfitTransferTransaction(amount, 'A19', 'ADVANCE_TO_REVENUE')
+      if (netTxSvc) txsSvc.push(netTxSvc)
+      return txsSvc
     }
 
     // Dominant stok hesabı (en büyük bakiyeli)
@@ -1596,9 +2217,18 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
     if (amount <= 0) return []
 
     const costAmount   = amount * (1 - grossMargin)
-    const profitAmount = amount * grossMargin
+    const profitAmount = grossMargin <= 0 ? 0 : (amount * grossMargin)
 
-    return [
+    // R8.1: İnşaat firmaları için 622 Hizmet Üretim Maliyeti (mali müşavir disiplini)
+    // Sonnet + Codex ortak bulgu: inşaat proje teslimatında 621 (SMM) değil
+    // 622 = Hizmet Üretim Maliyeti (Tek Düzen Hesap Planı resmi adı).
+    // Diğer sektörler (imalat/ticaret/perakende) → 621 SMM korunur.
+    const stockedCostCode = context.sector === 'CONSTRUCTION' ? '622' : '621'
+    const stockedCostName = context.sector === 'CONSTRUCTION'
+      ? 'Hizmet Üretim Maliyeti'   // Tek Düzen Hesap Planı resmi adı (622)
+      : 'Satılan Mal Maliyeti'
+
+    const txsStk: AccountingTransaction[] = [
       makeBalancedTransaction(
         'A19_DELIVERY_REVENUE_AND_COST',
         'Alınan avans teslimatla satışa dönüşür, ilgili stok maliyeti gelir tablosuna alınır',
@@ -1606,20 +2236,17 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
         [
           { accountCode: '340',              accountName: 'Alınan Sipariş Avansları', side: 'DEBIT',  amount,      description: 'Avans çözülmesi' },
           { accountCode: '600',              accountName: 'Yurtiçi Satışlar',         side: 'CREDIT', amount,      description: 'Hasılat artışı'  },
-          { accountCode: '621',              accountName: 'Satılan Mal Maliyeti',     side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
+          { accountCode: stockedCostCode,    accountName: stockedCostName,            side: 'DEBIT',  amount: costAmount, description: 'Maliyet artışı' },
           { accountCode: dominantStock.code, accountName: dominantStock.name,         side: 'CREDIT', amount: costAmount, description: 'Stok azalışı'  },
         ]
       ),
-      makeBalancedTransaction(
-        'A19_PROFIT_TRANSFER',
-        'Dönem kâr aktarımı',
-        'ADVANCE_TO_REVENUE',
-        [
-          { accountCode: '690', accountName: 'Dönem Kârı veya Zararı', side: 'DEBIT',  amount: profitAmount, description: 'Sonuç hesabı aktarımı' },
-          { accountCode: '590', accountName: 'Dönem Net Kârı',         side: 'CREDIT', amount: profitAmount, description: 'Dönem net kârı artışı' },
-        ]
-      ),
     ]
+    // R17.1: %25 kurumlar vergisi — profitAmount üzerinden (R10.2 guard: profitAmount<=0 → null)
+    const taxTxStk = buildTaxProvisionTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+    if (taxTxStk) txsStk.push(taxTxStk)
+    const netTxStk = buildNetProfitTransferTransaction(profitAmount, 'A19', 'ADVANCE_TO_REVENUE')
+    if (netTxStk) txsStk.push(netTxStk)
+    return txsStk
   },
 
   preconditions: {
@@ -1659,15 +2286,18 @@ const A19_ADVANCE_TO_REVENUE: ActionTemplateV3 = {
   description:
     'Müşteriden önceden alınan sipariş avanslarının (340) ürün/hizmet teslim edilmesiyle yurtiçi satışlara (600) dönüştürülmesi.',
   cfoRationale:
-    'Avans → hasılat dönüşümü üretim/teslimat hızlanmasıyla sağlanır. Proje portföyünü aktifleştirir ve gelir tablosunu güçlendirir.',
+    'Avans → hasılat dönüşümü üretim/teslimat hızlanmasıyla sağlanır. Proje portföyünü aktifleştirir ve gelir tablosunu güçlendirir. ' +
+    'Uyarı (R10.2): Firma brüt zararda ise kâr aktarımı (690→590) sıfır tutarla oluşturulmaz; sadece hasılat/maliyet kalemleri kaydedilir.',
   bankerPerspective:
     'Avansın hasılata dönüşmesi iş hacminin fiilen gerçekleştiğini belgeler ve gelir tablosunu güçlendirir. Teslim belgesi ve müşteri kabulü olmadan yapılan erken hasılat tanıma ilerleyen dönemlerde düzeltme riski yaratabilir; gerçek teslim takvimine uyum muhasebe güvenilirliğini korur.',
+  bankerTrust: 'medium',
+  requiresOperationalProof: true,
 }
 
 // ── A20 ──────────────────────────────────────────────────────────────────────
 const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   id: 'A20_GROSS_MARGIN_REFORM',
-  name: 'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
+  name: 'Brüt Marj Reformu',  // R8.7: 'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)' → sade
   family: 'EQUITY_PNL',
   semanticType: 'OPERATIONAL_MARGIN',
   horizons: ['medium'],
@@ -1683,37 +2313,49 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   },
 
   computeAmount: (ctx) => {
-    const netSales    = ctx.netSales    ?? 0
-    const grossProfit = ctx.grossProfit ?? 0
-    if (!ctx.netSales || netSales <= 0) return null
-    if (grossProfit < 0) return null
+    // R4 — Brüt zarar guard kaldırıldı; A20 nakit kanal (tedarikçi bağımsız)
+    const baseReduction = getGrossMarginReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = grossProfit / netSales
+    const cogs = getCogs(ctx) ?? 0
+    if (cogs <= 0) return null
 
-    const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
-    const targetMargin = bm?.value
-    if (!targetMargin || currentMargin >= targetMargin) return null
+    // Cap: COGS'un %30'u — nakit kanal makul üst sınır
+    const cap = cogs * 0.30
 
-    const gap    = targetMargin - currentMargin
-    const target = gap * netSales * 0.5
-
-    return Math.min(target, netSales * 0.20)
+    const result = Math.min(baseReduction, cap)
+    return result > 0 ? result : null
   },
 
   buildTransactions: (context) => {
     const amount = context.amount ?? 0
     if (amount <= 0) return []
-    return [
+
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel etki: nakit artar, maliyet azalır (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
-        'A20_GROSS_MARGIN_REFORM',
-        'Brüt marj iyileştirme — maliyet düşüşü ve nakit tasarruf',
+        'A20_REFORM_NAKİT',
+        'Brüt Marj Reformu — Maliyet Düşüşü (Nakit Kanal)',
         'OPERATIONAL_MARGIN',
         [
-          { accountCode: '102', accountName: 'Bankalar',              side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
-          { accountCode: '621', accountName: 'Satılan Mal Maliyeti',  side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
+          { accountCode: '102', accountName: 'Bankalar',             side: 'DEBIT',  amount, description: 'Maliyet tasarrufu nakit etkisi' },
+          { accountCode: '621', accountName: 'Satılan Mal Maliyeti', side: 'CREDIT', amount, description: 'Maliyet azalışı'                },
         ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A20', 'OPERATIONAL_MARGIN')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A20', 'OPERATIONAL_MARGIN')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -1754,7 +2396,8 @@ const A20_GROSS_MARGIN_REFORM: ActionTemplateV3 = {
   cfoRationale:
     'Maliyet yapısı iyileştirildiğinde her 1 puanlık brüt marj artışı net kâra doğrudan yansır. Nakit kanalı tedarikçi borç müzakeresi gerektirmez; operasyonel verimlilik, proses iyileştirme veya alternatif tedarik kanalı ile sağlanabilir.',
   bankerPerspective:
-    'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. A20, A12\'nin tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı versiyonudur.',
+    'Brüt marjdaki yapısal iyileşme operasyonel kalitenin sürdürülebilir göstergesidir. Tedarikçi bağımlılığı olmadan uygulanabilen nakit kanallı bir maliyet optimizasyonudur.',
+  bankerTrust: 'high',
 }
 
 // ── A21 ──────────────────────────────────────────────────────────────────────
@@ -1768,43 +2411,72 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
   useRatioBasedAmount: true,
 
   computeAmount: (ctx) => {
-    const netSales       = ctx.netSales       ?? 0
-    const operatingProfit = ctx.operatingProfit ?? 0
-    if (!ctx.netSales || netSales <= 0) return null
-    if (operatingProfit < 0) return null
+    // R5 — Faaliyet gideri rasyo bazlı (operatingExpenseRatio hedef)
+    // Atakan Karar 1: A21 güncellendi (id korundu)
+    // ÖNCE: ebitMargin hedef + operatingProfit<0 guard
+    // SONRA: operatingExpenseRatio hedef + guard kalktı
+    const baseReduction = getOperatingExpenseReductionTarget(ctx)
+    if (baseReduction === null) return null
 
-    const currentMargin = operatingProfit / netSales
+    // Cap: opex × %25 (konservatif, tek dönem hedefi)
+    const opex = getOperatingExpenses(ctx) ?? 0
+    if (opex <= 0) return null
 
-    const bm = getBenchmarkValue(ctx.sector, 'ebitMargin')
-    const targetMargin = bm?.value
-    if (!targetMargin || currentMargin >= targetMargin) return null
-
-    const gap        = targetMargin - currentMargin
-    const baseTarget = gap * netSales * 0.5
-
-    // OPEX kaynak guard
-    const balances  = ctx.accountBalances ?? {}
-    const opexTotal = (balances['630'] ?? 0) + (balances['631'] ?? 0) + (balances['632'] ?? 0)
-    if (opexTotal <= 0) return null
-    const opexCap = opexTotal * 0.5
-
-    return Math.min(baseTarget, netSales * 0.10, opexCap)
+    const cap = opex * 0.25
+    return Math.min(baseReduction, cap)
   },
 
   buildTransactions: (context) => {
+    // R7B — Dinamik faaliyet gideri hesabı (en yüklü 630/631/632 seçilir)
+    // R7B mini — getOperatingExpensesDetail: isEstimated bilgisi description'a yansıtılır
+    // R5 — Kar zinciri (R4 A12/A20 pattern, vergi 691 YOK)
     const amount = context.amount ?? 0
     if (amount <= 0) return []
-    return [
+
+    // isEstimated: detay hesap yoksa KOBİ fallback (grossProfit - operatingProfit)
+    const detail        = getOperatingExpensesDetail(context as unknown as import('./contracts').FirmContext)
+    const isEstimatedOp = detail?.isEstimated ?? true   // detay yok → tahmin
+
+    // En yüklü gider hesabı: 630/631/632 — büyük firmada doğru hesaba girer
+    // KOBİ fallback (tümü 0): 632 Genel Yönetim Giderleri temsili
+    const balances = context.accountBalances ?? {}
+    const candidates = [
+      { code: '630', name: 'Araştırma ve Geliştirme Giderleri',    amount: balances['630'] ?? 0 },
+      { code: '631', name: 'Pazarlama, Satış ve Dağıtım Giderleri', amount: balances['631'] ?? 0 },
+      { code: '632', name: 'Genel Yönetim Giderleri',               amount: balances['632'] ?? 0 },
+    ]
+    const dominant   = candidates.reduce((max, c) => c.amount > max.amount ? c : max, candidates[2])
+    const creditCode = dominant.amount > 0 ? dominant.code : '632'
+    const creditName = dominant.amount > 0 ? dominant.name : 'Genel Yönetim Giderleri'
+    const opexDesc   = isEstimatedOp
+      ? 'Faaliyet gideri azalışı (KOBİ tahmin — detay hesap yok)'
+      : 'Faaliyet gideri azalışı'
+
+    const transactions: AccountingTransaction[] = []
+
+    // 1. Operasyonel: nakit artar, en yüklü faaliyet gideri azalır (KORUNDU)
+    transactions.push(
       makeBalancedTransaction(
-        'A21_OPERATING_PROFIT_REFORM',
-        'Faaliyet kârı iyileştirme — gider optimizasyonu',
+        'A21_OPEX_REDUCTION',
+        'Faaliyet Kârı Reformu — Gider Optimizasyonu (Nakit Kanal)',
         'OPEX_REDUCTION',
         [
-          { accountCode: '102', accountName: 'Bankalar',                   side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
-          { accountCode: '632', accountName: 'Genel Yönetim Giderleri',    side: 'CREDIT', amount, description: 'Faaliyet gideri azalışı'      },
+          { accountCode: '102',      accountName: 'Bankalar', side: 'DEBIT',  amount, description: 'Gider tasarrufu nakit etkisi' },
+          { accountCode: creditCode, accountName: creditName,  side: 'CREDIT', amount, description: opexDesc                       },
         ]
-      ),
-    ]
+      )
+    )
+
+    // R17.1: %25 kurumlar vergisi (Codex YOL A1)
+    // 2. Vergi provizyonu: 691 DR / 370 CR
+    const taxTx = buildTaxProvisionTransaction(amount, 'A21', 'OPEX_REDUCTION')
+    if (taxTx) transactions.push(taxTx)
+
+    // 3. Net kâr transferi: 690 DR (NET) / 590 CR (NET)
+    const netTx = buildNetProfitTransferTransaction(amount, 'A21', 'OPEX_REDUCTION')
+    if (netTx) transactions.push(netTx)
+
+    return transactions
   },
 
   preconditions: {
@@ -1846,6 +2518,113 @@ const A21_OPERATING_PROFIT_REFORM: ActionTemplateV3 = {
     'Faaliyet giderlerindeki yapısal azalma FAVÖK marjını kalıcı olarak güçlendirir. Nakit kanalı tasarrufu anında bilanço güçlenmesi olarak yansıtır.',
   bankerPerspective:
     'Operasyonel gider disiplini FAVÖK kalitesini artırır. A21, A13\'ün projeksiyon modeli yerine gerçek muhasebe kaydı ile somutlaştırılmış versiyonudur.',
+  bankerTrust: 'medium',
+}
+
+// ── A22 ──────────────────────────────────────────────────────────────────────
+const A22_SHAREHOLDER_RECEIVABLE_COLLECTION: ActionTemplateV3 = {
+  id: 'A22_SHAREHOLDER_RECEIVABLE_COLLECTION',
+  name: 'Ortaklardan Alacak Tahsilatı',
+  family: 'WC_COMPOSITION',
+  semanticType: 'RECEIVABLE_COLLECTION',
+  horizons: ['short', 'medium'],
+
+  // R12.1-FIX4: 131 VEYA 231'den tahsilat — önce KV (131), kalan UV (231)
+  // Atakan mali kuralı: 131/231 = şirketin içinin boşaltılması, banka kırmızı bayrak.
+  // TAMAMI tahsil edilmeli — %50 cap KALDIRILDI (yarısı bırakmak mali olarak anlamsız).
+  buildTransactions: (context) => {
+    const bal131 = context.accountBalances?.['131'] ?? 0
+    const bal231 = context.accountBalances?.['231'] ?? 0
+    const total  = bal131 + bal231
+    if (total < 1_000_000) return []
+
+    // Cap yok — 131+231 TAMAMI tahsil edilir (en kısa sürede tam kapanma)
+    const amount = total
+    if (amount <= 0) return []
+
+    // Önce 131 (KV alacak), kalan 231 (UV alacak)
+    const from131 = Math.min(amount, bal131)
+    const from231 = amount - from131
+
+    const legs: AccountingLeg[] = [
+      { accountCode: '102', accountName: 'Bankalar', side: 'DEBIT', amount, description: 'Ortak tahsilatı nakit girişi — tam kapanma' },
+    ]
+    if (from131 > 0) {
+      legs.push({ accountCode: '131', accountName: 'Ortaklardan Alacaklar (KV)', side: 'CREDIT', amount: from131, description: 'KV ortak alacağı tam tahsilatı' })
+    }
+    if (from231 > 0) {
+      legs.push({ accountCode: '231', accountName: 'Ortaklardan Alacaklar (UV)', side: 'CREDIT', amount: from231, description: 'UV ortak alacağı tam tahsilatı' })
+    }
+
+    return [makeBalancedTransaction('A22_MAIN', 'Ortaklardan alacak tahsilatı — 131/231 → 102 (tam kapanma)', 'RECEIVABLE_COLLECTION', legs)]
+  },
+
+  // FIX 4: requiredAccountCodes kaldırıldı (AND yerine OR mantığı)
+  // Threshold 1M TL — customCheck'te doğrulanır
+  preconditions: {
+    minSourceAmountTRY: 1_000_000,
+    customCheck: (analysis) => {
+      const b131 = sumAccountsByPrefix(analysis, ['131'])
+      const b231 = sumAccountsByPrefix(analysis, ['231'])
+      const total = b131 + b231
+      if (total < 1_000_000) {
+        return {
+          pass: false,
+          reason: `Yetersiz ortak alacağı: ${total.toLocaleString('tr-TR')} TL < min 1.000.000 TL (131+231 hesapları)`,
+        }
+      }
+      return { pass: true }
+    },
+  },
+
+  // R12.1-FIX4: amountTRY tutarlılığı — suggestedAmount yerine computeAmount
+  // computeAmount = 131+231 tamamı → greedy/coverage amountTRY = transaction tutarıyla eşleşir
+  useRatioBasedAmount: true,
+  computeAmount: (ctx: FirmContext): number | null => {
+    const bal = ctx.accountBalances as Record<string, number>
+    const b131 = bal?.['131'] ?? 0
+    const b231 = bal?.['231'] ?? 0
+    const total = b131 + b231
+    if (total < 1_000_000) return null  // 1M eşik — precondition ile tutarlı
+    return total  // tam kapanma
+  },
+
+  qualityCoefficient: 0.65,
+  sustainability: 'ONE_OFF',
+
+  repeatDecay: { first: 1.00, second: 0.40, third: 0.15, maxRepeats: 1 },
+
+  suggestedAmount: {
+    basis: 'assets',
+    minPctOfBasis: 0.02,
+    typicalPctOfBasis: 0.05,
+    maxPctOfBasis: 1.0,          // R12.1-FIX4: tam kapanma — üst sınır yoktur (100%)
+    absoluteMinTRY: 1_000_000,
+  },
+
+  sectorCompatibility: {
+    CONSTRUCTION:  'primary',
+    MANUFACTURING: 'primary',
+    TRADE:         'primary',
+    RETAIL:        'applicable',
+    SERVICES:      'primary',
+    IT:            'primary',
+  },
+
+  expectedEconomicImpact: {
+    createsRealCash:        true,
+    strengthensOperations:  false,
+    realBalanceSheetGrowth: false,
+    reducesRisk:            true,
+  },
+
+  description:
+    'Ortaklara (131 — kısa vadeli, 231 — uzun vadeli) verilen borçların tahsil edilerek nakde (102) dönüştürülmesi. İlişkili taraf alacak riskini azaltır, nakit pozisyonunu güçlendirir.',
+  cfoRationale:
+    'Ortak alacakları zaman zaman bilanço şişmesine neden olur ve tahsilat disiplinsizliğine işaret eder. Tahsilat nakit döngüsünü kısaltır ve ilişkili taraf riskini açık biçimde azaltır.',
+  bankerPerspective:
+    'Ortaklardan alacak tahsilatı hem nakit pozisyonunu hem ilişkili taraf risk profilini iyileştirir. Bankacı perspektifinden bu, ortak disiplininin ve kurumsal yönetim kalitesinin somut göstergesidir. Belgelenmiş tahsilat kararları kredi değerlendirmesinde pozitif sinyal oluşturur.',
+  bankerTrust: 'high',
 }
 
 // ─── Katalog Derleme & Exports ────────────────────────────────────────────────
@@ -1871,6 +2650,7 @@ export const ACTION_CATALOG_V3: Record<string, ActionTemplateV3> = {
   A19_ADVANCE_TO_REVENUE,
   A20_GROSS_MARGIN_REFORM,
   A21_OPERATING_PROFIT_REFORM,
+  A22_SHAREHOLDER_RECEIVABLE_COLLECTION,
 }
 
 export const ACTION_IDS_V3 = Object.keys(ACTION_CATALOG_V3)

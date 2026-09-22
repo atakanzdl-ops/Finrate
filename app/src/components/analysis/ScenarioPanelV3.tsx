@@ -396,19 +396,72 @@ function OzetTab({ result }: { result: any }) {
 
             <div className="text-lg leading-relaxed mt-2">{heroMsg}</div>
 
-            {exec.confidence && (
-              <div className="mt-4 pt-4 border-t border-white/10 text-sm text-white/80">
-                Güven:{' '}
-                <strong className="text-white">
-                  {exec.confidence === 'HIGH' ? 'Yüksek' : exec.confidence === 'MEDIUM' ? 'Orta' : 'Düşük'}
-                </strong>
-              </div>
-            )}
+            {/* R11: 'Güven: Yüksek / Analiz: Tamamlandı' rozetleri KALDIRILDI — yapay kesinlik */}
           </div>
         )
       })()}
 
       {/* B. CAPACITY WARNING — Faz 7.3.37: tavan jargonu kaldırıldı */}
+
+      {/* B2. R11 KRİTİK UYARI KARTLARI — yapay güven yerine somut riskler */}
+      {(() => {
+        const r        = (result as { ratios?: { grossMargin?: number | null; interestCoverage?: number | null } }).ratios
+        const eq       = (result as { totalEquity?: number | null }).totalEquity
+        const portfolio = (da.whatCompanyShouldDo ?? []) as Array<{ actionId?: string; amount?: number; amountTRY?: number }>
+
+        const alerts: Array<{ message: string }> = []
+
+        // K1: Negatif brüt marj — sadece result.ratios.grossMargin (ana zincir)
+        if (r?.grossMargin != null && r.grossMargin < 0) {
+          alerts.push({ message: 'Temel faaliyet sürdürülebilir kâr üretmiyor' })
+        }
+
+        // K2: Faiz karşılama < 1.5 (Atakan kararı — erken uyarı)
+        if (r?.interestCoverage != null && r.interestCoverage < 1.5) {
+          alerts.push({ message: 'Faiz ödeme kapasitesi zayıf' })
+        }
+
+        // K3: 3+ not sıçraması (mevcut → istenen)
+        const reqStr = exec?.requestedTarget as string | undefined
+        const curStr = exec?.currentRating as string | undefined
+        if (curStr && reqStr) {
+          const notchGap = ratingToIndex(reqStr) - ratingToIndex(curStr)
+          if (notchGap >= 3) {
+            alerts.push({ message: 'Hedef rating mevcut finansal yapıdan çok uzak' })
+          }
+        }
+
+        // K4: Önerilen sermaye desteği > mevcut özkaynak
+        // SADECE A10/A10B (yeni nakit sermaye) — A15/A15B HARİÇ (swap/vade, sermaye değil)
+        if (eq != null && eq > 0 && portfolio.length > 0) {
+          const capitalActions = portfolio.filter(a =>
+            a.actionId === 'A10_CASH_EQUITY_INJECTION' ||
+            a.actionId === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION'
+          )
+          const totalCapitalNeed = capitalActions.reduce(
+            (s, a) => s + (a.amountTRY ?? a.amount ?? 0),
+            0,
+          )
+          if (totalCapitalNeed > eq) {
+            alerts.push({ message: 'Önerilen sermaye desteği mevcut özkaynağın üzerinde' })
+          }
+        }
+
+        if (alerts.length === 0) return null
+        return (
+          <div className="space-y-2">
+            {alerts.map((a, i) => (
+              <div
+                key={i}
+                className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 flex items-start gap-2"
+              >
+                <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+                <span>{a.message}</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* C. DATA QUALITY WARNING */}
       {da.dataQualityWarning && (
@@ -486,14 +539,7 @@ function OzetTab({ result }: { result: any }) {
           <BankerMetric label="Likidite"          value={assessLiquidity(productivity)} />
           <BankerMetric label="Yapısal Risk"        value={assessStructuralRisk(productivity)} />
           <BankerMetric label="Aktif Verimliliği"  value={assessAssetEfficiency(productivity)} />
-          <BankerMetric
-            label="Rating Güveni"
-            value={
-              exec.confidence === 'HIGH'   ? 'Yüksek' :
-              exec.confidence === 'MEDIUM' ? 'Orta'   :
-              'Düşük'
-            }
-          />
+          {/* R11: 'Rating Güveni / Veri Kalitesi' rozeti KALDIRILDI — yapay kesinlik */}
         </div>
       </div>
 
@@ -701,9 +747,21 @@ function AksiyonPlaniTab({
                   >
                     {action.priority ?? idx + 1}
                   </div>
-                  {/* Aksiyon adı + hesap özeti (Faz 7.3.48) */}
+                  {/* Aksiyon adı + R12.2B nakit etkisi badge + hesap özeti (Faz 7.3.48) */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-[#1E293B]">{action.actionName}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-[#1E293B]">{action.actionName}</span>
+                      {action.realLiquidityImpact === true && (
+                        <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                          Gerçek nakit etkisi var
+                        </span>
+                      )}
+                      {action.realLiquidityImpact === false && (
+                        <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-slate-50 text-slate-500 border border-slate-200 whitespace-nowrap">
+                          Nakit yaratmaz
+                        </span>
+                      )}
+                    </div>
                     {_accountCount > 0 ? (
                       <div className="text-xs text-[#64748B] mt-0.5">
                         {_accountCount} hesap etkileniyor · Δ {formatTRY(_delta)}
@@ -775,6 +833,68 @@ function AksiyonPlaniTab({
           })}
         </div>
       </div>
+
+      {/* R12.2A: Portföy Sonrası Rasyo Projeksiyonu */}
+      {(() => {
+        const cur = (result as { ratios?: { current?: Record<string, number | null> } }).ratios?.current
+        const prj = (result as { ratios?: { projected?: Record<string, number | null> | null } }).ratios?.projected
+        if (!prj) return null
+
+        const fmtR = (v: number | null | undefined) => v == null ? '—' : v.toFixed(2)
+        const fmtP = (v: number | null | undefined) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
+        // R12.2D+E: Net Borç/FAVÖK negatifse "güçlü likidite" notu
+        const fmtNetDebt = (v: number | null | undefined) => {
+          if (v == null) return '—'
+          const s = v.toFixed(2) + 'x'
+          return v < 0 ? `${s} (Net nakit fazlası — güçlü likidite)` : s
+        }
+
+        const rows = [
+          { label: 'Cari Oran',        k: 'currentRatio',     fmt: fmtR },
+          { label: 'Asit-Test',         k: 'quickRatio',       fmt: fmtR },
+          { label: 'Borç/Özkaynak',     k: 'debtToEquity',     fmt: fmtR },
+          { label: 'Faiz Karşılama',    k: 'interestCoverage', fmt: fmtR },
+          { label: 'Brüt Marj',         k: 'grossMargin',      fmt: fmtP },
+          { label: 'ROIC',              k: 'roic',              fmt: fmtP },
+          { label: 'FAVÖK Marjı',       k: 'ebitdaMargin',     fmt: fmtP },
+          { label: 'Net Borç/FAVÖK',    k: 'debtToEbitda',     fmt: fmtNetDebt },
+        ]
+
+        return (
+          <div className="rounded-[12px] border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2 text-[#0B3C5D] font-semibold text-sm mb-3">
+              <TrendingDown size={16} />
+              Aksiyon Sonrası Rasyo Projeksiyonu
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2 font-medium text-slate-500 text-xs">Rasyo</th>
+                  <th className="text-right py-2 font-medium text-slate-500 text-xs">Bugünkü</th>
+                  <th className="text-right py-2 font-medium text-slate-500 text-xs">Projeksiyon</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const curVal = cur?.[r.k] as number | null | undefined
+                  const prjVal = prj?.[r.k] as number | null | undefined
+                  // R12.2E: Net Borç/FAVÖK negatif = yeşil (güçlü likidite)
+                  const isNetDebtNeg = r.k === 'debtToEbitda'
+                  const curColor = isNetDebtNeg && curVal != null && curVal < 0 ? 'text-emerald-700' : 'text-slate-600'
+                  const prjColor = isNetDebtNeg && prjVal != null && prjVal < 0 ? 'text-emerald-700 font-medium' : 'text-[#0B3C5D] font-medium'
+                  return (
+                    <tr key={r.k} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 text-slate-700">{r.label}</td>
+                      <td className={`py-2 text-right ${curColor}`}>{r.fmt(curVal)}</td>
+                      <td className={`py-2 text-right ${prjColor}`}>{r.fmt(prjVal)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
 
       {/* B. WHY CAPITAL ALONE IS NOT ENOUGH */}
       {da.whyCapitalAloneIsNotEnough && (
@@ -885,9 +1005,15 @@ function DetayTab({
               </h3>
               <p className="text-sm text-[#64748B] mt-1">
                 {(() => {
-                  // Faz 7.3.19: enginePortfolioCount varsa kesin rakamları kullan
+                  // Faz 7.3.19 / R8.4.3: seçilen aksiyon sayısı için doğru kaynak
+                  // enginePortfolioCount = TÜM engine portföyü (subset seçimi öncesi)
+                  // displayActionCount   = selectTargetPackage çıktısı (guard sonrası subset)
                   if (da.enginePortfolioCount !== undefined) {
-                    return `${da.enginePortfolioCount} seçilen, ${da.rejectedInsightCount ?? rejected.length} seçilmeyen aksiyon`
+                    const selectedCount =
+                      da.targetPackageMeta?.displayActionCount
+                      ?? da.whatCompanyShouldDo?.length
+                      ?? da.enginePortfolioCount
+                    return `${selectedCount} seçilen, ${da.rejectedInsightCount ?? rejected.length} seçilmeyen aksiyon`
                   }
                   const totalEvals = rejected.reduce((s: number, r: any) => s + (r.rejectionCount ?? 1), 0)
                   return totalEvals > rejected.length
@@ -920,7 +1046,7 @@ function DetayTab({
                   {(() => {
                     const displayReason =
                       r.reasonDisplay ||
-                      'Bu aksiyon mevcut veriyle uygun görülmedi.'
+                      'Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.'  // R8.8
                     const reasons = toStringArray(displayReason)
                     if (reasons.length === 0) return null
                     return (

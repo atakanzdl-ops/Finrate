@@ -12,7 +12,9 @@ import type {
   MarginRatioTransparency,
   TurnoverRatioTransparency,
   AttributionSource,
+  SectorCode,
 } from './contracts'
+import { getDynamicMaterialityFloor } from './contracts'
 import { getSectorBenchmark } from '../benchmarks'
 import type { SectorBenchmark } from '../benchmarks'
 
@@ -78,18 +80,38 @@ export function buildRatioTransparency(
 
 function getBasisValueForTransparency(
   ctx: FirmContext,
-  basis: 'netSales' | 'cogs' | 'totalAssets'
+  basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'
 ): number | null {
-  if (basis === 'netSales') return (ctx as any).netSales ?? ctx.totalRevenue ?? null
-  if (basis === 'cogs') return getCogs(ctx)
-  if (basis === 'totalAssets') return ctx.totalAssets ?? null
+  if (basis === 'netSales')          return (ctx as any).netSales ?? ctx.totalRevenue ?? null
+  if (basis === 'cogs')              return getCogs(ctx)
+  if (basis === 'totalAssets')       return ctx.totalAssets ?? null
+  if (basis === 'equity')            return ctx.totalEquity ?? null
+  if (basis === 'interestExpense')   return ctx.interestExpense ?? null
+  if (basis === 'totalDebt') {
+    // 300+400 prefix toplam (finansal borç kısa ve uzun vade)
+    const bal = ctx.accountBalances ?? {}
+    const kv = Object.entries(bal).filter(([k]) => k.startsWith('30')).reduce((s,[,v]) => s + v, 0)
+    const uv = Object.entries(bal).filter(([k]) => k.startsWith('40')).reduce((s,[,v]) => s + v, 0)
+    const total = kv + uv
+    return total > 0 ? total : null
+  }
+  if (basis === 'currentLiabilities') {
+    // 3xx hesaplar toplamı (kısa vadeli yükümlülükler)
+    const bal = ctx.accountBalances ?? {}
+    const total = Object.entries(bal).filter(([k]) => k.startsWith('3')).reduce((s,[,v]) => s + v, 0)
+    return total > 0 ? total : null
+  }
   return null
 }
 
-function getBasisLabel(basis: 'netSales' | 'cogs' | 'totalAssets'): string {
-  if (basis === 'netSales') return 'Net Satış'
-  if (basis === 'cogs') return 'Satılan Mal Maliyeti'
-  if (basis === 'totalAssets') return 'Toplam Aktif'
+function getBasisLabel(basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'): string {
+  if (basis === 'netSales')           return 'Net Satış'
+  if (basis === 'cogs')               return 'Satılan Mal Maliyeti'
+  if (basis === 'totalAssets')        return 'Toplam Aktif'
+  if (basis === 'totalDebt')          return 'Toplam Finansal Borç'
+  if (basis === 'currentLiabilities') return 'Kısa Vadeli Yükümlülükler'
+  if (basis === 'equity')             return 'Özkaynak'
+  if (basis === 'interestExpense')    return 'Finansman Gideri'
   return basis
 }
 
@@ -121,6 +143,71 @@ function getCurrentBalanceForAction(action: ActionTemplateV3, ctx: FirmContext):
   return 0
 }
 
+// ─── sumByCodesPrefix ────────────────────────────────────────────────────────
+
+/**
+ * Hesap kodlarını prefix bazlı topla.
+ * "150" prefix'i şunları yakalar:
+ *   - "150" (exact)
+ *   - "150.01" (alt hesap nokta)
+ *   - "150-01" (alt hesap tire)
+ *   - "150/01" (alt hesap slash)
+ * Yakalamaz:
+ *   - "1500" (farklı hesap)
+ *   - "15000" (farklı hesap)
+ *   - "" (boş string)
+ */
+export function sumByCodesPrefix(
+  balances: Record<string, number>,
+  prefixes: string[]
+): number {
+  if (!balances) return 0
+  let sum = 0
+  for (const [code, balance] of Object.entries(balances)) {
+    if (balance == null) continue
+    const normalizedCode = code.trim()
+    if (!normalizedCode) continue
+    const isMatch = prefixes.some(prefix =>
+      normalizedCode === prefix ||
+      normalizedCode.startsWith(`${prefix}.`) ||
+      normalizedCode.startsWith(`${prefix}-`) ||
+      normalizedCode.startsWith(`${prefix}/`)
+    )
+    if (isMatch) {
+      sum += Math.abs(balance)
+    }
+  }
+  return sum
+}
+
+// ─── getInventoryBalance ──────────────────────────────────────────────────────
+
+/**
+ * Stok bakiyesi (150-153 hesapları, alt hesaplar dahil)
+ * 159 (Verilen Sipariş Avansları) HARİÇ — gerçek stok değil.
+ */
+export function getInventoryBalance(ctx: FirmContext): number {
+  return sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153']
+  )
+}
+
+// ─── computeDIO ───────────────────────────────────────────────────────────────
+
+/**
+ * Days Inventory Outstanding (Stok devir gün)
+ * DIO = (inventory / cogs) * periodDays
+ */
+export function computeDIO(
+  inventory: number,
+  cogs: number,
+  periodDays: number
+): number | null {
+  if (inventory <= 0 || cogs <= 0 || periodDays <= 0) return null
+  return (inventory / cogs) * periodDays
+}
+
 // ─── getCogs ────────────────────────────────────────────────────────────────
 
 /**
@@ -128,13 +215,28 @@ function getCurrentBalanceForAction(action: ActionTemplateV3, ctx: FirmContext):
  * cogs alanı varsa kullanır, yoksa netSales - grossProfit.
  */
 export function getCogs(ctx: FirmContext): number | null {
-  if ('cogs' in ctx && typeof (ctx as any).cogs === 'number' && (ctx as any).cogs > 0) {
-    return (ctx as any).cogs
+  // 1. Direkt costOfGoodsSold field
+  if (ctx.costOfGoodsSold != null && ctx.costOfGoodsSold > 0) {
+    return ctx.costOfGoodsSold
   }
+
+  // 2. 620-623 hesap kodlarından topla (TDHP)
+  // 620 Satılan Mamuller Maliyeti
+  // 621 Satılan Ticari Mallar Maliyeti
+  // 622 Satılan Hizmet Maliyeti
+  // 623 Diğer Satışların Maliyeti
+  const cogsFromAccounts = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['620', '621', '622', '623']
+  )
+  if (cogsFromAccounts > 0) return cogsFromAccounts
+
+  // 3. netSales - grossProfit derive
   if (ctx.netSales > 0 && typeof ctx.grossProfit === 'number') {
     const derived = ctx.netSales - ctx.grossProfit
     return derived > 0 ? derived : null
   }
+
   return null
 }
 
@@ -165,15 +267,12 @@ export function getPeriodDays(fd: any): { days: number; source: 'explicit' | 'de
     if (p === 'ANNUAL' || p === 'FULL_YEAR') {
       return { days: 365, source: 'derived' }
     }
-    if (p === 'Q1' || p === 'Q2' || p === 'Q3' || p === 'Q4') {
-      return { days: 90, source: 'derived' }
-    }
-    if (p === 'H1' || p === 'H2') {
-      return { days: 182, source: 'derived' }
-    }
-    if (p === '9M') {
-      return { days: 273, source: 'derived' }
-    }
+    // Türk muhasebe kümülatif dönem mantığı
+    if (p === 'Q4') return { days: 365, source: 'derived' }
+    if (p === 'Q3' || p === '9M') return { days: 273, source: 'derived' }
+    if (p === 'Q2' || p === 'H1') return { days: 182, source: 'derived' }
+    if (p === 'Q1') return { days: 90, source: 'derived' }
+    if (p === 'H2') return { days: 182, source: 'derived' }
   }
 
   // Fallback: 365 + warn
@@ -182,6 +281,454 @@ export function getPeriodDays(fd: any): { days: number; source: 'explicit' | 'de
     { period: fd?.period, periodStart: fd?.periodStart, periodEnd: fd?.periodEnd }
   )
   return { days: 365, source: 'unknown' }
+}
+
+// ─── getGrossMarginReductionTarget (R4) ─────────────────────────────────────
+
+/**
+ * R4 — Brüt Marj Açığı Hedefi (Half-gap formülü)
+ *
+ * A12 ve A20'nin ortak hesaplama mantığı.
+ * Atakan kararı: gap × netSales × 0.5
+ *
+ * Brüt zarar firma için de çalışır (guard kaldırıldı — R4).
+ *
+ * SONNET NOTU: Bu rakam KADEMELİ İYİLEŞTİRME HEDEFİDİR.
+ * Tek dönemde değil, 12-18 ay vadede uygulanır.
+ * UI'da transparency katmanında bu uyarı gösterilmelidir.
+ *
+ * @returns null:
+ *   - netSales geçersiz (sıfır, negatif, NaN)
+ *   - grossProfit NaN
+ *   - targetMargin tanımsız veya sıfır
+ *   - currentMargin >= targetMargin (zaten hedef üstünde)
+ * @returns number: önerilen maliyet azalma tutarı (TRY)
+ */
+export function getGrossMarginReductionTarget(ctx: FirmContext): number | null {
+  const netSales    = ctx.netSales    ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const grossProfit = ctx.grossProfit ?? 0
+  if (!Number.isFinite(grossProfit)) return null
+
+  const currentMargin = grossProfit / netSales
+
+  // Sektör hedef brüt marjı
+  const bm = getBenchmarkValue(ctx.sector, 'grossMargin')
+  const targetMargin = bm?.value ?? 0
+  if (!targetMargin || targetMargin <= 0) return null
+
+  if (currentMargin >= targetMargin) return null
+
+  // Half-gap (Atakan kararı) — 12-18 ay vade için makul
+  const gap       = targetMargin - currentMargin
+  const reduction = gap * netSales * 0.5
+
+  return reduction > 0 ? reduction : null
+}
+
+// ─── getOperatingExpenses (R5) ───────────────────────────────────────────────
+
+/**
+ * R5 — Faaliyet Gideri Tespiti (KOBİ fallback dahil)
+ *
+ * Üç kademe:
+ * 1. Detay hesaplar (630 + 631 + 632)
+ * 2. Fallback: gelir tablosu farkı (brütKar - faaliyetKar)
+ * 3. Null
+ *
+ * Atakan Karar 3: KOBİ mizanında detay yoksa toplamdan hesapla.
+ *
+ * R7A: 633 KALDIRILDI — finansman gideri (A14) ile semantik çakışma.
+ *      634 chartOfAccounts'ta yok — kullanılmıyordu.
+ *
+ * SONNET UYARISI: brütKar - faaliyetKar formülü 640/641 (Diğer Faaliyet
+ * Gelirleri) ve 654/659 (Diğer Faaliyet Giderleri) etkisini içerir.
+ * KOBİ pratik yaklaşımı, hata payı küçük çoğu durumda.
+ * Büyük firmalarda (iPOS, İSRA) sapma olabilir.
+ *
+ * API: number | null — KORUNUR (mevcut çağrı yerleri değişmez)
+ */
+export function getOperatingExpenses(ctx: FirmContext): number | null {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesaplar (büyük firma)
+  // R7A: 633 kaldırıldı (A14 finansman gideri ile semantik çakışma)
+  // R7A: 634 chartOfAccounts'ta yok — kullanılmıyordu
+  const opex630 = accountBalances['630'] ?? 0
+  const opex631 = accountBalances['631'] ?? 0
+  const opex632 = accountBalances['632'] ?? 0
+  const opexDetay = opex630 + opex631 + opex632
+
+  if (opexDetay > 0) return opexDetay
+
+  // 2. Fallback: gelir tablosu farkı (KOBİ)
+  // Uyarı: 640/641/654/659 etkisini içerebilir. KOBİ için pratik.
+  const grossProfit    = ctx.grossProfit    ?? 0
+  const operatingProfit = ctx.operatingProfit ?? 0
+
+  if (Number.isFinite(grossProfit) && Number.isFinite(operatingProfit)) {
+    const opexFallback = grossProfit - operatingProfit
+    if (opexFallback > 0) return opexFallback
+  }
+
+  // 3. Hiç bulunamadı
+  return null
+}
+
+/**
+ * R7B — Faaliyet Gideri Detayı (isEstimated bilgisi ile)
+ *
+ * getOperatingExpenses'in API'si KORUNUR (number | null).
+ * Bu helper A21 buildTransactions için ek bilgi sağlar.
+ * Mevcut çağrı yerleri getOperatingExpenses kullanmaya devam eder.
+ */
+export function getOperatingExpensesDetail(ctx: FirmContext): {
+  amount: number
+  isEstimated: boolean
+} | null {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesaplar (büyük firma) — R7A: 633/634 yok
+  const opex630 = accountBalances['630'] ?? 0
+  const opex631 = accountBalances['631'] ?? 0
+  const opex632 = accountBalances['632'] ?? 0
+  const directSum = opex630 + opex631 + opex632
+
+  if (directSum > 0) {
+    return { amount: directSum, isEstimated: false }
+  }
+
+  // 2. KOBİ fallback
+  const grossProfit    = ctx.grossProfit    ?? 0
+  const operatingProfit = ctx.operatingProfit ?? 0
+
+  if (Number.isFinite(grossProfit) && Number.isFinite(operatingProfit)) {
+    const estimated = grossProfit - operatingProfit
+    if (estimated > 0) return { amount: estimated, isEstimated: true }
+  }
+
+  return null
+}
+
+// ─── getFinancialExpenses (R5) ───────────────────────────────────────────────
+
+/**
+ * R5 — Finansman Gideri Tespiti (KOBİ fallback dahil)
+ *
+ * Üç kademe:
+ * 1. Detay hesap (780 + 781 Finansman Giderleri)
+ * 2. Fallback: mevcut borç helper'ları × tahmini faiz
+ * 3. Null
+ *
+ * SONNET UYARISI: %25 tahmini faiz TR 2025 alt sınır.
+ * Gerçek ticari kredi faizi %35-50 arasında olabilir.
+ * Konservatif tahmin. isEstimated=true ise UI'da uyarı gösterilmeli (R13).
+ *
+ * Codex Düzeltme 3: Mevcut getShortTermFinancialDebt / getLongTermFinancialDebt
+ * helper'larını kullanır (yeni toplama yazılmadı).
+ */
+export function getFinancialExpenses(ctx: FirmContext): {
+  amount: number | null
+  isEstimated: boolean
+} {
+  const accountBalances = ctx.accountBalances ?? {}
+
+  // 1. Detay hesap (780 Finansman Giderleri)
+  const fin780 = accountBalances['780'] ?? 0
+  const fin781 = accountBalances['781'] ?? 0
+  const finGider = fin780 + fin781
+
+  if (finGider > 0) {
+    return { amount: finGider, isEstimated: false }
+  }
+
+  // 2. Fallback: mevcut borç helper'ları (Codex önerisi)
+  // 300-309 + 400-409 kapsayan mevcut helper'lar kullanılır
+  const kvBorç   = getShortTermFinancialDebt(ctx)
+  const uvBorç   = getLongTermFinancialDebt(ctx)
+  const toplamBorç = kvBorç + uvBorç
+
+  if (toplamBorç > 0) {
+    // TR 2025 alt sınır tahmini; gerçek oran %35-50 olabilir
+    const TAHMINI_FAIZ_ORANI = 0.25
+    return {
+      amount:      toplamBorç * TAHMINI_FAIZ_ORANI,
+      isEstimated: true,
+    }
+  }
+
+  // 3. Bulunamadı
+  return { amount: null, isEstimated: false }
+}
+
+// ─── getOperatingExpenseReductionTarget (R5) ─────────────────────────────────
+
+/**
+ * R5 — Faaliyet Gideri Azaltma Hedefi (Half-gap)
+ *
+ * A21 için tutar hesabı.
+ * operatingExpenseRatio sektör benchmark'ı kullanılır.
+ * Half-gap katsayısı 0.5 (R4 ile tutarlı).
+ *
+ * @returns null:
+ *   - netSales geçersiz
+ *   - opex tespit edilemedi
+ *   - currentRatio ≤ targetRatio (zaten hedef altında)
+ */
+export function getOperatingExpenseReductionTarget(ctx: FirmContext): number | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const opex = getOperatingExpenses(ctx)
+  if (opex === null || opex <= 0) return null
+
+  const currentRatio = opex / netSales
+
+  const bm = getBenchmarkValue(ctx.sector, 'operatingExpenseRatio')
+  if (!bm || bm.value <= 0) return null
+
+  // Zaten hedef altında → null
+  if (currentRatio <= bm.value) return null
+
+  // Half-gap (R4 pattern)
+  const gap       = currentRatio - bm.value
+  const reduction = gap * netSales * 0.5
+
+  return reduction > 0 ? reduction : null
+}
+
+// ─── getFinancialExpenseReductionTarget (R5) ──────────────────────────────────
+
+/**
+ * R5 — Finansman Gideri Azaltma Hedefi (Half-gap)
+ *
+ * A14 için tutar hesabı. isEstimated flag taşır.
+ *
+ * @returns null:
+ *   - netSales geçersiz
+ *   - finansman gideri tespit edilemedi
+ *   - currentRatio ≤ targetRatio
+ */
+export function getFinancialExpenseReductionTarget(
+  ctx: FirmContext
+): { amount: number; isEstimated: boolean } | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) return null
+
+  const finResult = getFinancialExpenses(ctx)
+  if (finResult.amount === null || finResult.amount <= 0) return null
+
+  const currentRatio = finResult.amount / netSales
+
+  const bm = getBenchmarkValue(ctx.sector, 'financialExpenseRatio')
+  if (!bm || bm.value <= 0) return null
+
+  if (currentRatio <= bm.value) return null
+
+  const gap       = currentRatio - bm.value
+  const reduction = gap * netSales * 0.5
+
+  if (reduction <= 0) return null
+
+  return {
+    amount:      reduction,
+    isEstimated: finResult.isEstimated,
+  }
+}
+
+// ─── getEquityInjectionTarget (R8.3) ─────────────────────────────────────────
+
+/**
+ * R8.3 — Özkaynak Enjeksiyon Hedefi (Half-gap)
+ *
+ * A10 (Nakit Sermaye Artırımı) ve A10B (Senetli Sermaye Artırımı) için
+ * rasyo bazlı tutar hesabı. R5 kararını tamamlar.
+ *
+ * Formül: Hem aktif hem özkaynak eş zamanlı artar.
+ *   (E + x) / (A + x) = hedefRatio   →   x = (hedefRatio × A − E) / (1 − hedefRatio)
+ *
+ * Half-gap hedef:   targetRatio = (currentRatio + sectorMedian) / 2
+ * Sektör medyanı:   1 − benchmark.debtToAssets (TCMB kaynağı)
+ *
+ * @returns null:
+ *   - totalAssets ≤ 0 (geçersiz bilanço)
+ *   - currentRatio ≥ sectorMedian (zaten iyi durumda)
+ *   - targetRatio ≥ 0.99 (sıfır-bölme savunması — gerçekte görülmez)
+ *   - hesaplanan tutar ≤ 0
+ */
+export function getEquityInjectionTarget(
+  ctx: FirmContext,
+  options?: { halfGap?: boolean }
+): number | null {
+  const halfGap = options?.halfGap ?? true
+
+  const totalAssets = ctx.totalAssets ?? 0
+  const totalEquity = ctx.totalEquity ?? 0
+
+  if (!Number.isFinite(totalAssets) || totalAssets <= 0) return null
+
+  // Mevcut özkaynak/aktif oranı
+  const currentRatio = totalEquity / totalAssets
+
+  // TCMB sektör kıyası: 1 − debtToAssets (buildEquityRatioTransparency:742 ile aynı pattern)
+  const bm = getBenchmarkValue(ctx.sector, 'debtToAssets')
+  const sectorDebtToAssets = bm?.value ?? 0.66
+  const sectorMedian = 1 - sectorDebtToAssets
+
+  // Guard 1: Zaten hedef üstünde → null
+  if (currentRatio >= sectorMedian) return null
+
+  // Half-gap hedef rasyo
+  const targetRatio = halfGap
+    ? (currentRatio + sectorMedian) / 2
+    : sectorMedian
+
+  // Guard 2: Sıfır-bölme savunması (teorik edge case)
+  if (targetRatio >= 0.99) return null
+
+  // Tutar: x = (targetRatio × A − E) / (1 − targetRatio)
+  const amount = (targetRatio * totalAssets - totalEquity) / (1 - targetRatio)
+
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  return amount
+}
+
+// ─── getReceivableCollectionTarget (R8.4) ─────────────────────────────────────
+
+/**
+ * R8.4 — Alacak Tahsilat Hedefi (Half-gap DSO)
+ *
+ * A10 özkaynak yarım-boşluk formülünün alacak DSO uyarlaması.
+ * applyFeasibilityCap(%25) yerine yarım-boşluk DSO kullanılır:
+ *   halfGapDSO = (currentDSO + benchmarkDays) / 2
+ *   targetAR   = netSales × halfGapDSO / periodDays
+ *   amount     = currentAR − targetAR
+ *
+ * Null koşulları:
+ *   - AR veya netSales ≤ 0
+ *   - currentDSO ≤ benchmarkDays × 1.1 (zaten benchmark yakınında)
+ *   - Hesaplanan tutar ≤ 0 (sayısal güvenlik)
+ *   - Hesaplanan tutar ≤ 500.000 TL (mutlak materyal eşik)
+ *   - targetAR ≥ ar × 0.95 — nispi materyalite: %5'ten az iyileşme anlamsız
+ *     AR > 10M firmalarda 500K guard yetersiz kalır (İSRA: 5% × 129M = 6.45M).
+ */
+export function getReceivableCollectionTarget(
+  ctx: FirmContext,
+  options?: { halfGap?: boolean }
+): number | null {
+  const halfGap = options?.halfGap ?? true
+
+  // R8.4.2: Sadece 120 (Alıcılar) kullanılır.
+  // 121 (Alacak Senetleri) vade gelmeden tahsil edilemez — faktoring/iskonto ayrı mekanizma (R9 notu).
+  // A05 yevmiyesi sadece 120 CREDIT eder; 120+121 toplamı kullanılırsa
+  // amount, 120 bakiyesini aşarak negatif bilançoya yol açar (İSRA: 120=129.3M, amount=270.1M → -140.8M).
+  const ar = ctx.accountBalances?.['120'] ?? 0
+  const netSales = ctx.netSales ?? 0
+  if (ar <= 0 || netSales <= 0) return null
+
+  const { days: periodDays } = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+  const currentDSO = (ar / netSales) * periodDays
+
+  const bm = getBenchmarkValue(ctx.sector, 'receivablesDays')
+  const benchmarkDays = bm?.value ?? 90
+
+  // Guard 1: Zaten benchmark yakınında (1.1 tolerans)
+  if (currentDSO <= benchmarkDays * 1.1) return null
+
+  // Hedef DSO: yarım boşluk veya tam benchmark
+  const targetDSO = halfGap
+    ? (currentDSO + benchmarkDays) / 2
+    : benchmarkDays
+
+  // Hedef AR bakiyesi ve tahsilat tutarı
+  const targetAR = (netSales * targetDSO) / periodDays
+  const amount   = ar - targetAR
+
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  // Guard 2: Mutlak materyal eşik (500K minimum)
+  if (amount < 500_000) return null
+
+  // Guard 3: Nispi materyalite — %5'ten az iyileşme anlamsız öneri üretmez
+  // AR > 10M firmalarda 500K guard yetersizdir (İSRA: 5% × 129M = 6.45M).
+  if (targetAR >= ar * 0.95) return null
+
+  return amount
+}
+
+// ─── getCurrentRatioTarget (R8.5) ────────────────────────────────────────────
+
+/**
+ * R8.5 — Cari Oran Half-Gap Target
+ *
+ * A15B (Ortak Borcu UV'ye Aktarma) için rasyo bazlı tutar hesabı.
+ * KV ortak borcu (331) UV'ye (431) taşındığında cari oran iyileşir.
+ *
+ * Formül:
+ *   currentRatio  = currentAssets / currentLiabilities
+ *   sectorMedian  = TCMB benchmark currentRatio
+ *   halfGapRatio  = (currentRatio + sectorMedian) / 2
+ *   targetCL      = currentAssets / halfGapRatio
+ *   reductionAmt  = currentLiabilities − targetCL
+ *
+ * currentAssets ve currentLiabilities buildV3BalanceTotals mantığından türetilir.
+ * 331 (Ortaklara Borçlar KV) currentLiabilities içindedir — A15B bu hesabı azaltır.
+ * Circular import riski nedeniyle buildV3BalanceTotals import edilmez; mantık inline.
+ *
+ * @returns null:
+ *   - currentAssets ≤ 0 veya currentLiabilities ≤ 0 (geçersiz bilanço)
+ *   - currentRatio ≥ sectorMedian (zaten sektör üstünde)
+ *   - reductionAmount ≤ 0 (sayısal güvenlik)
+ */
+export function getCurrentRatioTarget(ctx: FirmContext): number | null {
+  const b = ctx.accountBalances ?? {}
+
+  // ─── Dönen Varlıklar (buildV3BalanceTotals mantığı) ─────────────────────
+  const cash     = sumByCodesPrefixNet(b, ['100','101','102','108'], ['103'])
+  const tradeRec = sumByCodesPrefixNet(b, ['120','121','126','127','128'], ['122','129'])
+  const otherRec = sumByCodesPrefixNet(b, ['131','132','133','135','136','138'], ['137','139'])
+  const inventory = sumByCodesPrefixNet(b, ['150','151','152','153','157'], ['158'])
+  const prepaid   = sumByCodesPrefix(b, ['159'])
+  const otherCA   = sumByCodesPrefix(b, ['180','181','190','191','193','195','196','197','198'])
+  const currentAssets = cash + tradeRec + otherRec + inventory + prepaid + otherCA
+
+  // ─── KV Yükümlülükler (buildV3BalanceTotals mantığı — 331 dahil) ────────
+  const stFinDebt     = sumByCodesPrefixNet(b, ['300','301','303','304','305','306','309'], ['302','308'])
+  const tradePay      = sumByCodesPrefixNet(b, ['320','321','326','329'], ['322'])
+  // otherShortTermPayables: 331 (Ortaklara Borçlar) burada — A15B azaltacak hesap
+  const otherStPay    = sumByCodesPrefixNet(b,
+    ['331','332','333','335','336','380','381','391','392','393','397','399'],
+    ['337'],
+  )
+  const advances      = sumByCodesPrefix(b, ['340','349'])
+  const constrBilling = sumByCodesPrefix(b, ['350','358'])
+  const taxPay        = sumByCodesPrefixNet(b,
+    ['360','361','368','369','370','372','373','379'],
+    ['371'],
+  )
+  const currentLiabilities = stFinDebt + tradePay + otherStPay
+    + advances + constrBilling + taxPay
+
+  if (currentAssets <= 0 || currentLiabilities <= 0) return null
+
+  const currentRatio = currentAssets / currentLiabilities
+
+  // TCMB benchmark — 'currentRatio' TCMB_DIRECT_FIELDS içinde
+  const bm = getBenchmarkValue(ctx.sector, 'currentRatio')
+  const sectorMedian = bm?.value ?? 1.5   // inşaat/imalat/ticaret genel default
+
+  // Guard: Zaten sektör medyanı üstünde
+  if (currentRatio >= sectorMedian) return null
+
+  const halfGapRatio   = (currentRatio + sectorMedian) / 2
+  const targetCL       = currentAssets / halfGapRatio
+  const reductionAmount = currentLiabilities - targetCL
+
+  if (!Number.isFinite(reductionAmount) || reductionAmount <= 0) return null
+
+  return reductionAmount
 }
 
 // ─── getBenchmarkValue ───────────────────────────────────────────────────────
@@ -270,27 +817,16 @@ function buildDIORatioTransparency(
   ctx: FirmContext,
   amount: number
 ): BalanceRatioTransparency | null {
-  const stockBalance =
-    (ctx.accountBalances['150'] ?? 0) +
-    (ctx.accountBalances['151'] ?? 0) +
-    (ctx.accountBalances['152'] ?? 0) +
-    (ctx.accountBalances['153'] ?? 0)
-
+  const stockBalance = getInventoryBalance(ctx)
   if (stockBalance <= 0) return null
 
-  // COGS: önce doğrudan hesap bakiyeleri, yoksa netSales - grossProfit
-  const rawCogs =
-    (ctx.accountBalances['620'] ?? 0) +
-    (ctx.accountBalances['621'] ?? 0) +
-    (ctx.accountBalances['622'] ?? 0) +
-    (ctx.accountBalances['623'] ?? 0)
-  const cogs = rawCogs > 0 ? rawCogs : (getCogs(ctx) ?? 0)
-  if (cogs <= 0) return null
+  const cogs = getCogs(ctx)
+  if (cogs == null || cogs <= 0) return null
 
   const benchmarkField = (action.targetRatio?.benchmarkField ?? 'inventoryDays') as keyof import('../benchmarks').SectorBenchmark
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
   const targetDays  = bm?.value ?? action.targetRatio?.fallback ?? 90
-  const periodDays  = 365
+  const periodDays  = getPeriodDays({ period: ctx.period ?? 'ANNUAL' }).days
 
   // realisticTarget: panel aksiyonunun stoka etkisi (sıfıra clamp)
   const realisticTarget = Math.max(stockBalance - amount, 0)
@@ -324,9 +860,12 @@ function buildDIORatioTransparency(
 }
 
 /**
- * A12 — Brüt Kâr Marjı transparency.
- * current: mevcut brüt marj
+ * A12 / A20 — Brüt Kâr Marjı transparency.
+ * current: mevcut brüt marj (negatif olabilir — R4 DEKAM desteği)
  * realisticTarget: aksiyon sonrası beklenen marj (sektör medyanı ile sınırlı)
+ *
+ * R4 — A20 nakit kanal: 320 Satıcılar gösterilmez (102/621 kanalı).
+ * R4 — Kademeli hedef uyarısı formula.description'a eklendi (Sonnet kritik 1).
  */
 function buildMarginRatioTransparency(
   action: ActionTemplateV3,
@@ -336,9 +875,11 @@ function buildMarginRatioTransparency(
   const netSales    = ctx.netSales    ?? 0
   const grossProfit = ctx.grossProfit ?? 0
 
-  if (netSales <= 0 || grossProfit < 0) return null
+  // R4: brüt zarar guard kaldırıldı — negatif grossProfit desteklenir (DEKAM senaryosu)
+  // ESKİ: if (netSales <= 0 || grossProfit < 0) return null
+  if (netSales <= 0) return null
 
-  const current = grossProfit / netSales
+  const current = grossProfit / netSales  // negatif olabilir (brüt zarar)
 
   const benchmarkField = (action.targetRatio?.benchmarkField ?? 'grossMargin') as keyof import('../benchmarks').SectorBenchmark
   const bm = getBenchmarkValue(ctx.sector, benchmarkField)
@@ -351,6 +892,22 @@ function buildMarginRatioTransparency(
     ? current
     : Math.min(current + amount / netSales, sectorMedian)
 
+  // R4 — A20 nakit kanal: 320 gösterilmez (Codex 3)
+  const isNakitKanal = action.id === 'A20_GROSS_MARGIN_REFORM'
+  const accounts = isNakitKanal
+    ? [
+        { code: '102', name: 'Bankalar',              delta: +amount, description: 'Nakit tasarruf etkisi' },
+        { code: '621', name: 'Satılan Mal Maliyeti',  delta: -amount, description: 'Maliyet azalışı'       },
+      ]
+    : [
+        { code: '320', name: 'Satıcılar',              delta: -amount, description: 'Tedarikçi iskonto'  },
+        { code: '621', name: 'Satılan Mal Maliyeti',   delta: -amount, description: 'Maliyet azalışı'    },
+      ]
+
+  // R4 — Kademeli hedef uyarısı (Sonnet kritik 1): 12-18 ay vade
+  const baseDesc = 'Brüt Kâr Marjı = (Net Satış − Maliyet) / Net Satış'
+  const description = `${baseDesc} — Kademeli iyileştirme hedefi (12-18 ay vade).`
+
   return {
     kind: 'margin',
     metricLabel: 'Brüt Kâr Marjı',
@@ -358,13 +915,10 @@ function buildMarginRatioTransparency(
     realisticTarget,
     sectorMedian,
     formula: {
-      description: 'Brüt Kâr Marjı = (Net Satış − Maliyet) / Net Satış',
+      description,
       netSales,
       costToReduce: amount,
-      accounts: [
-        { code: '320', name: 'Satıcılar',              delta: -amount, description: 'Tedarikçi iskonto'  },
-        { code: '621', name: 'Satılan Mal Maliyeti',   delta: -amount, description: 'Maliyet azalışı'    },
-      ],
+      accounts,
     },
   }
 }
@@ -464,9 +1018,16 @@ export function buildActionRatioTransparency(
   ctx: FirmContext,
   amount: number
 ): RatioTransparency | null {
-  // ── Faz 7.3.11: A10 — Özkaynak/Aktif (ID-tabanlı; katalogda targetRatio yok) ──
-  if (action.id === 'A10_CASH_EQUITY_INJECTION') {
+  // ── Faz 7.3.11 + R8.3: A10/A10B — Özkaynak/Aktif transparency ──
+  // A10B de aynı özkaynak/aktif rasyosunu etkiler (121 ↑ / 500 ↑)
+  if (action.id === 'A10_CASH_EQUITY_INJECTION' ||
+      action.id === 'A10B_PROMISSORY_NOTE_EQUITY_INJECTION') {
     return buildEquityRatioTransparency(action, ctx, amount)
+  }
+
+  // ── A08 — MDV Atıl Varlık Disposal ──
+  if (action.id === 'A08_FIXED_ASSET_DISPOSAL') {
+    return buildFixedAssetDisposalTransparency(action, ctx, amount)
   }
 
   // ── Faz 7.3.50A.11: A20 — GROSS_MARGIN nakit kanal (102/621, 320 gerektirmez) ──
@@ -485,6 +1046,493 @@ export function buildActionRatioTransparency(
       // A05 ve diğerleri: mevcut balance/DSO helper
       return buildRatioTransparency(action, ctx, amount)
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A08 MDV (Maddi Duran Varlık) Helpers — Refactor 2
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── sumByCodesPrefixNet ─────────────────────────────────────────────────────
+
+/**
+ * Net bakiye: pozitif hesaplar toplamı − negatif (kontra) hesaplar toplamı.
+ * Örnek: getNetFixedAssets için
+ *   positivePrefixes = ['250','251','252','253','254','255']
+ *   negativePrefixes = ['257','258'] (birikmiş amortisman)
+ */
+export function sumByCodesPrefixNet(
+  balances: Record<string, number>,
+  positivePrefixes: string[],
+  negativePrefixes: string[]
+): number {
+  const gross = sumByCodesPrefix(balances, positivePrefixes)
+  const contra = sumByCodesPrefix(balances, negativePrefixes)
+  return Math.max(gross - contra, 0)
+}
+
+// ─── getGrossFixedAssets ─────────────────────────────────────────────────────
+
+/**
+ * Brüt Maddi Duran Varlık — amortisman düşülmemiş.
+ *
+ * Engine ana formülü ile birebir uyumlu:
+ *   250 Arazi + 251 Yeraltı + 252 Binalar + 253 Tesis/Makine + 254 Taşıtlar
+ *   + 255 Diğer + 256 Diğer MDV + 258 Yapılmakta Olan Yatırım + 259 Verilen Avans
+ *
+ * Guard 2 (Yeni Yatırım): 257 / brütMDV < 0.15 kontrolü için kullanılır.
+ */
+export function getGrossFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259']
+  )
+}
+
+// ─── getNetFixedAssets ───────────────────────────────────────────────────────
+
+/**
+ * Net Maddi Duran Varlık — birikmiş amortisman (257) düşülmüş.
+ *
+ * Engine ana formülü ile birebir uyumlu:
+ *   Pozitif: 250+251+252+253+254+255+256+258+259
+ *   Negatif: 257 (Birikmiş Amortisman)
+ *
+ * NOT: 256 (Diğer MDV), 258 (Yapılmakta Olan Yatırım), 259 (Verilen Avans) DAHİL.
+ *      258/259 satılabilir havuzuna (selectIdleAssetAccount) dahil edilmez.
+ */
+export function getNetFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['250', '251', '252', '253', '254', '255', '256', '258', '259'],
+    ['257']
+  )
+}
+
+// ─── getConstructionSafeFixedAssets ──────────────────────────────────────────
+
+/**
+ * İnşaat sektörü güvenli MDV:
+ * 250 (Arazi), 253 (Tesis/Makine — operasyonel), 254 (Taşıtlar — proje) HARİÇ.
+ * Sadece: 251 (Yeraltı/Yerüstü Düzenleri), 252 (Binalar), 255 (Diğer MDV).
+ */
+export function getConstructionSafeFixedAssets(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['251', '252', '255'],
+    ['257', '258']
+  )
+}
+
+// ─── computeFixedAssetRatio ──────────────────────────────────────────────────
+
+/**
+ * MDV / Toplam Aktif oranı.
+ * null döner: totalAssets 0 veya negatif ise.
+ */
+export function computeFixedAssetRatio(
+  netMDV: number,
+  totalAssets: number
+): number | null {
+  if (totalAssets <= 0) return null
+  return netMDV / totalAssets
+}
+
+// ─── getFixedAssetRatioBenchmark ─────────────────────────────────────────────
+
+/**
+ * Sektör bazlı MDV/Aktif üst eşiği (FINRATE_ESTIMATE).
+ * Bu oran aşıldığında (×1.20 tolerans ile) MDV fazlası sinyali verilir.
+ *
+ * Değerler: Codex 5 tur audit + TCMB sektör bilançoları referanslı tahmin.
+ */
+const FIXED_ASSET_RATIO_BENCHMARKS: Record<string, number> = {
+  MANUFACTURING: 0.50,  // İmalat: makine ağırlıklı, %50 normal
+  CONSTRUCTION:  0.35,  // İnşaat: proje stoku yüksek, MDV %35 sınır
+  TRADE:         0.30,  // Ticaret: hafif, %30 üstü fazla
+  RETAIL:        0.25,  // Perakende: çok hafif
+  SERVICES:      0.40,  // Hizmet: ofis/ekipman, %40
+  IT:            0.20,  // BT: en hafif
+}
+
+export function getFixedAssetRatioBenchmark(sector: string): number {
+  return FIXED_ASSET_RATIO_BENCHMARKS[sector.toUpperCase()] ?? 0.40
+}
+
+// ─── isFixedAssetHeavy ───────────────────────────────────────────────────────
+
+/**
+ * Firma MDV/Aktif oranı sektör benchmark'ının %20 üstünde mi?
+ * Eşik 1: MDV fazlası tespiti.
+ */
+export function isFixedAssetHeavy(ctx: FirmContext): boolean {
+  const netMDV = getNetFixedAssets(ctx)
+  if (netMDV <= 0) return false
+  const ratio = computeFixedAssetRatio(netMDV, ctx.totalAssets)
+  if (ratio == null) return false
+  const benchmark = getFixedAssetRatioBenchmark(ctx.sector)
+  return ratio > benchmark * 1.20  // %20 tolerans
+}
+
+// ─── computeCurrentAssetTurnover ─────────────────────────────────────────────
+
+/**
+ * Aktif devir hızı = Net Satış / Toplam Aktif.
+ * null: totalAssets 0 ise.
+ */
+export function computeCurrentAssetTurnover(ctx: FirmContext): number | null {
+  if (ctx.totalAssets <= 0) return null
+  return ctx.netSales / ctx.totalAssets
+}
+
+// ─── isLowAssetTurnover ───────────────────────────────────────────────────────
+
+/**
+ * Aktif devir hızı sektör benchmark'ının %80 altında mı?
+ * Eşik 2: Düşük aktif verimliliği tespiti.
+ */
+export function isLowAssetTurnover(ctx: FirmContext): boolean {
+  const turnover = computeCurrentAssetTurnover(ctx)
+  if (turnover == null) return false
+  const bm = getBenchmarkValue(ctx.sector, 'assetTurnover')
+  if (bm == null) return false
+  return turnover < bm.value * 0.80  // benchmark'ın %80 altı
+}
+
+// ─── isIdleAssetCandidate ─────────────────────────────────────────────────────
+
+/**
+ * Atıl varlık satışı için uygun mu?
+ * GEREKLI: MDV fazlası (Eşik 1) VE düşük aktif devir (Eşik 2) — her ikisi.
+ * Tek başına düşük aktif devir yetmez (A06 ile çakışır).
+ */
+export function isIdleAssetCandidate(ctx: FirmContext): boolean {
+  return isFixedAssetHeavy(ctx) && isLowAssetTurnover(ctx)
+}
+
+// ─── isConstructionExcludedAccount ───────────────────────────────────────────
+
+/**
+ * İnşaat sektöründe hariç tutulan MDV hesabı mı?
+ * 250: Arazi/Arsalar (proje arazisi)
+ * 253: Tesis, Makine ve Cihazlar (operasyonel ekipman)
+ * 254: Taşıtlar (proje taşıtı)
+ */
+export function isConstructionExcludedAccount(accountCode: string): boolean {
+  const code = accountCode.trim()
+  return ['250', '253', '254'].some(prefix =>
+    code === prefix ||
+    code.startsWith(`${prefix}.`) ||
+    code.startsWith(`${prefix}-`) ||
+    code.startsWith(`${prefix}/`)
+  )
+}
+
+// ─── selectIdleAssetAccount ───────────────────────────────────────────────────
+
+export interface IdleAssetAccountResult {
+  /** Yeni alanlar */
+  code:         string
+  name:         string
+  balance:      number
+  usableAmount: number   // balance × 0.90 veya capped amount — senkronizasyon için
+  /** Geri uyum alanları (eski çağrıcılar için) */
+  accountCode:  string
+  accountName:  string
+}
+
+/**
+ * Atıl varlık satışı için akıllı hesap seçimi.
+ *
+ * Öncelik (253 Tesis/Makine HARIÇ — operasyonel):
+ *   1. 256 Diğer MDV
+ *   2. 250 Arazi ve Arsalar
+ *   3. 252 Binalar
+ *   4. 255 Demirbaşlar
+ *   5. 254 Taşıtlar
+ *
+ * CONSTRUCTION: 250 hariç (proje arazisi) → 256, 252, 255, 254
+ * isIpotekli:   250 ve 252 rehin altında → 256, 255, 254
+ *
+ * Güvenlik tamponu: bakiye × %90 satılabilir
+ *
+ * KRİTİK BUG FIX: Aday yoksa NULL döner (eskiden 253 dönerdi!).
+ * Fallback tutarı 1M altında kalırsa da NULL döner.
+ */
+export function selectIdleAssetAccount(
+  ctx: { sector: SectorCode | string; accountBalances?: Record<string, number> },
+  amount: number,
+  isIpotekli?: boolean
+): IdleAssetAccountResult | null {
+  const MDV_PRIORITY = [
+    { code: '256', name: 'Diğer Maddi Duran Varlıklar' },
+    { code: '250', name: 'Arazi ve Arsalar'             },
+    { code: '252', name: 'Binalar'                      },
+    { code: '255', name: 'Demirbaşlar'                  },
+    { code: '254', name: 'Taşıtlar'                     },
+  ]
+
+  // Sektör ve ipotek filtresi
+  let priorityList = MDV_PRIORITY
+  if (ctx.sector === 'CONSTRUCTION') {
+    priorityList = MDV_PRIORITY.filter(p => p.code !== '250')
+  }
+  if (isIpotekli) {
+    priorityList = priorityList.filter(p => p.code !== '250' && p.code !== '252')
+  }
+
+  const balances = ctx.accountBalances ?? {}
+  const candidates = priorityList
+    .map(item => ({
+      code:    item.code,
+      name:    item.name,
+      balance: sumByCodesPrefix(balances, [item.code]),
+    }))
+    .filter(c => c.balance > 0)
+
+  // KRİTİK: Aday yoksa NULL — 253 default DÖNMEZ (eski BUG fix)
+  if (candidates.length === 0) return null
+
+  // Öncelik sırasında %90 tamponu karşılayan ilk hesap
+  for (const c of candidates) {
+    if (c.balance * 0.90 >= amount) {
+      return {
+        code:        c.code,
+        name:        c.name,
+        balance:     c.balance,
+        usableAmount: amount,        // tam talep karşılandı
+        accountCode: c.code,         // geri uyum
+        accountName: c.name,         // geri uyum
+      }
+    }
+  }
+
+  // Hiçbiri tam kapsamıyorsa: en büyük bakiyeli, %90 cap
+  const largest = candidates.reduce((max, c) => c.balance > max.balance ? c : max, candidates[0])
+  const cappedAmount = largest.balance * 0.90
+
+  // Cap sonrası 1M altında → null (küçük hareket anlamsız)
+  if (cappedAmount < 1_000_000) return null
+
+  return {
+    code:        largest.code,
+    name:        largest.name,
+    balance:     largest.balance,
+    usableAmount: cappedAmount,
+    accountCode: largest.code,       // geri uyum
+    accountName: largest.name,       // geri uyum
+  }
+}
+
+// ─── buildFixedAssetDisposalTransparency ──────────────────────────────────────
+
+/**
+ * A08 MDV disposal için ratio transparency.
+ * currentBalance:  net MDV (güvenli hesaplar)
+ * realisticTarget: aksiyon sonrası MDV (MDV - amount)
+ * sectorMedian:    sektör benchmark MDV hedefi (totalAssets × benchmarkRatio)
+ * formula:         targetDays/periodDays = benchmarkRatio (örn: 50/100 = %50)
+ */
+function buildFixedAssetDisposalTransparency(
+  action: ActionTemplateV3,
+  ctx: FirmContext,
+  amount: number
+): BalanceRatioTransparency | null {
+  const netMDV = ctx.sector === 'CONSTRUCTION'
+    ? getConstructionSafeFixedAssets(ctx)
+    : getNetFixedAssets(ctx)
+
+  if (netMDV <= 0) return null
+
+  const benchmarkRatio = getFixedAssetRatioBenchmark(ctx.sector)
+  const targetMDV      = ctx.totalAssets * benchmarkRatio
+  const realisticTarget = Math.max(netMDV - amount, 0)
+
+  return {
+    kind:             'balance',
+    currentBalance:   netMDV,
+    realisticTarget,
+    sectorMedian:     targetMDV,
+    capPercent:       0.25,
+    formula: {
+      targetLabel: 'Hedef Net MDV',
+      basisLabel:  'Toplam Aktif',
+      basisValue:  ctx.totalAssets,
+      targetDays:  Math.round(benchmarkRatio * 100),   // % olarak (örn. 50)
+      periodDays:  100,                                 // bölen (% normalizer)
+    },
+    attribution: {
+      sourceType:  'FINRATE_ESTIMATE',
+      sectorLabel: getSectorLabel(ctx.sector),
+      year:        new Date().getFullYear(),
+    },
+    method: 'period-end-balance',
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A08 Likidite & Bilanço Helpers — Refactor 2 Tamamlama
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── getCashBalance ───────────────────────────────────────────────────────────
+
+/**
+ * Hazır Değerler — 100+101+102+108 eksi 103 (alınan çekler)
+ */
+export function getCashBalance(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['100', '101', '102', '108'],
+    ['103']
+  )
+}
+
+// ─── getShortTermFinancialDebt ────────────────────────────────────────────────
+
+/**
+ * KV Mali Borç — 300-309 arasından 302 (alınan çekler) ve 308 hariç
+ */
+export function getShortTermFinancialDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['300', '301', '303', '304', '305', '306', '309'],
+    ['302', '308']
+  )
+}
+
+// ─── getShortTermTradeDebt ────────────────────────────────────────────────────
+
+/**
+ * KV Ticari Borç — 320, 321, 326, 329 eksi 322 (alınan çekler)
+ */
+export function getShortTermTradeDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['320', '321', '326', '329'],
+    ['322']
+  )
+}
+
+// ─── getLongTermFinancialDebt ─────────────────────────────────────────────────
+
+/**
+ * UV Mali Borç — 400, 401, 405, 407, 409 eksi 402, 408
+ */
+export function getLongTermFinancialDebt(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['400', '401', '405', '407', '409'],
+    ['402', '408']
+  )
+}
+
+// ─── getTradeReceivables ──────────────────────────────────────────────────────
+
+/**
+ * Ticari Alacaklar — 120, 121, 126, 127, 128 eksi 122 (şüpheli) ve 129
+ */
+export function getTradeReceivables(ctx: FirmContext): number {
+  return sumByCodesPrefixNet(
+    ctx.accountBalances ?? {},
+    ['120', '121', '126', '127', '128'],
+    ['122', '129']
+  )
+}
+
+// ─── getAccumulatedDepreciation ───────────────────────────────────────────────
+
+/**
+ * Birikmiş Amortisman (257) — pozitif değer
+ */
+export function getAccumulatedDepreciation(ctx: FirmContext): number {
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, ['257'])
+}
+
+// ─── getRevaluationReserve ────────────────────────────────────────────────────
+
+/**
+ * MDV Yeniden Değerleme Fonu (522)
+ */
+export function getRevaluationReserve(ctx: FirmContext): number {
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, ['522'])
+}
+
+// ─── getCurrentRatio ──────────────────────────────────────────────────────────
+
+/**
+ * Cari Oran — Dönen Varlık / KV Yükümlülük
+ * Dönen varlık: nakit + ticari alacak + stok (150-159)
+ * KV yükümlülük: KV mali borç + KV ticari borç + diğer KV
+ */
+export function getCurrentRatio(ctx: FirmContext): number | null {
+  const cash        = getCashBalance(ctx)
+  const receivables = getTradeReceivables(ctx)
+  const inventory   = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153', '157', '158', '159']
+  )
+  const currentAssets = cash + receivables + inventory
+
+  const stDebt  = getShortTermFinancialDebt(ctx)
+  const stTrade = getShortTermTradeDebt(ctx)
+  const otherSt = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['340', '349', '360', '361', '368', '369', '370', '371', '372', '373', '379']
+  )
+  const currentLiabilities = stDebt + stTrade + otherSt
+
+  if (currentLiabilities <= 0) return null
+  return currentAssets / currentLiabilities
+}
+
+// ─── getNetWorkingCapital ─────────────────────────────────────────────────────
+
+/**
+ * Net İşletme Sermayesi — Dönen Varlık − KV Yükümlülük
+ */
+export function getNetWorkingCapital(ctx: FirmContext): number {
+  const cash        = getCashBalance(ctx)
+  const receivables = getTradeReceivables(ctx)
+  const inventory   = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['150', '151', '152', '153', '157', '158', '159']
+  )
+  const currentAssets = cash + receivables + inventory
+
+  const stDebt  = getShortTermFinancialDebt(ctx)
+  const stTrade = getShortTermTradeDebt(ctx)
+  const otherSt = sumByCodesPrefix(
+    ctx.accountBalances ?? {},
+    ['340', '349', '360', '361', '368', '369']
+  )
+  const currentLiabilities = stDebt + stTrade + otherSt
+
+  return currentAssets - currentLiabilities
+}
+
+// ─── getIdleAssetPoolBalance ──────────────────────────────────────────────────
+
+/**
+ * Atıl varlık pool — sektör ve ipotek duyarlı.
+ *
+ * Varsayılan: 256, 250, 252, 255
+ * CONSTRUCTION: 250 hariç (proje arazisi) → 256, 252, 255
+ * isIpotekli:   250 ve 252 rehin altında → sadece 256, 255
+ */
+export function getIdleAssetPoolBalance(
+  ctx: FirmContext,
+  options?: { isIpotekli?: boolean }
+): number {
+  let codes = ['256', '250', '252', '255']
+
+  if (ctx.sector === 'CONSTRUCTION') {
+    codes = ['256', '252', '255']
+  }
+
+  if (options?.isIpotekli) {
+    codes = codes.filter(c => c !== '250' && c !== '252')
+  }
+
+  return sumByCodesPrefix(ctx.accountBalances ?? {}, codes)
 }
 
 // ─── detectExtremeDeviation ──────────────────────────────────────────────────
@@ -508,4 +1556,193 @@ export function detectExtremeDeviation(
     isExtreme: ratio > 5 || ratio < 0.2,
     severity,
   }
+}
+
+// ─── Diagnostic Types & Helpers (R6) ─────────────────────────────────────────
+
+/**
+ * R6 — Tanı notları
+ *
+ * SECTOR_TARGET_MET:  Rasyo zaten sektör benchmarkının altında — aksiyon gerekmiyor.
+ * MATERIALITY_BELOW:  Rasyo üstünde ama gap/tutar önemsiz — öneri üretilmedi.
+ * DATA_NOT_FOUND:     Gerekli hesap verisi yok — hesaplama yapılamadı.
+ */
+export type EvaluationNote =
+  | 'SECTOR_TARGET_MET'
+  | 'MATERIALITY_BELOW'
+  | 'DATA_NOT_FOUND'
+
+export interface DiagnosticResult {
+  evaluationNote:   EvaluationNote
+  currentRatio?:    number
+  benchmarkRatio?:  number
+  gap?:             number
+  computedAmount?:  number
+  userMessage:      string
+}
+
+// ─── diagnoseFinancialExpenseReduction (R6) ───────────────────────────────────
+
+/**
+ * R6 — A14 için tanısal yardımcı (ORGANIKA debug / UI açıklama).
+ *
+ * Ana akış (A14.computeAmount) DOKUNULMAZ.
+ * Bu helper sadece "neden null?" sorusunu cevaplar.
+ *
+ * @returns null → öneri üretildi (normal durum); DiagnosticResult → neden üretilemedi
+ */
+export function diagnoseFinancialExpenseReduction(ctx: FirmContext): DiagnosticResult | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Net satış verisi bulunamadı — finansman gideri analizi yapılamadı.',
+    }
+  }
+
+  const finResult = getFinancialExpenses(ctx)
+  if (finResult.amount === null || finResult.amount <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Finansman gideri (780/781) veya mali borç (300/400) tespit edilemedi.',
+    }
+  }
+
+  const currentRatio = finResult.amount / netSales
+  const bm           = getBenchmarkValue(ctx.sector, 'financialExpenseRatio')
+  if (!bm || bm.value <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      currentRatio,
+      userMessage:    'Sektör finansman gideri benchmark değeri bulunamadı.',
+    }
+  }
+
+  const benchmarkRatio = bm.value
+
+  if (currentRatio <= benchmarkRatio) {
+    return {
+      evaluationNote: 'SECTOR_TARGET_MET',
+      currentRatio,
+      benchmarkRatio,
+      gap:            0,
+      userMessage:    `Finansman gideri oranı (${(currentRatio * 100).toFixed(1)}%) sektör hedefinin (${(benchmarkRatio * 100).toFixed(1)}%) altında — aksiyon gerekmiyor.`,
+    }
+  }
+
+  const gap       = currentRatio - benchmarkRatio
+  const reduction = gap * netSales * 0.5
+
+  // R6 HOTFIX (Codex K11): Gerçek dynamic materiality floor kullan
+  // Önceki: sadece reduction <= 0 (dead code — gap>0 + netSales>0 ise reduction>0)
+  // Şimdi: engine ile aynı eşik (medium horizon, totalAssets bazlı)
+  if (reduction <= 0) {
+    // Güvenlik: negatif/sıfır reduction (teorik olarak ulaşılamaz)
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: 0,
+      userMessage:    'Hesaplanan azaltma tutarı sıfır — anlamlı öneri yapılamadı.',
+    }
+  }
+
+  // Dynamic materiality floor (engine R3.2 ile aynı — medium horizon default)
+  const safeAssets   = Math.max(ctx.totalAssets ?? 0, 0)
+  const materialityFloor = getDynamicMaterialityFloor('medium', safeAssets)
+  if (reduction < materialityFloor) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: reduction,
+      userMessage:    `Hesaplanan azaltma tutarı (${(reduction / 1_000_000).toFixed(2)}M TL) materyal eşiğin altında (${(materialityFloor / 1_000_000).toFixed(2)}M TL) — öneri üretilmedi.`,
+    }
+  }
+
+  // Öneri üretildi — null dönülür (DiagnosticResult sadece "neden null?" içindir)
+  return null
+}
+
+// ─── diagnoseOperatingExpenseReduction (R6) ──────────────────────────────────
+
+/**
+ * R6 — A21 için tanısal yardımcı.
+ *
+ * Ana akış (A21.computeAmount) DOKUNULMAZ.
+ *
+ * @returns null → öneri üretildi; DiagnosticResult → neden üretilemedi
+ */
+export function diagnoseOperatingExpenseReduction(ctx: FirmContext): DiagnosticResult | null {
+  const netSales = ctx.netSales ?? 0
+  if (!Number.isFinite(netSales) || netSales <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Net satış verisi bulunamadı — faaliyet gideri analizi yapılamadı.',
+    }
+  }
+
+  const opex = getOperatingExpenses(ctx)
+  if (opex === null || opex <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      userMessage:    'Faaliyet gideri (632-634) veya KOBİ fallback (brüt kâr − faaliyet kârı) tespit edilemedi.',
+    }
+  }
+
+  const currentRatio = opex / netSales
+  const bm           = getBenchmarkValue(ctx.sector, 'operatingExpenseRatio')
+  if (!bm || bm.value <= 0) {
+    return {
+      evaluationNote: 'DATA_NOT_FOUND',
+      currentRatio,
+      userMessage:    'Sektör faaliyet gideri benchmark değeri bulunamadı.',
+    }
+  }
+
+  const benchmarkRatio = bm.value
+
+  if (currentRatio <= benchmarkRatio) {
+    return {
+      evaluationNote: 'SECTOR_TARGET_MET',
+      currentRatio,
+      benchmarkRatio,
+      gap:            0,
+      userMessage:    `Faaliyet gideri oranı (${(currentRatio * 100).toFixed(1)}%) sektör hedefinin (${(benchmarkRatio * 100).toFixed(1)}%) altında — aksiyon gerekmiyor.`,
+    }
+  }
+
+  const gap       = currentRatio - benchmarkRatio
+  const reduction = gap * netSales * 0.5
+
+  // R6 HOTFIX (Codex K11): Gerçek dynamic materiality floor kullan
+  if (reduction <= 0) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: 0,
+      userMessage:    'Hesaplanan azaltma tutarı sıfır — anlamlı öneri yapılamadı.',
+    }
+  }
+
+  // Dynamic materiality floor (engine R3.2 ile aynı — medium horizon default)
+  const safeAssets       = Math.max(ctx.totalAssets ?? 0, 0)
+  const materialityFloor = getDynamicMaterialityFloor('medium', safeAssets)
+  if (reduction < materialityFloor) {
+    return {
+      evaluationNote: 'MATERIALITY_BELOW',
+      currentRatio,
+      benchmarkRatio,
+      gap,
+      computedAmount: reduction,
+      userMessage:    `Hesaplanan azaltma tutarı (${(reduction / 1_000_000).toFixed(2)}M TL) materyal eşiğin altında (${(materialityFloor / 1_000_000).toFixed(2)}M TL) — öneri üretilmedi.`,
+    }
+  }
+
+  // Öneri üretildi
+  return null
 }

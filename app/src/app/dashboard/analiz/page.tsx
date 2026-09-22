@@ -673,7 +673,7 @@ function AnalizPageContent() {
         { id: 'Net Kar Marjı',                     desc: 'Net kâr / satışlar. Tüm giderler, faiz ve vergi sonrası kalan kâr payı. Bankaların en çok izlediği karlılık göstergesidir.',                                       val: fmtPct(r.netProfitMargin),        avg: fmtPct(bm.netProfitMargin),        good: r.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 },
         { id: 'Aktif Karlılığı (ROA)',             desc: 'Net kâr / toplam aktif. Varlıkların ne kadar verimli kullanıldığını gösterir. %4+ iyi, %8+ çok iyi kabul edilir.',                                                 val: fmtPct(r.roa),                    avg: fmtPct(bm.roa),                     good: r.roa != null && r.roa >= bm.roa * 0.8 },
         { id: 'Özkaynak Karlılığı (ROE)',          desc: 'Net kâr / özkaynak. Hissedar yatırımının getirisidir. %10+ iyi, sektör ortalamasının üzeri çok iyi sayılır.',                                                      val: fmtPct(r.roe),                    avg: fmtPct(bm.roe),                     good: r.roe != null && r.roe >= bm.roe * 0.8 },
-        { id: 'Yatırım Getirisi (ROIC)',           desc: 'FVÖK×(1-vergi) / yatırılan sermaye. Tüm finanse edilmiş sermayenin verimliliğini ölçer. Sermaye maliyetinin üzerinde olması gerekir.',                             val: fmtPct(r.roic),                   avg: fmtPct(bm.roic),                    good: r.roic != null && r.roic >= 0.10 },
+        { id: 'Yatırım Getirisi (ROIC)',           desc: 'FVÖK×(1-vergi) / yatırılan sermaye. Tüm finanse edilmiş sermayenin verimliliğini ölçer. Sermaye maliyetinin üzerinde olması gerekir.',                             val: fmtPct(r.roic),                   avg: fmtPct(bm.roic),                    good: r.roic != null && bm.roic != null && r.roic >= bm.roic * 0.8 },
         { id: 'Nominal Gelir Büyümesi',            desc: 'Cironun yıllık büyüme oranı (enflasyon dahil). Pozitif büyüme şirketin büyüdüğüne işaret eder.',                                                                   val: r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '—', avg: fmtPct(bm.revenueGrowth), good: r.revenueGrowth != null && r.revenueGrowth >= 0 },
         { id: 'Reel Büyüme (ÜFE Arındırılmış)',   desc: 'Nominal büyümeden ÜFE (üretici fiyat endeksi) çıkarılan reel büyüme. Enflasyondan arındırılmış gerçek büyümeyi gösterir.',                                         val: r.realGrowth != null ? fmtPct(r.realGrowth) : '—', avg: '—', good: r.realGrowth != null && r.realGrowth >= 0 },
       ]
@@ -987,7 +987,7 @@ function AnalizPageContent() {
                   const crStatus    = crRatio < 1 ? 'warning' : 'normal'
 
                   const activeRating = cr.replace(/[+\-]/g, '')
-                  const RATING_SCALE = ['AAA','AA','A','BBB','BB','B','CCC']
+                  const RATING_SCALE = ['AAA','AA','A','BBB','BB','B','CCC','CC','C','D']
                   const RISK_LABEL: Record<string,string> = {
                     AAA:'Çok Düşük', AA:'Düşük', A:'Düşük', BBB:'Orta',
                     BB:'Orta-Yüksek', B:'Yüksek', CCC:'Çok Yüksek', CC:'Kritik', C:'Kritik', D:'İflas',
@@ -1009,9 +1009,7 @@ function AnalizPageContent() {
                       <div className={clsx('kpi-card kpi-score', cs < 60 && 'kpi-card-warning')}>
                         <div className="kpi-header">
                           <span className="kpi-label">Finrate Skoru</span>
-                          <span className={clsx('kpi-badge', cs >= 60 ? 'badge-up' : 'badge-down')}>
-                            {cr}
-                          </span>
+                          {/* R12.2E-FIX: sağ üst rating rozeti kaldırıldı — orta büyük yazıyla duplikasyon */}
                         </div>
                         <div className="kpi-body-score">
                           <div className="score-ring-wrap" style={{ width:80, height:80 }}>
@@ -1037,7 +1035,7 @@ function AnalizPageContent() {
                             </div>
                           </div>
                           <div className="score-meta">
-                            <span className="score-grade" style={{ color: RATING_COLOR[cr] ?? '#2dd4bf', fontSize:18 }}>{cr}</span>
+                            <span className="score-grade" style={{ color: RATING_COLOR[cr] ?? '#2dd4bf', fontSize:32 }}>{cr}</span>
                             <span className="score-label">{RATING_LABEL[cr] ?? 'Kredi Notu'}</span>
                           </div>
                         </div>

@@ -859,14 +859,9 @@ export function buildBankerSummary(
     parts.push(`Adreslenmeyen kritik aksiyonlar: ${topMissedLabels}.`)
   }
 
-  // Guven ozeti
+  // Guven ozeti — %X sayisi kaldirildi (R11), sadece dusuk durumda uyari
   if (transition.confidence === 'LOW') {
-    parts.push(
-      `Rating iyileşme güveni düşük — güven katsayısı ` +
-      `%${(transition.confidenceModifier * 100).toFixed(0)} (minimum %25 tabanında).`
-    )
-  } else if (transition.confidence === 'HIGH') {
-    parts.push(`Rating iyileşme güveni yüksek.`)
+    parts.push(`Portföy kalitesi bu geçiş için yeterli değil; yapısal aksiyonlar güçlendirilmeli.`)
   }
 
   return parts.join(' ')

@@ -665,7 +665,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             skipDuplicates: true,
           })
         } else if (docType === 'MIZAN') {
-          // Mizan (Excel veya PDF): sadece bilanço hesapları (1xx-5xx)
+          // Mizan (Excel veya PDF): bilanço hesapları (1xx-5xx) + finansman giderleri (7xx)
+          // R8.4.5: 7xx (780 Finansman Giderleri, 781 vb.) eklendi — A14 helper gerçek 780 değeri kullanabilsin
           // 6xx gelir tablosu hesapları korunur (beyanname tarafından yazılmış olabilir)
           await prisma.financialAccount.deleteMany({
             where: {
@@ -676,11 +677,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 { accountCode: { startsWith: '3' } },
                 { accountCode: { startsWith: '4' } },
                 { accountCode: { startsWith: '5' } },
+                { accountCode: { startsWith: '7' } },
               ],
             },
           })
+          // R8.4.5: '7' prefix eklendi — 780/781 gibi finansman gider hesapları DB'ye yazılır
           const balanceAccounts = row.rawAccounts.filter(a =>
-            ['1', '2', '3', '4', '5'].some(p => a.code.startsWith(p))
+            ['1', '2', '3', '4', '5', '7'].some(p => a.code.startsWith(p))
           )
           if (balanceAccounts.length > 0) {
             await prisma.financialAccount.createMany({

@@ -5,7 +5,9 @@ import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioE
 import { formatScenariosForResponse, buildEngineResultDto } from '@/lib/scoring/scenarioV3/responseMapper'
 import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
 import type { EngineResult }               from '@/lib/scoring/scenarioV3/engineV3'
+import { calculateProjectedRatiosFromPortfolio } from '@/lib/scoring/scenarioV3/engineV3'
 import { calculateRatiosFromAccounts }        from '@/lib/scoring/ratios'
+import { rebuildAggregateFromAccounts }       from '@/lib/scoring/accountMapper'
 import { calculateScore, scoreToRating }      from '@/lib/scoring/score'
 import { combineScores, calcSubjectiveScore }  from '@/lib/scoring/subjective'
 import { calculateActualPostActionRating }    from '@/lib/scoring/scenarioV3/postActionRating'
@@ -247,6 +249,7 @@ export async function POST(req: NextRequest) {
       targetRating,
       accountBalances: balances,
       incomeStatement,
+      period: analysis.period,    // YENİ: Q1/Q2/Q3/Q4/ANNUAL
     }
 
     const [conservativeResult, typicalResult, aggressiveResult] = await Promise.all([
@@ -295,6 +298,9 @@ export async function POST(req: NextRequest) {
           currentCombinedScore,
           currentActualRating,
           decisionCurrentRating: er.currentRating,
+          // R7B — criticalIssues mandatori enjeksiyonu için
+          netSales:    incomeStatement.netSales,
+          grossProfit: incomeStatement.grossProfit,
         },
       )
 
@@ -386,10 +392,51 @@ export async function POST(req: NextRequest) {
       // Faz 7.3.48: Firma mevcut hesap bakiyeleri — AccountImpactTable Mevcut/Önerilen/Δ için
       currentAccountBalances: balances,
 
+      // R12.2A-FIX: _filteredPortfolio ONCE kullan, sonra response'tan SIL (API sızıntısı)
+      ratios: (() => {
+        const uiPortfolio = decisionAnswer._filteredPortfolio ?? engineResult.portfolio
+        const uiProjected = calculateProjectedRatiosFromPortfolio(balances, uiPortfolio)
+        return {
+          // R11 (geriye uyumlu — ScenarioPanelV3 okuyor):
+          grossMargin:      ratios.grossMargin,
+          interestCoverage: ratios.interestCoverage,
+          // R12.2A: 8 bankacı rasyosu — bugünkü + projeksiyon
+          current: {
+            currentRatio:     ratios.currentRatio,
+            quickRatio:       ratios.quickRatio,
+            debtToEquity:     ratios.debtToEquity,
+            interestCoverage: ratios.interestCoverage,
+            grossMargin:      ratios.grossMargin,
+            roic:             ratios.roic,
+            ebitdaMargin:     ratios.ebitdaMargin,
+            debtToEbitda:     ratios.debtToEbitda,
+          },
+          projected: uiProjected ? {
+            currentRatio:     uiProjected.currentRatio,
+            quickRatio:       uiProjected.quickRatio,
+            debtToEquity:     uiProjected.debtToEquity,
+            interestCoverage: uiProjected.interestCoverage,
+            grossMargin:      uiProjected.grossMargin,
+            roic:             uiProjected.roic,
+            ebitdaMargin:     uiProjected.ebitdaMargin,
+            debtToEbitda:     uiProjected.debtToEbitda,
+          } : null,
+        }
+      })(),
+      totalEquity: rebuildAggregateFromAccounts(analysis.financialAccounts).totalEquity ?? null,
+
       // Opsiyonel V2 karsilastirma -- henuz desteklenmiyor bu route'ta
       v2Comparison: includeV2Comparison
         ? { note: 'V2 karşılaştırması bu endpoint üzerinden desteklenmiyor. /api/scenarios/v2 ve /api/scenarios/v3 sonuçlarını client-side karşılaştırın.' }
         : undefined,
+    }
+
+    // R12.2A-FIX: _filteredPortfolio API JSON'a sızmasın — response'tan strip et
+    delete (responsePayload.decisionAnswer as Record<string, unknown>)._filteredPortfolio
+    if (responsePayload.plans) {
+      for (const plan of responsePayload.plans) {
+        delete (plan.decisionAnswer as Record<string, unknown>)?._filteredPortfolio
+      }
     }
 
     // === Faz 7.3.60.1: roadmapSnapshot kaydet (manuel kaynak) ===

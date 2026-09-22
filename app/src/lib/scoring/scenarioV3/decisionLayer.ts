@@ -36,7 +36,15 @@ import type {
   SelectedAction,
   FeasibilityAssessment,
 } from './engineV3'
-import { buildMaturityMismatchInsight } from './insightCatalog'
+import {
+  buildMaturityMismatchInsight,
+  buildLiquidityInsight,
+  buildQuickRatioInsight,
+  buildInventoryTurnoverInsight,
+  buildAdvancesPressureInsight,
+  buildInterestCoverageInsight,
+  buildLeverageInsight,
+} from './insightCatalog'
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 import type { RatingGrade } from './ratingReasoning'
 import {
@@ -45,6 +53,7 @@ import {
   ratingToIndex,
 } from './ratingReasoning'
 import { ceilingTypeToDisplay, confidenceToDisplay, formatCeilingDisplay } from '../displayMaps'
+import { getMandatoryActionsForFirm } from './criticalIssues'  // R7B
 import type {
   CeilingConstraint,
   DriverGroup,
@@ -137,6 +146,8 @@ export interface ActionPlanRow {
   bankerPerspective: string
   /** UI transparency bloku — sadece computeAmount aktif aksiyonlarda dolu */
   ratioTransparency?: import('./contracts').RatioTransparency
+  /** R12.2B: Gerçek nakit etkisi bayrağı — undefined: katalogda yok, true: nakit yaratır, false: yaratmaz */
+  realLiquidityImpact?: boolean
 }
 
 // ─── NOTCH PLAN ──────────────────────────────────────────────────────────────
@@ -302,6 +313,11 @@ export interface DecisionAnswer {
    * Üretim: buildDecisionAnswer içindeki buildCanonicalOutcome.
    */
   canonicalOutcome: CanonicalOutcome
+  /**
+   * R12.2A-FIX: UI'da gösterilen FINAL portföy (subset + mandatory injection).
+   * Route.ts'te projeksiyon hesabı için kullanılır — UI'a gönderilmez.
+   */
+  _filteredPortfolio?: SelectedAction[]
 }
 
 // ─── TARGET PACKAGE CONTEXT (Faz 7.3.8d) ─────────────────────────────────────
@@ -327,6 +343,12 @@ export interface TargetPackageContext {
    * selectTargetPackage'e doğrudan iletilir.
    */
   decisionCurrentRating?: string
+  /**
+   * R7B — criticalIssues için gelir tablosu verileri.
+   * Mandatori aksiyon enjeksiyonunda kullanılır.
+   */
+  netSales?:    number
+  grossProfit?: number
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -747,6 +769,8 @@ function buildActionPlan(engineResult: EngineResult): ActionPlanRow[] {
       cfoRationale:             template?.cfoRationale ?? action.narrative,
       bankerPerspective:        template?.bankerPerspective ?? '',
       ratioTransparency:        action.ratioTransparency,
+      // R12.2B: NESTED yoldan oku — ?? false KULLANMA (Codex: undefined bırak)
+      realLiquidityImpact:      template?.expectedEconomicImpact?.createsRealCash,
     })
   })
 
@@ -972,13 +996,13 @@ function buildTargetFeasibilityExplanation(
 
   if (targetAchieved) {
     parts.push(
-      `${currentRating} → ${requestedTarget} geçişi mümkün görünüyor. ` +
-      `${notchesGained} kategori iyileşme, güven: ${confidenceToDisplay(confidence)} ` +
-      `(%${(confidenceModifier * 100).toFixed(0)}).`
+      `${currentRating} → ${requestedTarget} hedefine ulaşılabilir görünüyor. ` +
+      `${notchesGained} kategori iyileşme.`
     )
   } else {
     parts.push(
-      `${requestedTarget} hedefine ulaşılamıyor — ulaşılabilir maksimum: ${finalTargetRating}. ` +
+      `${requestedTarget} hedefine bu dönemde ulaşılamıyor. ` +
+      `Mevcut koşullarda ulaşılabilecek en yüksek seviye: ${finalTargetRating}. ` +
       `${notchesGained} kategori iyileşme mümkün.`
     )
   }
@@ -1081,6 +1105,8 @@ function buildUiReadyRows(engineResult: EngineResult): UiReadyRow[] {
 // ─── HELPER: FRIENDLY REJECT REASON ─────────────────────────────────────────
 
 export function toFriendlyRejectReason(rawReason: string): string {
+  // R3: horizon hard-reject kaldirildi (engineV3 isActionApplicable ADIM 1).
+  // Bu dal artik ulasilamaz; geriye donuk uyumluluk icin korunuyor.
   if (rawReason.includes('Horizon') && rawReason.includes('desteklenmiyor')) {
     return 'Bu vade için uygun değil.'
   }
@@ -1098,12 +1124,14 @@ export function toFriendlyRejectReason(rawReason: string): string {
     return match ? match[1] : 'Aksiyon koşulu sağlanmadı.'
   }
   if (rawReason.includes('no valid amount candidates')) {
-    return 'Uygulanabilir tutar üretilemedi.'
+    // R8.8: 'Uygulanabilir tutar üretilemedi.' → daha açıklayıcı
+    return 'Bu aksiyona uygun finansal büyüklük hesaplanamadı.'
   }
   if (rawReason.includes('Aggregate guardrail')) {
     return 'Toplu kural nedeniyle uygun değil.'
   }
-  return 'Bu aksiyon mevcut veriyle uygun görülmedi.'
+  // R8.8: catch-all → daha açıklayıcı (jenerik 'mevcut veriyle uygun görülmedi' yerine)
+  return 'Bu aksiyonun koşulları mevcut bilanço yapısında karşılanmıyor.'
 }
 
 // ─── BUILDER: REJECTED INSIGHTS ──────────────────────────────────────────────
@@ -1315,8 +1343,6 @@ function buildConsultantNarrative(
   const blockedByCapacity  = transition?.blockedByPortfolioCapacity ?? false
   const capacityNotches    = transition?.achievableByPortfolio ?? notchesGained
   const rawCapacity        = transition?.portfolioNotchCapacity ?? Infinity
-  const confidenceLabel    = confidence === 'HIGH' ? 'yüksek güvenle' : confidence === 'MEDIUM' ? 'orta güvenle' : 'düşük güvenle'
-
   let bankerView: string
 
   if (blockedByCapacity) {
@@ -1328,24 +1354,22 @@ function buildConsultantNarrative(
       `Daha yüksek bir hedefe ulaşmak için portföyün yapısal aksiyonlarla genişletilmesi gerekiyor. ` +
       `Likidite iyileşmesi tek başına yeterli değildir; aktif verimlilik ve gelir kalitesinin de güçlenmesi gerekir.`
   } else if (notchesGained === 0) {
-    // Faz 7.3.31: bankerSummary referansı kaldırıldı (teknik sızıntı riski)
     bankerView =
       `Mevcut yapıda anlamlı rating iyileşmesi sağlanamıyor. ` +
       `Köklü operasyonel değişim ve finansal yeniden yapılandırma gerekiyor.`
+  } else if (confidence === 'LOW') {
+    bankerView =
+      `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
+      `önerilen aksiyonlarla destekleniyor. ` +
+      `Bilanço düzenlemeleri tek başına yeterli değil; kalıcı operasyonel dönüşüm gerekiyor. ` +
+      `Teminat yapısı ve nakit üretim kapasitesi finansal sağlığın temel göstergeleridir.`
   } else {
     bankerView =
       `${engineResult.currentRating} seviyesinden ${finalTargetRating} seviyesine iyileşme ` +
-      `${confidenceLabel} destekleniyor. `
-
-    if (confidence === 'HIGH') {
-      bankerView += 'Bu yol haritası tutarlı biçimde uygulanırsa iyileşme kalıcı olur.'
-    } else if (confidence === 'MEDIUM') {
-      bankerView += 'Orta güven — uygulama riski var, ilerlemenin düzenli izlenmesi önemli.'
-    } else {
-      bankerView +=
-        'Düşük güven — bilanço düzenlemeleri tek başına yeterli değil, kalıcı operasyonel dönüşüm gerekiyor. ' +
-        'Teminat yapısı ve nakit üretim kapasitesi finansal sağlığın temel göstergeleridir.'
-    }
+      `önerilen aksiyonlarla destekleniyor. ` +
+      (confidence === 'MEDIUM'
+        ? 'Uygulama sürecinde ilerlemenin düzenli izlenmesi önemli.'
+        : 'Bu yol haritası tutarlı biçimde uygulanırsa iyileşme kalıcı olur.')
   }
 
   return {
@@ -1519,6 +1543,37 @@ export function buildDecisionAnswer(
     // Pad/garanti yok — engine'in akıllı kararına güveniyoruz.
     portfolioForUI    = pkg.selectedActions  // Hotfix VI: subset kullan, B/BB ayrımı
     targetPackageMeta = pkg.meta             // meta korunur (badge/banner state için)
+
+    // R7B — criticalIssues: Mandatori aksiyon enjeksiyonu
+    // netSales sağlandıysa koşulları değerlendir; eksikse atla (geriye uyumlu).
+    if (targetPackageContext.netSales !== undefined) {
+      const mandatoryIds = getMandatoryActionsForFirm({
+        sector:          targetPackageContext.sector as import('./contracts').SectorCode,
+        netSales:        targetPackageContext.netSales,
+        grossProfit:     targetPackageContext.grossProfit ?? 0,
+        accountBalances: accountBalances as Record<string, number>,
+        // R10: rasyo bazlı mandatori kurallar için — runtime'da RatioResult olabilir
+        ratios:          ratios as import('../ratios').RatioResult | undefined,
+        // R10 AMEND: financialData v3 route'ta DB'den çekilmiyor (financialData OLMADAN yorumu).
+        // ADVANCES_PRESSURE koşulu accountBalances 3xx toplamına taşındı — bu alan undefined.
+        financialData:   undefined,
+      })
+      for (const actionId of mandatoryIds) {
+        const alreadyIn = portfolioForUI.find(a => a.actionId === actionId)
+        if (alreadyIn) {
+          // Mevcut öğeyi mandatory olarak işaretle (kopya — immutability)
+          portfolioForUI = portfolioForUI.map(a =>
+            a.actionId === actionId ? { ...a, mandatory: true } : a
+          )
+        } else {
+          // Full portfolio'dan al ve mandatory ekle
+          const candidate = engineResult.portfolio.find(a => a.actionId === actionId)
+          if (candidate) {
+            portfolioForUI = [...portfolioForUI, { ...candidate, mandatory: true }]
+          }
+        }
+      }
+    }
   }
 
   // Filtered view: yalniz portfolio swap edilir, diger alanlar korunur.
@@ -1553,11 +1608,18 @@ export function buildDecisionAnswer(
   const consultantNarrative          = buildConsultantNarrative(engineResult, requestedTarget)
   const dataQualityWarning           = buildDataQualityWarning(engineResult, accountBalances)
 
-  // Faz 7.3.7: vade uyumsuzluğu risk insight (7.3.7-FIX2: ratios.currentRatio direkt)
-  const maturityInsight = accountBalances
-    ? buildMaturityMismatchInsight(accountBalances, engineResult.sector, ratios)
-    : null
-  const riskInsights: DecisionInsight[] = maturityInsight ? [maturityInsight] : []
+  // Faz 7.3.7 + R10: risk insight'ları — vade uyumsuzluğu + rasyo bazlı 6 yeni kategori
+  // ratios runtime'da RatioResult olabilir; lokal tip dar olduğundan cast uygulanır.
+  const _r = ratios as import('../ratios').RatioResult | undefined
+  const riskInsights: DecisionInsight[] = [
+    accountBalances ? buildMaturityMismatchInsight(accountBalances, engineResult.sector, ratios) : null,
+    buildLiquidityInsight(engineResult.sector, _r),
+    buildQuickRatioInsight(_r),
+    buildInventoryTurnoverInsight(engineResult.sector, _r),
+    buildAdvancesPressureInsight(accountBalances),
+    buildInterestCoverageInsight(_r),
+    buildLeverageInsight(_r, accountBalances),
+  ].filter((x): x is DecisionInsight => x !== null)
 
   // PATCH 2: actionId → { debits, credits } gruplu lookup (mutation yok)
   const accountingLegsByAction: Record<string, { debits: AccountingImpactRow[]; credits: AccountingImpactRow[] }> = {}
@@ -1612,5 +1674,6 @@ export function buildDecisionAnswer(
     rejectedInsightCount,
     diagnostics,
     canonicalOutcome,
+    _filteredPortfolio: portfolioForUI,  // R12.2A-FIX: route.ts projection hesabı için
   }
 }

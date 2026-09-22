@@ -81,6 +81,8 @@ function setupMocks(opts: {
       if (opts.runEngineV3Behavior === 'throw') throw new Error('runEngineV3 fail')
       return MOCK_ENGINE_RESULT
     }),
+    // R12.2A-FIX: route.ts UI projection hesabı için mock
+    calculateProjectedRatiosFromPortfolio: jest.fn(() => null),
   }))
 
   jest.doMock('@/lib/scoring/scenarioV3/scenarioGenerator', () => ({

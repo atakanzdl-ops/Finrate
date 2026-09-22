@@ -83,12 +83,14 @@ describe('Test 1 — No behavior change (pre-4a snapshot karşılaştırması)',
       expect(result.leverageScore).toBeCloseTo(17.53, 1)
     })
 
-    test('DEKAM profitability skoru değişmedi (ref: 34.10)', () => {
-      expect(result.profitabilityScore).toBeCloseTo(34.10, 1)
+    test('DEKAM profitability skoru (R4 ref: 35.88 — İnşaat benchmark %24→%18)', () => {
+      // R4: CONSTRUCTION grossMargin benchmark 0.24→0.18 → profitability skoru değişti
+      expect(result.profitabilityScore).toBeCloseTo(35.88, 1)
     })
 
-    test('DEKAM total objektif skor değişmedi (ref: 28.85)', () => {
-      expect(result.finalScore).toBeCloseTo(28.85, 1)
+    test('DEKAM total objektif skor (R4 ref: 29.20)', () => {
+      // R4: profitability artışının toplam skora yansıması
+      expect(result.finalScore).toBeCloseTo(29.20, 1)
     })
   })
 
@@ -110,7 +112,7 @@ describe('Test 1 — No behavior change (pre-4a snapshot karşılaştırması)',
   })
 
   describe('combineScores — pre-4a referansı', () => {
-    test('DEKAM kombine skor değişmedi (subjective=23, objective=28.85)', () => {
+    test('DEKAM kombine skor aralıkta (subjective=23, R4 objective≈29.20)', () => {
       const dekamRatios  = calculateRatios({ ...DEKAM_INPUT, sector: DEKAM_SECTOR })
       const dekamScore   = calculateScore(dekamRatios, DEKAM_SECTOR)
       const combined     = combineScores(dekamScore.finalScore, DEKAM_SUBJECTIVE_TOTAL)
@@ -129,13 +131,14 @@ describe('Test 1 — No behavior change (pre-4a snapshot karşılaştırması)',
   })
 
   describe('computeScoreAttribution — 5 aksiyon × DEKAM (pre-4a snapshot)', () => {
-    // Faz 2 snapshot'larından alınan objectiveDelta referansları
+    // R4 güncel objectiveDelta referansları
+    // A18: R4 — İnşaat benchmark %24→%18; DEKAM marjı %18.2 ≥ yeni %18 → applied=false, delta=0
     const DEKAM_REF_DELTA: Record<ActionId, number> = {
       A05: 0.78,
       A06: 5.80,
       A10: 2.68,
       A12: 3.62,
-      A18: 1.62,
+      A18: 0,   // R4: CONSTRUCTION benchmark %18, DEKAM marjı %18.2 → uygulanmaz
     }
 
     for (const actionId of ALL_ACTIONS) {
@@ -144,7 +147,8 @@ describe('Test 1 — No behavior change (pre-4a snapshot karşılaştırması)',
           actionId, DEKAM_INPUT, DEKAM_SUBJECTIVE_TOTAL, DEKAM_SECTOR
         )
         expect(result.objectiveDelta).toBeCloseTo(DEKAM_REF_DELTA[actionId], 0)
-        expect(result.applied).toBe(true)
+        // R4: A18 DEKAM için applied=false (marj benchmark'ta veya üstünde)
+        expect(result.applied).toBe(actionId !== 'A18')
       })
     }
   })

@@ -284,7 +284,8 @@ export interface WorkingCapitalRow {
 
 export type IssueSeverity = 'KRİTİK' | 'CİDDİ' | 'ORTA' | 'HAFİF'
 
-export type PerspectiveLevel = 'İyi' | 'Orta' | 'Zayıf' | 'Yüksek' | 'Düşük'
+// R8.8: 'Tamamlandı' (HIGH confidence) + 'Yeterli' (HIGH veri kalitesi) eklendi
+export type PerspectiveLevel = 'İyi' | 'Orta' | 'Zayıf' | 'Yüksek' | 'Düşük' | 'Tamamlandı' | 'Yeterli'
 
 export interface RoadmapHero {
   currentRating:     string

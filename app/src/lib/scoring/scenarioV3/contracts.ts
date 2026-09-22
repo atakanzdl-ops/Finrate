@@ -328,10 +328,19 @@ export interface FirmContext {
   netSales:          number
   operatingProfit:   number
   grossProfit:       number
+  costOfGoodsSold?:  number          // YENİ: A06 DIO için
   interestExpense:   number
   operatingCashFlow: number | null
   /** Finansal dönem tipi — computeAmount period-day hesabı için */
   period?:           string
+  /** R6 Hotfix 2 — Baseline alanları: greedy loop başındaki frozen snapshot */
+  baselineAccountBalances?: Record<string, number>
+  baselineGrossProfit?:     number
+  baselineNetSales?:        number
+  /** R10 — Hesaplanmış rasyo sonuçları (mandatori kural değerlendirmesi için) */
+  ratios?:       import('../ratios').RatioResult
+  /** R10 — Bilanço/gelir tablosu input (ADVANCES_PRESSURE totalCurrentLiabilities için) */
+  financialData?: import('../ratios').FinancialInput
 }
 
 // ============ ACTION TEMPLATE V3 ============
@@ -422,6 +431,20 @@ export interface ActionTemplateV3 {
   useRatioBasedAmount?: boolean
 
   /**
+   * Bankacı güven seviyesi — UI metadatası, scoring'i etkilemez.
+   * 'high'   → TCMB/banka kesin kabul: teminat, borç kapatma, gerçek nakit
+   * 'medium' → Makul öneri ama sektörel bağımlılık var
+   * 'low'    → Spekülatif / yapısal: özkaynak dönüşümü, varlık satışı
+   */
+  bankerTrust?: 'high' | 'medium' | 'low'
+
+  /**
+   * true ise aksiyon fiziksel/operasyonel kanıt gerektirir (A18/A19 gibi).
+   * UI'da "Bu aksiyonun gerçekleşmesi operasyonel belge gerektirir" uyarısı gösterilir.
+   */
+  requiresOperationalProof?: boolean
+
+  /**
    * Opsiyonel TCMB benchmark hedef metadata.
    * UI transparency bloğunda "Hedef rasyo X gün, kaynak Y" gösterimi için.
    */
@@ -431,7 +454,7 @@ export interface ActionTemplateV3 {
     /** benchmarks.ts SectorBenchmark içindeki alan adı */
     benchmarkField: keyof SectorBenchmark
     /** Hangi gelir/aktif kalemine oranlanacak */
-    basis: 'netSales' | 'cogs' | 'totalAssets'
+    basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'
     /** TCMB hedef gün sayısı */
     targetDays?: number
     /** Benchmark bulunamazsa kullanılacak default */
@@ -454,6 +477,10 @@ export interface ActionBuildContext {
   accountBalances?: Record<string, number>
   netSales?: number
   grossProfit?: number
+  /** R6 Hotfix 2 — Baseline alanları: greedy loop başındaki frozen snapshot */
+  baselineAccountBalances?: Record<string, number>
+  baselineGrossProfit?:     number
+  baselineNetSales?:        number
 }
 
 // ============ ENGINE OUTPUT ============
@@ -601,16 +628,22 @@ export const MATERIALITY_BY_HORIZON: Record<HorizonKey, MaterialityThreshold> = 
   },
 }
 
-// ============ DİNAMİK MATERYALİTE HELPER (FAZ 7.3.43B — GÜN 1) ============
+// ============ DİNAMİK MATERYALİTE HELPER (R3.2 — Atakan kademeli formül) ============
 //
-// Runtime entegrasyonu GÜN 3'te (engineV3.ts).
-// Bu helper EXPORT edilir ama HENÜ HİÇBİR YER çağırmaz — runtime etkisi SIFIR.
-// MATERIALITY_BY_HORIZON sabiti korunmaktadır (geri uyumluluk).
+// R3.2: scaleFactor artık horizon'a değil, aktif büyüklüğüne göre kademeleniyor.
+// Büyük firmalar için gereksiz küçük aksiyonlar filtrelenir (saçma tutar guard).
+// MATERIALITY_BY_HORIZON sabiti korunmaktadır (geri uyumluluk, test vs.).
 
 /**
- * Aktif büyüklüğüne göre ölçeklenen dinamik materyalite tabanını hesaplar.
+ * Aktif büyüklüğüne göre kademeli olarak ölçeklenen materyalite tabanı.
  *
- * @param horizon  - Aksiyon ufku ('short' | 'medium' | 'long')
+ * Kademeler (Atakan formülü — R3.2):
+ *   < 50M TRY   → %1.0  (küçük firma: küçük tutarlar da anlamlı)
+ *   50M–500M    → %0.5  (orta firma)
+ *   500M–5B     → %0.3  (büyük firma)
+ *   > 5B        → %0.1  (çok büyük firma: yalnızca dev aksiyonlar anlam taşır)
+ *
+ * @param horizon     - Aksiyon ufku ('short' | 'medium' | 'long')
  * @param totalAssets - Firmanın toplam aktifi (TRY)
  * @returns Minimum anlamlı tutar (TRY) — sabit taban ile aktif yüzdesi
  *          arasındaki büyük olan değer.
@@ -625,11 +658,12 @@ export function getDynamicMaterialityFloor(
     long:   1_000_000,
   }[horizon]
 
-  const scaleFactor = {
-    short:  0.005,   // %0.5
-    medium: 0.01,    // %1.0
-    long:   0.01,    // %1.0
-  }[horizon]
+  // R3.2: Atakan kademeli ölçek — aktif büyüklüğüne göre
+  let scaleFactor: number
+  if      (totalAssets < 50_000_000)     { scaleFactor = 0.01  }  // %1.0
+  else if (totalAssets < 500_000_000)    { scaleFactor = 0.005 }  // %0.5
+  else if (totalAssets < 5_000_000_000)  { scaleFactor = 0.003 }  // %0.3
+  else                                   { scaleFactor = 0.001 }  // %0.1
 
   return Math.max(baseFloor, totalAssets * scaleFactor)
 }
@@ -770,10 +804,12 @@ export interface TargetGap {
  * ActionTemplateV3'ten bağımsız; engineV3 skoruna dahil değil.
  */
 export interface DecisionInsight {
-  insightId: 'A21_MATURITY_MISMATCH'
+  /** R10: genişletildi — yeni insight ID'leri eklendi */
+  insightId: string
   title: string
   message: string
-  severity: 'low' | 'medium' | 'high'
+  /** R10: 'critical' eklendi (currentRatio < 1.0 gibi yüksek öncelikli durumlar) */
+  severity: 'low' | 'medium' | 'high' | 'critical'
   ratio: number | null
   kvTotal: number
   uvTotal: number

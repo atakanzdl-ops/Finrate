@@ -64,7 +64,9 @@ export function aktifVerimlilikLevel(productivityScore: number): PerspectiveLeve
 
 export function ratingGuveniLevel(confidence: string): PerspectiveLevel {
   const upper = (confidence ?? '').toUpperCase()
-  if (upper === 'HIGH')   return 'Yüksek'
+  // R8.8: HIGH → 'Tamamlandı' (consensus sinyali — 'Yüksek' yanıltıcı kesinlik ima ediyordu)
+  // MEDIUM/LOW değişmedi
+  if (upper === 'HIGH')   return 'Tamamlandı'
   if (upper === 'MEDIUM') return 'Orta'
   return 'Düşük'
 }

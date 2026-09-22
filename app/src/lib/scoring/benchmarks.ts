@@ -55,6 +55,8 @@ export interface SectorBenchmark {
   payablesTurnoverDays:    number  // DPO (gün)
   fixedAssetTurnover:      number  // Sabit varlık devir hızı
   operatingExpenseRatio:   number  // Faaliyet gideri / Satışlar
+  // R5 — Finansman gideri hedefi (A14 için). Sağlıklı KOBİ hedef değeri, sektör ortalaması değil.
+  financialExpenseRatio:   number  // Finansman gideri / Satışlar
 }
 
 // ─── SEKTÖR AĞIRLIK PROFİLİ ARAYÜZÜ ─────────────────────────────────────────
@@ -131,6 +133,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.68, receivablesDays: 34,  inventoryDays: 82,
     payablesTurnoverDays: 30, fixedAssetTurnover: 0.85, operatingExpenseRatio: 0.132,
+    financialExpenseRatio: 0.03,  // R5 Tarım: orta düzey finansman yükü
   },
 
   // ── C: İmalat ────────────────────────────────────────────────────────────────
@@ -149,6 +152,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.87, receivablesDays: 53,  inventoryDays: 70,
     payablesTurnoverDays: 45, fixedAssetTurnover: 1.50, operatingExpenseRatio: 0.135,
+    financialExpenseRatio: 0.04,  // R5 İmalat: makine-teçhizat finansmanı
   },
 
   // ── D: Elektrik, Gaz, Buhar ──────────────────────────────────────────────────
@@ -167,6 +171,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.32, receivablesDays: 35,  inventoryDays: 10,
     payablesTurnoverDays: 30, fixedAssetTurnover: 0.45, operatingExpenseRatio: 0.105,
+    financialExpenseRatio: 0.03,  // R5 Enerji: sermaye yoğun ama düzenli borç servisi
   },
 
   // ── F: İnşaat ────────────────────────────────────────────────────────────────
@@ -176,7 +181,8 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     currentRatio: 1.50,  quickRatio: 0.94,
     cashRatio: 0.12,     netWorkingCapitalRatio: 0.12,  cashConversionCycle: 102,
     // Kârlılık
-    grossMargin: 0.24,   ebitdaMargin: 0.09,  ebitMargin: 0.070,
+    // R4 — Atakan kararı: KOBİ inşaat default %18 (eski: %24 büyük EPC seviyesi)
+    grossMargin: 0.18,   ebitdaMargin: 0.09,  ebitMargin: 0.070,
     netProfitMargin: 0.050, roa: 0.010,        roe: 0.029,
     roic: 0.055,         revenueGrowth: 0.48,
     // Kaldıraç
@@ -185,6 +191,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.32, receivablesDays: 79,  inventoryDays: 78,
     payablesTurnoverDays: 55, fixedAssetTurnover: 0.60, operatingExpenseRatio: 0.170,
+    financialExpenseRatio: 0.05,  // R5 İnşaat: yüksek borç yükü, proje finansmanı
   },
 
   // ── G: Toptan Ticaret ─────────────────────────────────────────────────────────
@@ -203,6 +210,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.66, receivablesDays: 37,  inventoryDays: 60,
     payablesTurnoverDays: 40, fixedAssetTurnover: 5.50, operatingExpenseRatio: 0.105,
+    financialExpenseRatio: 0.03,  // R5 Toptan Ticaret: düşük sabit varlık, orta borç
   },
 
   // ── G: Perakende Ticaret ──────────────────────────────────────────────────────
@@ -221,6 +229,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.80, receivablesDays: 20,  inventoryDays: 40,
     payablesTurnoverDays: 30, fixedAssetTurnover: 4.80, operatingExpenseRatio: 0.180,
+    financialExpenseRatio: 0.03,  // R5 Perakende: düşük finansman yükü
   },
 
   // ── H: Ulaştırma ve Depolama ──────────────────────────────────────────────────
@@ -239,6 +248,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.61, receivablesDays: 31,  inventoryDays: 6,
     payablesTurnoverDays: 25, fixedAssetTurnover: 0.90, operatingExpenseRatio: 0.130,
+    financialExpenseRatio: 0.03,  // R5 Ulaştırma: orta düzey araç finansmanı
   },
 
   // ── I: Konaklama ve Yiyecek-İçecek ───────────────────────────────────────────
@@ -257,6 +267,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.61, receivablesDays: 11,  inventoryDays: 24,
     payablesTurnoverDays: 20, fixedAssetTurnover: 0.75, operatingExpenseRatio: 0.145,
+    financialExpenseRatio: 0.03,  // R5 Turizm: mevsimsel, orta borç servisi
   },
 
   // ── J: Bilgi ve İletişim ──────────────────────────────────────────────────────
@@ -275,6 +286,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.55, receivablesDays: 65,  inventoryDays: 19,
     payablesTurnoverDays: 30, fixedAssetTurnover: 3.20, operatingExpenseRatio: 0.210,
+    financialExpenseRatio: 0.02,  // R5 Bilişim: düşük borç, özkaynak ağırlıklı
   },
 
   // ── Q: Sağlık ve Sosyal Hizmetler ────────────────────────────────────────────
@@ -293,6 +305,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.79, receivablesDays: 42,  inventoryDays: 22,
     payablesTurnoverDays: 25, fixedAssetTurnover: 1.80, operatingExpenseRatio: 0.185,
+    financialExpenseRatio: 0.02,  // R5 Sağlık: düşük finansman yükü
   },
 
   // ── C (alt): Gıda ve İçecek İmalatı ──────────────────────────────────────────
@@ -311,6 +324,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.20, receivablesDays: 40,  inventoryDays: 45,
     payablesTurnoverDays: 35, fixedAssetTurnover: 1.80, operatingExpenseRatio: 0.145,
+    financialExpenseRatio: 0.03,  // R5 Gıda: orta düzey işletme kredisi
   },
 
   // ── C (alt): Tekstil ve Hazır Giyim ──────────────────────────────────────────
@@ -329,6 +343,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.10, receivablesDays: 75,  inventoryDays: 65,
     payablesTurnoverDays: 40, fixedAssetTurnover: 1.40, operatingExpenseRatio: 0.155,
+    financialExpenseRatio: 0.04,  // R5 Tekstil: yüksek stok finansmanı
   },
 
   // ── M (alt): Mimarlık ve Mühendislik ─────────────────────────────────────────
@@ -347,6 +362,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.90, receivablesDays: 80,  inventoryDays: 10,
     payablesTurnoverDays: 35, fixedAssetTurnover: 3.50, operatingExpenseRatio: 0.220,
+    financialExpenseRatio: 0.02,  // R5 Mimarlık: düşük borç, emek yoğun
   },
 
   // ── Genel Hizmetler (M/N) ─────────────────────────────────────────────────────
@@ -365,6 +381,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.85, receivablesDays: 55,  inventoryDays: 12,
     payablesTurnoverDays: 30, fixedAssetTurnover: 2.80, operatingExpenseRatio: 0.190,
+    financialExpenseRatio: 0.02,  // R5 Hizmet: düşük sabit varlık, düşük borç
   },
 
   // ── G (alt): Pazarlama / Dağıtım / Distribütörlük ────────────────────────────
@@ -383,6 +400,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.50, receivablesDays: 30,  inventoryDays: 60,
     payablesTurnoverDays: 40, fixedAssetTurnover: 4.50, operatingExpenseRatio: 0.115,
+    financialExpenseRatio: 0.03,  // R5 Pazarlama: döner sermaye finansmanı
   },
 
   // ── G (alt): Otomotiv Bayi ve Servis ─────────────────────────────────────────
@@ -401,6 +419,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 1.80, receivablesDays: 25,  inventoryDays: 55,
     payablesTurnoverDays: 45, fixedAssetTurnover: 5.20, operatingExpenseRatio: 0.095,
+    financialExpenseRatio: 0.03,  // R5 Otomotiv: stok finansmanı yükü
   },
 
   // ── L: Gayrimenkul Faaliyetleri ───────────────────────────────────────────────
@@ -419,6 +438,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.18, receivablesDays: 45,  inventoryDays: 180,
     payablesTurnoverDays: 60, fixedAssetTurnover: 0.25, operatingExpenseRatio: 0.085,
+    financialExpenseRatio: 0.04,  // R5 Gayrimenkul: yüksek proje borçlanması
   },
 
   // ── Genel Ortalama (tüm NACE sektörleri) ─────────────────────────────────────
@@ -437,6 +457,7 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
     // Faaliyet
     assetTurnover: 0.90, receivablesDays: 50,  inventoryDays: 45,
     payablesTurnoverDays: 35, fixedAssetTurnover: 1.80, operatingExpenseRatio: 0.140,
+    financialExpenseRatio: 0.03,  // R5 Genel: default tüm sektörler için
   },
 }
 

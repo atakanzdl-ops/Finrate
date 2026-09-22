@@ -103,8 +103,9 @@ function HeroBanner({ hero }: { hero: RoadmapHero }) {
         }}>
           {hero.reachabilityLabel}
         </span>
+        {/* R8.8: HIGH → 'Analiz: Tamamlandı'; MEDIUM/LOW → 'Güven: Orta/Düşük' */}
         <span style={{ opacity: 0.9 }}>
-          Güven: <strong>{hero.confidence}</strong>
+          {hero.confidence === 'Tamamlandı' ? 'Analiz' : 'Güven'}: <strong>{hero.confidence}</strong>
         </span>
       </div>
     </div>
@@ -181,7 +182,7 @@ function PerspectiveBlock({ perspective }: { perspective: RoadmapPerspective }) 
     { label: 'Likidite',          value: perspective.likidite },
     { label: 'Yapısal Risk',      value: perspective.yapisalRisk },
     { label: 'Aktif Verimliliği', value: perspective.aktifVerimliligi },
-    { label: 'Rating Güveni',     value: perspective.ratingGuveni },
+    { label: perspective.ratingGuveni === 'Tamamlandı' ? 'Veri Kalitesi' : 'Rating Güveni', value: perspective.ratingGuveni },  // R8.8
   ]
 
   return (

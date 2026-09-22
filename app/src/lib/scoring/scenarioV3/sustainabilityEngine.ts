@@ -562,7 +562,7 @@ export function calculateSustainabilityConstraints(
   ) {
     ceilingReasons.push('Portföy one-off ağırlıklı, firma gelir kalitesi zayıf')
     liftRequirements.push(
-      `Portföye en az 2 RECURRING aksiyon (A12/A13/A14/A18) eklemek`
+      `Portföye en az 2 RECURRING aksiyon (A12/A21/A14/A18) eklemek`
     )
     return buildConstraintResult('BB', ceilingReasons, liftRequirements)
   }
@@ -649,9 +649,9 @@ export function calculateRepairPotential(
       'A12_GROSS_MARGIN_IMPROVEMENT — Brüt marj iyileştirme sürdürülebilir kâr'
     )
   }
-  if (earnings.extraordinaryDependency > 0.30 && !portfolioIds.has('A13_OPEX_OPTIMIZATION')) {
+  if (earnings.extraordinaryDependency > 0.30 && !portfolioIds.has('A21_OPERATING_PROFIT_REFORM')) {
     recommendedAdditions.push(
-      'A13_OPEX_OPTIMIZATION — Operasyonel kâr güçlendirme'
+      'Faaliyet giderleri sektör hedefinin üstünde — gider optimizasyonu (Faaliyet Karı Reformu) değerlendirin'
     )
   }
 
