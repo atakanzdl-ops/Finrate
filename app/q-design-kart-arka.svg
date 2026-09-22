@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Q DESIGN - Kartvizit ARKA YÜZ -->
+<!-- Matbaa Teknik Bilgiler: 90x50mm + 3mm taşma payı = 96x56mm -->
+<!-- Renk: CMYK | Baskı: Çift yön | Spot UV seçili alanlarda -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 1080 600" width="96mm" height="56mm">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1b2e"/>
+      <stop offset="100%" stop-color="#0a1520"/>
+    </linearGradient>
+
+    <linearGradient id="panelGrad2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#091525"/>
+      <stop offset="100%" stop-color="#0d1f35"/>
+    </linearGradient>
+
+    <linearGradient id="qGoldGrad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#ff9a30"/>
+      <stop offset="30%"  stop-color="#e05a00"/>
+      <stop offset="60%"  stop-color="#ff7a1a"/>
+      <stop offset="80%"  stop-color="#c04500"/>
+      <stop offset="100%" stop-color="#ff6a00"/>
+    </linearGradient>
+
+    <linearGradient id="qShadowGrad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#803000" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#200800" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <linearGradient id="accentGrad2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff6b00"/>
+      <stop offset="100%" stop-color="#e05000"/>
+    </linearGradient>
+
+    <linearGradient id="triGradA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#0d2040"/>
+    </linearGradient>
+    <linearGradient id="triGradB" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff8020" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#cc4400" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <linearGradient id="logoTextGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#e8f0f8"/>
+      <stop offset="100%" stop-color="#c0d0e0"/>
+    </linearGradient>
+
+    <filter id="dropShadow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="4" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+
+    <filter id="textGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="leftPanelClip2">
+      <rect x="0" y="0" width="265" height="600"/>
+    </clipPath>
+  </defs>
+
+  <!-- ===== ANA ARKA PLAN ===== -->
+  <rect x="0" y="0" width="1080" height="600" rx="12" ry="12" fill="url(#bgGrad2)"/>
+
+  <!-- ===== SOL GEOMETRİK DESEN PANELİ ===== -->
+  <g clip-path="url(#leftPanelClip2)">
+    <rect x="0" y="0" width="265" height="600" fill="url(#panelGrad2)"/>
+
+    <!-- Geometrik desen - Satır 1 -->
+    <g>
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#193355" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+      <polygon points="60,10 110,55 60,55" fill="#ff6b00" opacity="0.15"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#193355" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+    </g>
+
+    <g transform="translate(55, 90)">
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#1a3555" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+      <polygon points="60,10 110,55 60,55" fill="url(#triGradB)"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#193355" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+    </g>
+
+    <g transform="translate(0, 180)">
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#193355" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#1a3555" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+      <polygon points="170,10 220,55 170,55" fill="url(#triGradB)"/>
+    </g>
+
+    <g transform="translate(55, 270)">
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#1a3555" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+      <polygon points="60,10 110,55 60,55" fill="url(#triGradB)"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#193355" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+    </g>
+
+    <g transform="translate(0, 360)">
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#193355" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#1a3555" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+      <polygon points="60,10 110,55 60,55" fill="url(#triGradB)"/>
+    </g>
+
+    <g transform="translate(55, 450)">
+      <polygon points="60,10 110,55 60,100 10,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="60,10 110,55 60,55" fill="#1a3555" opacity="0.9"/>
+      <polygon points="110,55 60,100 60,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="10,55 60,100 60,55" fill="#112240" opacity="0.9"/>
+
+      <polygon points="170,10 220,55 170,100 120,55" fill="url(#triGradA)" stroke="#1e3f60" stroke-width="0.8"/>
+      <polygon points="170,10 220,55 170,55" fill="#193355" opacity="0.9"/>
+      <polygon points="220,55 170,100 170,55" fill="#0b1c30" opacity="0.9"/>
+      <polygon points="120,55 170,100 170,55" fill="#112240" opacity="0.9"/>
+      <polygon points="170,10 220,55 170,55" fill="url(#triGradB)"/>
+    </g>
+
+    <line x1="265" y1="0" x2="265" y2="600" stroke="#ff6b00" stroke-width="1.5" stroke-opacity="0.3"/>
+    <rect x="0" y="0" width="265" height="4" fill="#ff6b00" opacity="0.6"/>
+    <rect x="0" y="596" width="265" height="4" fill="#ff6b00" opacity="0.6"/>
+  </g>
+
+  <!-- ===== BÜYÜK Q LOGO - MERKEZDE ===== -->
+  <g transform="translate(430, 70)" filter="url(#dropShadow2)">
+    <!-- Q gölge -->
+    <path d="M 200,220 C 200,120 128,46 18,46 C -92,46 -164,120 -164,220 C -164,320 -92,394 18,394 C 73,394 123,374 159,338 L 220,404 L 286,338 L 225,274 C 213,290 200,257 200,220 Z
+             M 18,312 C -45,312 -92,270 -92,220 C -92,170 -45,128 18,128 C 81,128 128,170 128,220 C 128,240 121,259 110,272 L 50,210 L -14,274 L 48,336 C 32,344 25,346 18,346 Z"
+          fill="url(#qShadowGrad2)" opacity="0.5" transform="translate(8,12)"/>
+    <!-- Q ana gövde -->
+    <path d="M 200,220 C 200,120 128,46 18,46 C -92,46 -164,120 -164,220 C -164,320 -92,394 18,394 C 73,394 123,374 159,338 L 220,404 L 286,338 L 225,274 C 213,290 200,257 200,220 Z
+             M 18,312 C -45,312 -92,270 -92,220 C -92,170 -45,128 18,128 C 81,128 128,170 128,220 C 128,240 121,259 110,272 L 50,210 L -14,274 L 48,336 C 32,344 25,346 18,346 Z"
+          fill="url(#qGoldGrad2)"/>
+    <!-- Highlight -->
+    <path d="M 200,220 C 200,120 128,46 18,46 C -30,46 -72,64 -104,95 C -68,66 -25,52 18,52 C 126,52 194,124 194,220 Z"
+          fill="#ffb060" opacity="0.4"/>
+  </g>
+
+  <!-- ===== Q DESIGN YAZI ===== -->
+  <!-- Ana logo metni - metalik gümüş/beyaz -->
+  <text x="540" y="440"
+        font-family="'Arial Black', 'Helvetica Neue', sans-serif"
+        font-size="72" font-weight="900"
+        fill="url(#logoTextGrad)"
+        text-anchor="middle"
+        letter-spacing="8"
+        filter="url(#textGlow)">Q DESIGN</text>
+
+  <!-- DAHA İYİSİ MÜMKÜN tagline -->
+  <text x="540" y="490"
+        font-family="'Arial', 'Helvetica Neue', sans-serif"
+        font-size="24" font-weight="400"
+        fill="#7a9ab8"
+        text-anchor="middle"
+        letter-spacing="8">DAHA İYİSİ MÜMKÜN</text>
+
+  <!-- Tagline altı turuncu çizgi -->
+  <rect x="465" y="500" width="150" height="2.5" rx="1" fill="url(#accentGrad2)"/>
+
+  <!-- ===== SAĞ ÜST: Q UICK / Q UALITY / Q UEST ===== -->
+  <g transform="translate(680, 55)">
+    <text x="0" y="0" font-family="'Arial Black', sans-serif" font-size="30" font-weight="900" fill="#ff6b00">Q</text>
+    <text x="38" y="0" font-family="'Arial', sans-serif" font-size="28" font-weight="400" fill="#8aa8c4" letter-spacing="2"> UICK</text>
+    <text x="0" y="44" font-family="'Arial Black', sans-serif" font-size="30" font-weight="900" fill="#ff6b00">Q</text>
+    <text x="38" y="44" font-family="'Arial', sans-serif" font-size="28" font-weight="400" fill="#8aa8c4" letter-spacing="2"> UALITY</text>
+    <text x="0" y="88" font-family="'Arial Black', sans-serif" font-size="30" font-weight="900" fill="#ff6b00">Q</text>
+    <text x="38" y="88" font-family="'Arial', sans-serif" font-size="28" font-weight="400" fill="#8aa8c4" letter-spacing="2"> UEST</text>
+    <rect x="0" y="100" width="80" height="2.5" rx="1" fill="url(#accentGrad2)"/>
+  </g>
+
+  <!-- ===== ALT ÇUBUK ===== -->
+  <line x1="310" y1="548" x2="930" y2="548" stroke="#1e3f60" stroke-width="1.5"/>
+  <g transform="translate(310, 575)">
+    <text x="0"   y="0" font-family="'Arial', sans-serif" font-size="20" font-weight="400" fill="#6a8aaa" letter-spacing="3">AMBALAJ</text>
+    <text x="155" y="0" font-family="'Arial', sans-serif" font-size="18" fill="#ff6b00" opacity="0.7">|</text>
+    <text x="175" y="0" font-family="'Arial', sans-serif" font-size="20" font-weight="400" fill="#6a8aaa" letter-spacing="3">TASARIM</text>
+    <text x="330" y="0" font-family="'Arial', sans-serif" font-size="18" fill="#ff6b00" opacity="0.7">|</text>
+    <text x="350" y="0" font-family="'Arial', sans-serif" font-size="20" font-weight="400" fill="#6a8aaa" letter-spacing="3">ÜRETİM</text>
+    <text x="500" y="0" font-family="'Arial', sans-serif" font-size="18" fill="#ff6b00" opacity="0.7">|</text>
+    <text x="520" y="0" font-family="'Arial', sans-serif" font-size="20" font-weight="400" fill="#6a8aaa" letter-spacing="3">ÇÖZÜM</text>
+  </g>
+
+  <!-- Sol alt turuncu accent -->
+  <rect x="310" y="590" width="60" height="3" rx="1.5" fill="url(#accentGrad2)"/>
+
+</svg>

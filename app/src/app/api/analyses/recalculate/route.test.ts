@@ -69,7 +69,8 @@ function setupMocks(opts: {
       },
       financialData_findFirst_mock: jest.fn(() => Promise.resolve(null)),
       analysis: {
-        update: updateMock,
+        update:     updateMock,
+        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
       },
     },
   }))
@@ -82,7 +83,9 @@ function setupMocks(opts: {
         findFirst: jest.fn(() => Promise.resolve(null)),
       },
       analysis: {
-        update: updateMock,
+        update:     updateMock,
+        // Faz 7.3.60.1: roadmapSnapshot invalidation
+        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
       },
     },
   }))
