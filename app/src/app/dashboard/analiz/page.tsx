@@ -18,6 +18,7 @@ import ScenarioPanelV2 from '@/components/analysis/ScenarioPanelV2'
 import ScenarioPanelV3 from '@/components/analysis/ScenarioPanelV3'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
+import { PERIOD_LABEL_SHORT, PERIOD_LABEL_AXIS } from '@/lib/periods'
 import { scoreToRating } from '@/lib/scoring/score'
 import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
@@ -130,10 +131,10 @@ function BarMetricChart({ periods, primaryLabel, secondaryLabel, tab, onTab }: {
   const fmtV = (v: number) => {
     const sign = v < 0 ? '-' : ''
     const abs  = Math.abs(v)
-    if (abs >= 1_000_000_000) return `${sign}₺${(abs / 1_000_000_000).toFixed(1)}B`
-    if (abs >= 1_000_000)     return `${sign}₺${(abs / 1_000_000).toFixed(1)}M`
-    if (abs >= 1_000)         return `${sign}₺${(abs / 1_000).toFixed(0)}K`
-    return `${sign}₺${abs.toFixed(0)}`
+    if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
+    if (abs >= 1_000_000)     return `${sign}${(abs / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
+    if (abs >= 1_000)         return `${sign}${(abs / 1_000).toFixed(0)} bin TL`
+    return `${sign}${abs.toFixed(0)} TL`
   }
 
   const n = periods.length
@@ -160,7 +161,7 @@ function BarMetricChart({ periods, primaryLabel, secondaryLabel, tab, onTab }: {
       <div className="card-head">
         <div className="card-head-left">
           <h2 className="card-title">Gelir &amp; Performans Analizi</h2>
-          <p className="card-desc">{periods.length} Dönemlik mukayeseli trend</p>
+          <p className="card-desc">{periods.length} Dönemlik karşılaştırmalı trend</p>
         </div>
         <div className="card-head-right">
           <div className="tab-group">
@@ -259,9 +260,10 @@ function DonutSegChart({ title, totalLabel, segments, displayTotal }: {
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null)
 
   const fmtM = (v: number) => {
-    if (v >= 1_000_000) return `₺${(v / 1_000_000).toFixed(1)}M`
-    if (v >= 1_000)     return `₺${(v / 1_000).toFixed(0)}K`
-    return `₺${v.toFixed(0)}`
+    if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
+    if (v >= 1_000_000)     return `${(v / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
+    if (v >= 1_000)         return `${(v / 1_000).toFixed(0)} bin TL`
+    return `${v.toFixed(0)} TL`
   }
 
   // Denominator = sum of segments (not external total → avoids >100% bug)
@@ -571,9 +573,10 @@ function AnalizPageContent() {
   const fmtPct = (v?: number | null) => v == null ? '—' : `%${(v * 100).toFixed(1)}`
   const fmtTL  = (v?: number | null) => {
     if (v == null) return '—'
-    if (Math.abs(v) >= 1_000_000) return `₺${(v / 1_000_000).toFixed(1)}M`
-    if (Math.abs(v) >= 1_000)    return `₺${(v / 1_000).toFixed(0)}K`
-    return `₺${v.toFixed(0)}`
+    if (Math.abs(v) >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
+    if (Math.abs(v) >= 1_000_000)     return `${(v / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
+    if (Math.abs(v) >= 1_000)         return `${(v / 1_000).toFixed(0)} bin TL`
+    return `${v.toFixed(0)} TL`
   }
 
   /* ─── Loading / Empty ─────────────────────────── */
@@ -844,7 +847,7 @@ function AnalizPageContent() {
                           {best.entity?.name ?? 'Şirket'}
                         </p>
                         <p className="mt-0.5 font-mono text-[9px] font-semibold text-slate-400">
-                          {group.length > 1 ? `${group.length} dönem` : `${best.year} · ${best.period}`}
+                          {group.length > 1 ? `${group.length} dönem` : `${best.year} · ${PERIOD_LABEL_SHORT[best.period] ?? best.period}`}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -872,7 +875,7 @@ function AnalizPageContent() {
                                 selected?.id === item.id ? "bg-[#EDF4F8] text-[#0B3C5D] font-semibold" : "text-slate-600 hover:bg-slate-50",
                               )}
                             >
-                              {item.year} · {item.period}
+                              {item.year} · {PERIOD_LABEL_SHORT[item.period] ?? item.period}
                             </button>
                           ))}
                       </div>
@@ -911,7 +914,7 @@ function AnalizPageContent() {
                       onClick={() => setYearOpen(v => !v)}
                       className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-semibold text-[#0B3C5D] transition-colors hover:bg-slate-50"
                     >
-                      {selected.year} · {selected.period}
+                      {selected.year} · {PERIOD_LABEL_SHORT[selected.period] ?? selected.period}
                       <ChevronDown size={12} className={clsx("transition-transform", yearOpen && "rotate-180")} />
                     </button>
                     {yearOpen && (
@@ -928,7 +931,7 @@ function AnalizPageContent() {
                               selected.id === a.id ? "bg-[#EDF4F8] text-[#0B3C5D]" : "text-slate-600"
                             )}
                           >
-                            {a.year} · {a.period}
+                            {a.year} · {PERIOD_LABEL_SHORT[a.period] ?? a.period}
                           </button>
                         ))}
                       </div>
@@ -1097,7 +1100,7 @@ function AnalizPageContent() {
                         <div className="kpi-header">
                           <span className="kpi-label">Borç / Özkaynak</span>
                           <span className={clsx('kpi-badge', deTrend==='up'?'badge-up':'badge-down')}>
-                            {deTrend==='up' ? '↓ İyi' : '↑ Yük'}
+                            {deTrend==='up' ? '↓ İyi' : '↑ Yüksek'}
                           </span>
                         </div>
                         <div className="kpi-body">
@@ -1122,7 +1125,7 @@ function AnalizPageContent() {
                         const sorted4 = [...entityAnalyses]
                           .sort((a, b) => a.year - b.year || a.period.localeCompare(b.period))
                           .slice(-4)
-                        const PERIOD_S: Record<string,string> = { ANNUAL:'', Q1:'Q1', Q2:'Q2', Q3:'Q3', Q4:'Q4' }
+                        const PERIOD_S = PERIOD_LABEL_AXIS
                         const periods: BarPeriod[] = sorted4.map(a => {
                           const fd = a.financialData as FinData | undefined
                           const p  = PERIOD_S[a.period] ?? a.period

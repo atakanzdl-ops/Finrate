@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { FileText, ExternalLink, Loader2, Building2, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import FinrateShell from '@/components/layout/FinrateShell'
+import { PERIOD_LABEL_LONG } from '@/lib/periods'
 
 interface Report {
   id: string
@@ -23,9 +24,7 @@ const RATING_COLOR: Record<string, string> = {
   CCC: 'text-red-500',     CC: 'text-red-500',     C: 'text-red-600', D: 'text-red-700',
 }
 
-const PERIOD_LABEL: Record<string, string> = {
-  ANNUAL: 'Yıllık', Q1: '1. Çeyrek', Q2: '2. Çeyrek', Q3: '3. Çeyrek', Q4: '4. Çeyrek',
-}
+const PERIOD_LABEL = PERIOD_LABEL_LONG
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })

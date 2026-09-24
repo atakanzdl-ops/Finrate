@@ -2,11 +2,13 @@
 // Sayısal değerleri V2 rapor sayfaları için hazır string'e dönüştürür.
 // "—" döndürülen tüm yerler eksik/null veri anlamına gelir.
 
+import { periodLabelLong } from '@/lib/periods'
+
 // ─── PARA BİRİMİ ──────────────────────────────────────────────────────────────
 
 /**
- * Milyon/Milyar kısaltmalı TL formatı.
- * Örn: 52_300_000 → "52.3M TL"  |  1_250_000_000 → "1.3Mr TL"
+ * Türkçe kısaltmalı TL formatı (ondalık virgül).
+ * Örn: 52_300_000 → "52,3 Mn TL"  |  1_250_000_000 → "1,3 Mr TL"  |  418_500 → "418,5 bin TL"
  * NOT: ₺ (U+20BA) Headless Chromium PDF'inde render edilmiyor —
  *      "TL" son eki garantili çalışır.
  */
@@ -17,12 +19,10 @@ export function fmtCurrency(
   if (value == null || isNaN(value)) return '—'
   const abs = Math.abs(value)
   const sign = value < 0 ? '-' : ''
-  if (abs >= 1_000_000_000)
-    return `${sign}${(abs / 1_000_000_000).toFixed(decimals)}Mr TL`
-  if (abs >= 1_000_000)
-    return `${sign}${(abs / 1_000_000).toFixed(decimals)}M TL`
-  if (abs >= 1_000)
-    return `${sign}${(abs / 1_000).toFixed(decimals)}B TL`
+  const tr = (v: number) => v.toFixed(decimals).replace('.', ',')
+  if (abs >= 1_000_000_000) return `${sign}${tr(abs / 1_000_000_000)} Mr TL`
+  if (abs >= 1_000_000)     return `${sign}${tr(abs / 1_000_000)} Mn TL`
+  if (abs >= 1_000)         return `${sign}${tr(abs / 1_000)} bin TL`
   return `${sign}${abs.toFixed(0)} TL`
 }
 
@@ -161,18 +161,8 @@ export const BAR_COLOR: Record<'iyi' | 'uyari' | 'risk', string> = {
 
 // ─── DÖNEM ETİKETİ ────────────────────────────────────────────────────────────
 
-const PERIOD_LABEL: Record<string, string> = {
-  ANNUAL: 'Yıllık',
-  Q1: '1. Çeyrek',
-  Q2: '2. Çeyrek',
-  Q3: '3. Çeyrek',
-  Q4: '4. Çeyrek',
-  H1: '1. Yarıyıl',
-  H2: '2. Yarıyıl',
-}
-
 export function fmtPeriod(year: number, period: string): string {
-  return `${year} · ${PERIOD_LABEL[period] ?? period}`
+  return periodLabelLong(year, period)
 }
 
 // ─── ÖLÇEK ETİKETİ ────────────────────────────────────────────────────────────

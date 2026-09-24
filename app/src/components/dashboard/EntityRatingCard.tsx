@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { periodLabel } from './RatingHistoryChart'
+import { PERIOD_LABEL_AXIS } from '@/lib/periods'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function sortByPeriod(analyses: CardAnalysisItem[]): CardAnalysisItem[] {
  * 8px çubuk genişliğinde sığacak şekilde kısa tutulur.
  */
 export function miniPeriodLabel(year: number, period: string): string {
-  return period === 'ANNUAL' ? String(year).slice(-2) : period
+  return period === 'ANNUAL' ? String(year).slice(-2) : (PERIOD_LABEL_AXIS[period] ?? period)
 }
 
 /**

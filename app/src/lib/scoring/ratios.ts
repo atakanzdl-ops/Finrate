@@ -306,7 +306,13 @@ export function calculateRatios(d: FinancialInput): RatioResult {
   // ─── KALDIRAC ─────────────────────────────────────────────────
   const debtToEquity   = safe(totalDebt, totalEquity)
   const debtToAssets   = safe(totalDebt, totalAssets)
-  const debtToEbitda   = ebitda != null && ebitda !== 0 ? netFinancialDebt / ebitda : null
+  // FAVÖK ≤ 0 iken bölme işareti anlamsızlaşır: borçlu firma "net nakit" gibi
+  // görünürdü. Borç varsa çok yüksek kaldıraç sayılır (99 → skor tabanı), yoksa null.
+  const debtToEbitda   =
+    ebitda == null ? null
+    : ebitda > 0 ? netFinancialDebt / ebitda
+    : netFinancialDebt > 0 ? 99
+    : null
   const equityRatio    = safe(totalEquity, totalAssets)
 
   const interestExpenseVal = n(d.interestExpense)

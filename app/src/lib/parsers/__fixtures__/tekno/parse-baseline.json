@@ -1,0 +1,419 @@
+{
+  "2025-aralik-mizan.xlsx": [
+    {
+      "year": 2025,
+      "period": "ANNUAL",
+      "fields": {
+        "cash": 11424694.610000001,
+        "tradeReceivables": 2240908.13,
+        "inventory": 18104378.13,
+        "otherCurrentAssets": 2390876.12,
+        "tangibleAssets": 418509.45,
+        "tradePayables": 8252369.54,
+        "otherShortTermPayables": 110523.43,
+        "taxPayables": 181534.30000000002,
+        "paidInCapital": 5700000,
+        "capitalReserves": 18115539,
+        "retainedEarnings": 1194825.89
+      },
+      "rawAccounts": [
+        {
+          "code": "100",
+          "amount": 137422.21
+        },
+        {
+          "code": "101",
+          "amount": 11042150
+        },
+        {
+          "code": "102",
+          "amount": 198167.09
+        },
+        {
+          "code": "108",
+          "amount": 46955.31
+        },
+        {
+          "code": "120",
+          "amount": 2240908.13
+        },
+        {
+          "code": "153",
+          "amount": 18104378.13
+        },
+        {
+          "code": "190",
+          "amount": 2049351.37
+        },
+        {
+          "code": "193",
+          "amount": 341524.75
+        },
+        {
+          "code": "254",
+          "amount": 566547.03
+        },
+        {
+          "code": "255",
+          "amount": 298084.85
+        },
+        {
+          "code": "257",
+          "amount": 446122.43
+        },
+        {
+          "code": "335",
+          "amount": 110523.43
+        },
+        {
+          "code": "360",
+          "amount": 134074.07
+        },
+        {
+          "code": "361",
+          "amount": 47460.23
+        },
+        {
+          "code": "500",
+          "amount": 15000000
+        },
+        {
+          "code": "501",
+          "amount": 9300000
+        },
+        {
+          "code": "502",
+          "amount": 115539
+        },
+        {
+          "code": "529",
+          "amount": 18000000
+        },
+        {
+          "code": "570",
+          "amount": 1194825.89
+        },
+        {
+          "code": "590",
+          "amount": 1024574.28
+        }
+      ],
+      "metaPath": "mizan",
+      "confidence": 1,
+      "identity": {
+        "taxNumber": null,
+        "title": null,
+        "sourceConfidence": "LOW"
+      }
+    }
+  ],
+  "2025-kurumlar-beyanname.pdf": [
+    {
+      "year": 2025,
+      "period": "ANNUAL",
+      "fields": {
+        "cash": 11482094.61,
+        "tradeReceivables": 2240908.13,
+        "inventory": 18104378.13,
+        "otherCurrentAssets": 4714642.78,
+        "prepaidExpenses": 341524.75,
+        "tangibleAssets": 12037342.79,
+        "totalAssets": 48579366.44,
+        "tradePayables": 8252369.54,
+        "otherShortTermPayables": 110523.43,
+        "taxPayables": 181534.3,
+        "shortTermProvisions": 0,
+        "longTermOtherPayables": 0,
+        "paidInCapital": 15115539,
+        "capitalReserves": 22700000,
+        "retainedEarnings": 1194825.89,
+        "netProfitCurrentYear": 1024574.28,
+        "totalLiabilitiesAndEquity": 48579366.44,
+        "revenue": 206463730.32,
+        "cogs": 199517821.39,
+        "grossProfit": 6945908.93,
+        "operatingExpenses": 5579809.9,
+        "ebit": 1366099.03,
+        "ebt": 1366099.03,
+        "netProfit": 1024574.28,
+        "taxExpense": 341524.76
+      },
+      "rawAccounts": [
+        {
+          "code": "100",
+          "amount": 194422.21
+        },
+        {
+          "code": "101",
+          "amount": 11042150
+        },
+        {
+          "code": "102",
+          "amount": 198567.09
+        },
+        {
+          "code": "120",
+          "amount": 2240908.13
+        },
+        {
+          "code": "153",
+          "amount": 18104378.13
+        },
+        {
+          "code": "190",
+          "amount": 4373118.03
+        },
+        {
+          "code": "254",
+          "amount": 566547.03
+        },
+        {
+          "code": "255",
+          "amount": 298084.85
+        },
+        {
+          "code": "257",
+          "amount": 446122.43
+        },
+        {
+          "code": "320",
+          "amount": 8252369.54
+        },
+        {
+          "code": "335",
+          "amount": 110523.43
+        },
+        {
+          "code": "360",
+          "amount": 134074.07
+        },
+        {
+          "code": "361",
+          "amount": 47460.23
+        },
+        {
+          "code": "370",
+          "amount": 341524.75
+        },
+        {
+          "code": "371",
+          "amount": 341524.75
+        },
+        {
+          "code": "500",
+          "amount": 15115539
+        },
+        {
+          "code": "502",
+          "amount": 115539
+        },
+        {
+          "code": "529",
+          "amount": 22700000
+        },
+        {
+          "code": "570",
+          "amount": 1194825.89
+        },
+        {
+          "code": "590",
+          "amount": 1024574.28
+        },
+        {
+          "code": "600",
+          "amount": 206878493.06
+        },
+        {
+          "code": "602",
+          "amount": 1263746.53
+        },
+        {
+          "code": "611",
+          "amount": 1678509.27
+        },
+        {
+          "code": "621",
+          "amount": 199517821.39
+        },
+        {
+          "code": "631",
+          "amount": 2707169.23
+        },
+        {
+          "code": "632",
+          "amount": 2872640.67
+        }
+      ],
+      "metaPath": null,
+      "confidence": null,
+      "identity": {
+        "taxNumber": "8360845044",
+        "tcKimlik": null,
+        "title": "SİS. LTD. ŞTİ.",
+        "sourceConfidence": "HIGH"
+      }
+    }
+  ],
+  "2026-q2-gecici-beyanname.pdf": [
+    {
+      "year": 2026,
+      "period": "Q2",
+      "fields": {
+        "revenue": 275036322.99,
+        "cogs": 262898589.73,
+        "grossProfit": 12137733.26,
+        "operatingExpenses": 10287032.54,
+        "ebit": 1850700.72,
+        "ebt": 1850700.72,
+        "netProfit": 1850700.72
+      },
+      "rawAccounts": [
+        {
+          "code": "600",
+          "amount": 274982113.76
+        },
+        {
+          "code": "602",
+          "amount": 541812.64
+        },
+        {
+          "code": "611",
+          "amount": 487603.41
+        },
+        {
+          "code": "621",
+          "amount": 262898589.73
+        },
+        {
+          "code": "631",
+          "amount": 4847983.92
+        },
+        {
+          "code": "632",
+          "amount": 5439048.62
+        }
+      ],
+      "metaPath": null,
+      "confidence": null,
+      "identity": {
+        "taxNumber": "8360845044",
+        "tcKimlik": null,
+        "title": "SİS. LTD. ŞTİ.",
+        "sourceConfidence": "HIGH"
+      }
+    }
+  ],
+  "2026-q2-mizan.xlsx": [
+    {
+      "year": 2026,
+      "period": "Q2",
+      "fields": {
+        "cash": 18575930.29,
+        "tradeReceivables": 5285594.64,
+        "inventory": 15000639.77,
+        "otherCurrentAssets": 2242992.92,
+        "tangibleAssets": 11369937.95,
+        "tradePayables": 871941.18,
+        "otherShortTermPayables": 280755,
+        "taxPayables": 136759.5,
+        "otherNonCurrentLiabilities": 24000000,
+        "paidInCapital": 15000000,
+        "capitalReserves": 8115539,
+        "retainedEarnings": 2219400.17
+      },
+      "rawAccounts": [
+        {
+          "code": "100",
+          "amount": 351048.96
+        },
+        {
+          "code": "101",
+          "amount": 17824850
+        },
+        {
+          "code": "102",
+          "amount": 323576.02
+        },
+        {
+          "code": "108",
+          "amount": 76455.31
+        },
+        {
+          "code": "120",
+          "amount": 5285594.64
+        },
+        {
+          "code": "153",
+          "amount": 15000639.77
+        },
+        {
+          "code": "190",
+          "amount": 2069180.28
+        },
+        {
+          "code": "193",
+          "amount": 173812.64
+        },
+        {
+          "code": "253",
+          "amount": 11618833.34
+        },
+        {
+          "code": "254",
+          "amount": 566547.03
+        },
+        {
+          "code": "255",
+          "amount": 298084.85
+        },
+        {
+          "code": "257",
+          "amount": 1113527.27
+        },
+        {
+          "code": "335",
+          "amount": 280755
+        },
+        {
+          "code": "360",
+          "amount": 16000
+        },
+        {
+          "code": "361",
+          "amount": 120759.5
+        },
+        {
+          "code": "431",
+          "amount": 24000000
+        },
+        {
+          "code": "500",
+          "amount": 15000000
+        },
+        {
+          "code": "502",
+          "amount": 115539
+        },
+        {
+          "code": "529",
+          "amount": 8000000
+        },
+        {
+          "code": "570",
+          "amount": 2219400.17
+        },
+        {
+          "code": "590",
+          "amount": 1850700.72
+        }
+      ],
+      "metaPath": "mizan",
+      "confidence": 1,
+      "identity": {
+        "taxNumber": null,
+        "title": null,
+        "sourceConfidence": "LOW"
+      }
+    }
+  ]
+}

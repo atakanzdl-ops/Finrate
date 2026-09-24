@@ -71,8 +71,8 @@ type ApiErrorResponse = { error?: string }
 function formatAmount(n: number | undefined | null): string {
   if (n == null || n === 0) return '0 TL'
   const abs = Math.abs(n)
-  if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} Mr TL`
-  if (abs >= 1_000_000)     return `${(n / 1_000_000).toFixed(1)} M TL`
+  if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
+  if (abs >= 1_000_000)     return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
   if (abs >= 1_000)         return `${(n / 1_000).toFixed(0)} K TL`
   return `${n.toFixed(0)} TL`
 }
