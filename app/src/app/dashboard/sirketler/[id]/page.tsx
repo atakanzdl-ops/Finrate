@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { FileUpload } from '@/components/analysis/FileUpload'
 import DashboardShell from '@/components/layout/DashboardShell'
 import { TdhpSpreadsheet } from '@/components/analysis/TdhpSpreadsheet'
+import { PERIOD_LABEL_LONG } from '@/lib/periods'
 
 interface FinancialData {
   id: string
@@ -67,9 +68,7 @@ interface Entity {
   financialData: FinancialData[]
 }
 
-const PERIOD_LABELS: Record<string, string> = {
-  ANNUAL: 'Kesin Beyan', Q1: '1. Geçici', Q2: '2. Geçici', Q3: '3. Geçici', Q4: '4. Geçici',
-}
+const PERIOD_LABELS = PERIOD_LABEL_LONG
 
 function fmt(v: number | null): string {
   if (v == null) return '—'

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Upload, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 import clsx from 'clsx'
+import { PERIOD_LABEL_SHORT } from '@/lib/periods'
 
 interface Props {
   entityId: string
@@ -68,9 +69,7 @@ const PERIODS = [
   { value: 'Q4', label: '4. Geçici Vergi (Oca–Ara)' },
 ]
 
-const PERIOD_LABELS: Record<string, string> = {
-  ANNUAL: 'Yıllık', Q1: '1Ç', Q2: '2Ç', Q3: '3Ç', Q4: '4Ç',
-}
+const PERIOD_LABELS = PERIOD_LABEL_SHORT
 
 function fileIcon(name: string) {
   const n = name.toLowerCase()

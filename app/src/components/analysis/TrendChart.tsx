@@ -7,6 +7,7 @@ import {
 import { useState } from 'react'
 import { Info } from 'lucide-react'
 import { scoreToRating } from '@/lib/scoring/score'
+import { PERIOD_LABEL_AXIS } from '@/lib/periods'
 
 interface AnalysisBrief {
   id: string
@@ -42,9 +43,7 @@ function combinedRating(score: number): string {
   return scoreToRating(score)
 }
 
-const PERIOD_SHORT: Record<string, string> = {
-  ANNUAL: '', Q1: 'Q1', Q2: 'Q2', Q3: 'Q3', Q4: 'Q4',
-}
+const PERIOD_SHORT = PERIOD_LABEL_AXIS
 
 interface TooltipProps {
   active?: boolean

@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    take: 100,
+    take: 1000,
   })
 
   const analyses = raw.map((a: (typeof raw)[number]) => {

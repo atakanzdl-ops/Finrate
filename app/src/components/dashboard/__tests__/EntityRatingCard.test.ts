@@ -204,7 +204,7 @@ describe('T_ERC4 — computeTrend: 2+ analiz → skor farkı', () => {
       makeItem('a2', 2024, 'ANNUAL', 60),
       makeItem('a3', 2025, 'Q1',    65),
     ]
-    // Son: 65 (2025/Q1), Önceki: 60 (2024), Fark: +5
+    // Son: 65 (2025/3A), Önceki: 60 (2024), Fark: +5
     expect(computeTrend(analyses)).toBeCloseTo(5, 2)
   })
 })
@@ -312,18 +312,18 @@ describe('T_ERC8 — latestAnalysisPeriodLabel: en son dönem etiketi', () => {
     expect(latestAnalysisPeriodLabel(analyses)).toBe('2024')
   })
 
-  test('tek analiz Q4 → "2024/Q4"', () => {
+  test('tek analiz Q4 → "2024/12A"', () => {
     const analyses = [makeItem('a1', 2024, 'Q4', 60)]
-    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/Q4')
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/12A')
   })
 
-  test('3 karışık analiz → en son dönem (2025/Q4)', () => {
+  test('3 karışık analiz → en son dönem (2025/12A)', () => {
     const analyses = [
       makeItem('a1', 2024, 'Q1',    60),
       makeItem('a2', 2025, 'Q4',    70),
       makeItem('a3', 2023, 'ANNUAL', 55),
     ]
-    expect(latestAnalysisPeriodLabel(analyses)).toBe('2025/Q4')
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2025/12A')
   })
 
   test('aynı yılda ANNUAL < Q1 < Q4 → Q4 döner', () => {
@@ -332,6 +332,6 @@ describe('T_ERC8 — latestAnalysisPeriodLabel: en son dönem etiketi', () => {
       makeItem('a2', 2024, 'Q4',    70),
       makeItem('a3', 2024, 'Q1',    65),
     ]
-    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/Q4')
+    expect(latestAnalysisPeriodLabel(analyses)).toBe('2024/12A')
   })
 })

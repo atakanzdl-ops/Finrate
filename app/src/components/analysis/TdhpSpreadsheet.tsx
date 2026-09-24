@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
+import { PERIOD_LABEL_SHORT } from '@/lib/periods'
 
 // ─── Types ─────────────────────────────────────────────────
 type RowType = 'header' | 'account' | 'subtotal' | 'total'
@@ -106,9 +107,7 @@ const TDHP_ROWS: RowDef[] = [
 ]
 
 // ─── Sabitler ──────────────────────────────────────────────
-const PERIOD_LABEL: Record<string, string> = {
-  ANNUAL: 'Kesin Beyan', Q1: '1. Geçici', Q2: '2. Geçici', Q3: '3. Geçici', Q4: '4. Geçici',
-}
+const PERIOD_LABEL = PERIOD_LABEL_SHORT
 const CODE_W   = 44    // px — sticky kod sütun genişliği (ilk sütun)
 const LABEL_W  = 216   // px — sticky label sütun genişliği (ikinci sütun)
 

@@ -130,10 +130,10 @@ function BarMetricChart({ periods, primaryLabel, secondaryLabel, tab, onTab }: {
   const fmtV = (v: number) => {
     const sign = v < 0 ? '-' : ''
     const abs  = Math.abs(v)
-    if (abs >= 1_000_000_000) return `${sign}₺${(abs / 1_000_000_000).toFixed(1)}B`
-    if (abs >= 1_000_000)     return `${sign}₺${(abs / 1_000_000).toFixed(1)}M`
-    if (abs >= 1_000)         return `${sign}₺${(abs / 1_000).toFixed(0)}K`
-    return `${sign}₺${abs.toFixed(0)}`
+    if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
+    if (abs >= 1_000_000)     return `${sign}${(abs / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
+    if (abs >= 1_000)         return `${sign}${(abs / 1_000).toFixed(0)} bin TL`
+    return `${sign}${abs.toFixed(0)} TL`
   }
 
   const n = periods.length

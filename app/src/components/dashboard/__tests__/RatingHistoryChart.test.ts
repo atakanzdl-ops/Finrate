@@ -33,20 +33,20 @@ describe('T_RH1 — periodLabel', () => {
     expect(periodLabel(2024, 'ANNUAL')).toBe('2024')
   })
 
-  test('Q1 → "2024/Q1"', () => {
-    expect(periodLabel(2024, 'Q1')).toBe('2024/Q1')
+  test('Q1 → "2024/3A"', () => {
+    expect(periodLabel(2024, 'Q1')).toBe('2024/3A')
   })
 
-  test('Q2 → "2024/Q2"', () => {
-    expect(periodLabel(2024, 'Q2')).toBe('2024/Q2')
+  test('Q2 → "2024/6A"', () => {
+    expect(periodLabel(2024, 'Q2')).toBe('2024/6A')
   })
 
-  test('Q3 → "2025/Q3"', () => {
-    expect(periodLabel(2025, 'Q3')).toBe('2025/Q3')
+  test('Q3 → "2025/9A"', () => {
+    expect(periodLabel(2025, 'Q3')).toBe('2025/9A')
   })
 
-  test('Q4 → "2025/Q4"', () => {
-    expect(periodLabel(2025, 'Q4')).toBe('2025/Q4')
+  test('Q4 → "2025/12A"', () => {
+    expect(periodLabel(2025, 'Q4')).toBe('2025/12A')
   })
 })
 

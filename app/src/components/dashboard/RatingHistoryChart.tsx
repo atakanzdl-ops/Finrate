@@ -10,6 +10,8 @@
  *   periodLabel, sortAnalyses, filterAnalyses
  */
 
+import { periodLabelAxis } from '@/lib/periods'
+
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 
@@ -30,7 +32,7 @@ export type ChartTab = 'tumu' | 'yillik' | 'ceyreklik'
 
 /** X ekseni etiketi: ANNUAL → "2024", Q4 → "2024/Q4" */
 export function periodLabel(year: number, period: string): string {
-  return period === 'ANNUAL' ? String(year) : `${year}/${period}`
+  return periodLabelAxis(year, period)
 }
 
 const PERIOD_ORDER: Record<string, number> = {

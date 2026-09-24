@@ -68,7 +68,7 @@ export default function DashboardHome() {
     if (!analyses.length) return 'Henüz analiz bulunmuyor.'
     // updatedAt API'den {} geliyor (jsonUtf8 Date→{} hatası); year+period güvenilir
     const lastPeriod = latestAnalysisPeriodLabel(analyses as CardAnalysisItem[]) ?? '—'
-    return `${entityGroups.length} firma • Son dönem: ${lastPeriod}`
+    return `${entityGroups.length} analizli firma • Son dönem: ${lastPeriod}`
   }, [analyses, entityGroups.length])
 
   return (
