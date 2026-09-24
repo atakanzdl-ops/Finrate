@@ -56,16 +56,16 @@ describe('miniPeriodLabel', () => {
     expect(miniPeriodLabel(2024, 'ANNUAL')).toBe('24')
   })
 
-  test('Q1 → "Q1"', () => {
-    expect(miniPeriodLabel(2024, 'Q1')).toBe('Q1')
+  test('Q1 → "3A"', () => {
+    expect(miniPeriodLabel(2024, 'Q1')).toBe('3A')
   })
 
-  test('Q4 → "Q4"', () => {
-    expect(miniPeriodLabel(2025, 'Q4')).toBe('Q4')
+  test('Q4 → "12A"', () => {
+    expect(miniPeriodLabel(2025, 'Q4')).toBe('12A')
   })
 
-  test('Q3 2023 → "Q3"', () => {
-    expect(miniPeriodLabel(2023, 'Q3')).toBe('Q3')
+  test('Q3 2023 → "9A"', () => {
+    expect(miniPeriodLabel(2023, 'Q3')).toBe('9A')
   })
 })
 
