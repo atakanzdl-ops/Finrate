@@ -85,7 +85,10 @@ body {
   border-top: 1px solid var(--fr-border);
 }
 
-.nav-link {
+/* .sidebar-nav/.sidebar-footer ile kapsanır: globals.css'teki genel .nav-link
+   kuralı CSS yüklenme sırasından bağımsız olarak asla bunları ezemez. */
+.sidebar-nav .nav-link,
+.sidebar-footer .nav-link {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -93,18 +96,22 @@ body {
   padding: 0 12px;
   border-radius: 10px;
   color: var(--fr-text-secondary);
+  background: transparent;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   border: 1px solid transparent;
 }
 
-.nav-link:hover {
+.sidebar-nav .nav-link:hover,
+.sidebar-footer .nav-link:hover {
   background: #f1f5f9;
   color: var(--fr-text);
 }
 
-.nav-link.active {
+.sidebar-nav .nav-link.active,
+.sidebar-footer .nav-link.active {
   background: #edf4f8;
   color: var(--fr-primary);
   border-color: #d7e4ee;
@@ -112,7 +119,8 @@ body {
 
 /* Sidebar (hem .sidebar-nav hem .sidebar-footer) aktif öğesinde
    border görünmesini engelle — topbar .nav-link davranışı korunur. */
-.sidebar-link.active {
+.sidebar-nav .sidebar-link.active,
+.sidebar-footer .sidebar-link.active {
   border-color: transparent;
 }
 
