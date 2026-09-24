@@ -19,6 +19,7 @@ import ScenarioPanelV3 from '@/components/analysis/ScenarioPanelV3'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
 import { PERIOD_LABEL_SHORT, PERIOD_LABEL_AXIS } from '@/lib/periods'
+import { RATING_LABEL } from '@/lib/ratingLabels'
 import { scoreToRating } from '@/lib/scoring/score'
 import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
@@ -60,10 +61,6 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'trend',      label: 'Trend',          icon: <TrendingUp      size={14} /> },
 ]
 
-const RATING_LABEL: Record<string, string> = {
-  AAA: 'Mükemmel', AA: 'Yüksek', A: 'İyi', BBB: 'Yeterli',
-  BB: 'Spekülatif', B: 'Riskli', CCC: 'Çok Riskli', CC: 'Çok Riskli', C: 'Kritik', D: 'Temerrüt',
-}
 
 const RATING_COLOR: Record<string, string> = {
   AAA: '#0B3C5D', AA: '#0B3C5D', A: '#0B3C5D',
@@ -558,15 +555,9 @@ function AnalizPageContent() {
     doLoad()
   }, [entityId])
 
-  function combinedScore(a: Analysis) {
-    const subj     = a.entity?.id ? (subjectiveScores[a.entity.id] ?? 0) : 0
-    // Faz 7.3.4C: Double-application fix.
-    // POST /subjective, DB.finalScore'u combined ile eziyor ama orijinal finansal
-    // skoru ratios.__financialScore'da saklıyor. Burada o orijinal değeri kullanarak
-    // combineScores'un ikinci kez uygulanmasını önlüyoruz.
-    const financial = a.ratios?.__financialScore ?? a.finalScore
-    return combineScores(financial, subj)
-  }
+  // Tek skor kaynağı: DB'deki finalScore (upload/recalculate/subjective hepsi
+  // resolveFinalScore ile yazar). Sayfa yeniden hesaplamaz.
+  function combinedScore(a: Analysis) { return a.finalScore ?? 0 }
   function combinedRating(s: number) { return scoreToRating(s) }
 
   const fmtN   = (v?: number | null, d = 2) => v == null ? '—' : v.toFixed(d)
@@ -1380,6 +1371,7 @@ function AnalizPageContent() {
                         setSubjectiveScores(prev => ({ ...prev, [selected.entity!.id]: total }))
                         setSubjectiveMissing(prev => ({ ...prev, [selected.entity!.id]: false }))
                       }
+                      loadAnalyses()
                     }}
                   />
                 )}

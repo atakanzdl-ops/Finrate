@@ -5,6 +5,7 @@ import { getUserIdFromRequest } from '@/lib/auth'
 import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
+import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { checkDuplicates, checkEntityIdentity } from '@/lib/validation/uploadValidation'
 import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
@@ -608,18 +609,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const ratios = calculateRatios(enrichedFields)
       const score  = calculateScore(ratios, entity.sector)
       const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
+      const resolved = await resolveFinalScore(entityId, score.finalScore)
+      const ratiosJson = JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta })
 
       const analysis = await prisma.analysis.upsert({
         where: { entityId_year_period: { entityId, year: row.year, period } },
         update: {
           financialDataId:    financialData.id,
-          finalScore:         score.finalScore,
-          finalRating:        score.finalRating,
+          finalScore:         resolved.finalScore,
+          finalRating:        resolved.finalRating,
           liquidityScore:     score.liquidityScore,
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
           activityScore:      score.activityScore,
-          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null }),
+          ratios:             ratiosJson,
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),
         },
@@ -630,13 +633,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           year:               row.year,
           period:             period,
           mode:               'SOLO',
-          finalScore:         score.finalScore,
-          finalRating:        score.finalRating,
+          finalScore:         resolved.finalScore,
+          finalRating:        resolved.finalRating,
           liquidityScore:     score.liquidityScore,
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
           activityScore:      score.activityScore,
-          ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null }),
+          ratios:             ratiosJson,
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
         },
       })

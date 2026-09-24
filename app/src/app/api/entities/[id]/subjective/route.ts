@@ -48,6 +48,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const body = await req.json() as SubjectiveInputData
 
+  const REQUIRED: (keyof SubjectiveInputData)[] = [
+    'kkbCategory', 'activeDelayDays', 'creditLimitUtilPct', 'avgMaturityMonths', 'companyAgeYears', 'auditLevel',
+  ]
+  const missing = REQUIRED.filter(k => body[k] == null)
+  if (missing.length > 0) {
+    return jsonUtf8({ error: 'Subjektif form eksik: tüm alanlar doldurulmalı.', missing }, { status: 400 })
+  }
+
   // SubjectiveInput kaydet / güncelle
   const saved = await prisma.subjectiveInput.upsert({
     where:  { entityId },

@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
       ratios: parsedRatios,
       overallCoverage,
       insufficientCategories,
+      subjectiveMissing: parsedRatios?.__subjectiveTotal == null,
       hasBalanceAccounts:              hasBalanceAccounts(accountCodes),
       hasIncomeAccounts:               hasIncomeAccounts(accountCodes),
       missingQuarterlySourceWarning:   detectMissingQuarterlySource(a.period, accountCodes),

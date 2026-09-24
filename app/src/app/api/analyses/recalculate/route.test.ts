@@ -46,6 +46,7 @@ function setupMocks(opts: {
   userId:       string | null
   financialData?: ReturnType<typeof makeFinancialData>
   updateSpy?:   jest.Mock
+  subjectiveRow?: Record<string, unknown> | null
 }) {
   const updateMock = opts.updateSpy ?? jest.fn(() => Promise.resolve({}))
 
@@ -62,20 +63,7 @@ function setupMocks(opts: {
     getUserIdFromRequest: jest.fn(() => opts.userId),
   }))
 
-  jest.doMock('@/lib/db', () => ({
-    prisma: {
-      financialData: {
-        findMany: jest.fn(() => Promise.resolve(opts.financialData ?? makeFinancialData())),
-      },
-      financialData_findFirst_mock: jest.fn(() => Promise.resolve(null)),
-      analysis: {
-        update:     updateMock,
-        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
-      },
-    },
-  }))
-
-  // prevYear lookup → null (her zaman)
+  // prevYear lookup → null (her zaman); subjectiveInput → opts.subjectiveRow (varsayılan: yok)
   jest.doMock('@/lib/db', () => ({
     prisma: {
       financialData: {
@@ -87,6 +75,9 @@ function setupMocks(opts: {
         // Faz 7.3.60.1: roadmapSnapshot invalidation
         updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
       },
+      subjectiveInput: {
+        findUnique: jest.fn(() => Promise.resolve(opts.subjectiveRow ?? null)),
+      },
     },
   }))
 
@@ -97,6 +88,7 @@ function setupMocks(opts: {
 
   jest.doMock('@/lib/scoring/score', () => ({
     calculateScore: jest.fn(() => MOCK_SCORE),
+    scoreToRating:  jest.fn(() => 'B'),
   }))
 
   jest.doMock('@/lib/scoring/optimizerSnapshot', () => ({
@@ -128,37 +120,17 @@ describe('POST /api/analyses/recalculate', () => {
     jest.clearAllMocks()
   })
 
-  // ── Test K: __subjectiveTotal korunur ─────────────────────────────────────
+  // ── Test K: subjektif kayıt varsa birleşik skor + __subjectiveTotal yazılır ─
 
-  test('K — Mevcut ratios JSON\'da __subjectiveTotal var → yeniden yazıda korunur', async () => {
-    const existingRatios = JSON.stringify({
-      someRatio: 1.2,
-      __subjectiveTotal: 18,
-    })
-    const { updateMock } = setupMocks({
-      userId:       'user-1',
-      financialData: makeFinancialData({ analysisRatios: existingRatios }),
-    })
-
-    const req = createMockRequest()
-    await callPost(req)
-
-    expect(updateMock).toHaveBeenCalledTimes(1)
-    const updateCall  = updateMock.mock.calls[0][0]
-    const writtenJSON = JSON.parse(updateCall.data.ratios)
-    expect(writtenJSON.__subjectiveTotal).toBe(18)
-  })
-
-  // ── Test L: __financialScore korunur ──────────────────────────────────────
-
-  test('L — Mevcut ratios JSON\'da __financialScore var → yeniden yazıda korunur', async () => {
-    const existingRatios = JSON.stringify({
-      someRatio: 0.8,
-      __financialScore: 65,
-    })
+  test('K — SubjectiveInput kaydı var → finalScore birleşik, __subjectiveTotal dolu', async () => {
     const { updateMock } = setupMocks({
       userId:        'user-1',
-      financialData: makeFinancialData({ analysisRatios: existingRatios }),
+      financialData: makeFinancialData({ analysisRatios: JSON.stringify({ someRatio: 1.2 }) }),
+      subjectiveRow: {
+        kkbCategory: 'iyi', activeDelayDays: 0, checkProtest: false, enforcementFile: false,
+        creditLimitUtilPct: 20, hasMultipleBanks: true, avgMaturityMonths: 36, companyAgeYears: 12,
+        auditLevel: 'bagimsiz', ownershipClarity: true, hasTaxDebt: false, hasSgkDebt: false, activeLawsuitCount: 0,
+      },
     })
 
     const req = createMockRequest()
@@ -167,12 +139,32 @@ describe('POST /api/analyses/recalculate', () => {
     expect(updateMock).toHaveBeenCalledTimes(1)
     const updateCall  = updateMock.mock.calls[0][0]
     const writtenJSON = JSON.parse(updateCall.data.ratios)
-    expect(writtenJSON.__financialScore).toBe(65)
+    expect(writtenJSON.__subjectiveTotal).toBe(30)        // tüm cevaplar en iyi → 30/30
+    expect(writtenJSON.__financialScore).toBe(72)
+    expect(updateCall.data.finalScore).not.toBe(72)       // birleşik skor finansaldan farklı
+  })
+
+  // ── Test L: __financialScore her zaman yeni hesaplanan finansal skordur ───
+
+  test('L — Eski ratios JSON\'daki __financialScore korunmaz, yeni skor yazılır', async () => {
+    const { updateMock } = setupMocks({
+      userId:        'user-1',
+      financialData: makeFinancialData({ analysisRatios: JSON.stringify({ someRatio: 0.8, __financialScore: 65 }) }),
+    })
+
+    const req = createMockRequest()
+    await callPost(req)
+
+    expect(updateMock).toHaveBeenCalledTimes(1)
+    const updateCall  = updateMock.mock.calls[0][0]
+    const writtenJSON = JSON.parse(updateCall.data.ratios)
+    expect(writtenJSON.__financialScore).toBe(72)
+    expect(updateCall.data.finalScore).toBe(72)           // subjektif yok → finalScore = finansal
   })
 
   // ── Test M: null ratios → crash yok, update başarılı ─────────────────────
 
-  test('M — Mevcut ratios null → meta alanı yoksa da update başarılı, crash yok', async () => {
+  test('M — Mevcut ratios null → update başarılı, subjektif yoksa __subjectiveTotal null', async () => {
     const { updateMock } = setupMocks({
       userId:        'user-1',
       financialData: makeFinancialData({ analysisRatios: null }),
@@ -184,10 +176,8 @@ describe('POST /api/analyses/recalculate', () => {
     expect(updateMock).toHaveBeenCalledTimes(1)
     const updateCall  = updateMock.mock.calls[0][0]
     const writtenJSON = JSON.parse(updateCall.data.ratios)
-    // meta alanlar yoksa yazılmaz
-    expect(writtenJSON.__subjectiveTotal).toBeUndefined()
-    expect(writtenJSON.__financialScore).toBeUndefined()
-    // temel alanlar var
+    expect(writtenJSON.__subjectiveTotal).toBeNull()
+    expect(writtenJSON.__financialScore).toBe(72)
     expect(writtenJSON.__overallCoverage).toBeDefined()
   })
 

@@ -27,6 +27,7 @@ export interface CardAnalysisItem {
   updatedAt?: string | null
   finalScore: number
   finalRating: string
+  subjectiveMissing?: boolean
   entity?: { id: string; name: string; sector?: string | null } | null
 }
 
@@ -227,8 +228,11 @@ export default function EntityRatingCard({ entity, analyses }: Props) {
             <span style={{ fontSize: 22, fontWeight: 900, color: '#0B3C5D', lineHeight: 1 }}>
               {Math.round(last.finalScore)}
             </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(last.finalRating)}`}>
-              {last.finalRating}
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ratingTone(last.finalRating)}`}
+              title={last.subjectiveMissing ? 'Subjektif faktörler girilmedi — ön değerlendirme (yalnızca finansal skor)' : undefined}
+            >
+              {last.finalRating}{last.subjectiveMissing ? '*' : ''}
             </span>
             {trend != null && (
               <span style={{

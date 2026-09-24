@@ -5,6 +5,7 @@ import { getUserIdFromRequest } from '@/lib/auth'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
+import { resolveFinalScore } from '@/lib/scoring/persistScore'
 
 /**
  * POST /api/analyses/recalculate
@@ -56,17 +57,13 @@ export async function POST(req: NextRequest) {
     const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, fd.entity.sector)
 
     if (fd.analysis) {
-      // Mevcut ratios JSON'daki meta alanları koru (__subjectiveTotal, __financialScore)
-      let existingMeta: Record<string, unknown> = {}
-      try {
-        if (fd.analysis.ratios) existingMeta = JSON.parse(fd.analysis.ratios as string)
-      } catch { /* ignore — bozuk JSON ise meta kaybolmasın diye silent */ }
+      const resolved = await resolveFinalScore(fd.entityId, score.finalScore)
 
       await prisma.analysis.update({
         where: { id: fd.analysis.id },
         data: {
-          finalScore:         score.finalScore,
-          finalRating:        score.finalRating,
+          finalScore:         resolved.finalScore,
+          finalRating:        resolved.finalRating,
           liquidityScore:     score.liquidityScore,
           profitabilityScore: score.profitabilityScore,
           leverageScore:      score.leverageScore,
@@ -75,8 +72,7 @@ export async function POST(req: NextRequest) {
             ...ratios,
             __overallCoverage:        score.overallCoverage ?? null,
             __insufficientCategories: score.insufficientCategories,
-            ...(existingMeta.__subjectiveTotal !== undefined && { __subjectiveTotal: existingMeta.__subjectiveTotal }),
-            ...(existingMeta.__financialScore  !== undefined && { __financialScore:  existingMeta.__financialScore  }),
+            ...resolved.meta,
           }),
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),
