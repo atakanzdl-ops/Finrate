@@ -587,9 +587,9 @@ const MIZAN_MAP: Record<string, string> = {
   // 42x — UV Ticari Borçlar → longTermTradePayables_A
   '420': 'longTermTradePayables_A',  '421': 'longTermTradePayables_A',
   '426': 'longTermTradePayables_A',  '429': 'longTermTradePayables_A',
-  // 43x — UV Diğer Borçlar → otherNonCurrentLiabilities_A
-  '431': 'otherNonCurrentLiabilities_A', '432': 'otherNonCurrentLiabilities_A',
-  '433': 'otherNonCurrentLiabilities_A', '436': 'otherNonCurrentLiabilities_A',
+  // 43x — UV Diğer Borçlar → longTermOtherPayables_A (satır 43; 331/431 ortaklara borçlar = BORÇ)
+  '431': 'longTermOtherPayables_A', '432': 'longTermOtherPayables_A',
+  '433': 'longTermOtherPayables_A', '436': 'longTermOtherPayables_A',
   '500': 'paidInCapital_A',
   // R8.4.5: 501 Ödenmemiş Sermaye (kontra hesap, borç bakiyeli)
   // _CB = -bakBorç → 501 tutarı paidInCapital'dan otomatik düşer
@@ -612,7 +612,7 @@ const MIZAN_MAP: Record<string, string> = {
   '302': 'shortTermFinancialDebt_CB',
   '402': 'longTermFinancialDebt_CB',
   '422': 'longTermTradePayables_CB',           // UV Alacak Senetleri Reeskontu (kontra)
-  '437': 'otherNonCurrentLiabilities_CB',      // UV Borç Senetleri Reeskontu (kontra)
+  '437': 'longTermOtherPayables_CB',           // UV Borç Senetleri Reeskontu (kontra)
 }
 
 // Ana hesap → kanonik alt hesap eşlemesi (2 haneli → 3 haneli)

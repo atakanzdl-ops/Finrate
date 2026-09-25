@@ -19,7 +19,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const entity = await prisma.entity.findFirst({
     where: { id, userId },
     include: {
-      financialData: { orderBy: [{ year: 'desc' }, { period: 'asc' }] },
+      financialData: {
+        orderBy: [{ year: 'desc' }, { period: 'asc' }],
+        include: {
+          analysis: {
+            select: {
+              id: true,
+              financialAccounts: { select: { accountCode: true, amount: true } },
+            },
+          },
+        },
+      },
       group: { select: { id: true, name: true } },
     },
   })
