@@ -10,6 +10,13 @@ import type { ReportData } from '@/types/report'
 import { Logo } from '@/components/ui/Logo'
 import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
+const RATING_ORDER = ['D', 'C', 'CC', 'CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
+function nextGrade(current: string): string {
+  const i = RATING_ORDER.indexOf((current || '').toUpperCase().replace(/[+-]$/, ''))
+  if (i < 0) return 'BBB'
+  return RATING_ORDER[Math.min(i + 1, RATING_ORDER.length - 1)]
+}
+
 // ─── Yükleme Ekranı ──────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
@@ -42,6 +49,31 @@ function RaporContent() {
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [error, setError]           = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenError, setRegenError]     = useState<string | null>(null)
+
+  // Snapshot subjektif/veri değişince geçersiz olur; rapor tekrar açılabilsin diye
+  // yol haritası buradan yeniden üretilir (hedef: mevcut notun bir üstü).
+  async function regenerateRoadmap(currentRating: string) {
+    if (!id) return
+    setRegenerating(true)
+    setRegenError(null)
+    try {
+      const res = await fetch('/api/scenarios/v3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysisId: id, targetGrade: nextGrade(currentRating), currentGrade: currentRating }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
+      }
+      window.location.reload()
+    } catch (err: unknown) {
+      setRegenError(err instanceof Error ? err.message : 'Yol haritası oluşturulamadı')
+      setRegenerating(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) {
@@ -83,23 +115,41 @@ function RaporContent() {
         <p style={{ color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
           {ROADMAP_MESSAGES.ROADMAP_REQUIRED}
         </p>
-        <button
-          onClick={() => {
-            window.location.href = '/dashboard/analiz'
-          }}
-          style={{
-            background:   '#0f2942',
-            color:        '#fff',
-            padding:      '10px 24px',
-            borderRadius: '6px',
-            fontSize:     '14px',
-            fontWeight:   500,
-            border:       'none',
-            cursor:       'pointer',
-          }}
-        >
-          Analiz Sayfasına Dön
-        </button>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => regenerateRoadmap(reportData.rating)}
+            disabled={regenerating}
+            style={{
+              background:   '#0B3C5D',
+              color:        '#fff',
+              padding:      '10px 24px',
+              borderRadius: '6px',
+              fontSize:     '14px',
+              fontWeight:   600,
+              border:       'none',
+              cursor:       regenerating ? 'wait' : 'pointer',
+              opacity:      regenerating ? 0.6 : 1,
+            }}
+          >
+            {regenerating ? 'Oluşturuluyor…' : 'Yol Haritasını Oluştur ve Raporu Aç'}
+          </button>
+          <button
+            onClick={() => { window.location.href = '/dashboard/analiz' }}
+            style={{
+              background:   '#fff',
+              color:        '#0B3C5D',
+              padding:      '10px 24px',
+              borderRadius: '6px',
+              fontSize:     '14px',
+              fontWeight:   500,
+              border:       '1px solid #d7e4ee',
+              cursor:       'pointer',
+            }}
+          >
+            Analiz Sayfasına Dön
+          </button>
+        </div>
+        {regenError && <p style={{ color: '#dc2626', marginTop: '14px', fontSize: '13px' }}>{regenError}</p>}
       </div>
     )
   }

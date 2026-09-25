@@ -3,6 +3,7 @@
 // "—" döndürülen tüm yerler eksik/null veri anlamına gelir.
 
 import { periodLabelLong } from '@/lib/periods'
+import { RATING_LABEL } from '@/lib/ratingLabels'
 
 // ─── PARA BİRİMİ ──────────────────────────────────────────────────────────────
 
@@ -201,37 +202,30 @@ export function getRatingBand(
   rating: string,
 ): { label: string; bg: string; border: string; text: string } {
   const r = (rating || '').toUpperCase().replace(/[+-]$/, '')
+  const label = RATING_LABEL[r] ?? 'Değerlendirilmemiş'
 
-  // AAA / AA / A / BBB — Yatırım Yapılabilir (yeşil)
   if (r === 'AAA' || r === 'AA' || r === 'A' || r === 'BBB') {
-    return { label: 'Yatırım Yapılabilir', bg: 'rgba(34,197,94,.10)', border: 'rgba(34,197,94,.30)', text: '#16a34a' }
+    return { label, bg: 'rgba(34,197,94,.10)', border: 'rgba(34,197,94,.30)', text: '#16a34a' }
   }
-  // BB — Yatırım Yapılabilir Alt (mavi)
   if (r === 'BB') {
-    return { label: 'Yatırım Yapılabilir Alt', bg: 'rgba(59,130,246,.10)', border: 'rgba(59,130,246,.30)', text: '#3b82f6' }
+    return { label, bg: 'rgba(59,130,246,.10)', border: 'rgba(59,130,246,.30)', text: '#3b82f6' }
   }
-  // B — Spekülatif (turuncu)
   if (r === 'B') {
-    return { label: 'Spekülatif', bg: 'rgba(249,115,22,.10)', border: 'rgba(249,115,22,.30)', text: '#f97316' }
+    return { label, bg: 'rgba(249,115,22,.10)', border: 'rgba(249,115,22,.30)', text: '#f97316' }
   }
-  // CCC — Spekülatif Alt (koyu turuncu)
   if (r === 'CCC') {
-    return { label: 'Spekülatif Alt', bg: 'rgba(234,88,12,.10)', border: 'rgba(234,88,12,.30)', text: '#ea580c' }
+    return { label, bg: 'rgba(234,88,12,.10)', border: 'rgba(234,88,12,.30)', text: '#ea580c' }
   }
-  // CC — Yüksek Risk (koyu turuncu-kırmızı)
   if (r === 'CC') {
-    return { label: 'Yüksek Risk', bg: 'rgba(220,38,38,.10)', border: 'rgba(220,38,38,.30)', text: '#dc2626' }
+    return { label, bg: 'rgba(220,38,38,.10)', border: 'rgba(220,38,38,.30)', text: '#dc2626' }
   }
-  // C — Çok Yüksek Risk (kırmızı)
   if (r === 'C') {
-    return { label: 'Çok Yüksek Risk', bg: 'rgba(239,68,68,.10)', border: 'rgba(239,68,68,.30)', text: '#ef4444' }
+    return { label, bg: 'rgba(239,68,68,.10)', border: 'rgba(239,68,68,.30)', text: '#ef4444' }
   }
-  // D — Temerrüt Riski (koyu kırmızı)
   if (r === 'D') {
-    return { label: 'Temerrüt Riski', bg: 'rgba(153,27,27,.10)', border: 'rgba(153,27,27,.30)', text: '#991b1b' }
+    return { label, bg: 'rgba(153,27,27,.10)', border: 'rgba(153,27,27,.30)', text: '#991b1b' }
   }
-  // Bilinmeyen / fallback (gri)
-  return { label: 'Değerlendirilmemiş', bg: 'rgba(107,114,128,.10)', border: 'rgba(107,114,128,.30)', text: '#6b7280' }
+  return { label, bg: 'rgba(107,114,128,.10)', border: 'rgba(107,114,128,.30)', text: '#6b7280' }
 }
 
 // ─── ENTİTE TİPİ ETİKETİ ─────────────────────────────────────────────────────

@@ -73,22 +73,26 @@ function SelectField({ label, value, options, onChange }: { label: string; value
 }
 
 function SliderField({ label, value, min, max, step, unit, onChange }: {
-  label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (v: number) => void
+  label: string; value: number | null | undefined; min: number; max: number; step: number; unit?: string; onChange: (v: number) => void
 }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between">
         <label className="card-desc uppercase tracking-widest">{label}</label>
-        <span className="text-xs font-black text-[#0B3C5D] font-mono">{value}{unit}</span>
+        <span className="text-xs font-black text-[#0B3C5D] font-mono">
+          {value == null ? <span className="text-amber-500">Seçilmedi</span> : <>{value}{unit}</>}
+        </span>
       </div>
       <input
         type="range"
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={value ?? min}
+        className={value == null ? 'opacity-50' : undefined}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-cyan-500 h-1.5 rounded-full cursor-pointer"
+        onClick={e => { if (value == null) onChange(Number((e.target as HTMLInputElement).value)) }}
+        style={{ width: '100%' }}
       />
       <div className="flex justify-between text-[9px] text-[#94A3B8]">
         <span>{min}{unit}</span>
@@ -98,22 +102,27 @@ function SliderField({ label, value, min, max, step, unit, onChange }: {
   )
 }
 
+// Kullanıcının açıkça seçmesi gereken alanlar — ön-dolu değer yok, kaydetmeden önce hepsi zorunlu.
+const REQUIRED_FIELDS: Array<{ key: keyof SubjectiveInputData; label: string }> = [
+  { key: 'kkbCategory',        label: 'KKB Kategorisi' },
+  { key: 'activeDelayDays',    label: 'Aktif Gecikme Süresi' },
+  { key: 'creditLimitUtilPct', label: 'Kredi Limiti Kullanım Oranı' },
+  { key: 'avgMaturityMonths',  label: 'Ortalama Kredi Vadesi' },
+  { key: 'companyAgeYears',    label: 'Şirket Yaşı' },
+  { key: 'auditLevel',         label: 'Denetim Düzeyi' },
+]
+
 export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
   const [data, setData] = useState<SubjectiveInputData>({
-    kkbCategory: 'iyi',
-    activeDelayDays: 0,
     checkProtest: false,
     enforcementFile: false,
-    creditLimitUtilPct: 50,
-    hasMultipleBanks: true,
-    avgMaturityMonths: 24,
-    companyAgeYears: 7,
-    auditLevel: 'ymm',
+    hasMultipleBanks: false,
     ownershipClarity: true,
     hasTaxDebt: false,
     hasSgkDebt: false,
     activeLawsuitCount: 0,
   })
+  const [error, setError] = useState<string | null>(null)
   const [score, setScore] = useState<SubjectiveBreakdown | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -135,8 +144,12 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
     setSaved(false)
   }, [])
 
+  const missingFields = REQUIRED_FIELDS.filter(f => data[f.key] == null)
+
   async function handleSave() {
+    if (missingFields.length > 0) return
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch(`/api/entities/${entityId}/subjective`, {
         method: 'POST',
@@ -144,6 +157,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
         body: JSON.stringify(data),
       })
       const d = await res.json()
+      if (!res.ok) { setError(d.error ?? 'Kaydedilemedi.'); return }
       if (d.score) {
         setScore(d.score)
         onScoreChange?.(d.score.total)
@@ -175,19 +189,26 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
             <h3 className="card-title text-[10px] uppercase tracking-[0.3em]">Subjektif Değerlendirme</h3>
             <p className="card-desc mt-1">KKB · Banka · Kurumsal · Uyum — toplam 30 puan</p>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={clsx(
-              "btn px-4 py-2 text-xs",
-              saved
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
-                : "btn-primary"
+          <div className="text-right">
+            <button
+              onClick={handleSave}
+              disabled={saving || missingFields.length > 0}
+              title={missingFields.length > 0 ? `Eksik: ${missingFields.map(f => f.label).join(', ')}` : undefined}
+              className={clsx(
+                "btn px-4 py-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed",
+                saved
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
+                  : "btn-primary"
+              )}
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle2 size={13} /> : <Save size={13} />}
+              {saved ? 'Kaydedildi' : 'Kaydet'}
+            </button>
+            {missingFields.length > 0 && (
+              <p className="text-[10px] text-amber-600 mt-1">{missingFields.length} alan seçilmedi</p>
             )}
-          >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle2 size={13} /> : <Save size={13} />}
-            {saved ? 'Kaydedildi' : 'Kaydet'}
-          </button>
+            {error && <p className="text-[10px] text-red-500 mt-1">{error}</p>}
+          </div>
         </div>
 
         {score && (
@@ -214,7 +235,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
             </div>
             <SelectField
               label="KKB Kategorisi"
-              value={data.kkbCategory ?? 'iyi'}
+              value={data.kkbCategory ?? ''}
               options={[
                 { val: 'iyi', label: 'İyi' },
                 { val: 'orta', label: 'Orta' },
@@ -225,7 +246,7 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
             />
             <SelectField
               label="Aktif Gecikme Süresi"
-              value={String(data.activeDelayDays ?? 0)}
+              value={data.activeDelayDays == null ? '' : String(data.activeDelayDays)}
               options={[
                 { val: '0', label: 'Yok' },
                 { val: '30', label: '1–30 gün' },
@@ -258,13 +279,13 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
             </div>
             <SliderField
               label="Kredi Limiti Kullanım Oranı"
-              value={data.creditLimitUtilPct ?? 50}
+              value={data.creditLimitUtilPct}
               min={0} max={100} step={5} unit="%"
               onChange={v => update('creditLimitUtilPct', v)}
             />
             <SliderField
               label="Ortalama Kredi Vadesi"
-              value={data.avgMaturityMonths ?? 12}
+              value={data.avgMaturityMonths}
               min={1} max={60} step={1} unit=" ay"
               onChange={v => update('avgMaturityMonths', v)}
             />
@@ -286,13 +307,13 @@ export default function SubjectiveForm({ entityId, onScoreChange }: Props) {
             </div>
             <SliderField
               label="Şirket Yaşı"
-              value={data.companyAgeYears ?? 3}
+              value={data.companyAgeYears}
               min={0} max={30} step={1} unit=" yıl"
               onChange={v => update('companyAgeYears', v)}
             />
             <SelectField
               label="Denetim Düzeyi"
-              value={data.auditLevel ?? 'ymm'}
+              value={data.auditLevel ?? ''}
               options={[
                 { val: 'yok', label: 'Denetimsiz' },
                 { val: 'smmm', label: 'SMMM' },

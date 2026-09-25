@@ -17,12 +17,19 @@ export async function GET(req: NextRequest) {
       finalScore: true,
       finalRating: true,
       reportedAt: true,
+      ratios: true,
       entity: { select: { id: true, name: true, sector: true } },
     },
     take: 200,
   })
 
-  return jsonUtf8({ reports })
+  const withFlags = reports.map(({ ratios, ...r }) => {
+    let subjectiveMissing = true
+    try { subjectiveMissing = (ratios ? JSON.parse(ratios).__subjectiveTotal : null) == null } catch { /* bozuk JSON → eksik say */ }
+    return { ...r, subjectiveMissing }
+  })
+
+  return jsonUtf8({ reports: withFlags })
 }
 
 export async function DELETE(req: NextRequest) {

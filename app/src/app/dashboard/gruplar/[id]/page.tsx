@@ -11,6 +11,7 @@ import DashboardShell from '@/components/layout/DashboardShell'
 import ScenarioPanel from '@/components/analysis/ScenarioPanel'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import type { SectorBenchmark } from '@/lib/scoring/benchmarks'
+import { RATING_LABEL } from '@/lib/ratingLabels'
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -79,10 +80,6 @@ const ENTITY_TYPES = [
   { value: 'JV',         label: 'Grup Şirketi' },
 ]
 
-const RATING_LABEL: Record<string, string> = {
-  AAA: 'Mükemmel', AA: 'Yüksek', A: 'İyi', BBB: 'Yeterli',
-  BB: 'Spekülatif', B: 'Riskli', CCC: 'Çok Riskli', CC: 'Kritik', C: 'Kritik', D: 'Temerrüt',
-}
 
 // ── Tenzilat sekmesi sabitleri ────────────────────────────────────────────────
 const IC_ACCOUNT_CODES = [

@@ -1,5 +1,6 @@
 'use client'
 import type { ReportData } from '@/types/report'
+import { RATING_LABEL } from '@/lib/ratingLabels'
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo'>
@@ -50,17 +51,17 @@ export default function MethodologyPage({ data, sector }: Props) {
                 <thead><tr><th>Rating</th><th>Puan Aralığı</th><th>Segment</th></tr></thead>
                 <tbody>
                   {[
-                    ['AAA', '92–100', 'Premium'],
-                    ['AA',  '84–91',  'Mükemmel'],
-                    ['A',   '76–83',  'Çok İyi'],
-                    ['BBB', '68–75',  'Yatırım Yapılabilir'],
-                    ['BB',  '60–67',  'Yatırım Yapılabilir Alt'],
-                    ['B',   '52–59',  'Spekülatif'],
-                    ['CCC', '44–51',  'Spekülatif Alt'],
-                    ['CC',  '36–43',  'Yüksek Risk'],
-                    ['C',   '28–35',  'Çok Yüksek Risk'],
-                    ['D',   '0–27',   'Temerrüt Riski'],
-                  ].map(([r, p, s]) => (
+                    ['AAA', '93–100'],
+                    ['AA',  '84–92'],
+                    ['A',   '76–83'],
+                    ['BBB', '68–75'],
+                    ['BB',  '60–67'],
+                    ['B',   '52–59'],
+                    ['CCC', '44–51'],
+                    ['CC',  '36–43'],
+                    ['C',   '30–35'],
+                    ['D',   '0–29'],
+                  ].map(([r, p]) => [r, p, RATING_LABEL[r]]).map(([r, p, s]) => (
                     <tr key={r}><td style={{ fontWeight: 700 }}>{r}</td><td>{p}</td><td>{s}</td></tr>
                   ))}
                 </tbody>

@@ -15,6 +15,7 @@ interface Report {
   finalScore: number | null
   finalRating: string | null
   reportedAt: string
+  subjectiveMissing?: boolean
   entity?: { id: string; name: string; sector?: string | null }
 }
 
@@ -124,8 +125,11 @@ export default function RaporlarPage() {
 
                   {/* Not */}
                   <div className="col-span-2 text-center">
-                    <span className={clsx('text-lg font-black font-display', RATING_COLOR[r.finalRating ?? 'D'] ?? 'text-slate-400')}>
-                      {r.finalRating ?? '—'}
+                    <span
+                      className={clsx('text-lg font-black font-display', RATING_COLOR[r.finalRating ?? 'D'] ?? 'text-slate-400')}
+                      title={r.subjectiveMissing ? 'Subjektif faktörler girilmedi — ön değerlendirme' : undefined}
+                    >
+                      {r.finalRating ?? '—'}{r.subjectiveMissing ? '*' : ''}
                     </span>
                     {r.finalScore != null && (
                       <p className="text-[9px] font-semibold text-slate-400 mt-0.5">{Math.round(r.finalScore)} puan</p>
