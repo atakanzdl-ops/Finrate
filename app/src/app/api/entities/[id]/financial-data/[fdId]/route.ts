@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
-import { calculateRatios } from '@/lib/scoring/ratios'
-import { calculateScore } from '@/lib/scoring/score'
+import { rescoreFinancialData } from '@/lib/scoring/rescoreFinancialData'
 
 // PATCH /api/entities/[id]/financial-data/[fdId] — tekil alan güncelle (TdhpSpreadsheet inline düzenleme)
 export async function PATCH(
@@ -37,46 +36,10 @@ export async function PATCH(
       data: { ...updateData, updatedAt: new Date() },
     })
 
-    // Skor yeniden hesapla
-    const numericKeys = [
-      'revenue','cogs','grossProfit','operatingExpenses','ebit','depreciation',
-      'ebitda','interestExpense','otherIncome','otherExpense','ebt','taxExpense',
-      'netProfit','netProfitCurrentYear','cash','shortTermInvestments',
-      'tradeReceivables','inventory','otherCurrentAssets','totalCurrentAssets',
-      'tangibleAssets','intangibleAssets','longTermInvestments','otherNonCurrentAssets',
-      'totalNonCurrentAssets','totalAssets','shortTermFinancialDebt','tradePayables',
-      'otherCurrentLiabilities','totalCurrentLiabilities','longTermFinancialDebt',
-      'otherNonCurrentLiabilities','totalNonCurrentLiabilities','paidInCapital',
-      'retainedEarnings','totalEquity','totalLiabilitiesAndEquity','purchases',
-    ] as const
+    // Skor: yükleme yoluyla aynı adımlar (sektör + önceki yıl + subjektif birleşimi)
+    const result = await rescoreFinancialData(fdId)
 
-    const allFields: Record<string, number | null> = {}
-    for (const k of numericKeys) {
-      const v = (updated as Record<string, unknown>)[k]
-      allFields[k] = v != null ? Number(v) : null
-    }
-
-    const ratios = calculateRatios(allFields)
-    const score  = calculateScore(ratios)
-
-    const existingAnalysis = await prisma.analysis.findUnique({ where: { financialDataId: fdId } })
-    if (existingAnalysis) {
-      await prisma.analysis.update({
-        where: { id: existingAnalysis.id },
-        data: {
-          finalScore:         score.finalScore,
-          finalRating:        score.finalRating,
-          liquidityScore:     score.liquidityScore,
-          profitabilityScore: score.profitabilityScore,
-          leverageScore:      score.leverageScore,
-          activityScore:      score.activityScore,
-          ratios:             JSON.stringify(ratios),
-          updatedAt:          new Date(),
-        },
-      })
-    }
-
-    return jsonUtf8({ financialData: updated, score })
+    return jsonUtf8({ financialData: updated, score: result?.resolved ?? null })
   } catch (err) {
     console.error(err)
     return jsonUtf8({ error: 'Güncelleme başarısız.' }, { status: 500 })

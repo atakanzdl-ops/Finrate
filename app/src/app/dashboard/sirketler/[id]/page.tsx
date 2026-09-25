@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { FileUpload } from '@/components/analysis/FileUpload'
 import DashboardShell from '@/components/layout/DashboardShell'
 import { TdhpSpreadsheet } from '@/components/analysis/TdhpSpreadsheet'
+import { TdhpChartTable } from '@/components/analysis/TdhpChartTable'
 import { PERIOD_LABEL_LONG } from '@/lib/periods'
 
 interface FinancialData {
@@ -80,6 +81,7 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
   const [entity, setEntity]       = useState<Entity | null>(null)
   const [loading, setLoading]     = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [tableView, setTableView]   = useState<'chart' | 'summary'>('chart')
   const [deletingFd, setDeletingFd] = useState<string | null>(null)
   const [confirmFd, setConfirmFd]   = useState<string | null>(null)
 
@@ -266,12 +268,35 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* TDHP Bilanço & Gelir Tablosu Spreadsheet */}
-      <TdhpSpreadsheet
-        entityId={id}
-        data={entity.financialData as unknown as Parameters<typeof TdhpSpreadsheet>[0]['data']}
-        onRefresh={reload}
-      />
+      {/* TDHP tablo görünümü: Hesap Planı (3 haneli) | Özet (2 haneli) */}
+      <div className="flex items-center gap-1 border-b border-slate-200">
+        {([['chart', 'Hesap Planı'], ['summary', 'Özet Bilanço']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTableView(key)}
+            className={clsx(
+              'px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors',
+              tableView === key ? 'border-[#0B3C5D] text-[#0B3C5D]' : 'border-transparent text-slate-400 hover:text-slate-600',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tableView === 'chart' ? (
+        <TdhpChartTable
+          entityId={id}
+          data={entity.financialData as unknown as Parameters<typeof TdhpChartTable>[0]['data']}
+          onRefresh={reload}
+        />
+      ) : (
+        <TdhpSpreadsheet
+          entityId={id}
+          data={entity.financialData as unknown as Parameters<typeof TdhpSpreadsheet>[0]['data']}
+          onRefresh={reload}
+        />
+      )}
     </div>
     </DashboardShell>
   )
