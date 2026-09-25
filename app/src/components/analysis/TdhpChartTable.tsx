@@ -41,7 +41,7 @@ export function TdhpChartTable({ entityId, data, onRefresh }: Props) {
     () => [...data].sort((a, b) => a.year - b.year || a.period.localeCompare(b.period)),
     [data],
   )
-  const [showAll, setShowAll] = useState(false)
+  const [showAll, setShowAll] = useState(true)
   const [editing, setEditing] = useState<Record<string, string>>({})   // key: fdId:code
   const [saving, setSaving]   = useState<Record<string, boolean>>({})
   const [error, setError]     = useState<string | null>(null)
@@ -143,8 +143,8 @@ export function TdhpChartTable({ entityId, data, onRefresh }: Props) {
     )
 
     for (const g of groups) {
+      // Varsayılan: tam hesap planı (tüm 3 haneli hesaplar). "Sadece dolu" seçilirse boş hesaplar gizlenir, grup başlığı kalır.
       const visibleAccounts = g.accounts.filter(a => showAll || cols.some(c => amt(c.id, a.code) !== 0))
-      if (visibleAccounts.length === 0) continue
 
       rows.push(
         <tr key={`g-${g.code}`} className="bg-white border-b border-slate-100">
@@ -189,7 +189,19 @@ export function TdhpChartTable({ entityId, data, onRefresh }: Props) {
         )
       }
 
-      rows.push(<TotalRow key={`gt-${g.code}`} label={`${g.code} ${g.name} Toplamı`} compute={fdId => groupTotal(fdId, g.code)} level="group" />)
+      if (visibleAccounts.length === 0) {
+        rows.push(
+          <tr key={`empty-${g.code}`} className="border-b border-slate-50">
+            <td className={clsx(stickyCode, 'bg-white')} style={{ width: CODE_W, minWidth: CODE_W }} />
+            <td className={clsx(stickyLabel, 'bg-white text-slate-300 italic')} style={{ left: CODE_W, minWidth: LABEL_W, paddingLeft: 24 }}>
+              bu grupta dolu hesap yok
+            </td>
+            {cols.map(col => <td key={col.id} className="px-2 py-1 text-right tabular-nums text-[10px] text-slate-300">0,00</td>)}
+          </tr>,
+        )
+      } else {
+        rows.push(<TotalRow key={`gt-${g.code}`} label={`${g.code} ${g.name} Toplamı`} compute={fdId => groupTotal(fdId, g.code)} level="group" />)
+      }
     }
 
     // Bölüm toplamı ve genel toplamlar
@@ -240,8 +252,8 @@ export function TdhpChartTable({ entityId, data, onRefresh }: Props) {
           Bir hesabı değiştirmek yalnızca o hesabın bağlı olduğu kalemi günceller.
         </p>
         <label className="flex items-center gap-2 text-[11px] text-slate-600 whitespace-nowrap cursor-pointer">
-          <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} />
-          Tüm hesapları göster
+          <input type="checkbox" checked={!showAll} onChange={e => setShowAll(!e.target.checked)} />
+          Sadece dolu hesapları göster
         </label>
       </div>
       {error && <div className="px-4 py-2 text-[11px] text-red-600 bg-red-50 border-b border-red-100">{error}</div>}
