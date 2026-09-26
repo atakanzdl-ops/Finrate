@@ -3,15 +3,12 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
-const PLANS = ['Demo (Ücretsiz)', 'Standart', 'Pro']
-
 export default function KayitSimplePage() {
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     company: '',
-    plan: 'Demo (Ücretsiz)',
     kvkk: false,
   })
   const [loading, setLoading] = useState(false)
@@ -19,12 +16,6 @@ export default function KayitSimplePage() {
 
   const update = (field: keyof typeof form, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const planKey = (label: string): string => {
-    if (label.startsWith('Standart')) return 'STANDART'
-    if (label.startsWith('Pro')) return 'PRO'
-    return 'DEMO'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +37,7 @@ export default function KayitSimplePage() {
           password: form.password,
           fullName: form.name.normalize('NFC'),
           companyName: form.company ? form.company.normalize('NFC') : null,
-          plan: planKey(form.plan),
+          plan: 'DEMO',
         }),
       })
       const data = await res.json()
@@ -127,25 +118,11 @@ export default function KayitSimplePage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Plan</label>
-              <div className="grid grid-cols-3 gap-2">
-                {PLANS.map((plan) => (
-                  <button
-                    key={plan}
-                    type="button"
-                    onClick={() => update('plan', plan)}
-                    className={`h-10 rounded-lg border text-xs font-semibold transition-colors ${
-                      form.plan === plan
-                        ? 'bg-[#0B3C5D] text-white border-[#0B3C5D]'
-                        : 'bg-white text-[#1E293B] border-[#E5E9F0] hover:border-[#0B3C5D]'
-                    }`}
-                  >
-                    {plan.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Plan seçimi kaldırıldı: kayıt ücretsiz (Demo) açılır, paketler ödeme ile alınır */}
+            <p className="text-xs text-slate-500">
+              Hesabınız ücretsiz analiz hakkıyla açılır. Paketleri dilediğiniz zaman{' '}
+              <Link href="/#fiyatlar" className="font-medium text-[#0B3C5D] hover:underline">fiyatlar</Link> bölümünden inceleyebilirsiniz.
+            </p>
 
             <label className="flex items-start gap-2 text-sm text-slate-600">
               <input

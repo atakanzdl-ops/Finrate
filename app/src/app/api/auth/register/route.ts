@@ -9,7 +9,9 @@ import { buildVerifyEmail } from '@/lib/email-templates/verify-email'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, fullName, companyName, plan } = body
+    const { email, password, fullName, companyName } = body
+    // Kayıt her zaman ücretsiz (DEMO) plan ile açılır; ücretli plan yalnızca ödeme ile atanır
+    const plan = 'DEMO'
 
     if (!email || !password || !fullName) {
       return jsonUtf8({ error: 'E-posta, şifre ve ad soyad zorunludur.' }, { status: 400 })
@@ -50,9 +52,9 @@ export async function POST(req: NextRequest) {
           isVerified:  false,
           subscription: {
             create: {
-              plan:               plan === 'STANDART' ? 'STANDART' : plan === 'PRO' ? 'PRO' : 'DEMO',
+              plan,
               billingCycle:       'MONTHLY',
-              status:             plan === 'DEMO' ? 'ACTIVE' : 'TRIALING',
+              status:             'ACTIVE',
               currentPeriodStart: now,
               currentPeriodEnd:   periodEnd,
             },
