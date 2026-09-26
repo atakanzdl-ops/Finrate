@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       optimizerSnapshot: true,
       roadmapSnapshot:   true,   // YENİ — Faz 7.3.60.2
       reportedAt: true,   // Rapor oluşturulma tarihi
-      entity: { select: { id: true, name: true, sector: true, taxNumber: true, entityType: true } },
+      entity: { select: { id: true, name: true, sector: true, taxNumber: true, entityType: true, naceCode: true } },
       financialData: {
         select: {
           revenue: true, cogs: true, grossProfit: true,
@@ -160,6 +160,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       take: 3,
       select: trendSelect,
     })
+    // Ara dönem için aynı dönem tipinde geçmiş yıl yoksa yıllık (ANNUAL) verilerle kıyasla —
+    // ara dönem oranları yıllıklandırıldığından yıllık verilerle karşılaştırılabilir.
+    if (trendRaw.length === 0 && a.period !== 'ANNUAL') {
+      trendRaw = await prisma.analysis.findMany({
+        where: { entityId, userId, period: 'ANNUAL', year: { lt: a.year } },
+        orderBy: { year: 'desc' },
+        take: 3,
+        select: trendSelect,
+      })
+    }
   } else {
     trendRaw = []
   }

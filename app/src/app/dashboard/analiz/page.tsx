@@ -603,6 +603,10 @@ function AnalizPageContent() {
     const s = assess(key, v, bmv).status
     return s === 'iyi' || s === 'na'
   }
+  // Finansal borcu olmayan firma: faiz gideri boş kalsa bile faiz karşılama "uygulanamaz"dır
+  const selFd = selected?.financialData
+  const noFinDebt = !!selFd && (selFd.shortTermFinancialDebt ?? 0) === 0 && (selFd.longTermFinancialDebt ?? 0) === 0
+  const icNA = r.interestCoverage != null ? r.interestCoverage >= 9999 : noFinDebt
   const whyItems = selected ? (
     [
       { category: 'Likidite', metric: 'Cari Oran:',       key: 'currentRatio' as const,    val: fmtN(r.currentRatio),      bmv: bm.currentRatio },
@@ -664,9 +668,9 @@ function AnalizPageContent() {
         { id: 'Borç / Özkaynak',        desc: 'Toplam borç / özkaynak. 1.0x altı dengeli, 2.0x üzeri yüksek kaldıraçlıdır. Bankaların en çok dikkat ettiği kaldıraç göstergesidir.',                                        val: fmtN(r.debtToEquity),             avg: fmtN(bm.debtToEquity),              good: ok('debtToEquity', r.debtToEquity, bm.debtToEquity) },
         { id: 'Borç / Aktif',           desc: 'Toplam borç / toplam aktif. Varlıkların ne kadarının borçla finanse edildiğini gösterir. 0.50 altı tercih edilir.',                                                           val: fmtN(r.debtToAssets),             avg: fmtN(bm.debtToAssets),              good: ok('debtToAssets', r.debtToAssets, bm.debtToAssets) },
         { id: 'Özkaynak Oranı',         desc: 'Özkaynak / toplam aktif. Öz finansman gücüdür. %30 üzeri sağlıklı kabul edilir; yükseldikçe mali bağımsızlık artar.',                                                        val: fmtN(r.equityRatio),              avg: '—',                                good: r.equityRatio != null && r.equityRatio >= 0.30 },
-        { id: 'KV Borç Oranı',          desc: 'Kısa vadeli borçlar / toplam borçlar. %50 altı dengeli; yüksek oran yakın vadeli yeniden finansman riskine işaret eder.',                                                     val: fmtN(r.shortTermDebtRatio),       avg: fmtN(bm.shortTermDebtRatio),        good: ok('shortTermDebtRatio', r.shortTermDebtRatio, bm.shortTermDebtRatio) },
+        { id: 'KV Borç Oranı',          desc: 'Kısa vadeli finansal borçlar / toplam finansal borçlar. %50 altı dengeli; yüksek oran yakın vadeli yeniden finansman riskine işaret eder. Finansal borç yoksa uygulanamaz.',   val: r.shortTermDebtRatio == null && noFinDebt ? 'Uygulanamaz (finansal borç yok)' : fmtN(r.shortTermDebtRatio), avg: fmtN(bm.shortTermDebtRatio), good: (r.shortTermDebtRatio == null && noFinDebt) || ok('shortTermDebtRatio', r.shortTermDebtRatio, bm.shortTermDebtRatio) },
         { id: 'Net Borç / FAVÖK',        desc: 'Net finansal borç / FAVÖK. Mevcut FAVÖK ile borcun kaç yılda ödenebileceğini gösterir. 3.0x altı iyi, 5.0x üzeri kritik sayılır. Net nakit pozisyonunda (nakit > finansal borç) uygulanmaz.', val: r.debtToEbitda == null ? '—' : r.debtToEbitda < 0 ? 'Net nakit' : r.debtToEbitda >= 99 ? '> 99x (FAVÖK ≤ 0)' : fmtN(r.debtToEbitda, 1) + 'x', avg: fmtN(bm.debtToEbitda, 1) + 'x', good: ok('debtToEbitda', r.debtToEbitda, bm.debtToEbitda) },
-        { id: 'Faiz Karşılama',         desc: 'FVÖK / faiz giderleri. Faiz ödemelerinin kaç katı FVÖK üretildiğini gösterir. 2.0x altı riskli, 4.0x üzeri rahat kabul edilir. Faiz gideri yoksa uygulanamaz.',                val: r.interestCoverage == null ? '—' : r.interestCoverage >= 9999 ? 'Uygulanamaz (faiz gideri yok)' : fmtN(r.interestCoverage, 1) + 'x', avg: fmtN(bm.interestCoverage, 1) + 'x', good: ok('interestCoverage', r.interestCoverage, bm.interestCoverage) },
+        { id: 'Faiz Karşılama',         desc: 'FVÖK / faiz giderleri. Faiz ödemelerinin kaç katı FVÖK üretildiğini gösterir. 2.0x altı riskli, 4.0x üzeri rahat kabul edilir. Faiz gideri yoksa uygulanamaz.',                val: icNA ? 'Uygulanamaz (finansal borç yok)' : r.interestCoverage == null ? '—' : fmtN(r.interestCoverage, 1) + 'x', avg: fmtN(bm.interestCoverage, 1) + 'x', good: icNA || ok('interestCoverage', r.interestCoverage, bm.interestCoverage) },
       ]
     },
     {
@@ -700,21 +704,60 @@ function AnalizPageContent() {
               className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-[#1E293B] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
             />
           </div>
-          {/* === Rapor Oluştur — snapshot zorunlu (Faz 7.3.60.2) === */}
+          {/* === Rapor Oluştur — subjektif + snapshot zorunlu (Faz 7.3.60.2) === */}
           <button
             onClick={() => {
               if (!selected) return
+              if (selected.entity?.id && subjectiveMissing[selected.entity.id]) return  // Defansif
               if (!(selected.hasRoadmapSnapshot ?? false)) return  // Defansif
               setPeriodModalOpen(true)
             }}
-            disabled={!selected || !(selected?.hasRoadmapSnapshot ?? false)}
-            title={selected && !(selected.hasRoadmapSnapshot ?? false) ? ROADMAP_MESSAGES.BUTTON_DISABLED_TOOLTIP : undefined}
+            disabled={!selected || !(selected?.hasRoadmapSnapshot ?? false) || !!(selected?.entity?.id && subjectiveMissing[selected.entity.id])}
+            title={
+              selected && selected.entity?.id && subjectiveMissing[selected.entity.id]
+                ? ROADMAP_MESSAGES.SUBJECTIVE_BUTTON_DISABLED_TOOLTIP
+                : selected && !(selected.hasRoadmapSnapshot ?? false) ? ROADMAP_MESSAGES.BUTTON_DISABLED_TOOLTIP : undefined
+            }
             className="btn btn-primary disabled:opacity-40"
           >
             <Download size={14} /> Rapor Oluştur
           </button>
         </div>
       </div>
+
+      {/* === Banner — subjektif girilmemişse rapor ve nihai skor oluşmaz === */}
+      {selected && selected.entity?.id && subjectiveMissing[selected.entity.id] && (
+        <div style={{
+          background:   '#fee2e2',
+          border:       '1px solid #fca5a5',
+          borderRadius: '6px',
+          padding:      '10px 14px',
+          fontSize:     '13px',
+          display:      'flex',
+          alignItems:   'center',
+          gap:          '10px',
+        }}>
+          <span style={{ color: '#991b1b' }}>⚠️</span>
+          <span style={{ flex: 1, color: '#7f1d1d' }}>
+            {ROADMAP_MESSAGES.SUBJECTIVE_BANNER_TEXT}
+          </span>
+          <button
+            onClick={() => setActiveTab('subjective')}
+            style={{
+              background:   '#991b1b',
+              color:        '#fff',
+              padding:      '5px 12px',
+              borderRadius: '4px',
+              fontSize:     '12px',
+              fontWeight:   500,
+              border:       'none',
+              cursor:       'pointer',
+            }}
+          >
+            {ROADMAP_MESSAGES.SUBJECTIVE_BANNER_CTA}
+          </button>
+        </div>
+      )}
 
       {/* === Banner — snapshot yoksa, seçili analiz varken göster (Faz 7.3.60.2) === */}
       {selected && !(selected.hasRoadmapSnapshot ?? false) && (
@@ -1190,7 +1233,7 @@ function AnalizPageContent() {
                                 {[
                                   { label: 'EBITDA Marjı',   val: r.ebitdaMargin,     fmt: (v: number) => fmtPct(v) },
                                   { label: 'Net Kâr Marjı',  val: r.netProfitMargin,  fmt: (v: number) => fmtPct(v) },
-                                  { label: 'Faiz Karşılama', val: r.interestCoverage === Infinity ? null : r.interestCoverage, fmt: (v: number) => `${v.toFixed(1)}x`, special: r.interestCoverage === Infinity ? '∞x' : null },
+                                  { label: 'Faiz Karşılama', val: icNA ? null : r.interestCoverage, fmt: (v: number) => `${v.toFixed(1)}x`, special: icNA ? 'Uygulanamaz' : null },
                                 ].map(({ label, val, fmt, special }) => {
                                   const display = special ?? (val != null ? fmt(val) : '—')
                                   const isNeg   = val != null && val < 0

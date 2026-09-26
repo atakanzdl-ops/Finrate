@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 import { validateRoadmapSnapshot } from '@/lib/scoring/scenarioV3/hasValidRoadmapSnapshot'
-import { ROADMAP_ERROR_CODES, ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
+import { ROADMAP_ERROR_CODES, ROADMAP_ERROR_CODES_EXT, ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
 export const runtime = 'nodejs'
 // Vercel serverless fonksiyon timeout (saniye) — PDF render ~20-40s sürer
@@ -34,6 +34,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const code     = isStale ? ROADMAP_ERROR_CODES.ROADMAP_STALE    : ROADMAP_ERROR_CODES.ROADMAP_REQUIRED
     const message  = isStale ? ROADMAP_MESSAGES.ROADMAP_STALE       : ROADMAP_MESSAGES.ROADMAP_REQUIRED
     return jsonUtf8({ error: message, code }, { status: 409 })
+  }
+
+  // Subjektif faktörler girilmeden rapor üretilmez (nihai skor 70+30 eksik kalır)
+  const analysisRow = await prisma.analysis.findFirst({ where: { id, userId }, select: { entityId: true } })
+  const subj = analysisRow?.entityId
+    ? await prisma.subjectiveInput.findUnique({ where: { entityId: analysisRow.entityId }, select: { id: true } })
+    : null
+  if (!subj) {
+    return jsonUtf8({ error: ROADMAP_MESSAGES.SUBJECTIVE_REQUIRED, code: ROADMAP_ERROR_CODES_EXT.SUBJECTIVE_REQUIRED }, { status: 409 })
   }
 
   const requestedType = req.nextUrl.searchParams.get('type')
