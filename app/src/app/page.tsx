@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { FaqSection } from '@/components/FaqSection'
 import { Logo } from '@/components/ui/Logo'
+import { RATING_BAND_TABLE } from '@/config/methodology'
 import './finrate-landing.css'
 
 const pricingItems = [
@@ -57,6 +58,7 @@ export default function Page() {
           <li><Link href="#nasil-calisir">Nasıl Çalışır</Link></li>
           <li><Link href="#ozellikler">Özellikler</Link></li>
           <li><Link href="#fiyatlar">Fiyatlar</Link></li>
+          <li><Link href="/metodoloji">Metodoloji</Link></li>
           <li><Link href="#sss">SSS</Link></li>
         </ul>
         <div className="nav-actions">
@@ -76,7 +78,7 @@ export default function Page() {
           </div>
           <div className="hero-stats">
             <div className="stat-item"><div className="stat-num">25</div><div className="stat-label">Finansal metrik</div></div>
-            <div className="stat-item"><div className="stat-num">10</div><div className="stat-label">Rating kademesi</div></div>
+            <div className="stat-item"><div className="stat-num">{RATING_BAND_TABLE.length}</div><div className="stat-label">Rating kademesi</div></div>
             <div className="stat-item"><div className="stat-num">100</div><div className="stat-label">TCMB benchmark puanı</div></div>
           </div>
         </div>
@@ -88,7 +90,7 @@ export default function Page() {
             </div>
             <div className="score-main">
               <div><div className="score-num">74</div><div className="score-denom">/ 100</div></div>
-              <div><div className="score-rating">BBB+</div><div className="score-rating-label">Kredi Notu</div></div>
+              <div><div className="score-rating">BBB</div><div className="score-rating-label">Finrate Notu</div></div>
             </div>
             <div className="score-teminat"><div className="score-teminat-label">Kredi Görünümü</div><div className="score-teminat-text">Kefalet ile çalışma potansiyeli</div></div>
             <div className="score-actions">
@@ -114,7 +116,7 @@ export default function Page() {
           <div className="steps">
             <div className="step"><div className="step-num">01</div><h3>Mali Veri Yükleme</h3><p>Excel/PDF dosyalarını yükleyin.</p></div>
             <div className="step"><div className="step-num">02</div><h3>Skor Hesaplama</h3><p>25 metrik ile 100 puan skorlama.</p></div>
-            <div className="step"><div className="step-num">03</div><h3>Rating Üretimi</h3><p>AAA’dan D’ye not ve açıklama.</p></div>
+            <div className="step"><div className="step-num">03</div><h3>Rating Üretimi</h3><p>AAA’dan D’ye {RATING_BAND_TABLE.length} kademeli Finrate Notu ve açıklama.</p></div>
             <div className="step"><div className="step-num">04</div><h3>Aksiyon Planı</h3><p>Minimum ve ideal set ile iyileştirme yolu.</p></div>
           </div>
         </div>
@@ -127,7 +129,7 @@ export default function Page() {
           <p className="section-sub">Findeks sadeliği + bankacı derinliği + senaryo motoru.</p>
           <div className="features-grid">
             <div className="feature-card"><h3>Hibrit Skorlama</h3><p>70 finansal + 30 subjektif yapı.</p></div>
-            <div className="feature-card"><h3>Guardrail Sistemi</h3><p>Yapay not şişmesini engelleyen güvenlik katmanı.</p></div>
+            <div className="feature-card"><h3>Guardrail Sistemi</h3><p>Ortaklara borçlar gibi yapay not şişmesini engelleyen koruyucu kurallar. <Link href="/metodoloji" style={{ textDecoration: 'underline' }}>Metodoloji</Link></p></div>
             <div className="feature-card"><h3>Senaryo Motoru</h3><p>“BB’den BBB’ye nasıl çıkarım?” sorusuna sayısal cevap.</p></div>
             <div className="feature-card"><h3>Bankaya Hazır PDF</h3><p>Yönetici özeti, skor breakdown, aksiyon planı.</p></div>
             <div className="feature-card"><h3>TCMB Benchmark</h3><p>TCMB sektör ortalamaları ile kıyaslama.</p></div>
@@ -209,6 +211,7 @@ export default function Page() {
                 <li><Link href="#nasil-calisir">Nasıl Çalışır</Link></li>
                 <li><Link href="#ozellikler">Özellikler</Link></li>
                 <li><Link href="#fiyatlar">Fiyatlar</Link></li>
+                <li><Link href="/metodoloji">Metodoloji</Link></li>
                 <li><Link href="/giris">Giriş Yap</Link></li>
               </ul>
             </div>
@@ -227,7 +230,7 @@ export default function Page() {
               <ul>
                 <li><Link href="mailto:info@finrate.com.tr">info@finrate.com.tr</Link></li>
                 <li><Link href="#sss">SSS</Link></li>
-                <li><Link href="#">Destek</Link></li>
+                <li><Link href="mailto:info@finrate.com.tr?subject=Destek">Destek</Link></li>
               </ul>
             </div>
           </div>
