@@ -137,7 +137,7 @@ export default function TrendPage({ data, sector }: Props) {
                     </th>
                   )
                 })}
-                <th>4Y Büyüme</th>
+                <th>{(() => { const span = Math.max(1, (years[years.length - 1] ?? 0) - (years[0] ?? 0)); return years.length > 1 ? `${span}Y Büyüme` : 'Büyüme' })()}</th>
               </tr>
             </thead>
             <tbody>
