@@ -163,7 +163,8 @@ export const BAR_COLOR: Record<'iyi' | 'uyari' | 'risk', string> = {
 // ─── DÖNEM ETİKETİ ────────────────────────────────────────────────────────────
 
 export function fmtPeriod(year: number, period: string): string {
-  return periodLabelLong(year, period)
+  const base = periodLabelLong(year, period)
+  return period === 'ANNUAL' ? base : `${base} · oranlar yıllıklandırılmış`
 }
 
 // ─── ÖLÇEK ETİKETİ ────────────────────────────────────────────────────────────

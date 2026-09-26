@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
-import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
+import { calculateRatios } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
+import { buildRatioInput } from '@/lib/scoring/ratioInput'
 
 /**
  * POST /api/analyses/recalculate
@@ -27,31 +28,8 @@ export async function POST(req: NextRequest) {
   for (const fd of allData) {
     const fields = fd as unknown as Record<string, unknown>
 
-    // Önceki yıl verileri (reel büyüme + ortalama stok/alacak/borç için)
-    // Önce aynı period'u dene, bulamazsan ANNUAL'ı kullan (Q4 → ANNUAL fallback)
-    let prevYearData = await prisma.financialData.findFirst({
-      where: { entityId: fd.entityId, year: fd.year - 1, period: fd.period },
-      select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
-    })
-    if (!prevYearData) {
-      prevYearData = await prisma.financialData.findFirst({
-        where: { entityId: fd.entityId, year: fd.year - 1 },
-        orderBy: { period: 'desc' },
-        select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
-      })
-    }
-
-    const enriched = {
-      ...fields,
-      sector:                fd.entity.sector,
-      prevRevenue:           prevYearData?.revenue           ?? null,
-      prevInventory:         prevYearData?.inventory         ?? null,
-      prevTradeReceivables:  prevYearData?.tradeReceivables  ?? null,
-      prevTradePayables:     prevYearData?.tradePayables     ?? null,
-      prevAdvancesReceived:  prevYearData?.advancesReceived  ?? null,
-      ppiRate: TURKEY_PPI[fd.year] ?? TURKEY_PPI[2024],
-    }
-
+    // Yıllıklandırma + önceki yıl (aynı dönem, yoksa yıllık) + ÜFE — tek kaynak: buildRatioInput
+    const enriched = await buildRatioInput(fields, { entityId: fd.entityId, year: fd.year, period: fd.period, sector: fd.entity.sector })
     const ratios = calculateRatios(enriched as Parameters<typeof calculateRatios>[0])
     const score  = calculateScore(ratios, fd.entity.sector)
     const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, fd.entity.sector)

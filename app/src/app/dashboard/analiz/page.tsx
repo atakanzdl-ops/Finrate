@@ -906,6 +906,11 @@ function AnalizPageContent() {
                       className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-semibold text-[#0B3C5D] transition-colors hover:bg-slate-50"
                     >
                       {selected.year} · {PERIOD_LABEL_SHORT[selected.period] ?? selected.period}
+                      {selected.period !== 'ANNUAL' && (
+                        <span title="Ara dönem: ciro, kâr ve giderler oran hesabında 12 aya tamamlanmıştır" style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>
+                          YILLIKLANDIRILMIŞ
+                        </span>
+                      )}
                       <ChevronDown size={12} className={clsx("transition-transform", yearOpen && "rotate-180")} />
                     </button>
                     {yearOpen && (

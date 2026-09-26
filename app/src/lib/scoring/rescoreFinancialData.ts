@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/db'
-import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
+import { calculateRatios } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
+import { buildRatioInput } from '@/lib/scoring/ratioInput'
 
 /**
  * Bir FinancialData kaydını yükleme yoluyla BİREBİR aynı adımlarla yeniden skorlar:
@@ -24,22 +25,7 @@ export async function rescoreFinancialData(fdId: string) {
     else if (v === null) fields[k] = null
   }
 
-  const prevYearData = await prisma.financialData.findFirst({
-    where: { entityId: fd.entityId, year: fd.year - 1, period: fd.period },
-    select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
-  })
-
-  const enriched = {
-    ...fields,
-    sector:               entity.sector,
-    prevRevenue:          prevYearData?.revenue          ?? null,
-    prevInventory:        prevYearData?.inventory        ?? null,
-    prevTradeReceivables: prevYearData?.tradeReceivables ?? null,
-    prevTradePayables:    prevYearData?.tradePayables    ?? null,
-    prevAdvancesReceived: prevYearData?.advancesReceived ?? null,
-    ppiRate:              TURKEY_PPI[fd.year] ?? TURKEY_PPI[2024],
-  }
-
+  const enriched = await buildRatioInput(fields, { entityId: fd.entityId, year: fd.year, period: fd.period, sector: entity.sector })
   const ratios = calculateRatios(enriched as Parameters<typeof calculateRatios>[0])
   const score  = calculateScore(ratios, entity.sector)
   const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
