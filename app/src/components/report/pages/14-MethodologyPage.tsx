@@ -25,10 +25,10 @@ export default function MethodologyPage({ data, sector }: Props) {
 
           {/* Sol */}
           <div>
-            <div className="st" style={{ marginBottom: '12px' }}>Derecelendirme Metodolojisi</div>
+            <div className="st" style={{ marginBottom: '12px' }}>Skorlama Metodolojisi</div>
 
             <div style={{ fontSize: '9px', color: '#334155', lineHeight: 1.7, marginBottom: '14px' }}>
-              Finrate derecelendirme sistemi, TCMB Sektör Bilançoları İstatistikleri (2024 yayını) ve bankacılık sektörü standartlarına dayalı 70 puanlık finansal skor ile 30 puanlık subjektif skoru birleştiren iki bileşenli bir modeldir.
+              Finrate skorlama sistemi, TCMB Sektör Bilançoları İstatistikleri (2024 yayını) ve bankacılık sektörü standartlarına dayalı 70 puanlık finansal skor ile 30 puanlık subjektif skoru birleştiren iki bileşenli bir modeldir.
             </div>
 
             {/* Kategori tablosu */}
@@ -87,20 +87,20 @@ export default function MethodologyPage({ data, sector }: Props) {
             <div className="st" style={{ marginBottom: '12px' }}>Yasal Uyarı &amp; Sınırlar</div>
             <div className="rsk">
               <div className="rsk-i">Bu rapor yatırım tavsiyesi niteliği taşımaz; bilgilendirme amacıyla hazırlanmıştır.</div>
-              <div className="rsk-i">Derecelendirme, sunulan verilerin doğruluğunu esas alır. Hatalı veya eksik veri sistemin sorumluluğunu ortadan kaldırır.</div>
+              <div className="rsk-i">Skor, sunulan verilerin doğruluğunu esas alır; Finrate bir kredi derecelendirme kuruluşu değildir. Hatalı veya eksik veri sistemin sorumluluğunu ortadan kaldırır.</div>
               <div className="rsk-i">Sektör benchmarkları TCMB 2024 yılı verilerine dayanmaktadır. Gerçek zamanlı sektör dinamiklerini yansıtmayabilir.</div>
               <div className="rsk-i">Subjektif faktörler kullanıcı beyanına dayalıdır; bağımsız doğrulama yapılmamıştır.</div>
             </div>
 
             <div className="ev" style={{ marginTop: '12px' }}>
               <div className="ev-t">Finrate Hakkında</div>
-              <div className="ev-tx">Finrate; KOBİ&apos;ler, mali müşavirler, sektör profesyonelleri ve kurumsal firmalar için bankacılık düzeyinde finansal analiz ve skorlama platformudur. TCMB verileri, 25+ finansal oran ve sektörel ağırlık profilleriyle birleşik derecelendirme sunmaktadır. <strong style={{ color: '#2dd4bf' }}>www.finrate.com.tr</strong></div>
+              <div className="ev-tx">Finrate; KOBİ&apos;ler, mali müşavirler, sektör profesyonelleri ve kurumsal firmalar için bankacılık düzeyinde finansal analiz ve skorlama platformudur. TCMB verileri, 25+ finansal oran ve sektörel ağırlık profilleriyle birleşik skor sunmaktadır. <strong style={{ color: '#2dd4bf' }}>www.finrate.com.tr</strong></div>
             </div>
           </div>
         </div>
       </div>
       <div className="pf">
-        <span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span>
+        <span>Bu rapor gizlidir · Finrate Finansal Analiz Platformu</span>
         <span>finrate.com.tr · {reportNo}</span>
       </div>
     </div>

@@ -186,7 +186,7 @@ describe('PATCH /api/entities/[id]', () => {
 
   // ── Test Q: Sektör değişince recalc tetiklenir + __subjectiveTotal korunur
 
-  test('Q — Sektör değişince analysis.update çağrılır; __subjectiveTotal korunur', async () => {
+  test('Q — Sektör değişince her dönem ortak rescoreFinancialData ile yeniden skorlanır', async () => {
     const analysisUpdateMock = jest.fn(() => Promise.resolve({}))
     const existingRatios = JSON.stringify({ someRatio: 1.2, __subjectiveTotal: 18 })
 
@@ -197,6 +197,9 @@ describe('PATCH /api/entities/[id]', () => {
       financialData:     makeFinancialData(existingRatios),
       analysisUpdateSpy: analysisUpdateMock,
     })
+    // Skorlama tek yol: yıllıklandırma + guardrail + subjektif birleşimi rescoreFinancialData içinde
+    const rescoreMock = jest.fn(() => Promise.resolve({ ratios: {}, score: MOCK_SCORE, resolved: { finalScore: 72, finalRating: 'B' }, analysisId: 'an-1' }))
+    jest.doMock('@/lib/scoring/rescoreFinancialData', () => ({ rescoreFinancialData: rescoreMock }))
 
     const req = createMockRequest({ sector: 'Üretim' }) // Ticaret → Üretim
     const res = await callPatch(req)
@@ -205,14 +208,8 @@ describe('PATCH /api/entities/[id]', () => {
     const body = await res.json()
     expect(body.recalculated).toBe(1)
 
-    expect(analysisUpdateMock).toHaveBeenCalledTimes(1)
-    const updateCall  = analysisUpdateMock.mock.calls[0][0]
-    const writtenJSON = JSON.parse(updateCall.data.ratios)
-    // Subjektif puan korunmalı
-    expect(writtenJSON.__subjectiveTotal).toBe(18)
-    // Temel skor alanları yazılmış
-    expect(updateCall.data.finalScore).toBe(MOCK_SCORE.finalScore)
-    expect(updateCall.data.finalRating).toBe(MOCK_SCORE.finalRating)
+    expect(rescoreMock).toHaveBeenCalledTimes(1)
+    expect(rescoreMock).toHaveBeenCalledWith('fd-1')
   })
 
   // ── Test R: Sektör değişmedi → recalc yok ────────────────────────────────

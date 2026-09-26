@@ -41,7 +41,7 @@ export default function CoverPage({ data }: Props) {
             <Logo variant="light" size={46} showSubtext={false} />
             <div style={{ textAlign: 'right' }}>
               <div className="outfit" style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px' }}>Finansal Analiz Raporu</div>
-              <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '5px' }}>Erişim: Yönetim Kurulu · Kredi Komitesi</div>
+              <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '5px' }}>Kredi değerlendirmesine destek amaçlı ön değerlendirme</div>
             </div>
           </div>
 
@@ -77,7 +77,7 @@ export default function CoverPage({ data }: Props) {
 
               {/* Rating — Ö4: daha küçük (36px), skor gauge öne çıktı */}
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '7px' }}>Derecelendirme Notu</div>
+                <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '7px' }}>Finrate Skoru · Ön Değerlendirme Notu</div>
                 <div className="outfit" style={{ fontSize: '36px', fontWeight: 900, lineHeight: 1, color: '#2dd4bf', textShadow: '0 0 28px rgba(45,212,191,.4)' }}>
                   {rating.replace(/[+-]$/, '')}
                   {rating.endsWith('+') && <span style={{ fontSize: '24px' }}>+</span>}
@@ -110,12 +110,12 @@ export default function CoverPage({ data }: Props) {
           {/* Alt bilgi */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div style={{ fontSize: '9px', color: '#475569', lineHeight: 1.7, maxWidth: '360px' }}>
-              Bu rapor TCMB 2024 sektör kıyaslama verileri kullanılarak bankacılık metodolojisi ile üretilmiştir. Gizlidir; yetkisiz kişilerle paylaşılamaz. KVKK kapsamında kişisel veri içermektedir.
+              Bu rapor TCMB 2024 sektör kıyaslama verileri kullanılarak bankacılık metodolojisi ile üretilmiş bağımsız bir ön değerlendirmedir. Finrate bir kredi derecelendirme kuruluşu değildir; rapor yatırım veya kredi tavsiyesi niteliği taşımaz. Gizlidir; yetkisiz kişilerle paylaşılamaz.
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="outfit" style={{ fontSize: '11px', color: '#475569', letterSpacing: '2px', fontWeight: 700 }}>FINRATE.COM.TR</div>
               <div style={{ fontSize: '8.5px', color: '#334155', marginTop: '3px' }}>Rapor No: {reportNo}</div>
-              <div style={{ fontSize: '8.5px', color: '#334155', marginTop: '2px' }}>Geçerlilik: {data.validUntil}</div>
+              <div style={{ fontSize: '8.5px', color: '#334155', marginTop: '2px' }}>Güncelleme önerisi: bir sonraki mali dönem verileriyle ({data.validUntil})</div>
             </div>
           </div>
 
