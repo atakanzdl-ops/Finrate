@@ -704,19 +704,18 @@ function AnalizPageContent() {
               className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-xs font-semibold text-[#1E293B] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1FA4A9]/20"
             />
           </div>
-          {/* === Rapor Oluştur — subjektif + snapshot zorunlu (Faz 7.3.60.2) === */}
+          {/* === Rapor Oluştur — subjektif zorunlu; yol haritası yoksa rapor sayfası otomatik üretir === */}
           <button
             onClick={() => {
               if (!selected) return
               if (selected.entity?.id && subjectiveMissing[selected.entity.id]) return  // Defansif
-              if (!(selected.hasRoadmapSnapshot ?? false)) return  // Defansif
               setPeriodModalOpen(true)
             }}
-            disabled={!selected || !(selected?.hasRoadmapSnapshot ?? false) || !!(selected?.entity?.id && subjectiveMissing[selected.entity.id])}
+            disabled={!selected || !!(selected?.entity?.id && subjectiveMissing[selected.entity.id])}
             title={
               selected && selected.entity?.id && subjectiveMissing[selected.entity.id]
                 ? ROADMAP_MESSAGES.SUBJECTIVE_BUTTON_DISABLED_TOOLTIP
-                : selected && !(selected.hasRoadmapSnapshot ?? false) ? ROADMAP_MESSAGES.BUTTON_DISABLED_TOOLTIP : undefined
+                : undefined
             }
             className="btn btn-primary disabled:opacity-40"
           >
@@ -759,39 +758,7 @@ function AnalizPageContent() {
         </div>
       )}
 
-      {/* === Banner — snapshot yoksa, seçili analiz varken göster (Faz 7.3.60.2) === */}
-      {selected && !(selected.hasRoadmapSnapshot ?? false) && (
-        <div style={{
-          background:   '#fef3c7',
-          border:       '1px solid #fbbf24',
-          borderRadius: '6px',
-          padding:      '10px 14px',
-          fontSize:     '13px',
-          display:      'flex',
-          alignItems:   'center',
-          gap:          '10px',
-        }}>
-          <span style={{ color: '#92400e' }}>⚠️</span>
-          <span style={{ flex: 1, color: '#78350f' }}>
-            {ROADMAP_MESSAGES.BANNER_TEXT}
-          </span>
-          <button
-            onClick={() => setActiveTab('scenario')}
-            style={{
-              background:   '#92400e',
-              color:        '#fff',
-              padding:      '5px 12px',
-              borderRadius: '4px',
-              fontSize:     '12px',
-              fontWeight:   500,
-              border:       'none',
-              cursor:       'pointer',
-            }}
-          >
-            {ROADMAP_MESSAGES.BANNER_CTA}
-          </button>
-        </div>
-      )}
+      {/* Yol haritası bandı kaldırıldı: rapor sayfası eksikse yol haritasını kendisi üretir */}
 
       {selected && (
         <div className="bg-white border border-slate-200 rounded-[4px]">

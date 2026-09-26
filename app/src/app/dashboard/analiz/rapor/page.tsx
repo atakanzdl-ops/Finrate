@@ -104,8 +104,31 @@ function RaporContent() {
     })()
   }, [id, compareIds])
 
+  // Yol haritası yoksa (ilk rapor ya da yeni yükleme sonrası) kullanıcıya iş vermeden otomatik üret.
+  // Aynı analiz için 2 dakikada bir kez denenir (üretim başarısız olursa döngüye girmesin).
+  useEffect(() => {
+    if (loading || error || !reportData || subjectiveMissing || reportData.scenario != null || !id) return
+    const key = `finrate_rapor_autogen_${id}`
+    let last = 0
+    try { last = Number(sessionStorage.getItem(key) ?? 0) } catch { /* özel pencere vb. */ }
+    if (Date.now() - last < 120_000) return
+    try { sessionStorage.setItem(key, String(Date.now())) } catch { /* yoksay */ }
+    regenerateRoadmap(reportData.rating)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, reportData, subjectiveMissing, id])
+
   if (loading)        return <LoadingScreen />
   if (error || !reportData) return <ErrorScreen message={error ?? 'Veri alınamadı.'} />
+  if (regenerating) {
+    return (
+      <div className="min-h-screen bg-[#0a192f] flex flex-col items-center justify-center gap-4">
+        <Logo variant="light" size={56} showSubtext={false} />
+        <Loader2 className="w-6 h-6 text-[#2dd4bf] animate-spin" />
+        <p className="text-sm text-[#64748b] tracking-widest uppercase">Rapor Hazırlanıyor</p>
+        <p className="text-xs text-[#94a3b8]">Yol haritası ve aksiyon planı üretiliyor, birkaç saniye sürebilir…</p>
+      </div>
+    )
+  }
 
   // Subjektif faktörler girilmeden rapor oluşmaz (nihai skor 70 finansal + 30 subjektif)
   if (subjectiveMissing) {
@@ -135,9 +158,11 @@ function RaporContent() {
     return (
       <div style={{ maxWidth: '600px', margin: '60px auto', padding: '32px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
-        <h2 style={{ marginBottom: '14px', color: '#1f2937' }}>Rapor Görüntülenemiyor</h2>
+        <h2 style={{ marginBottom: '14px', color: '#1f2937' }}>Rapor Hazırlanamadı</h2>
         <p style={{ color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
-          {ROADMAP_MESSAGES.ROADMAP_REQUIRED}
+          {regenError
+            ? `Yol haritası üretilemedi: ${regenError}`
+            : 'Yol haritası otomatik üretilemedi. Tekrar deneyin; sorun sürerse Senaryo sekmesinden "Yol Haritası Oluştur" ile üretebilirsiniz.'}
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
@@ -155,7 +180,7 @@ function RaporContent() {
               opacity:      regenerating ? 0.6 : 1,
             }}
           >
-            {regenerating ? 'Oluşturuluyor…' : 'Yol Haritasını Oluştur ve Raporu Aç'}
+            {regenerating ? 'Oluşturuluyor…' : 'Tekrar Dene'}
           </button>
           <button
             onClick={() => { window.location.href = '/dashboard/analiz' }}
@@ -173,7 +198,6 @@ function RaporContent() {
             Analiz Sayfasına Dön
           </button>
         </div>
-        {regenError && <p style={{ color: '#dc2626', marginTop: '14px', fontSize: '13px' }}>{regenError}</p>}
       </div>
     )
   }
