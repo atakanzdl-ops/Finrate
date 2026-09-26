@@ -3,16 +3,14 @@ import { prisma } from '@/lib/db'
 /**
  * Hak sistemi (tek kaynak).
  *
- *  ÜCRETSİZ (DEMO): kayıtta 14 gün. 1 firma, 1 dönem, skor + Hızlı Teşhis + senaryo/yol haritası + ekran raporu.
- *                   PDF indirme yok. Süre bitince yeni yükleme ve senaryo yok, mevcut sonuçlar görünür.
+ *  ÜCRETSİZ (DEMO): kayıtta 14 gün, SINIRSIZ (tüm özellikler, firma ve dönem sayısı serbest).
+ *                   Süre bitince yeni yükleme, senaryo ve PDF kapanır; mevcut sonuçlar görünür.
  *  ÜCRETLİ:         analiz hakkı (kredi). Her yeni firma-dönem 1 hak yer; aynı dönemi yeniden yüklemek hak yemez.
  *                   Krediler creditsExpireAt'e kadar geçerli; bu süre içinde PDF, senaryo, trend açık.
  *  YÖNETİCİ (role ADMIN): sınırsız.
  */
 
 export const FREE_TRIAL_DAYS   = 14
-export const FREE_MAX_ENTITIES = 1
-export const FREE_MAX_PERIODS  = 1
 export const CREDIT_VALIDITY_MONTHS = 12
 
 export const PACKAGES = {
@@ -36,12 +34,9 @@ export interface Entitlements {
 }
 
 export const ENTITLEMENT_MESSAGES = {
-  FREE_EXPIRED:      'Ücretsiz deneme süreniz doldu. Devam etmek için bir paket satın alın (info@finrate.com.tr).',
-  FREE_ENTITY_LIMIT: `Ücretsiz planda en fazla ${FREE_MAX_ENTITIES} firma açılabilir. Daha fazla firma için bir paket satın alın.`,
-  FREE_PERIOD_LIMIT: `Ücretsiz planda ${FREE_MAX_PERIODS} dönem analiz edilebilir. Yeni dönem için bir paket satın alın.`,
+  FREE_EXPIRED:      '14 günlük ücretsiz deneme süreniz doldu. Devam etmek için bir paket satın alın (info@finrate.com.tr).',
   NO_CREDITS:        'Analiz hakkınız kalmadı. Yeni dönem yüklemek için paket satın alın (info@finrate.com.tr).',
-  CREDITS_EXPIRED:   'Paketinizin geçerlilik süresi doldu. Yeni dönem yüklemek için paket yenileyin.',
-  PAID_FEATURE:      'PDF rapor indirme ücretli paketlerde sunulur. Paketler için: info@finrate.com.tr',
+  CREDITS_EXPIRED:   'Paketinizin geçerlilik süresi doldu. Devam etmek için paket yenileyin (info@finrate.com.tr).',
 } as const
 
 export async function getEntitlements(userId: string): Promise<Entitlements | null> {
@@ -78,45 +73,34 @@ export async function getEntitlements(userId: string): Promise<Entitlements | nu
 export type Denial = { code: keyof typeof ENTITLEMENT_MESSAGES; message: string }
 const deny = (code: keyof typeof ENTITLEMENT_MESSAGES): Denial => ({ code, message: ENTITLEMENT_MESSAGES[code] })
 
-/** Yeni firma açılabilir mi? */
+/** Yeni firma açılabilir mi? (ücretsiz deneme süresi içinde sınırsız) */
 export function canCreateEntity(e: Entitlements): Denial | null {
   if (e.isAdmin) return null
-  if (e.plan === 'DEMO') {
-    if (!e.freeActive) return deny('FREE_EXPIRED')
-    if (e.entityCount >= FREE_MAX_ENTITIES) return deny('FREE_ENTITY_LIMIT')
-    return null
-  }
+  if (e.plan === 'DEMO') return e.freeActive ? null : deny('FREE_EXPIRED')
   if (!e.paidActive) return deny('CREDITS_EXPIRED')
   return null
 }
 
-/** `newPeriods` adet yeni firma-dönem yüklenebilir mi? (mevcut dönemin yeniden yüklenmesi serbest) */
+/** `newPeriods` adet yeni firma-dönem yüklenebilir mi? (deneme süresinde sınırsız; pakette hak düşer) */
 export function canUploadNewPeriods(e: Entitlements, newPeriods: number): Denial | null {
   if (e.isAdmin || newPeriods <= 0) return null
-  if (e.plan === 'DEMO') {
-    if (!e.freeActive) return deny('FREE_EXPIRED')
-    if (e.periodCount + newPeriods > FREE_MAX_PERIODS) return deny('FREE_PERIOD_LIMIT')
-    return null
-  }
+  if (e.plan === 'DEMO') return e.freeActive ? null : deny('FREE_EXPIRED')
   if (!e.paidActive) return deny('CREDITS_EXPIRED')
   if (e.credits < newPeriods) return deny('NO_CREDITS')
   return null
 }
 
-/** PDF rapor indirme — ücretli paket özelliği */
+/** PDF rapor indirme — 14 günlük ücretsiz deneme içinde de açık; süre/paket dolunca kapalı */
 export function canUsePaidFeature(e: Entitlements): Denial | null {
-  if (e.isAdmin) return null
-  if (e.plan === 'DEMO') return deny('PAID_FEATURE')
-  if (!e.paidActive) return deny('CREDITS_EXPIRED')
-  return null
-}
-
-/** Senaryo / yol haritası — ücretsiz deneme süresi içinde de açık */
-export function canUseScenario(e: Entitlements): Denial | null {
   if (e.isAdmin) return null
   if (e.plan === 'DEMO') return e.freeActive ? null : deny('FREE_EXPIRED')
   if (!e.paidActive) return deny('CREDITS_EXPIRED')
   return null
+}
+
+/** Senaryo / yol haritası — PDF ile aynı kural */
+export function canUseScenario(e: Entitlements): Denial | null {
+  return canUsePaidFeature(e)
 }
 
 /** Kredi düş (yönetici ve ücretsiz planda düşülmez). */

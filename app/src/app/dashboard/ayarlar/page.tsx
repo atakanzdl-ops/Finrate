@@ -383,7 +383,7 @@ export default function AyarlarPage() {
                 <InfoRow label="Analiz hakkı" value="Sınırsız (yönetici)" />
               ) : user.subscription.plan === 'DEMO' ? (
                 <>
-                  <InfoRow label="Kapsam" value="1 firma · 1 dönem · skor, senaryo, ekran raporu (PDF hariç)" />
+                  <InfoRow label="Kapsam" value="14 gün boyunca tüm özellikler sınırsız" />
                   <InfoRow
                     label="Ücretsiz süre bitişi"
                     value={new Date(user.subscription.currentPeriodEnd).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
