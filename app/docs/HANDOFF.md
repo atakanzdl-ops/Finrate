@@ -36,11 +36,30 @@ teknik değildir: her şeyi sen yaparsın, o onaylar. Türkçe konuş, kısa yaz
 2. Migration eklersen `prisma/migrations/<tarih>_<ad>/migration.sql` + `schema.prisma`; nullable/geriye uyumlu olsun.
 3. UI: `CLAUDE.md`'deki tasarım sistemi (beyaz kartlar, `#0B3C5D` lacivert, `#2EC4B6` cyan; kart içinde `text-white` yok).
 
+## Ödeme (iyzico) — iskelet hazır, anahtar bekliyor
+- Kod: `src/lib/payments/iyzico.ts` (IYZWSv2 imza, Checkout Form başlat/doğrula, bağımlılık yok),
+  `src/app/api/payments/{config,checkout,callback}/route.ts`, `src/components/account/PackagePurchase.tsx` (Ayarlar → Abonelik).
+- Tek hak yükleme yolu: `entitlements.grantPackage()` — yönetici paneli (havale) ve iyzico callback aynı fonksiyonu kullanır.
+- Paket fiyatları `PACKAGES.priceTRY` (KDV dahil; landing ile aynı: 1.999 / 6.999 / 29.999).
+- Anahtar yokken davranış: `/api/payments/config` → `enabled:false`; Ayarlar'da "E-posta ile Satın Al" görünür. Kod canlıya çıksa da kart ödemesi kendini göstermez.
+- Migration `20260928000000_payment_iyzico_fields` (payments tablosuna nullable alanlar; build'de otomatik uygulanır).
+- **Yerel oturumda yapılacaklar (anahtar gelince):**
+  1. Vercel → Environment Variables: `IYZICO_API_KEY`, `IYZICO_SECRET_KEY`, `IYZICO_BASE_URL` (önce sandbox ile Preview'da dene, sonra Production'a `https://api.iyzipay.com`).
+  2. Sandbox test kartıyla `Ayarlar → Paket Satın Al → Kartla Satın Al` akışını uçtan uca dene; `?odeme=basarili` bandı ve kalan hak artışı görülmeli.
+  3. Alıcı bilgisi: iyzico `identityNumber` zorunlu; kayıtta TCKN/VKN alınmadığı için yer tutucu gönderiliyor. Gerekirse kayıt formuna VKN alanı eklenir.
+  4. Yasal: mesafeli satış / ön bilgilendirme metni `/yasal` sayfasına eklenmeli (kart ödemesi açılmadan önce).
+
 ## Açık işler (öncelik sırasıyla)
-1. Ödeme: iyzico entegrasyonu (kullanıcı üye işyeri başvurusu yapacak; anahtar gelince kart ödemesi + otomatik hak yükleme).
+1. iyzico anahtarları gelince yukarıdaki "yerel oturumda yapılacaklar".
 2. Analizler sayfası (`src/app/dashboard/analiz/page.tsx`) 1000px altında sol firma listesi içeriğin üstüne yığılıyor → dar ekran düzeni.
-3. Gruplar/konsolide analiz: sayfalar çalışıyor ama konsolide skor motoru zayıf; ihtiyaç olunca ele alınacak.
-4. Yükleme sayfasındaki hata mesajlarını (teknik kodlar) sadeleştirmek.
+3. Gruplar/konsolide: dönem hizalama + ara dönem yıllıklandırma yapıldı (`consolidationPeriod.ts`). Kalan zayıflıklar:
+   `/api/groups/[id]/consolidate` rotası UI'da kullanılmıyor (sahiplik/yıllıklandırma yok; kaldırılabilir);
+   konsolide skor guardrail/subjektif birleşimi tek firma yolundan (`resolveFinalScore`) geçmiyor — motor kararı gerektirir.
+4. Kayıt formunda VKN/TCKN alanı (iyzico alıcı bilgisi için, isteğe bağlı).
+
+## Son değişiklikler (2026-09-26, bulut oturumu)
+Yükleme hata mesajları sadeleştirildi (`src/lib/i18n/uploadErrorText.ts`); konsolide skor aynı döneme hizalanır ve
+ara dönemde yıllıklandırılır; iyzico ödeme iskeleti (anahtar bekliyor); Ayarlar'da yasal bağlantılar `/yasal`'a açıldı.
 
 ## Son büyük değişiklikler (2026-09-26)
 Subjektif zorunlu rapor; /metodoloji; landing tutarlılığı; hukuk metinleri (ücretsiz kapsam, iade); preview DB;
