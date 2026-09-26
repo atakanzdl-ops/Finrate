@@ -6,6 +6,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PDFParse } = require('pdf-parse')
 import type { ParsedRow, ParsedIdentity } from './excel'
+import { extractNaceFromText } from '@/lib/nace'
 
 // ─── norm ─────────────────────────────────────────────────────────────────────
 
@@ -259,7 +260,8 @@ export function parseTaxIdentity(pdfText: string): ParsedIdentity {
   const sourceConfidence: 'HIGH' | 'MEDIUM' | 'LOW' =
     (taxNumber || tcKimlik) ? 'HIGH' : title ? 'MEDIUM' : 'LOW'
 
-  return { taxNumber, tcKimlik, title, sourceConfidence }
+  const naceCode = extractNaceFromText(rawLines.join('\n'))
+  return { taxNumber, tcKimlik, title, naceCode, sourceConfidence }
 }
 
 // ─── Sayı ayrıştırma ──────────────────────────────────────────────────────────

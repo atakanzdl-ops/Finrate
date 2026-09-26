@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { SECTOR_OPTIONS } from '@/lib/sectorOptions'
+import { sectorFromNace } from '@/lib/nace'
 
 const ENTITY_TYPES = [
   { value: 'STANDALONE', label: 'Bağımsız Şirket' },
@@ -20,12 +21,25 @@ export default function YeniSirketPage() {
   const [form, setForm] = useState({
     name:       '',
     taxNumber:  '',
+    naceCode:   '',
     sector:     '',
     entityType: 'STANDALONE',
   })
+  const [sectorTouched, setSectorTouched] = useState(false)
 
   const set = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }))
+
+  // NACE yazıldıkça sektör otomatik önerilir; kullanıcı elle seçtiyse üzerine yazılmaz
+  const suggestedSector = sectorFromNace(form.naceCode)
+  function setNace(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 6)
+    setForm(prev => ({
+      ...prev,
+      naceCode: digits,
+      sector: sectorTouched ? prev.sector : (sectorFromNace(digits) ?? prev.sector),
+    }))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -90,12 +104,34 @@ export default function YeniSirketPage() {
           <p className="mt-1 text-xs text-gray-400">Sermaye şirketi için 10 haneli VKN, şahıs şirketi için 11 haneli TCKN.</p>
         </div>
 
+        {/* NACE / Faaliyet Kodu */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            NACE / Faaliyet Kodu
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={form.naceCode}
+            onChange={(e) => setNace(e.target.value)}
+            placeholder="Örn: 464305"
+            maxLength={6}
+            className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] placeholder-gray-400 focus:outline-none focus:border-cyan-500"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Vergi levhasındaki / beyannamedeki 6 haneli faaliyet kodu. Sektör bu koddan otomatik seçilir.
+            {suggestedSector && form.naceCode.length >= 4 && (
+              <span className="ml-1 text-[#0B3C5D] font-medium">Önerilen sektör: {suggestedSector}</span>
+            )}
+          </p>
+        </div>
+
         {/* Sektör */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5">Sektör</label>
           <select
             value={form.sector}
-            onChange={(e) => set('sector', e.target.value)}
+            onChange={(e) => { setSectorTouched(true); set('sector', e.target.value) }}
             className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
           >
             <option value="">— Seçiniz —</option>

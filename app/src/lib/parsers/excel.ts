@@ -14,6 +14,7 @@ export interface ParsedIdentity {
   taxNumber?: string | null    // VKN (10 hane)
   tcKimlik?: string | null     // TC Kimlik (11 hane)
   title?: string | null        // Mükellef unvanı
+  naceCode?: string | null     // Faaliyet (NACE) kodu, 6 hane — geçici beyannamede "Faaliyet Kodu" satırı
   sourceConfidence: 'HIGH' | 'MEDIUM' | 'LOW'
 }
 

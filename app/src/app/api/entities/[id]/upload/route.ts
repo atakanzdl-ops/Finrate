@@ -9,6 +9,7 @@ import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { deriveDepreciation } from '@/lib/scoring/depreciation'
 import { buildRatioInput } from '@/lib/scoring/ratioInput'
 import { applyGuardrails } from '@/lib/scoring/guardrails'
+import { normalizeNace, sectorFromNace } from '@/lib/nace'
 import { PERIOD_ORDER } from '@/lib/periods'
 
 /** Aynı entity için (year, period) öncesindeki en yakın dönemin hesap kırılımı (yoksa null). */
@@ -248,6 +249,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
+    let naceWarning: string | null = null
+
     // PREFLIGHT 4 — ENTITY IDENTITY CHECK (Faz 7.3.50A.3 + 7.3.50B.2)
     // Dosyada bulunan VKN/TC/unvan ile sisteme kayıtlı entity karşılaştırılır.
     // ÖNCELİK 0: VKN match → tüm soft kontroller atlanır.
@@ -276,6 +279,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           where: { id: entityId },
           data:  { taxNumber: detId },
         })
+      }
+
+      // ─── NACE: beyannamedeki faaliyet kodu ile kayıt karşılaştırılır ───
+      // Kayıtta kod yoksa beyannamedeki yazılır (sektör boşsa koddan türetilir).
+      // Kod veya sektör çelişiyorsa yükleme durmaz; uyarı döner, kullanıcı düzeltebilir.
+      const detNace = normalizeNace((detectedIdentity as { naceCode?: string | null }).naceCode)
+      if (detNace) {
+        const suggested = sectorFromNace(detNace)
+        if (!entity.naceCode) {
+          await prisma.entity.update({
+            where: { id: entityId },
+            data:  { naceCode: detNace, ...(!entity.sector && suggested ? { sector: suggested, sectorSource: 'DECLARATION' } : {}) },
+          })
+          if (entity.sector && suggested && suggested !== entity.sector) {
+            naceWarning = `Beyannamedeki faaliyet kodu ${detNace} "${suggested}" sektörüne işaret ediyor; kayıtlı sektör "${entity.sector}". Sektör benchmark'ı kayıtlı sektöre göre hesaplandı — şirket bilgilerinden düzeltebilirsiniz.`
+          }
+        } else if (entity.naceCode !== detNace) {
+          naceWarning = `Beyannamedeki faaliyet kodu (${detNace}) kayıtlı koddan (${entity.naceCode}) farklı. Şirket bilgilerini kontrol edin.`
+        } else if (entity.sector && suggested && suggested !== entity.sector) {
+          naceWarning = `Faaliyet kodu ${detNace} "${suggested}" sektörüne işaret ediyor; kayıtlı sektör "${entity.sector}". Benchmark kayıtlı sektöre göre hesaplandı.`
+        }
       }
     }
 
@@ -528,6 +552,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         where: { entityId_year_period: { entityId, year: row.year, period } },
       })
       const nextSource = existing && existing.source !== source ? 'MIXED' : source
+
+      // ─── Mutabakat: aynı dönem için ikinci kaynak geldiğinde aktif toplamı karşılaştır ───
+      // Fark > %5 ise yükleme durmaz; uyarı döner ve rapor için ratios meta'ya yazılır.
+      let reconciliation: null | { existingSource: string; incomingSource: string; totalAssetsExisting: number; totalAssetsIncoming: number; diff: number; diffPct: number; message: string } = null
+      {
+        const exTA = existing?.totalAssets != null ? Number(existing.totalAssets) : null
+        const inTA = f.totalAssets != null ? Number(f.totalAssets) : null
+        if (existing && existing.source !== source && exTA != null && inTA != null && exTA > 0) {
+          const diff = inTA - exTA
+          const diffPct = Math.abs(diff) / exTA
+          if (diffPct > 0.05) {
+            const fmtMn = (v: number) => `${(v / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
+            reconciliation = {
+              existingSource: existing.source, incomingSource: source,
+              totalAssetsExisting: exTA, totalAssetsIncoming: inTA, diff, diffPct,
+              message: `Veri doğrulaması gerekli: ${row.year} ${period} için ${existing.source === 'PDF' ? 'beyanname' : 'mizan'} aktif toplamı ${fmtMn(exTA)}, ${source === 'PDF' ? 'beyanname' : 'mizan'} ${fmtMn(inTA)} — fark ${fmtMn(Math.abs(diff))} (%${(diffPct * 100).toFixed(1)}). ${source === 'PDF' ? 'Bilanço için beyanname esas alındı.' : 'Bilanço kalemleri mizandan alındı.'}`,
+            }
+            parseWarnings.add(reconciliation.message)
+          }
+        }
+      }
       // PDF parse bazı belgelerde sparse gelebilir; bu durumda mevcut bilanço alanlarını silmeyelim.
       // Sadece yeterince geniş alan seti gelirse full-replace uygula.
       const parsedFieldCount = Object.keys(row.fields ?? {}).length
@@ -676,6 +721,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const ratiosJson = JSON.stringify({
         ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta,
         __guardrails: guard.notes, __shareholderLoans: guard.shareholderLoans, __shareholderLoanToEquity: guard.shareholderLoanToEquity,
+        __reconciliation: reconciliation,
       })
 
       const analysis = await prisma.analysis.upsert({
@@ -841,6 +887,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return jsonUtf8({
       imported: results.length,
       results,
+      naceWarning,
       parseSummary: {
         parsedRows: parsedRows.length,
         processedRows: results.length,
