@@ -37,6 +37,8 @@ export default function SirketlerPage() {
   const [entities, setEntities]   = useState<Entity[]>([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
+  const [sortBy, setSortBy]       = useState<'newest' | 'name' | 'periods'>('newest')
+  const [sectorFilter, setSectorFilter] = useState('')
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
 
@@ -132,10 +134,18 @@ export default function SirketlerPage() {
     } finally { setDeleting(null); setConfirmId(null) }
   }
 
-  const filtered = entities.filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    (e.taxNumber ?? '').includes(search) ||
-    (e.sector ?? '').toLowerCase().includes(search.toLowerCase()))
+  const sectors = Array.from(new Set(entities.map(e => e.sector).filter((s): s is string => !!s))).sort((a, b) => a.localeCompare(b, 'tr'))
+  const filtered = entities
+    .filter(e =>
+      e.name.toLowerCase().includes(search.toLowerCase()) ||
+      (e.taxNumber ?? '').includes(search) ||
+      (e.sector ?? '').toLowerCase().includes(search.toLowerCase()))
+    .filter(e => !sectorFilter || e.sector === sectorFilter)
+    .sort((a, b) => {
+      if (sortBy === 'name')    return a.name.localeCompare(b.name, 'tr')
+      if (sortBy === 'periods') return b._count.financialData - a._count.financialData || a.name.localeCompare(b.name, 'tr')
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
 
   return (
     <DashboardShell>
@@ -158,16 +168,39 @@ export default function SirketlerPage() {
           </button>
         </div>
 
-        {/* Arama */}
-        <div className="relative max-w-xl">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Şirket adı, vergi no veya sektör ara..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-white border border-slate-200 focus:outline-none focus:border-slate-400 text-[#1E293B] placeholder:text-slate-400 transition-colors"
-          />
+        {/* Arama + sıralama + sektör filtresi */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px] max-w-xl">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Şirket adı, vergi no veya sektör ara..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-white border border-slate-200 focus:outline-none focus:border-slate-400 text-[#1E293B] placeholder:text-slate-400 transition-colors"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as typeof sortBy)}
+            className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+            aria-label="Sıralama"
+          >
+            <option value="newest">En yeni</option>
+            <option value="name">Ada göre (A–Z)</option>
+            <option value="periods">Dönem sayısına göre</option>
+          </select>
+          {sectors.length > 1 && (
+            <select
+              value={sectorFilter}
+              onChange={e => setSectorFilter(e.target.value)}
+              className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+              aria-label="Sektör filtresi"
+            >
+              <option value="">Tüm sektörler</option>
+              {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
         </div>
 
         {/* İçerik */}
@@ -200,7 +233,7 @@ export default function SirketlerPage() {
               <div key={entity.id} className="relative group">
                 <Link
                   href={`/dashboard/sirketler/${entity.id}`}
-                  className="glass-card flex items-center gap-4 p-5 pr-28 hover:shadow-md transition-all block"
+                  className="glass-card flex items-center gap-4 p-5 pr-24 hover:shadow-md transition-all block"
                   style={{ textDecoration: 'none' }}
                 >
                   {/* İkon */}
@@ -213,8 +246,8 @@ export default function SirketlerPage() {
 
                   {/* Bilgi */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-semibold text-[#0B3C5D] truncate">{entity.name}</p>
+                    <div className="flex items-start gap-2 mb-1">
+                      <p className="text-sm font-semibold text-[#0B3C5D] break-words leading-snug" title={entity.name}>{entity.name}</p>
                       <span className={`text-[10px] px-2 py-0.5 rounded font-medium border flex-shrink-0 ${ENTITY_TYPE_COLORS[entity.entityType] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                         {ENTITY_TYPE_LABELS[entity.entityType] ?? entity.entityType}
                       </span>
