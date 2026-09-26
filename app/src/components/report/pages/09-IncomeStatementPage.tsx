@@ -93,7 +93,7 @@ export default function IncomeStatementPage({ data, sector }: Props) {
         </div>
       </div>
       <div className="pf">
-        <span>Bu rapor gizlidir · Finrate Finansal Derecelendirme Platformu</span>
+        <span>Bu rapor gizlidir · Finrate Finansal Analiz Platformu</span>
         <span>finrate.com.tr · {reportNo}</span>
       </div>
     </div>

@@ -34,14 +34,14 @@ export default function ClosingPage({ data }: Props) {
 
           {/* Orta: Ana içerik */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '4px', fontWeight: 600, marginBottom: '20px' }}>Derecelendirme Sonucu</div>
+            <div style={{ fontSize: '10px', color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '4px', fontWeight: 600, marginBottom: '20px' }}>Ön Değerlendirme Sonucu</div>
             <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '32px', fontWeight: 300, lineHeight: 1.2, color: 'white', letterSpacing: '-0.5px', marginBottom: '32px' }}>
               {companyName}
             </h2>
 
             {/* Rating badge */}
             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.08)', borderRadius: '22px', padding: '28px 48px' }}>
-              <div style={{ fontSize: '8.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '8px' }}>Final Rating</div>
+              <div style={{ fontSize: '8.5px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '8px' }}>Finrate Notu</div>
               <div className="outfit" style={{ fontSize: '80px', fontWeight: 900, lineHeight: 1, color: ratingColor, textShadow: `0 0 50px ${ratingColor}40` }}>
                 {rating.replace(/[+-]$/, '')}
                 {(rating.endsWith('+') || rating.endsWith('-')) && (
@@ -60,7 +60,7 @@ export default function ClosingPage({ data }: Props) {
                 </div>
                 <div style={{ width: '1px', height: '40px', background: 'rgba(255,255,255,.1)' }} />
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '2px' }}>Geçerlilik</div>
+                  <div style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '2px' }}>Güncelleme Önerisi</div>
                   <div className="mono" style={{ fontSize: '12px', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>{validUntil}</div>
                 </div>
               </div>
@@ -75,12 +75,12 @@ export default function ClosingPage({ data }: Props) {
           {/* Alt */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div style={{ fontSize: '8.5px', color: '#334155', lineHeight: 1.7, maxWidth: '340px' }}>
-              Bu rapor, Finrate Finansal Derecelendirme Platformu tarafından {reportDate} tarihinde otomatik olarak üretilmiştir. {validUntil} tarihine kadar geçerlidir. Raporun tamamı gizlidir; yetkisiz kişilerle paylaşılamaz.
+              Bu rapor, Finrate Finansal Analiz Platformu tarafından {reportDate} tarihinde otomatik olarak üretilmiş bir ön değerlendirmedir; {validUntil} itibarıyla bir sonraki mali dönem verileriyle güncellenmesi önerilir. Finrate bir kredi derecelendirme kuruluşu değildir. Raporun tamamı gizlidir; yetkisiz kişilerle paylaşılamaz.
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="outfit" style={{ fontSize: '14px', color: '#475569', letterSpacing: '3px', fontWeight: 700 }}>FINRATE.COM.TR</div>
               <div style={{ fontSize: '8px', color: '#334155', marginTop: '5px' }}>
-                Bankacılık Standartlarında Finansal Derecelendirme
+                Bankacılık Standartlarında Finansal Analiz
               </div>
             </div>
           </div>

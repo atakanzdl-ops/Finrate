@@ -205,9 +205,9 @@ export function buildConclusion(
   const band = getRatingBand(rating)
 
   const intros: Record<string, string> = {
-    investment: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla yatırım yapılabilir segment içinde yer almaktadır.`,
-    speculative: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla spekülatif segmentte konumlanmaktadır.`,
-    high_risk: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla yüksek risk segmentindedir.`,
+    investment: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla düşük risk grubunda yer almaktadır.`,
+    speculative: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla orta risk grubunda konumlanmaktadır.`,
+    high_risk: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla yüksek risk grubundadır.`,
   }
 
   // Orta cümle kalıp değil, gerçek durum dağılımından üretilir (tablo/özet ile aynı hüküm)
@@ -263,10 +263,10 @@ export function buildCollateralNote(rating: string, score: number): string {
 // ─── SENARYO NOTU ─────────────────────────────────────────────────────────────
 
 export function buildScenarioNote(rating: string, score: number): string {
-  if (score >= 80) return 'En üst derecelendirme segmentlerinden birinde. Teminatsız kredi imkânı mevcuttur.'
+  if (score >= 80) return 'En düşük risk grubunda. Teminatsız kredi imkânı değerlendirilebilir.'
   if (score >= 70) return 'Yatırım yapılabilir segment. Kefalet veya müşteri çeki karşılığı kullanım uygundur.'
   if (score >= 60) return 'Yatırım yapılabilir alt segment. Ek teminat ile kredi kullanımı mümkündür.'
-  if (score >= 50) return 'Spekülatif segment. Güçlü teminat paketi ve detaylı iş planı sunulması önerilir.'
+  if (score >= 50) return 'Orta-yüksek risk grubu. Güçlü teminat paketi ve detaylı iş planı sunulması önerilir.'
   return 'Yüksek risk segmenti. Yapısal finansal iyileştirmeler öncelikli hedef olmalıdır.'
 }
 
