@@ -531,8 +531,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const parsedFieldCount = Object.keys(row.fields ?? {}).length
       const shouldReplace = isPdf && parsedFieldCount >= 25
         && !(docType === 'BEYANNAME' && period !== 'ANNUAL')
+      // Tam mizan (≥10 hesap) bilançonun tek kaynağıdır: bilanço alanları mizandan olduğu gibi
+      // yenilenir (mizanda olmayan alan boşalır). Eski eşlemeden kalan bayat değerler kalmaz;
+      // gelir tablosu alanları (beyannameden) korunur.
+      const shouldReplaceBalance = docType === 'MIZAN' && (row.rawAccounts?.length ?? 0) >= 10
       const mergedFields = existing
-        ? shouldReplace
+        ? shouldReplaceBalance
+          ? Object.fromEntries(
+              Object.entries({ ...(existing as Record<string, unknown>), ...row.fields })
+                .filter(([k]) => !(k in { id:1, entityId:1, year:1, period:1, source:1, fileName:1, createdAt:1, updatedAt:1 }))
+                .map(([k, v]) => [k, BALANCE_SHEET_FIELDS.has(k) ? ((row.fields as Record<string, unknown>)[k] ?? null) : v])
+            )
+          : shouldReplace
           ? Object.fromEntries(
               Object.entries(existing as Record<string, unknown>)
                 .filter(([k]) => !(k in { id:1, entityId:1, year:1, period:1, source:1, fileName:1, createdAt:1, updatedAt:1 }))
@@ -602,6 +612,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
         if (mf.depreciation != null && mf.ebit != null) {
           mf.ebitda = Number(mf.ebit) + Number(mf.depreciation)
+        }
+      }
+
+      // Ara dönem vergi karşılığı (370): geçici beyannamedeki "Hesaplanan Geçici Vergi" net kârı
+      // düşürür; mizanda 370 kaydı yoksa aynı tutar KV borç ve gider karşılıklarına eklenir ki
+      // Aktif = Pasif dengesi korunsun. Hesap kırılımından her seferinde yeniden türetilir (idempotent).
+      if (period !== 'ANNUAL') {
+        const mf = mergedFields as Record<string, number | null>
+        const tax = mf.taxExpense != null ? Number(mf.taxExpense) : 0
+        if (tax > 0) {
+          const accounts = docType === 'MIZAN' && row.rawAccounts?.length
+            ? row.rawAccounts.map(a => ({ accountCode: a.code, amount: a.amount }))
+            : await prisma.financialAccount.findMany({
+                where: { analysis: { entityId, year: row.year, period } },
+                select: { accountCode: true, amount: true },
+              })
+          const has370 = accounts.some(a => a.accountCode === '370' && Number(a.amount) > 0)
+          if (!has370 && accounts.length > 0) {
+            const sum = (codes: string[]) => accounts.filter(a => codes.includes(a.accountCode)).reduce((s, a) => s + Number(a.amount), 0)
+            const base = sum(['372', '373', '379']) - sum(['371'])
+            const before = mf.shortTermProvisions != null ? Number(mf.shortTermProvisions) : 0
+            const next = base + tax
+            if (Math.abs(next - before) > 0.005) {
+              mf.shortTermProvisions = next
+              if (mf.totalCurrentLiabilities != null) mf.totalCurrentLiabilities = Number(mf.totalCurrentLiabilities) - before + next
+              if (mf.totalLiabilitiesAndEquity != null) mf.totalLiabilitiesAndEquity = Number(mf.totalLiabilitiesAndEquity) - before + next
+            }
+          }
         }
       }
 
