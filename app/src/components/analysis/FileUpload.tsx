@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { Upload, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 import clsx from 'clsx'
 import { PERIOD_LABEL_SHORT } from '@/lib/periods'
+import { describeUploadError, UPLOAD_NETWORK_ERROR_TEXT } from '@/lib/i18n/uploadErrorText'
 
 interface Props {
   entityId: string
@@ -165,7 +166,7 @@ export function FileUpload({ entityId, onImported }: Props) {
         }
         // 400 MISSING_YEAR_CONTEXT
         if (res.status === 400 && d.error === 'MISSING_YEAR_CONTEXT') {
-          updateEntry(idx, { status: 'error', error: d.message ?? 'Dosyada yıl bulunamadı.' })
+          updateEntry(idx, { status: 'error', error: describeUploadError(res.status, d) })
           return false
         }
         // 422 — ENTITY_TAX_NUMBER_MISMATCH (HARD — bypass YOK)
@@ -189,7 +190,8 @@ export function FileUpload({ entityId, onImported }: Props) {
           updateEntry(idx, { status: 'pending', error: undefined })
           return false
         }
-        updateEntry(idx, { status: 'error', error: d.error ?? 'Yükleme başarısız.' })
+        // Diğer tüm hatalar (402 hak yok, 413 büyük dosya, 500, JSON olmayan gövde…) okunur Türkçe
+        updateEntry(idx, { status: 'error', error: describeUploadError(res.status, d) })
         return false
       }
       const first = d.results?.[0]
@@ -205,7 +207,7 @@ export function FileUpload({ entityId, onImported }: Props) {
       })
       return true
     } catch {
-      updateEntry(idx, { status: 'error', error: 'Bağlantı hatası.' })
+      updateEntry(idx, { status: 'error', error: UPLOAD_NETWORK_ERROR_TEXT })
       return false
     }
   }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, Loader2, Upload } from 'lucide-react'
 import FinrateShell from '@/components/layout/FinrateShell'
+import { describeUploadError, UPLOAD_NETWORK_ERROR_TEXT } from '@/lib/i18n/uploadErrorText'
 
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
 
@@ -138,7 +139,7 @@ export default function MultiYearUploadPage() {
         }
         // 400 MISSING_YEAR_CONTEXT — yıl bulunamadı
         if (res.status === 400 && data.error === 'MISSING_YEAR_CONTEXT') {
-          setYearUpload(year, { status: 'error', error: data.message ?? 'Dosyada yıl bulunamadı.' })
+          setYearUpload(year, { status: 'error', error: describeUploadError(res.status, data) })
           return
         }
         // 422 — ENTITY_TAX_NUMBER_MISMATCH (HARD — bypass YOK)
@@ -162,18 +163,18 @@ export default function MultiYearUploadPage() {
           setYearUpload(year, { status: 'idle', error: undefined })
           return
         }
+        // Diğer tüm hatalar (402 hak yok, 413 büyük dosya, 500, JSON olmayan gövde…) okunur Türkçe
         setYearUpload(year, {
           status:   'error',
           uploaded: false,
-          // 402 (hak yok / süre doldu) gibi durumlarda okunur mesaj döner
-          error:    data.message ?? data.error ?? 'Yükleme başarısız.',
+          error:    describeUploadError(res.status, data),
         })
         return
       }
 
       setYearUpload(year, { status: 'done', uploaded: true, error: undefined })
     } catch {
-      setYearUpload(year, { status: 'error', uploaded: false, error: 'Bağlantı hatası oluştu.' })
+      setYearUpload(year, { status: 'error', uploaded: false, error: UPLOAD_NETWORK_ERROR_TEXT })
     }
   }
 
