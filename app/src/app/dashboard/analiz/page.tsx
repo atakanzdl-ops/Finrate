@@ -797,8 +797,38 @@ function AnalizPageContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
-        {/* ── Sol: Şirket Listesi ─────────────── */}
-        <div className="lg:col-span-3">
+        {/* ── Dar ekran (<1024px): firma ve dönem seçici (uzun liste yerine) ── */}
+        <div className="lg:hidden card p-4 flex flex-wrap gap-2 items-center">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 w-full">Şirket / Dönem</label>
+          <select
+            value={selected?.entity?.id ?? ''}
+            onChange={e => {
+              const group = entityGroups[e.target.value]
+              if (!group?.length) return
+              const best = [...group].sort((a, b) => b.year - a.year || b.period.localeCompare(a.period))[0]
+              setSelected(best)
+              if (best.entity?.id) sessionStorage.setItem('finrate_last_entity', best.entity.id)
+            }}
+            className="flex-1 min-w-[180px] px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+          >
+            {Object.entries(entityGroups).map(([eid, group]) => {
+              const best = [...group].sort((a, b) => b.year - a.year || b.period.localeCompare(a.period))[0]
+              return <option key={eid} value={eid}>{best.entity?.name ?? 'Şirket'} · {Math.round(combinedScore(best))} {combinedRating(combinedScore(best))}</option>
+            })}
+          </select>
+          {selected && entityAnalyses.length > 1 && (
+            <select
+              value={selected.id}
+              onChange={e => { const it = entityAnalyses.find(a => a.id === e.target.value); if (it) setSelected(it) }}
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500"
+            >
+              {entityAnalyses.map(a => <option key={a.id} value={a.id}>{a.year} · {PERIOD_LABEL_SHORT[a.period] ?? a.period}</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* ── Sol: Şirket Listesi (geniş ekran) ─────────────── */}
+        <div className="hidden lg:block lg:col-span-3">
           <div className="card p-5">
             <p className="card-desc uppercase tracking-[0.3em] mb-4">Şirketler</p>
             <div className="space-y-2">
