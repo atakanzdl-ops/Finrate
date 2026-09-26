@@ -11,15 +11,19 @@ type FaqItem = {
 const FAQ_ITEMS: FaqItem[] = [
   {
     q: 'Finrate nedir, ne işe yarar?',
-    a: 'Finrate, firmaların mali tablolarını bankacılık standartlarında analiz eden ve kredi notunu hesaplayan bir platformdur.',
+    a: 'Finrate, firmaların mali tablolarını bankacılık metodolojisiyle analiz eden ve 100 puan üzerinden bir Finrate Notu (ön değerlendirme notu) üreten bir platformdur. Finrate bir kredi derecelendirme kuruluşu değildir; çıktılar karar destek amaçlıdır.',
   },
   {
     q: 'Hangi dosya formatlarını yükleyebilirim?',
     a: 'Excel (.xlsx, .xls), CSV ve PDF formatındaki mali veri dosyalarını yükleyebilirsiniz.',
   },
   {
-    q: 'Kredi notu nasıl hesaplanıyor?',
-    a: 'Finrate 100 puan üzerinden çalışır: 70 puan finansal kriterler, 30 puan subjektif kriterlerden gelir.',
+    q: 'Finrate Notu nasıl hesaplanıyor?',
+    a: 'Finrate 100 puan üzerinden çalışır: 70 puan 25 finansal orandan (likidite, kârlılık, kaldıraç, faaliyet), 30 puan subjektif kriterlerden (KKB, banka ilişkileri, kurumsal yapı, uyum) gelir. Subjektif faktörler girilmeden nihai not ve rapor oluşmaz. Ayrıntılar Metodoloji sayfasındadır.',
+  },
+  {
+    q: 'Ara dönem (geçici vergi) verileriyle analiz yapılabilir mi?',
+    a: 'Evet. 3, 6 ve 9 aylık dönemlerde gelir tablosu kalemleri yıllıklandırılır ve rapor "oranlar yıllıklandırılmış" ibaresiyle işaretlenir.',
   },
   {
     q: 'Senaryo analizi ne işe yarar?',
@@ -70,8 +74,8 @@ export function FaqSection() {
           })}
         </div>
         <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <Link href="/giris" className="btn-ghost">
-            Daha fazla soru için giriş yapın
+          <Link href="/metodoloji" className="btn-ghost">
+            Skorlama metodolojisini inceleyin
           </Link>
         </div>
       </div>

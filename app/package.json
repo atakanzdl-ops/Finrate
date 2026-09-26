@@ -11,7 +11,8 @@
     "backfill:dekam": "tsx scripts/backfill_dekam_pdf_accounts.ts",
     "fixtures:collect": "tsx scripts/collect-fixtures.ts",
     "test:smtp": "tsx scripts/test-smtp.ts",
-    "test:smoke": "jest --testPathPatterns=smokeTests --verbose"
+    "test:smoke": "jest --testPathPatterns=smokeTests --verbose",
+    "backup:db": "tsx --env-file=.env.local scripts/backup-db.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
