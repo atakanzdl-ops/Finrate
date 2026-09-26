@@ -76,6 +76,7 @@ function setupMocks(opts: {
       },
       subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
       financialAccount: {
+        findMany: jest.fn(() => Promise.resolve([])),
         deleteMany: deleteMock,
         createMany: createMock,
       },
@@ -384,7 +385,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
         financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount:{ findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:     jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -422,7 +423,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
         financialData:   { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:        { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount:{ deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount:{ findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:     jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -590,7 +591,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
         financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -651,7 +652,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
         financialData:    { findUnique: findUniqueMock, upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -710,7 +711,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertFDMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: upsertAnalysisMock, updateMany: jest.fn() },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(), createMany: jest.fn() },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(), createMany: jest.fn() },
         $executeRaw:      executeRawMock,
       },
     }))
@@ -735,7 +736,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -861,7 +862,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 2 Q4/ANNUAL toleransı (F
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -884,7 +885,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 2 Q4/ANNUAL toleransı (F
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -934,7 +935,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -983,7 +984,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1019,7 +1020,7 @@ function setupWithEntity(entityOverride: Record<string, unknown>, identity?: Rec
       financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
       analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
       subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-      financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+      financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
       $executeRaw:      jest.fn(() => Promise.resolve(1)),
     },
   }))
@@ -1051,7 +1052,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1112,7 +1113,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1134,7 +1135,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1154,7 +1155,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1215,7 +1216,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID })), findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(() => Promise.resolve({ count: 0 })), createMany: jest.fn(() => Promise.resolve({ count: 1 })) },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))
@@ -1247,7 +1248,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
         financialData:    { findUnique: jest.fn(() => Promise.resolve(null)), upsert: upsertMock, findFirst: jest.fn(() => Promise.resolve(null)), findMany: jest.fn(() => Promise.resolve([])) },
         analysis:         { upsert: jest.fn(() => Promise.resolve(makeAnalysis())), updateMany: jest.fn(() => Promise.resolve({ count: 0 })) },
         subjectiveInput: { findUnique: jest.fn(() => Promise.resolve(null)) },
-        financialAccount: { deleteMany: jest.fn(), createMany: jest.fn() },
+        financialAccount: { findMany: jest.fn(() => Promise.resolve([])), deleteMany: jest.fn(), createMany: jest.fn() },
         $executeRaw:      jest.fn(() => Promise.resolve(1)),
       },
     }))

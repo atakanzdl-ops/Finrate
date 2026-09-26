@@ -8,6 +8,7 @@ import { calculateScore } from '@/lib/scoring/score'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { deriveDepreciation } from '@/lib/scoring/depreciation'
 import { buildRatioInput } from '@/lib/scoring/ratioInput'
+import { applyGuardrails } from '@/lib/scoring/guardrails'
 import { PERIOD_ORDER } from '@/lib/periods'
 
 /** Aynı entity için (year, period) öncesindeki en yakın dönemin hesap kırılımı (yoksa null). */
@@ -665,9 +666,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const ratios = calculateRatios(enrichedFields as Parameters<typeof calculateRatios>[0])
       const score  = calculateScore(ratios, entity.sector)
-      const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
-      const resolved = await resolveFinalScore(entityId, score.finalScore)
-      const ratiosJson = JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta })
+      // Guardrail (ortaklara borçlar 331+431): skor motoru sonrası, subjektif birleşimi öncesi
+      const guardAccounts = docType === 'MIZAN' && row.rawAccounts?.length
+        ? row.rawAccounts
+        : await prisma.financialAccount.findMany({ where: { analysis: { entityId, year: row.year, period } }, select: { accountCode: true, amount: true } })
+      const guard = applyGuardrails(score.finalScore, { accounts: guardAccounts, totalEquity: (mergedFields as Record<string, number | null>).totalEquity })
+      const optimizerSnapshot = createOptimizerSnapshot(ratios, guard.financialScore, entity.sector)
+      const resolved = await resolveFinalScore(entityId, guard.financialScore)
+      const ratiosJson = JSON.stringify({
+        ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta,
+        __guardrails: guard.notes, __shareholderLoans: guard.shareholderLoans, __shareholderLoanToEquity: guard.shareholderLoanToEquity,
+      })
 
       const analysis = await prisma.analysis.upsert({
         where: { entityId_year_period: { entityId, year: row.year, period } },

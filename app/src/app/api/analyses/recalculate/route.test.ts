@@ -78,6 +78,9 @@ function setupMocks(opts: {
       subjectiveInput: {
         findUnique: jest.fn(() => Promise.resolve(opts.subjectiveRow ?? null)),
       },
+      financialAccount: {
+        findMany: jest.fn(() => Promise.resolve([])),
+      },
     },
   }))
 

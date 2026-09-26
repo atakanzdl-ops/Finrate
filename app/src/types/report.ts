@@ -81,7 +81,7 @@ export interface ExecutiveSummary {
     sectorCurrentRatio:    number
     debtToEquity:          number
     sectorDebtToEquity:    number
-    interestCoverage:      number
+    interestCoverage:      number | null   // null = veri yok; ≥ 9999 = faiz gideri yok (uygulanamaz)
     sectorInterestCoverage: number
     equity:                number
     equityYoY:             number | null

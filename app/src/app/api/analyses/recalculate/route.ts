@@ -7,6 +7,7 @@ import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { buildRatioInput } from '@/lib/scoring/ratioInput'
+import { applyGuardrails } from '@/lib/scoring/guardrails'
 
 /**
  * POST /api/analyses/recalculate
@@ -32,10 +33,12 @@ export async function POST(req: NextRequest) {
     const enriched = await buildRatioInput(fields, { entityId: fd.entityId, year: fd.year, period: fd.period, sector: fd.entity.sector })
     const ratios = calculateRatios(enriched as Parameters<typeof calculateRatios>[0])
     const score  = calculateScore(ratios, fd.entity.sector)
-    const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, fd.entity.sector)
 
     if (fd.analysis) {
-      const resolved = await resolveFinalScore(fd.entityId, score.finalScore)
+      const accounts = await prisma.financialAccount.findMany({ where: { analysisId: fd.analysis.id }, select: { accountCode: true, amount: true } })
+      const guard = applyGuardrails(score.finalScore, { accounts, totalEquity: fd.totalEquity })
+      const optimizerSnapshot = createOptimizerSnapshot(ratios, guard.financialScore, fd.entity.sector)
+      const resolved = await resolveFinalScore(fd.entityId, guard.financialScore)
 
       await prisma.analysis.update({
         where: { id: fd.analysis.id },
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
             __overallCoverage:        score.overallCoverage ?? null,
             __insufficientCategories: score.insufficientCategories,
             ...resolved.meta,
+            __guardrails: guard.notes, __shareholderLoans: guard.shareholderLoans, __shareholderLoanToEquity: guard.shareholderLoanToEquity,
           }),
           optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
           updatedAt:          new Date(),

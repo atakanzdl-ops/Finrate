@@ -97,7 +97,7 @@ export function buildStrengths(
   }
 
   // Kaldıraç
-  if (r.interestCoverage != null && r.interestCoverage > bm.interestCoverage) {
+  if (r.interestCoverage != null && r.interestCoverage < 9999 && r.interestCoverage > bm.interestCoverage) {
     const dev = (r.interestCoverage - bm.interestCoverage) / (bm.interestCoverage || 0.01)
     candidates.push({ deviation: dev, text: `Faiz karşılama oranı ${r.interestCoverage.toFixed(1)}x — borç servis kapasitesi güçlü.` })
   }
@@ -164,7 +164,7 @@ export function buildWatchAreas(
     candidates.push({ deviation: dev, text: `Borç/Özkaynak ${r.debtToEquity.toFixed(2)}x ile sektörün (${bm.debtToEquity.toFixed(2)}x) ${getDeviationPhrase(dev, 'above')} — kaldıraç riski izlenmeli.` })
   }
 
-  if (r.interestCoverage != null && r.interestCoverage < bm.interestCoverage) {
+  if (r.interestCoverage != null && r.interestCoverage < 9999 && r.interestCoverage < bm.interestCoverage) {
     const dev = (bm.interestCoverage - r.interestCoverage) / (bm.interestCoverage || 0.01)
     candidates.push({ deviation: dev, text: `Faiz karşılama ${r.interestCoverage.toFixed(1)}x — sektör (${bm.interestCoverage.toFixed(1)}x) ${getDeviationPhrase(dev, 'below')}; faiz riski yönetimi önemli.` })
   }
