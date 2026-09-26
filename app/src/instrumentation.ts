@@ -1,6 +1,14 @@
 // Next.js instrumentation — sunucu başlamadan önce çalışır
 // pdf-parse / pdfjs-dist Node.js'te DOMMatrix bekliyor, bu polyfill sağlar
+import * as Sentry from '@sentry/nextjs'
+
+// Sunucu tarafı istek hataları (route handler / server component) Sentry'ye gider
+export const onRequestError = Sentry.captureRequestError
+
 export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') await import('../sentry.server.config')
+  if (process.env.NEXT_RUNTIME === 'edge')   await import('../sentry.edge.config')
+
   if (typeof globalThis.DOMMatrix === 'undefined') {
     // @ts-ignore
     globalThis.DOMMatrix = class DOMMatrix {
