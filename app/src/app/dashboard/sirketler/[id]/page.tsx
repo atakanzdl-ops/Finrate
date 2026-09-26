@@ -8,6 +8,7 @@ import { FileUpload } from '@/components/analysis/FileUpload'
 import DashboardShell from '@/components/layout/DashboardShell'
 import { TdhpSpreadsheet } from '@/components/analysis/TdhpSpreadsheet'
 import { TdhpChartTable } from '@/components/analysis/TdhpChartTable'
+import { UploadHistory } from '@/components/analysis/UploadHistory'
 import { PERIOD_LABEL_LONG } from '@/lib/periods'
 
 interface FinancialData {
@@ -253,6 +254,9 @@ export default function SirketDetayPage({ params }: { params: Promise<{ id: stri
           </table>
         </div>
       </div>
+
+      {/* Yüklenen dosyalar (saklananlar yeniden işlenebilir) */}
+      <UploadHistory entityId={id} onReprocessed={reload} />
 
       {/* Analize Başla */}
       {entity.financialData.length > 0 && (

@@ -29,6 +29,7 @@ import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { checkDuplicates, checkEntityIdentity } from '@/lib/validation/uploadValidation'
 import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
 import { getEntitlements, canUploadNewPeriods, consumeCredits, listExistingAnalysisPeriods } from '@/lib/entitlements'
+import { storeUploadFile } from '@/lib/fileStorage'
 
 // ─── Alan grupları: hangi docType hangi alanları yazabilir (Faz 7.3.16) ────────
 const BALANCE_SHEET_FIELDS = new Set([
@@ -718,6 +719,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         VALUES
           (${uploadId}, ${entityId}, ${financialData.id}, ${row.year}, ${period}, ${source}, ${file.name}, ${Object.keys(row.fields ?? {}).length}, ${unmappedJson}, ${parseWarningsJson}, NOW())
       `
+      // Dosyayı sakla (Vercel Blob) — yeniden işleme ve "ne yüklemiştim" için. Başarısız olursa akış devam eder.
+      await storeUploadFile({ uploadId, entityId, fileName: file.name, buffer, contentType: file.type || (isPdf ? 'application/pdf' : 'application/octet-stream') })
 
       // Yıllıklandırma + önceki yıl (aynı dönem, yoksa yıllık) + ÜFE — tek kaynak: buildRatioInput
       const enrichedFields = await buildRatioInput(mergedFields as Record<string, unknown>, { entityId, year: row.year, period, sector: entity.sector })
