@@ -5,6 +5,7 @@ import { hashPassword } from '@/lib/auth'
 import { createVerificationToken } from '@/lib/verification'
 import { sendMail } from '@/lib/email'
 import { buildVerifyEmail } from '@/lib/email-templates/verify-email'
+import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,11 @@ export async function POST(req: NextRequest) {
     if (password.length < 8) {
       return jsonUtf8({ error: 'Şifre en az 8 karakter olmalıdır.' }, { status: 400 })
     }
+    // VKN (10 hane) / TCKN (11 hane) — isteğe bağlı
+    if (!isValidOptionalTaxNumber(body.taxNumber)) {
+      return jsonUtf8({ error: 'Vergi numarası 10 hane, TC kimlik numarası 11 hane olmalıdır.' }, { status: 400 })
+    }
+    const taxNumber = normalizeTaxNumber(body.taxNumber)
 
     const existing = await prisma.user.findUnique({ where: { email } })
 
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
       // Kayıtlı ama doğrulanmamış — şifreyi güncelle, yeni kod gönder
       user = await prisma.user.update({
         where: { id: existing.id },
-        data:  { passwordHash },
+        data:  { passwordHash, ...(taxNumber ? { taxNumber } : {}) },
         select: { id: true, email: true, fullName: true, role: true },
       })
     } else {
@@ -49,6 +55,7 @@ export async function POST(req: NextRequest) {
           passwordHash,
           fullName,
           companyName: companyName ?? null,
+          taxNumber,
           isVerified:  false,
           subscription: {
             create: {

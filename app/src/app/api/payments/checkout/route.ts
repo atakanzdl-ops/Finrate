@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, fullName: true, isActive: true, subscription: { select: { id: true } } },
+    select: { id: true, email: true, fullName: true, taxNumber: true, isActive: true, subscription: { select: { id: true } } },
   })
   if (!user || !user.isActive) return jsonUtf8({ error: 'Kullanıcı bulunamadı.' }, { status: 404 })
 
@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
       price:          pkg.priceTRY,
       itemName:       `Finrate ${pkg.label} Paketi (${pkg.credits} analiz hakkı)`,
       callbackUrl,
-      buyer: { id: user.id, name, surname, email: user.email, ip },
+      // identityNumber: kullanıcı VKN/TCKN girdiyse o, yoksa iyzico'nun kabul ettiği yer tutucu
+      buyer: { id: user.id, name, surname, email: user.email, ip, identityNumber: user.taxNumber ?? undefined },
     })
 
     if (result.status !== 'success' || !result.token) {

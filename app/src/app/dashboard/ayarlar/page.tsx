@@ -15,6 +15,7 @@ interface UserProfile {
   email:       string
   fullName:    string
   companyName: string | null
+  taxNumber?:  string | null
   role?:       string
   subscription: {
     plan:              string
@@ -53,6 +54,7 @@ export default function AyarlarPage() {
   // Profil formu
   const [fullName, setFullName]       = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [taxNumber, setTaxNumber]     = useState('')
   const [profileSaving, setProfileSaving]   = useState(false)
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [profileError, setProfileError]     = useState('')
@@ -90,6 +92,7 @@ export default function AyarlarPage() {
           setUser(d.user)
           setFullName(d.user.fullName ?? '')
           setCompanyName(d.user.companyName ?? '')
+          setTaxNumber(d.user.taxNumber ?? '')
         }
       })
       .finally(() => setPageLoading(false))
@@ -104,7 +107,7 @@ export default function AyarlarPage() {
       const res = await fetch('/api/user/profile', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ fullName: fullName.trim(), companyName: companyName.trim() || null }),
+        body:    JSON.stringify({ fullName: fullName.trim(), companyName: companyName.trim() || null, taxNumber: taxNumber.trim() || null }),
       })
       const d = await res.json()
       if (!res.ok) { setProfileError(d.error ?? 'Hata oluştu.'); return }
@@ -289,6 +292,16 @@ export default function AyarlarPage() {
                 value={companyName}
                 onChange={e => setCompanyName(e.target.value)}
                 placeholder="ABC A.Ş."
+                className="w-full h-10 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D] bg-white"
+              />
+            </Field>
+            <Field label="Vergi No / TC Kimlik No (opsiyonel, fatura için)">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={taxNumber}
+                onChange={e => setTaxNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="10 haneli VKN veya 11 haneli TCKN"
                 className="w-full h-10 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D] bg-white"
               />
             </Field>

@@ -112,7 +112,10 @@ export default function PackagePurchase({ onPurchased }: { onPurchased?: () => v
         <p className="mt-2 text-[11px] text-[#94A3B8]">Kart ile ödeme yakında. Şimdilik havale/EFT için e-posta ile iletişime geçin; hakkınız aynı gün tanımlanır.</p>
       )}
       {enabled && (
-        <p className="mt-2 text-[11px] text-[#94A3B8]">Ödemeler iyzico güvencesiyle alınır; kart bilgileriniz Finrate sunucularına ulaşmaz.</p>
+        <p className="mt-2 text-[11px] text-[#94A3B8]">
+          Ödemeler iyzico güvencesiyle alınır; kart bilgileriniz Finrate sunucularına ulaşmaz.
+          &quot;Kartla Satın Al&quot; ile <a href="/yasal#mesafeli" target="_blank" rel="noreferrer" className="underline text-[#0B3C5D]">Mesafeli Satış Sözleşmesi</a>&apos;ni kabul etmiş olursunuz.
+        </p>
       )}
       <div id="iyzipay-checkout-form" className="responsive mt-3" />
     </div>

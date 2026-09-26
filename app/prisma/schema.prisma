@@ -16,6 +16,7 @@ model User {
   passwordHash  String
   fullName      String
   companyName   String?
+  taxNumber     String?   // VKN (10) / TCKN (11) — fatura ve iyzico alıcı bilgisi için, isteğe bağlı
   role          String   @default("USER")
   isVerified    Boolean  @default(false)
   isActive           Boolean   @default(true)

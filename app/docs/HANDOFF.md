@@ -46,16 +46,15 @@ teknik değildir: her şeyi sen yaparsın, o onaylar. Türkçe konuş, kısa yaz
 - **Yerel oturumda yapılacaklar (anahtar gelince):**
   1. Vercel → Environment Variables: `IYZICO_API_KEY`, `IYZICO_SECRET_KEY`, `IYZICO_BASE_URL` (önce sandbox ile Preview'da dene, sonra Production'a `https://api.iyzipay.com`).
   2. Sandbox test kartıyla `Ayarlar → Paket Satın Al → Kartla Satın Al` akışını uçtan uca dene; `?odeme=basarili` bandı ve kalan hak artışı görülmeli.
-  3. Alıcı bilgisi: iyzico `identityNumber` zorunlu; kayıtta TCKN/VKN alınmadığı için yer tutucu gönderiliyor. Gerekirse kayıt formuna VKN alanı eklenir.
-  4. Yasal: mesafeli satış / ön bilgilendirme metni `/yasal` sayfasına eklenmeli (kart ödemesi açılmadan önce).
+  3. Alıcı bilgisi: kullanıcı VKN/TCKN girdiyse (`users.taxNumber`, kayıt ve Ayarlar → Profil) iyzico'ya o gider; boşsa yer tutucu.
+  4. Yasal: mesafeli satış / ön bilgilendirme metni `/yasal#mesafeli`'de hazır (taslak; avukat kontrolü önerilir).
 
 ## Açık işler (öncelik sırasıyla)
 1. iyzico anahtarları gelince yukarıdaki "yerel oturumda yapılacaklar".
-2. Analizler sayfası (`src/app/dashboard/analiz/page.tsx`) 1000px altında sol firma listesi içeriğin üstüne yığılıyor → dar ekran düzeni.
-3. Gruplar/konsolide: dönem hizalama + ara dönem yıllıklandırma yapıldı (`consolidationPeriod.ts`). Kalan zayıflıklar:
-   `/api/groups/[id]/consolidate` rotası UI'da kullanılmıyor (sahiplik/yıllıklandırma yok; kaldırılabilir);
-   konsolide skor guardrail/subjektif birleşimi tek firma yolundan (`resolveFinalScore`) geçmiyor — motor kararı gerektirir.
-4. Kayıt formunda VKN/TCKN alanı (iyzico alıcı bilgisi için, isteğe bağlı).
+2. Gruplar/konsolide: dönem hizalama + ara dönem yıllıklandırma yapıldı (`consolidationPeriod.ts`); kullanılmayan
+   `/api/groups/[id]/consolidate` rotası kaldırıldı. Kalan tek konu motor kararı gerektirir:
+   konsolide skor guardrail/subjektif birleşimi tek firma yolundan (`resolveFinalScore`) geçmiyor.
+3. Analizler sayfası dar ekran düzeni yapıldı (25911e2: <1024px firma/dönem seçici) — kapalı.
 
 ## Son değişiklikler (2026-09-26, bulut oturumu)
 Yükleme hata mesajları sadeleştirildi (`src/lib/i18n/uploadErrorText.ts`); konsolide skor aynı döneme hizalanır ve

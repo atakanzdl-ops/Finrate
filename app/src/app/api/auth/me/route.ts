@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
         email:       true,
         fullName:    true,
         companyName: true,
+        taxNumber:   true,
         role:        true,
         isVerified:  true,
         subscription: {
