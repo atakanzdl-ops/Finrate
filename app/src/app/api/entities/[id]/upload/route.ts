@@ -3,10 +3,11 @@ import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
-import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
+import { calculateRatios } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { deriveDepreciation } from '@/lib/scoring/depreciation'
+import { buildRatioInput } from '@/lib/scoring/ratioInput'
 import { PERIOD_ORDER } from '@/lib/periods'
 
 /** Aynı entity için (year, period) öncesindeki en yakın dönemin hesap kırılımı (yoksa null). */
@@ -659,24 +660,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           (${uploadId}, ${entityId}, ${financialData.id}, ${row.year}, ${period}, ${source}, ${file.name}, ${Object.keys(row.fields ?? {}).length}, ${unmappedJson}, ${parseWarningsJson}, NOW())
       `
 
-      // Önceki yıl verisini sorgula (büyüme + dönem ortalamaları için)
-      const prevYearData = await prisma.financialData.findFirst({
-        where: { entityId, year: row.year - 1, period },
-        select: { revenue: true, inventory: true, tradeReceivables: true, tradePayables: true, advancesReceived: true },
-      })
-      const ppiRate = TURKEY_PPI[row.year] ?? TURKEY_PPI[2024]
-      const enrichedFields = {
-        ...mergedFields,
-        sector:               entity.sector,
-        prevRevenue:          prevYearData?.revenue          ?? null,
-        prevInventory:        prevYearData?.inventory        ?? null,
-        prevTradeReceivables: prevYearData?.tradeReceivables ?? null,
-        prevTradePayables:    prevYearData?.tradePayables    ?? null,
-        prevAdvancesReceived: prevYearData?.advancesReceived ?? null,
-        ppiRate,
-      }
+      // Yıllıklandırma + önceki yıl (aynı dönem, yoksa yıllık) + ÜFE — tek kaynak: buildRatioInput
+      const enrichedFields = await buildRatioInput(mergedFields as Record<string, unknown>, { entityId, year: row.year, period, sector: entity.sector })
 
-      const ratios = calculateRatios(enrichedFields)
+      const ratios = calculateRatios(enrichedFields as Parameters<typeof calculateRatios>[0])
       const score  = calculateScore(ratios, entity.sector)
       const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
       const resolved = await resolveFinalScore(entityId, score.finalScore)
