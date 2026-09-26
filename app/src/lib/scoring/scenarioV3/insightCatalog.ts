@@ -391,7 +391,7 @@ export function buildLeverageInsight(
   accountBalances: Record<string, number> | undefined | null,
 ): DecisionInsight | null {
   const dte = ratios?.debtToEquity
-  const ortaklarBorcu = accountBalances?.['331'] ?? 0
+  const ortaklarBorcu = (accountBalances?.['331'] ?? 0) + (accountBalances?.['431'] ?? 0)
   if (dte == null || dte <= 3.0 || ortaklarBorcu <= 0) return null
 
   return {

@@ -78,8 +78,10 @@ describe('A15 suggestedAmount sizing — Faz 7.3.43C', () => {
     expect(sa.absoluteMinTRY).toBe(1_000_000)
   })
 
-  test('T7: requiredAccountCodes değişmedi — [331]', () => {
-    expect(a15.preconditions?.requiredAccountCodes).toEqual(['331'])
+  test('T7 (Faz 7b): kaynak 331+431 — requiredAccountCodes yerine customCheck toplamı', () => {
+    expect(a15.preconditions?.requiredAccountCodes).toBeUndefined()
+    expect(a15.preconditions?.customCheck).toBeDefined()
+    expect(a15.preconditions?.customCheck!({ accounts: [{ accountCode: '431', amount: 24_000_000 }] }).pass).toBe(true)
   })
 
 })
