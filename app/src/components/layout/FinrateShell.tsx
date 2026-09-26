@@ -13,11 +13,16 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
+  Menu,
+  X,
 } from 'lucide-react'
 
 export default function FinrateShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [isAdmin, setIsAdmin] = useState(false)
+  // Dar ekran (≤900px): kenar menüsü çekmece olur, üst çubuktaki ☰ ile açılır
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   // Yönetici bağlantısı yalnızca role=ADMIN kullanıcıya görünür (sunucu tarafı ayrıca 403 döner)
   useEffect(() => {
@@ -56,7 +61,17 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
 
   return (
     <div className="app-shell">
-      <aside className="app-sidebar">
+      {/* Dar ekran üst çubuğu (masaüstünde gizli) */}
+      <div className="mobile-topbar">
+        <button type="button" className="mobile-menu-btn" aria-label="Menüyü aç" onClick={() => setMenuOpen(v => !v)}>
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <FinrateLogoCanvas size={28} />
+        <span className="mobile-topbar-title"><span style={{ color: '#0B1F3A' }}>FIN</span><span style={{ color: '#0DC4A0' }}>RATE</span></span>
+      </div>
+      {menuOpen && <div className="mobile-backdrop" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`app-sidebar${menuOpen ? ' open' : ''}`}>
         <div className="app-brand flex items-center gap-3">
           <FinrateLogoCanvas size={40} />
           <div>
