@@ -45,6 +45,11 @@ model Subscription {
   currentPeriodEnd   DateTime
   cancelAtPeriodEnd  Boolean @default(false)
   iyzicoSubKey    String?
+  // Hak sistemi: ücretli paketler analiz hakkı (kredi) olarak tanımlanır.
+  // DEMO planında currentPeriodEnd = ücretsiz deneme bitişi.
+  analysisCredits Int      @default(0)
+  creditsExpireAt DateTime?
+  notes           String?   // yönetici notu (ör. "havale 26.09.2026, Başlangıç paketi")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

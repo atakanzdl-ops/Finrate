@@ -36,6 +36,8 @@ function setupMocks(opts: {
     getUserIdFromRequest: jest.fn(() => opts.userId),
   }))
 
+  jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
+
   jest.doMock('@/lib/db', () => ({
     prisma: {
       entity: {

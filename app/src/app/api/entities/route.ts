@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
 import { normalizeNace, sectorFromNace } from '@/lib/nace'
+import { getEntitlements, canCreateEntity } from '@/lib/entitlements'
 
 // GET /api/entities — kullanıcının şirketleri
 export async function GET(req: NextRequest) {
@@ -50,6 +51,11 @@ export async function POST(req: NextRequest) {
     if (naceCode && !normalizeNace(naceCode)) {
       return jsonUtf8({ error: 'NACE / faaliyet kodu 4–6 haneli rakam olmalıdır (örn. 464305).' }, { status: 400 })
     }
+
+    // Hak kontrolü: ücretsiz planda firma sınırı / süre
+    const ent = await getEntitlements(userId)
+    const denial = ent ? canCreateEntity(ent) : null
+    if (denial) return jsonUtf8({ error: denial.message, code: denial.code }, { status: 402 })
 
     const normalizedTaxNumber = normalizeTaxNumber(taxNumber)
     const normalizedNace = normalizeNace(naceCode)

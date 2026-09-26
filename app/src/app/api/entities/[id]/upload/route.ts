@@ -28,6 +28,7 @@ async function findPreviousPeriodAccounts(entityId: string, year: number, period
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { checkDuplicates, checkEntityIdentity } from '@/lib/validation/uploadValidation'
 import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
+import { getEntitlements, canUploadNewPeriods, consumeCredits, listExistingAnalysisPeriods } from '@/lib/entitlements'
 
 // ─── Alan grupları: hangi docType hangi alanları yazabilir (Faz 7.3.16) ────────
 const BALANCE_SHEET_FIELDS = new Set([
@@ -325,6 +326,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           conflicts,
         }, { status: 409 })
       }
+    }
+
+    // PREFLIGHT 5 — HAK KONTROLÜ: yeni firma-dönem sayısı kadar hak gerekir (mevcut dönem yenileme serbest)
+    const entitlements = await getEntitlements(userId)
+    const candidatePeriods = parsedRows
+      .filter((row): row is typeof row & { year: number } => typeof row.year === 'number')
+      .map(row => ({ year: row.year, period: (row.period as string) ?? 'ANNUAL' }))
+    const existingAnalyses = await listExistingAnalysisPeriods(entityId, candidatePeriods)
+    const newPeriodCount = candidatePeriods.filter(p => !existingAnalyses.some(a => a.year === p.year && a.period === p.period)).length
+    const entitlementDenial = entitlements ? canUploadNewPeriods(entitlements, newPeriodCount) : null
+    if (entitlementDenial) {
+      return jsonUtf8({ error: entitlementDenial.code, message: entitlementDenial.message }, { status: 402 })
     }
 
     const results = []
@@ -884,6 +897,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       },
       data: { roadmapSnapshot: null },
     })
+
+    // Yeni firma-dönem başına 1 analiz hakkı düş (ücretsiz plan ve yönetici hariç)
+    if (entitlements && results.length > 0) {
+      const consumed = results.filter(r => {
+        const y = (r as { year?: number }).year; const p = (r as { period?: string }).period
+        return y != null && !existingAnalyses.some(a => a.year === y && a.period === (p ?? 'ANNUAL'))
+      }).length
+      await consumeCredits(entitlements, consumed)
+    }
 
     return jsonUtf8({
       imported: results.length,

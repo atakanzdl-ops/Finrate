@@ -11,8 +11,8 @@ const pricingItems = [
     amount: '₺1.999',
     period: '4 analiz hakkı · KDV dahil',
     features: ['Tüm finansal oranlar (25 metrik)', 'Excel / PDF yükleme', '5 yıllık trend analizi', 'Senaryo analizi modülü', 'Subjektif faktör değerlendirme', 'ÜFE reel büyüme düzeltmesi', 'Kredi notu artırıcı öneriler', 'PDF rapor üretimi'],
-    href: '/kayit',
-    button: 'Hemen Satın Al',
+    href: 'mailto:info@finrate.com.tr?subject=Ba%C5%9Flang%C4%B1%C3%A7%20paketi%20sat%C4%B1n%20alma',
+    button: 'Satın Almak İçin Yazın',
     featured: false,
   },
   {
@@ -21,8 +21,8 @@ const pricingItems = [
     amount: '₺6.999',
     period: '5 ayrı erişim kodu · KDV dahil',
     features: ['Başlangıç paketindeki tüm özellikler', 'Her kodda 4 analiz hakkı', 'Toplam 20 analiz hakkı (5 × 4)', 'Kodları müşterilerinize devredebilirsiniz'],
-    href: '/kayit',
-    button: 'Hemen Satın Al',
+    href: 'mailto:info@finrate.com.tr?subject=S.M.M.M%20paketi%20sat%C4%B1n%20alma',
+    button: 'Satın Almak İçin Yazın',
     featured: true,
   },
   {
@@ -31,8 +31,8 @@ const pricingItems = [
     amount: '₺29.999',
     period: '100 analiz hakkı · KDV dahil',
     features: ['S.M.M.M paketindeki tüm özellikler', '100 müşteri analizi kapasitesi'],
-    href: '/kayit',
-    button: 'Hemen Satın Al',
+    href: 'mailto:info@finrate.com.tr?subject=Profesyonel%20paket%20sat%C4%B1n%20alma',
+    button: 'Satın Almak İçin Yazın',
     featured: false,
   },
   {
@@ -163,6 +163,7 @@ export default function Page() {
           <div style={{ textAlign: 'center' }}>
             <div className="section-label">Fiyatlar</div>
             <div className="section-title outfit" style={{ maxWidth: 'none', marginBottom: 12 }}>İhtiyacınıza göre plan</div>
+            <p className="section-sub" style={{ margin: '0 auto 8px' }}>Kayıt ücretsizdir: 14 gün, 1 firma, 1 dönem, skor ve Hızlı Teşhis. Paketler analiz hakkı olarak tanımlanır ve 12 ay geçerlidir; ödeme sonrası hakkınız aynı gün hesabınıza işlenir.</p>
           </div>
           <div className="pricing-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', maxWidth: 'none' }}>
             {pricingItems.map((item) => (

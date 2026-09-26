@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { FinrateLogoCanvas } from '@/components/ui/FinrateLogoCanvas'
 import {
   LayoutDashboard,
@@ -11,10 +12,17 @@ import {
   FileText,
   Settings,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react'
 
 export default function FinrateShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Yönetici bağlantısı yalnızca role=ADMIN kullanıcıya görünür (sunucu tarafı ayrıca 403 döner)
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => setIsAdmin(d?.user?.role === 'ADMIN')).catch(() => {})
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -43,6 +51,7 @@ export default function FinrateShell({ children }: { children: React.ReactNode }
     { href: '/dashboard/analiz',      label: 'Analizler',      icon: BarChart3 },
     { href: '/dashboard/gruplar',     label: 'Gruplar',        icon: GitBranch },
     { href: '/dashboard/raporlar',    label: 'Raporlar',       icon: FileText },
+    ...(isAdmin ? [{ href: '/dashboard/admin', label: 'Yönetim', icon: ShieldCheck }] : []),
   ]
 
   return (

@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
             currentPeriodEnd:   true,
             billingCycle:       true,
             cancelAtPeriodEnd:  true, // Faz 7.3.50D
+            analysisCredits:    true,
+            creditsExpireAt:    true,
           },
         },
       },

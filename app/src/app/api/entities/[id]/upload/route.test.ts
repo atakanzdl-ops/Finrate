@@ -56,6 +56,8 @@ function setupMocks(opts: {
     getUserIdFromRequest: jest.fn(() => opts.userId),
   }))
 
+  jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
+
   jest.doMock('@/lib/db', () => ({
     prisma: {
       entity: {
@@ -379,6 +381,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
       isExcel: true,
     })
     // upsert mock'u override et
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -417,6 +420,7 @@ describe('POST /api/entities/[id]/upload — parserProvidedKeys docType filtresi
       }],
       isExcel: false,
     })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:          { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -585,6 +589,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }),
     )
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -646,6 +651,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
       Promise.resolve({ source: 'EXCEL', updatedAt: new Date() }),
     )
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: true })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -705,6 +711,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
     const executeRawMock     = jest.fn()
 
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2023, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
@@ -730,6 +737,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT validation (Faz 7.3.50A)'
   test('T14 — mevcut başarılı tek yıl akışı: upsert çağrıldı, 200', async () => {
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2024, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -856,6 +864,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 2 Q4/ANNUAL toleransı (F
   test('T_PRE6 — detectedPeriod=ANNUAL + formPeriod=Q4 → upsert where+create period=Q4', async () => {
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'ANNUAL')], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -879,6 +888,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 2 Q4/ANNUAL toleransı (F
   test('T_PRE7 — detectedPeriod=Q4 + formPeriod=ANNUAL → upsert where+create period=ANNUAL', async () => {
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(2025, 'Q4')], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -929,6 +939,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
   test('T2 — confirmDetectionMissing=true → PREFLIGHT 1.5 bypass, upsert çağrıldı', async () => {
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -978,6 +989,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 1.5 soft warning (Faz 7.3
   test('T8 — detectedYear null, confirm=false → 409, upsert ÇAĞRILMADI', async () => {
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupMocks({ userId: 'user-1', parsedRows: [PREFLIGHT_ROW(null, null)], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret' })) },
@@ -1014,6 +1026,7 @@ function IDENTITY_ROW(identity: Record<string, unknown>) {
 function setupWithEntity(entityOverride: Record<string, unknown>, identity?: Record<string, unknown>) {
   const id = identity ?? { sourceConfidence: 'LOW' as const }
   setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW(id)], isExcel: false })
+  jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
   jest.doMock('@/lib/db', () => ({
     prisma: {
       entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', ...entityOverride })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -1046,6 +1059,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
   // ── T7a ÖNCELİK 0: VKN match → soft kontroller atlanır, ok ─────────────────
   test('T7a — VKN match (priority 0) → ok, entity accepted even if confidence=LOW', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'HIGH' })], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: '1234567890' })) },
@@ -1107,6 +1121,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
   test('T12 — title detected, fuzzy match → ok, upsert called', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ title: 'Test Firması Ltd. Şti.', sourceConfidence: 'MEDIUM' })], isExcel: false })
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -1129,6 +1144,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
     setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ sourceConfidence: 'LOW' })], isExcel: false })
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
     setupWithEntity({ name: 'Test Firması', taxNumber: null })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -1149,6 +1165,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
   test('T14 — confirmEntityUnverified=true + VKN unverified → bypass, upsert called', async () => {
     setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'HIGH' })], isExcel: false })
     const upsertMock = jest.fn(() => Promise.resolve({ id: FINANCIAL_DATA_ID }))
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
@@ -1210,6 +1227,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
       parsedRows: [IDENTITY_ROW({ taxNumber: '1234567890', sourceConfidence: 'LOW' })],
       isExcel: false,
     })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: '1234567890' })) },
@@ -1242,6 +1260,7 @@ describe('POST /api/entities/[id]/upload — PREFLIGHT 4 entity identity (Faz 7.
   test('T19 — ENTITY_UNVERIFIED → upsert never called', async () => {
     const upsertMock = jest.fn()
     setupMocks({ userId: 'user-1', parsedRows: [IDENTITY_ROW({ sourceConfidence: 'LOW' })], isExcel: false })
+    jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
     jest.doMock('@/lib/db', () => ({
       prisma: {
         entity:           { findFirst: jest.fn(() => Promise.resolve({ id: ENTITY_ID, userId: 'user-1', sector: 'Ticaret', name: 'Test Firması', taxNumber: null })), update: jest.fn(() => Promise.resolve({ id: ENTITY_ID })) },
