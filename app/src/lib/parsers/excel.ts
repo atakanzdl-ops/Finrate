@@ -546,6 +546,18 @@ const MIZAN_MAP: Record<string, string> = {
   '260': 'intangibleAssets', '261': 'intangibleAssets', '264': 'intangibleAssets', '267': 'intangibleAssets', // Faz 7.3.25: 267 Diğer Maddi Olmayan
   '280': 'longTermPrepaidExpenses',
   '580': 'retainedLosses',
+  // Faz 3b: TDHP tam hesap planı ile eklenen eşlemeler (bakBorç tarafı)
+  '110': 'shortTermInvestments', '111': 'shortTermInvestments', '112': 'shortTermInvestments', '118': 'shortTermInvestments',
+  '181': 'prepaidExpenses',
+  '220': 'longTermTradeReceivables', '221': 'longTermTradeReceivables', '226': 'longTermTradeReceivables',
+  '232': 'longTermOtherReceivables', '233': 'longTermOtherReceivables', '235': 'longTermOtherReceivables', '236': 'longTermOtherReceivables',
+  '240': 'longTermInvestments', '242': 'longTermInvestments', '245': 'longTermInvestments', '248': 'longTermInvestments',
+  '251': 'tangibleAssets', '256': 'tangibleAssets', '259': 'tangibleAssets',
+  '262': 'intangibleAssets', '263': 'intangibleAssets', '269': 'intangibleAssets',
+  '271': 'depletableAssets', '272': 'depletableAssets', '277': 'depletableAssets', '279': 'depletableAssets',
+  '281': 'longTermPrepaidExpenses',
+  '291': 'otherNonCurrentAssets', '292': 'otherNonCurrentAssets', '293': 'otherNonCurrentAssets',
+  '294': 'otherNonCurrentAssets', '295': 'otherNonCurrentAssets', '297': 'otherNonCurrentAssets',
   // Gelir tablosu – 64x/65x/67x/68x (mizan'da görünebilir)
   // 64x: Diğer Olağan Gelir ve Karlar → bakAlacak (_A)
   '640': 'otherIncome_A', '641': 'otherIncome_A', '642': 'otherIncome_A',
@@ -581,7 +593,18 @@ const MIZAN_MAP: Record<string, string> = {
   '350': 'constructionProgress_A', '358': 'constructionProgress_A',  // Faz 7.3.21: 350 eklendi
   // 44x — UV Alınan Avanslar → longTermAdvancesReceived_A (Faz 7.3.21)
   '440': 'longTermAdvancesReceived_A', '449': 'longTermAdvancesReceived_A',
-  '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',
+  '360': 'taxPayables_A',            '361': 'taxPayables_A',            '368': 'taxPayables_A',            '369': 'taxPayables_A',
+  // Faz 3b: eksik pasif eşlemeleri (bakAlacak)
+  '304': 'shortTermFinancialDebt_A', '305': 'shortTermFinancialDebt_A', '306': 'shortTermFinancialDebt_A',
+  '349': 'advancesReceived_A',
+  '370': 'shortTermProvisions_A', '372': 'shortTermProvisions_A', '373': 'shortTermProvisions_A', '379': 'shortTermProvisions_A',
+  '391': 'otherCurrentLiabilities_A', '392': 'otherCurrentLiabilities_A', '393': 'otherCurrentLiabilities_A',
+  '397': 'otherCurrentLiabilities_A', '399': 'otherCurrentLiabilities_A',
+  '405': 'longTermFinancialDebt_A',  '407': 'longTermFinancialDebt_A',  '409': 'longTermFinancialDebt_A',
+  '438': 'longTermOtherPayables_A',
+  '472': 'longTermProvisions_A',     '479': 'longTermProvisions_A',
+  '480': 'otherNonCurrentLiabilities_A', '481': 'otherNonCurrentLiabilities_A',
+  '492': 'otherNonCurrentLiabilities_A', '493': 'otherNonCurrentLiabilities_A', '499': 'otherNonCurrentLiabilities_A',
   '380': 'deferredRevenue_A', '381': 'deferredRevenue_A', // R9.1: 380 Gelecek Aylara Ait Gelirler
   '400': 'longTermFinancialDebt_A',  '401': 'longTermFinancialDebt_A',
   // 42x — UV Ticari Borçlar → longTermTradePayables_A
@@ -611,6 +634,19 @@ const MIZAN_MAP: Record<string, string> = {
   '268': 'intangibleAssets_CA',
   '302': 'shortTermFinancialDebt_CB',
   '402': 'longTermFinancialDebt_CB',
+  // Faz 3b: eksik kontra hesaplar
+  '119': 'shortTermInvestments_CA',
+  '122': 'tradeReceivables_CA',       '124': 'tradeReceivables_CA',       '129': 'tradeReceivables_CA',
+  '137': 'otherReceivables_CA',       '139': 'otherReceivables_CA',
+  '158': 'inventory_CA',              '199': 'otherCurrentAssets_CA',
+  '222': 'longTermTradeReceivables_CA', '224': 'longTermTradeReceivables_CA', '229': 'longTermTradeReceivables_CA',
+  '237': 'longTermOtherReceivables_CA', '239': 'longTermOtherReceivables_CA',
+  '241': 'longTermInvestments_CA', '243': 'longTermInvestments_CA', '244': 'longTermInvestments_CA',
+  '246': 'longTermInvestments_CA', '247': 'longTermInvestments_CA', '249': 'longTermInvestments_CA',
+  '278': 'depletableAssets_CA',       '298': 'otherNonCurrentAssets_CA', '299': 'otherNonCurrentAssets_CA',
+  '308': 'shortTermFinancialDebt_CB', '322': 'tradePayables_CB',          '337': 'otherShortTermPayables_CB',
+  '371': 'shortTermProvisions_CB',    '408': 'longTermFinancialDebt_CB',
+  '503': 'paidInCapital_CB',
   '422': 'longTermTradePayables_CB',           // UV Alacak Senetleri Reeskontu (kontra)
   '437': 'longTermOtherPayables_CB',           // UV Borç Senetleri Reeskontu (kontra)
 }

@@ -69,6 +69,14 @@ const TITLE_REJECT_PATTERNS: RegExp[] = [
 
 /** Şirket türü suffix'leri — unvan parçalarını birleştirmek için */
 const COMPANY_SUFFIX_RE = /^(anonim sirketi|limited sirketi|anonim ortakligi|limited|ltd sti|a\.?s\.?|ltd\.?|sirketi)$/
+// GİB formu unvanı iki kutuya böler ("Soyadı (Unvanı)" + "Adı (Unvanın Devamı)") ve PDF metni
+// kutuları ters sırada verebilir: "SİS. LTD. ŞTİ." önce, "TEKNOENERJİ ELEKTRİK VE AYD." sonra.
+// Kısa ve şirket ekiyle BİTEN parça kuyruk parçadır; baş parça ondan sonra gelir.
+const COMPANY_SUFFIX_END_RE = /(anonim sirketi|limited sirketi|anonim ortakligi|ltd\.?\s*sti\.?|a\.?\s?s\.?|ltd\.?|sirketi)\.?$/
+function isTailFragment(c: string): boolean {
+  const n = norm(c).trim()
+  return n.length <= 24 && COMPANY_SUFFIX_END_RE.test(n) && !COMPANY_SUFFIX_RE.test(n)
+}
 
 /**
  * rawLines içinde ilk SMMM_BOUNDARY_PATTERNS eşleşmesinin satır indeksini döner.
@@ -215,6 +223,12 @@ export function parseTaxIdentity(pdfText: string): ParsedIdentity {
           title = candidates[suffixIdx - 1] + ' ' + candidates[suffixIdx]
         } else if (suffixIdx === 0 && candidates.length > 1) {
           // Suffix ilk sırada: diğer parça öne alınır
+          title = candidates[1] + ' ' + candidates[0]
+        } else if (
+          suffixIdx === -1 && candidates.length > 1 &&
+          isTailFragment(candidates[0]) && !COMPANY_SUFFIX_END_RE.test(norm(candidates[1]).trim())
+        ) {
+          // Ters sıralı iki kutu: "SİS. LTD. ŞTİ." + "TEKNOENERJİ ELEKTRİK VE AYD." → baş + kuyruk
           title = candidates[1] + ' ' + candidates[0]
         } else {
           // Şahıs mükellef context: "Soyadı (Unvanı)" vb. etiket + kişi adı parçaları → birleştir
@@ -1499,24 +1513,35 @@ export async function parsePdfBuffer(buffer: Buffer, _fileName?: string): Promis
   if (type === 'kurumlar_gecici') {
     const taxFields = parseTaxForm(text)
     const rawAccKVG = tdhpRawAccounts.length > 0 ? tdhpRawAccounts : undefined
+    // Ara dönem gelir tablosunda 690 = 692 (vergi karşılığı henüz kayıtlara alınmamış).
+    // Beyannamedeki "Hesaplanan Geçici Vergi" dönemin vergi karşılığıdır → net kâr vergi sonrası.
+    const withInterimTax = (cari: Record<string, number | null>): Record<string, number | null> => {
+      const tax = taxFields.taxExpense
+      const { taxExpense: _t, ...taxNoTax } = taxFields
+      void _t
+      const merged: Record<string, number | null> = { ...cari, ...taxNoTax }
+      if (typeof tax === 'number' && tax > 0) {
+        merged.taxExpense = tax
+        const preTax = cari.netProfit ?? cari.ebt ?? merged.ebt
+        if (typeof preTax === 'number') merged.netProfit = preTax - tax
+      }
+      return merged
+    }
     const gelirIdx  = findNormIdx(text, 'tek duzen hesap planina uygun gelir tablosu')
     if (gelirIdx !== -1) {
       const raw = parseEkSection(text.slice(gelirIdx, gelirIdx + 5000))
-      // Geçici vergide taxExpense gelir tablosu kalemi değil
-      const { taxExpense: _t, ...taxNoTax } = taxFields
-      return [{ year, period, fields: { ...raw.cari, ...taxNoTax }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
+      return [{ year, period, fields: withInterimTax(raw.cari), unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
     }
     const rawFull = parseEkSection(text)
-    const { taxExpense: _t2, ...taxNoTax2 } = taxFields
     if (Object.keys(rawFull.cari).length > 0) {
       console.info('[pdf] kurumlar_gecici fulltext fallback', {
         fieldCount: Object.keys(rawFull.cari).length,
         hasRevenue: rawFull.cari.revenue != null,
         hasCogs: rawFull.cari.cogs != null,
       })
-      return [{ year, period, fields: { ...rawFull.cari, ...taxNoTax2 }, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
+      return [{ year, period, fields: withInterimTax(rawFull.cari), unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
     }
-    return [{ year, period, fields: taxNoTax2, unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
+    return [{ year, period, fields: withInterimTax({}), unmapped: [], rawAccounts: rawAccKVG, docType: 'BEYANNAME', identity }]
   }
 
   // 6) Bilinmeyen: satır bazlı fallback

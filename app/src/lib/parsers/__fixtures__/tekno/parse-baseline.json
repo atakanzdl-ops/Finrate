@@ -12,6 +12,7 @@
         "tradePayables": 8252369.54,
         "otherShortTermPayables": 110523.43,
         "taxPayables": 181534.30000000002,
+        "shortTermProvisions": 0,
         "paidInCapital": 5700000,
         "capitalReserves": 18115539,
         "retainedEarnings": 1194825.89
@@ -72,6 +73,14 @@
         {
           "code": "361",
           "amount": 47460.23
+        },
+        {
+          "code": "370",
+          "amount": 341524.75
+        },
+        {
+          "code": "371",
+          "amount": 341524.75
         },
         {
           "code": "500",
@@ -249,7 +258,7 @@
       "identity": {
         "taxNumber": "8360845044",
         "tcKimlik": null,
-        "title": "SİS. LTD. ŞTİ.",
+        "title": "TEKNOENERJİ ELEKTRİK VE AYD. SİS. LTD. ŞTİ.",
         "sourceConfidence": "HIGH"
       }
     }
@@ -265,7 +274,8 @@
         "operatingExpenses": 10287032.54,
         "ebit": 1850700.72,
         "ebt": 1850700.72,
-        "netProfit": 1850700.72
+        "netProfit": 1388025.54,
+        "taxExpense": 462675.18
       },
       "rawAccounts": [
         {
@@ -298,7 +308,7 @@
       "identity": {
         "taxNumber": "8360845044",
         "tcKimlik": null,
-        "title": "SİS. LTD. ŞTİ.",
+        "title": "TEKNOENERJİ ELEKTRİK VE AYD. SİS. LTD. ŞTİ.",
         "sourceConfidence": "HIGH"
       }
     }
@@ -316,7 +326,7 @@
         "tradePayables": 871941.18,
         "otherShortTermPayables": 280755,
         "taxPayables": 136759.5,
-        "otherNonCurrentLiabilities": 24000000,
+        "longTermOtherPayables": 24000000,
         "paidInCapital": 15000000,
         "capitalReserves": 8115539,
         "retainedEarnings": 2219400.17

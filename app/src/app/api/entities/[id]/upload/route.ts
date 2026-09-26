@@ -6,6 +6,22 @@ import { parseExcelBuffer, parseCsvText } from '@/lib/parsers/excel'
 import { calculateRatios, TURKEY_PPI } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
+import { deriveDepreciation } from '@/lib/scoring/depreciation'
+import { PERIOD_ORDER } from '@/lib/periods'
+
+/** Aynı entity için (year, period) öncesindeki en yakın dönemin hesap kırılımı (yoksa null). */
+async function findPreviousPeriodAccounts(entityId: string, year: number, period: string) {
+  const candidates = await prisma.financialData.findMany({
+    where: { entityId, year: { lte: year } },
+    select: { year: true, period: true, analysis: { select: { financialAccounts: { select: { accountCode: true, amount: true } } } } },
+  })
+  const rank = (y: number, p: string) => y * 10 + (PERIOD_ORDER[p] ?? 0)
+  const current = rank(year, period)
+  const prev = candidates
+    .filter(c => rank(c.year, c.period) < current && (c.analysis?.financialAccounts.length ?? 0) > 0)
+    .sort((a, b) => rank(b.year, b.period) - rank(a.year, a.period))[0]
+  return prev?.analysis?.financialAccounts ?? null
+}
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { checkDuplicates, checkEntityIdentity } from '@/lib/validation/uploadValidation'
 import { UPLOAD_ERRORS }           from '@/lib/i18n/uploadErrors'
@@ -570,6 +586,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           const ncl = nm(mf.totalNonCurrentLiabilities)
           if (cl != null || ncl != null)
             mf.totalLiabilitiesAndEquity = (cl ?? 0) + (ncl ?? 0) + mf.totalEquity
+        }
+      }
+
+      // Amortisman: mizan yüklemesinde önceki dönemin birikmiş amortismanına (257/268) göre fark.
+      // Parser'a dokunmaz; yalnızca depreciation boşsa doldurur. ebit biliniyorsa FAVÖK = FVÖK + amortisman.
+      {
+        const mf = mergedFields as Record<string, number | null>
+        if (docType === 'MIZAN' && mf.depreciation == null && row.rawAccounts && row.rawAccounts.length > 0) {
+          const prevPeriodAccounts = await findPreviousPeriodAccounts(entityId, row.year, period)
+          if (prevPeriodAccounts) {
+            const dep = deriveDepreciation(prevPeriodAccounts, row.rawAccounts)
+            if (dep != null && dep > 0) mf.depreciation = dep
+          }
+        }
+        if (mf.depreciation != null && mf.ebit != null) {
+          mf.ebitda = Number(mf.ebit) + Number(mf.depreciation)
         }
       }
 
