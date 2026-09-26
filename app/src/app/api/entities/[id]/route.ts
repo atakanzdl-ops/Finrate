@@ -7,6 +7,7 @@ import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
 import { SECTOR_VALUES } from '@/lib/sectorOptions'
+import { normalizeNace } from '@/lib/nace'
 
 const VALID_ENTITY_TYPES = new Set(['STANDALONE', 'PARENT', 'SUBSIDIARY', 'JV'])
 
@@ -49,7 +50,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const body = await req.json()
-    const { name, taxNumber, sector, entityType, groupId, ownershipPct, weightBasis } = body
+    const { name, taxNumber, sector, entityType, groupId, ownershipPct, weightBasis, naceCode } = body
+    if (naceCode !== undefined && naceCode !== null && naceCode !== '' && !normalizeNace(naceCode)) {
+      return jsonUtf8({ error: 'NACE / faaliyet kodu 4–6 haneli rakam olmalıdır.' }, { status: 400 })
+    }
 
     // ── Validasyon ────────────────────────────────────────────────────────────
     if (name !== undefined && name.trim().length < 2) {
@@ -87,7 +91,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: {
         ...(name        !== undefined && { name: name.trim() }),
         ...(taxNumber   !== undefined && { taxNumber: normalizedTaxNumber }),
-        ...(sector      !== undefined && { sector: sector || null }),
+        ...(sector      !== undefined && { sector: sector || null, sectorSource: sector ? 'USER' : null }),
+        ...(naceCode    !== undefined && { naceCode: normalizeNace(naceCode) }),
         ...(entityType  !== undefined && { entityType }),
         ...(groupId     !== undefined && { groupId }),
         ...(ownershipPct !== undefined && { ownershipPct }),

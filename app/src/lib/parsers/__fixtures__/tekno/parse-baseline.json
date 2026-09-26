@@ -259,6 +259,7 @@
         "taxNumber": "8360845044",
         "tcKimlik": null,
         "title": "TEKNOENERJİ ELEKTRİK VE AYD. SİS. LTD. ŞTİ.",
+        "naceCode": null,
         "sourceConfidence": "HIGH"
       }
     }
@@ -309,6 +310,7 @@
         "taxNumber": "8360845044",
         "tcKimlik": null,
         "title": "TEKNOENERJİ ELEKTRİK VE AYD. SİS. LTD. ŞTİ.",
+        "naceCode": "46.43.05",
         "sourceConfidence": "HIGH"
       }
     }

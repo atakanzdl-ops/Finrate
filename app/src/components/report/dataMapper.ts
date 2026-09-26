@@ -1243,9 +1243,14 @@ function auditColor(level: string): string {
 
 /** Skorlama guardrail notları (ratios JSON meta: __guardrails) → İzleme Alanı'nın başına. */
 function guardrailMessages(ratios: Record<string, unknown>): string[] {
+  const out: string[] = []
+  const rec = ratios.__reconciliation as { message?: unknown } | null | undefined
+  if (rec && typeof rec.message === 'string') out.push(rec.message)
   const g = ratios.__guardrails
-  if (!Array.isArray(g)) return []
-  return g
-    .map(n => (n && typeof n === 'object' && typeof (n as { message?: unknown }).message === 'string') ? (n as { message: string }).message : null)
-    .filter((m): m is string => !!m)
+  if (Array.isArray(g)) {
+    for (const n of g) {
+      if (n && typeof n === 'object' && typeof (n as { message?: unknown }).message === 'string') out.push((n as { message: string }).message)
+    }
+  }
+  return out
 }

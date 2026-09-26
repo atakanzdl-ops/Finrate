@@ -78,6 +78,8 @@ model Entity {
   name                 String
   taxNumber            String?
   sector               String?
+  naceCode             String?  // Faaliyet (NACE) kodu "46.43.05" — kayitta girilir veya beyannameden okunur
+  sectorSource         String?  // USER | DECLARATION — sektorun kaynagi
   entityType           String   @default("STANDALONE")
   groupId              String?
   ownershipPct         Float?

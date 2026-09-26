@@ -18,6 +18,7 @@ interface FileEntry {
   rating?:   string
   score?:    number
   error?:    string
+  warning?:  string
   unmapped?: string[]
 }
 
@@ -197,6 +198,10 @@ export function FileUpload({ entityId, onImported }: Props) {
         rating:   first?.rating,
         score:    first?.score,
         unmapped: first?.unmapped ?? [],
+        warning:  [
+          typeof d.naceWarning === 'string' ? d.naceWarning : null,
+          ...((d.parseSummary?.parseWarnings ?? []) as string[]).filter(w => w.startsWith('Veri doğrulaması gerekli')),
+        ].filter(Boolean).join(' ') || undefined,
       })
       return true
     } catch {
@@ -437,7 +442,9 @@ export function FileUpload({ entityId, onImported }: Props) {
                     <span className="text-slate-400 ml-1">({entry.score?.toFixed(1)})</span>
                   </p>
                 )}
-                {/* yearMismatch amber uyarı kaldırıldı — Faz 7.3.50A: PREFLIGHT 2'de 422 bloklayıcı */}
+                {entry.status === 'done' && entry.warning && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">{entry.warning}</p>
+                )}
                 {entry.status === 'error' && (
                   <p className="text-xs text-red-500">{entry.error}</p>
                 )}

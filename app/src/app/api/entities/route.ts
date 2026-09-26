@@ -3,6 +3,7 @@ import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 import { isValidOptionalTaxNumber, normalizeTaxNumber } from '@/lib/validation/taxNumber'
+import { normalizeNace, sectorFromNace } from '@/lib/nace'
 
 // GET /api/entities — kullanıcının şirketleri
 export async function GET(req: NextRequest) {
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest) {
       name: true,
       taxNumber: true,
       sector: true,
+      naceCode: true,
+      sectorSource: true,
       entityType: true,
       groupId: true,
       ownershipPct: true,
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, taxNumber, sector, entityType, groupId, ownershipPct, weightBasis } = body
+    const { name, taxNumber, sector, entityType, groupId, ownershipPct, weightBasis, naceCode } = body
 
     if (!name || name.trim().length < 2) {
       return jsonUtf8({ error: 'Şirket adı en az 2 karakter olmalıdır.' }, { status: 400 })
@@ -44,8 +47,15 @@ export async function POST(req: NextRequest) {
     if (taxNumber !== undefined && !isValidOptionalTaxNumber(taxNumber)) {
       return jsonUtf8({ error: 'VKN/TCKN 10 veya 11 haneli rakam olmalıdır.' }, { status: 400 })
     }
+    if (naceCode && !normalizeNace(naceCode)) {
+      return jsonUtf8({ error: 'NACE / faaliyet kodu 4–6 haneli rakam olmalıdır (örn. 464305).' }, { status: 400 })
+    }
 
     const normalizedTaxNumber = normalizeTaxNumber(taxNumber)
+    const normalizedNace = normalizeNace(naceCode)
+    // Sektör: kullanıcı seçtiyse o; seçmediyse NACE'den türet
+    const resolvedSector: string | null = sector ? sector : (normalizedNace ? sectorFromNace(normalizedNace) : null)
+    const sectorSource: string | null = resolvedSector ? (sector ? 'USER' : 'DECLARATION') : null
 
     // Ownership check — saldırgan kendi entity'sini yabancı gruba bağlayamaz
     if (groupId) {
@@ -60,7 +70,9 @@ export async function POST(req: NextRequest) {
         userId,
         name: name.trim(),
         taxNumber: normalizedTaxNumber,
-        sector: sector ?? null,
+        sector: resolvedSector,
+        naceCode: normalizedNace,
+        sectorSource,
         entityType: entityType ?? 'STANDALONE',
         groupId: groupId ?? null,
         ownershipPct: ownershipPct != null ? ownershipPct : null,
