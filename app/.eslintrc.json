@@ -1,5 +1,48 @@
 {
   "extends": [
-    "next/core-web-vitals"
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/__tests__/**"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-require-imports": "off"
+      }
+    },
+    {
+      "files": [
+        "src/lib/scoring/score.ts",
+        "src/lib/scoring/benchmarks.ts",
+        "src/lib/scoring/ratios.ts",
+        "src/lib/parsers/beyanname.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "off",
+        "prefer-const": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "backups/",
+    "tmp/",
+    "src/tmp/",
+    ".next/",
+    "node_modules/"
   ]
 }

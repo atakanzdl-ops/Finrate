@@ -282,12 +282,6 @@ function firstNum(line: string): number | null {
   return m ? parseTR(m[0]) : null
 }
 
-function twoNums(line: string): [number | null, number | null] {
-  const m = line.match(ANY_NUM)
-  if (!m) return [null, null]
-  return [parseTR(m[0]), m[1] ? parseTR(m[1]) : null]
-}
-
 // ─── Yıl / Dönem tespiti ──────────────────────────────────────────────────────
 
 function extractYearPeriod(text: string): { year: number | null; period: string } {
@@ -742,7 +736,7 @@ function parsePdfMizan(text: string): ParsedRow[] {
 
 // ─── Fallback parser ──────────────────────────────────────────────────────────
 
-function parseFallback(text: string, year: number, period: string): ParsedRow[] {
+function parseFallback(text: string, year: number | null, period: string): ParsedRow[] {
   const fields: Record<string, number | null> = {}
 
   for (const line of text.split('\n')) {

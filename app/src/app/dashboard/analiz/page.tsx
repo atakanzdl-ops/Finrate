@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import React, { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -17,7 +17,6 @@ import ScenarioPanel   from '@/components/analysis/ScenarioPanel'
 import ScenarioPanelV2 from '@/components/analysis/ScenarioPanelV2'
 import ScenarioPanelV3 from '@/components/analysis/ScenarioPanelV3'
 import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
-import { combineScores } from '@/lib/scoring/subjective'
 import { PERIOD_LABEL_SHORT, PERIOD_LABEL_AXIS } from '@/lib/periods'
 import { RATING_LABEL } from '@/lib/ratingLabels'
 import { assess } from '@/lib/scoring/assess'
@@ -71,12 +70,6 @@ const RATING_COLOR: Record<string, string> = {
   CC: '#0B3C5D',
   C: '#0B3C5D',
   D: '#0B3C5D',
-}
-
-function prussianBlue(score: number): string {
-  if (score > 80) return '#0B3C5D'
-  if (score > 50) return '#0B3C5D'
-  return '#EF4444'
 }
 
 /* ─── RatioInfoCell ─────────────────────────────── */
@@ -430,54 +423,16 @@ function CoverageBanner({ coverage }: { coverage: number | null | undefined }) {
   )
 }
 
-/* ─── CircularScore ──────────────────────────────── */
-function CircularScore({ score, rating }: { score: number; rating: string }) {
-  const circ   = 2 * Math.PI * 34
-  const offset = circ - (score / 100) * circ
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="score-ring-wrap mb-4">
-        <svg className="score-ring" viewBox="0 0 80 80">
-          <defs>
-            <linearGradient id="scoreGradAn" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#2dd4bf"/>
-              <stop offset="100%" stopColor="#14b8a6"/>
-            </linearGradient>
-          </defs>
-          <circle className="ring-bg" cx="40" cy="40" r="34" />
-          <motion.circle
-            className="ring-fill"
-            cx="40" cy="40" r="34"
-            stroke="url(#scoreGradAn)"
-            strokeDasharray={circ}
-            initial={{ strokeDashoffset: circ }}
-            animate={{ strokeDashoffset: offset }}
-            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-          />
-        </svg>
-        <div className="score-value">
-          <div className="score-num" style={{ color: '#2dd4bf' }}>{Math.round(score)}</div>
-          <div className="score-max">/ 100</div>
-        </div>
-      </div>
-      <div className="text-center">
-        <div className="score-grade" style={{ color: RATING_COLOR[rating] ?? '#2dd4bf' }}>{rating}</div>
-        <div className="score-label mt-1">{RATING_LABEL[rating] ?? 'Kredi Notu'}</div>
-      </div>
-    </div>
-  )
-}
-
 /* ─── Feature flag: ?v2=1 → ScenarioPanelV2 (yedek) ──────── */
-function useV2Scenario(): boolean {
+// Not: hook değildir (window.location okur); koşullu çağrılabilsin diye "use" öneki yok.
+function isV2ScenarioFlag(): boolean {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('v2') === '1'
 }
 
 /* ─── Feature flag: ?legacy=1 → ScenarioPanel (iç destek) ── */
 // Faz 7.3.10: Default artık V3. Legacy'ye erişim için ?legacy=1 gerekli.
-function useLegacyScenario(): boolean {
+function isLegacyScenarioFlag(): boolean {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('legacy') === '1'
 }
@@ -1017,12 +972,6 @@ function AnalizPageContent() {
                     AAA:'Çok Düşük', AA:'Düşük', A:'Düşük', BBB:'Orta',
                     BB:'Orta-Yüksek', B:'Yüksek', CCC:'Çok Yüksek', CC:'Kritik', C:'Kritik', D:'İflas',
                   }
-                  const catItems = [
-                    { label: 'Likidite',  value: Math.round(selected.liquidityScore),     color: '#0ea5e9', fill: 'fill-cyan'   },
-                    { label: 'Karlılık',  value: Math.round(selected.profitabilityScore), color: '#6366f1', fill: 'fill-indigo' },
-                    { label: 'Kaldıraç', value: Math.round(selected.leverageScore),      color: '#2dd4bf', fill: 'fill-teal'   },
-                    { label: 'Faaliyet', value: Math.round(selected.activityScore),      color: '#10b981', fill: 'fill-emerald'},
-                  ]
 
                   return (
                   <div className="space-y-4">
@@ -1371,13 +1320,13 @@ function AnalizPageContent() {
                 {/* ── SENARYO ─────────────────── */}
                 {/* Faz 7.3.10: Default V3. ?v2=1 → V2 yedek. ?legacy=1 → iç destek. */}
                 {activeTab === 'scenario' && (
-                  useLegacyScenario() ? (
+                  isLegacyScenarioFlag() ? (
                     <ScenarioPanel
                       analysisId={selected.id}
                       currentGrade={cr}
                       currentScore={cs}
                     />
-                  ) : useV2Scenario() ? (
+                  ) : isV2ScenarioFlag() ? (
                     <ScenarioPanelV2
                       analysisId={selected.id}
                       currentScore={cs}

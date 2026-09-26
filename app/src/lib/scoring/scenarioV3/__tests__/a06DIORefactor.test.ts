@@ -2,9 +2,7 @@ import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
 import {
   getPeriodDays,
   sumByCodesPrefix,
-  getInventoryBalance,
   computeDIO,
-  getCogs
 } from '../ratioHelpers'
 import type { FirmContext } from '../contracts'
 

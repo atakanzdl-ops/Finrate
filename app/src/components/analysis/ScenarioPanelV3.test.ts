@@ -101,7 +101,7 @@ describe('T_DETAY — override case mantığı (Faz 7.3.45)', () => {
   })
 
   test('T_DETAY2: targetMatchesRequest=false → override ÇALIŞMAZ', () => {
-    const targetMatchesRequest = false
+    const targetMatchesRequest = false as boolean
     const rawFeasText = 'BB hedefine ulaşılamıyor — ulaşılabilir maksimum: B.'
 
     const feasText        = sanitizeJargon(rawFeasText)

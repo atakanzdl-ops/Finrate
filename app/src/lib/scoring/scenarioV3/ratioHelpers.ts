@@ -39,7 +39,7 @@ export function buildRatioTransparency(
   const benchmark = getBenchmarkValue(ctx.sector, tr.benchmarkField)
   const targetDays = benchmark?.value ?? tr.fallback ?? 90
 
-  const period = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+  const period = getPeriodDays({ period: (ctx as { period?: string }).period ?? 'ANNUAL' })
   const periodDays = period.days
 
   const basisValue = getBasisValueForTransparency(ctx, tr.basis)
@@ -82,7 +82,7 @@ function getBasisValueForTransparency(
   ctx: FirmContext,
   basis: 'netSales' | 'cogs' | 'totalAssets' | 'totalDebt' | 'currentLiabilities' | 'equity' | 'interestExpense'
 ): number | null {
-  if (basis === 'netSales')          return (ctx as any).netSales ?? ctx.totalRevenue ?? null
+  if (basis === 'netSales')          return (ctx as { netSales?: number | null }).netSales ?? ctx.totalRevenue ?? null
   if (basis === 'cogs')              return getCogs(ctx)
   if (basis === 'totalAssets')       return ctx.totalAssets ?? null
   if (basis === 'equity')            return ctx.totalEquity ?? null
@@ -249,7 +249,7 @@ export function getCogs(ctx: FirmContext): number | null {
  * Period source unknown ise 365 + console.warn.
  * Sessiz varsayım yapılmaz.
  */
-export function getPeriodDays(fd: any): { days: number; source: 'explicit' | 'derived' | 'unknown' } {
+export function getPeriodDays(fd: { period?: string | null; periodStart?: string | Date | null; periodEnd?: string | Date | null } | null | undefined): { days: number; source: 'explicit' | 'derived' | 'unknown' } {
   // periodStart + periodEnd mevcutsa hesapla
   if (fd && fd.periodStart && fd.periodEnd) {
     const start = new Date(fd.periodStart)
@@ -628,7 +628,7 @@ export function getReceivableCollectionTarget(
   const netSales = ctx.netSales ?? 0
   if (ar <= 0 || netSales <= 0) return null
 
-  const { days: periodDays } = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' })
+  const { days: periodDays } = getPeriodDays({ period: (ctx as { period?: string }).period ?? 'ANNUAL' })
   const currentDSO = (ar / netSales) * periodDays
 
   const bm = getBenchmarkValue(ctx.sector, 'receivablesDays')
@@ -945,7 +945,7 @@ function buildEquityRatioTransparency(
 
   const totalAssets = ctx.totalAssets ?? 0
   // runtime guard: FirmContext.totalEquity: number ama JS'de undefined gelebilir
-  const totalEquity = (ctx as any).totalEquity as number | undefined | null
+  const totalEquity = (ctx as { totalEquity?: number | null }).totalEquity
   if (totalAssets <= 0) return null
   if (totalEquity === undefined || totalEquity === null || isNaN(totalEquity)) return null
 

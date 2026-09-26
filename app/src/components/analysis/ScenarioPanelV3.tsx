@@ -28,7 +28,7 @@
  * Tum veri backend'den hazir gelir (decisionAnswer), UI sadece render eder.
  */
 
-import { useState } from 'react'
+import { useState, type JSX } from 'react'
 import {
   Sparkles,
   FileText,
@@ -36,7 +36,6 @@ import {
   Layers,
   AlertTriangle,
   Loader2,
-  Info,
   Shield,
   Database,
   MessageSquare,
@@ -67,15 +66,6 @@ interface ScenarioPanelV3Props {
 type ApiErrorResponse = { error?: string }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-function formatAmount(n: number | undefined | null): string {
-  if (n == null || n === 0) return '0 TL'
-  const abs = Math.abs(n)
-  if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace('.', ',')} Mr TL`
-  if (abs >= 1_000_000)     return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mn TL`
-  if (abs >= 1_000)         return `${(n / 1_000).toFixed(0)} K TL`
-  return `${n.toFixed(0)} TL`
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function assessLiquidity(productivity: any): string {
@@ -231,49 +221,6 @@ export function sanitizeJargon(text: string): string {
   return result
 }
 
-// ─── classifyLeg ─────────────────────────────────────────────────────────────
-
-/**
- * TDHP hesap koduna ve kayıt yönüne göre bilanço hareketinin
- * görünür yönünü belirler. Faz 7.3.5C1 + B3b-1.
- * Aktif (1xx/2xx) : Borç=artan,  Alacak=azalan
- * Pasif (3xx-5xx)  : Alacak=artan, Borç=azalan
- * Gelir (6xx, hasılat)  : Alacak=artan, Borç=azalan
- * Gider/Maliyet (6xx/7xx) : Borç=artan, Alacak=azalan
- */
-
-// Hasılat hesapları — CREDIT artış
-const INCOME_CREDIT_INCREASE = new Set([
-  '600','601','602',
-  '640','641','642','643','644','645','646','647','648','649',
-  '671','679',
-])
-// Gider/maliyet hesapları — DEBIT artış
-const EXPENSE_DEBIT_INCREASE = new Set([
-  '610','611','612',
-  '620','621','622','623',
-  '630','631','632','633',
-  '653','654','655','656','657','658','659',
-  '660','661',
-  '680','681','689',
-  '691',
-])
-
-function classifyLeg(accountCode: string, side: 'DEBIT' | 'CREDIT'): 'increase' | 'decrease' {
-  const p = accountCode.charAt(0)
-  // 1xx/2xx: aktif — borç artış
-  if (p === '1' || p === '2') return side === 'DEBIT'  ? 'increase' : 'decrease'
-  // 3xx-5xx: pasif — alacak artış
-  if (p === '3' || p === '4' || p === '5') return side === 'CREDIT' ? 'increase' : 'decrease'
-  // 6xx: önce açık listeler, sonra fallback (hasılat → alacak artış)
-  if (INCOME_CREDIT_INCREASE.has(accountCode))  return side === 'CREDIT' ? 'increase' : 'decrease'
-  if (EXPENSE_DEBIT_INCREASE.has(accountCode))  return side === 'DEBIT'  ? 'increase' : 'decrease'
-  if (p === '6') return side === 'CREDIT' ? 'increase' : 'decrease'
-  // 7xx: tüm gider/maliyet — borç artış
-  if (p === '7') return side === 'DEBIT'  ? 'increase' : 'decrease'
-  return side === 'DEBIT' ? 'increase' : 'decrease'
-}
-
 // ─── BankerMetric ─────────────────────────────────────────────────────────────
 
 function BankerMetric({ label, value }: { label: string; value: string }) {
@@ -354,10 +301,9 @@ function OzetTab({ result }: { result: any }) {
   const da          = result.decisionAnswer
   const exec        = da.executiveAnswer
   const consultant  = da.consultantNarrative
-  const productivity = (result as any).engineResult?.layerSummaries?.productivity
-    ?? (result as any).layerSummaries?.productivity
+  const productivity = result.engineResult?.layerSummaries?.productivity
+    ?? result.layerSummaries?.productivity
     ?? null
-  const transition  = result.engineResult?.reasoning?.transition
 
   // Faz 7.3.33: Canonical kaynak — exec.currentRating tek referans.
   const displayCurrentRating = exec.currentRating
@@ -565,10 +511,11 @@ function OzetTab({ result }: { result: any }) {
 
 // ─── RISK INSIGHT CARD (Faz 7.3.7) ──────────────────────────────────────────
 
-const severityStyles: Record<'low' | 'medium' | 'high', { bg: string; border: string; icon: string }> = {
-  low:    { bg: 'bg-amber-50',  border: 'border-amber-200',  icon: 'text-amber-600'  },
-  medium: { bg: 'bg-orange-50', border: 'border-orange-200', icon: 'text-orange-600' },
-  high:   { bg: 'bg-red-50',    border: 'border-red-200',    icon: 'text-red-600'    },
+const severityStyles: Record<'low' | 'medium' | 'high' | 'critical', { bg: string; border: string; icon: string }> = {
+  low:      { bg: 'bg-amber-50',  border: 'border-amber-200',  icon: 'text-amber-600'  },
+  medium:   { bg: 'bg-orange-50', border: 'border-orange-200', icon: 'text-orange-600' },
+  high:     { bg: 'bg-red-50',    border: 'border-red-200',    icon: 'text-red-600'    },
+  critical: { bg: 'bg-red-100',   border: 'border-red-300',    icon: 'text-red-700'    },
 }
 
 function RiskInsightCard({ insight }: { insight: DecisionInsight }) {
@@ -701,7 +648,7 @@ function AksiyonPlaniTab({
           {/* Faz 7.3.50A.5: infeasible uyarı kutusu */}
           {da?.canonicalOutcome?.isFeasible === false && (
             <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-3 text-sm text-amber-900 mt-3">
-              Bu firma için yapısal sorunlar bulunmaktadır. Aşağıdaki aksiyonlar finansal dayanıklılığı güçlendirir ancak rating'i yükseltmek için operasyonel iyileşme (maliyet/fiyat/marj revizyonu) gibi stratejik kararlar da gerekebilir.
+              Bu firma için yapısal sorunlar bulunmaktadır. Aşağıdaki aksiyonlar finansal dayanıklılığı güçlendirir ancak rating&apos;i yükseltmek için operasyonel iyileşme (maliyet/fiyat/marj revizyonu) gibi stratejik kararlar da gerekebilir.
             </div>
           )}
         </div>
@@ -727,10 +674,10 @@ function AksiyonPlaniTab({
             const _legData = da.accountingLegsByAction?.[action.actionId]
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const _legRaw: any[] = [
-              ...(_legData?.debits  ?? []).map((l: any) => ({ ...l, legSide: 'DEBIT'  as const })),
-              ...(_legData?.credits ?? []).map((l: any) => ({ ...l, legSide: 'CREDIT' as const })),
+              ...(_legData?.debits  ?? []).map((l: Record<string, unknown>) => ({ ...l, legSide: 'DEBIT'  as const })),
+              ...(_legData?.credits ?? []).map((l: Record<string, unknown>) => ({ ...l, legSide: 'CREDIT' as const })),
             ]
-            const _legs: AccountingImpactRow[] = _legRaw.filter((l: any) => l.accountCode !== '690')
+            const _legs: AccountingImpactRow[] = _legRaw.filter((l) => l.accountCode !== '690')
             const _accountCount = _legs.length
             const _delta        = computeDelta(_legs, action.amountTRY)
             return (
@@ -1015,7 +962,7 @@ function DetayTab({
                       ?? da.enginePortfolioCount
                     return `${selectedCount} seçilen, ${da.rejectedInsightCount ?? rejected.length} seçilmeyen aksiyon`
                   }
-                  const totalEvals = rejected.reduce((s: number, r: any) => s + (r.rejectionCount ?? 1), 0)
+                  const totalEvals = rejected.reduce((s: number, r) => s + (r.rejectionCount ?? 1), 0)
                   return totalEvals > rejected.length
                     ? `${rejected.length} benzersiz aksiyon, ${totalEvals} değerlendirme reddi`
                     : `${rejected.length} aksiyon değerlendirme dışı kaldı`

@@ -71,6 +71,18 @@ function formatTL(n: number): string {
 const GRADES = ['CCC', 'B', 'BB', 'BBB', 'A', 'AA', 'AAA']
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/** F-4e eligibility raporu satırı (API'den gelir; yalnızca gösterimde kullanılan alanlar) */
+type EligibilityRow = {
+  status:          string
+  actionName?:     string
+  family?:         string
+  proposedAmount?: number | null
+  scoreDelta?:     number | null
+  selectionCount?: number | null
+  reasonCode?:     string | null
+  reasonMessage?:  string | null
+}
+
 export default function ScenarioPanelV2({ analysisId, currentScore, currentGrade }: Props) {
   const [targetGrade, setTargetGrade] = useState<string>('')
   const [loading, setLoading]         = useState(false)
@@ -295,25 +307,25 @@ function ScenarioCard({ scenario }: { scenario: any }) {
           <summary className="cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 select-none">
             🔍 14 Aksiyon Analizi —{' '}
             <span className="text-green-700">
-              {scenario.eligibilityReport.filter((r: any) => r.status === 'SELECTED').length} seçildi
+              {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'SELECTED').length} seçildi
             </span>
             {' · '}
             <span className="text-blue-700">
-              {scenario.eligibilityReport.filter((r: any) => r.status === 'ELIGIBLE').length} eligible
+              {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'ELIGIBLE').length} eligible
             </span>
             {' · '}
             <span className="text-red-700">
-              {scenario.eligibilityReport.filter((r: any) => r.status === 'REJECTED').length} reddedildi
+              {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'REJECTED').length} reddedildi
             </span>
             {' · '}
             <span className="text-slate-400">
-              {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_EVALUABLE').length} değerlendirilmedi
+              {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'NOT_EVALUABLE').length} değerlendirilmedi
             </span>
-            {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_SELECTED_TARGET_REACHED').length > 0 && (
+            {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'NOT_SELECTED_TARGET_REACHED').length > 0 && (
               <>
                 {' · '}
                 <span className="text-slate-400">
-                  {scenario.eligibilityReport.filter((r: any) => r.status === 'NOT_SELECTED_TARGET_REACHED').length} hedef karşılandı
+                  {scenario.eligibilityReport.filter((r: EligibilityRow) => r.status === 'NOT_SELECTED_TARGET_REACHED').length} hedef karşılandı
                 </span>
               </>
             )}
@@ -332,7 +344,7 @@ function ScenarioCard({ scenario }: { scenario: any }) {
                 </tr>
               </thead>
               <tbody>
-                {scenario.eligibilityReport.map((row: any, i: number) => {
+                {scenario.eligibilityReport.map((row: EligibilityRow, i: number) => {
                   const familyLabel = row.family === 'WC_COMPOSITION' ? 'Çalışma Sermayesi'
                     : row.family === 'DEBT_STRUCTURE' ? 'Borç Yapısı'
                     : 'Özkaynak/Kârlılık'

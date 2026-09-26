@@ -29,3 +29,7 @@ prisma/*.db
 prisma/*.db-journal
 
 .env*.local
+
+# Gecici dosyalar ve yerel yedekler (musteri verisi icerebilir) — repoya girmez
+tmp/
+src/tmp/

@@ -65,7 +65,7 @@ async function runScenarioEngineSelection(
 // ─── PUBLIC API ───────────────────────────────────────────────────────────────
 
 /** Eski public kontrat — sadece engineResult döner (geriye uyumlu). */
-export async function selectScenarioEngine(input: any): Promise<any> {
+export async function selectScenarioEngine(input: EngineInput): Promise<EngineResult> {
   const { engineResult } = await runScenarioEngineSelection(input)
   return engineResult
 }

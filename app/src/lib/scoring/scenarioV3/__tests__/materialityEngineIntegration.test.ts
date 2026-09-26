@@ -36,36 +36,6 @@ import { runEngineV3, type EngineInput } from '../engineV3'
 
 // ─── Helper: calculateAmountCandidates'ı dolaylı test etmek için runEngineV3 kullanımı ──
 
-/**
- * A06 ile basit bir EngineInput — totalAssets kontrollü.
- * A06 horizons: ['short', 'medium'] → hem short hem medium candidatelara bakabiliriz.
- */
-function makeA06Input(totalAssets: number, horizon?: 'short' | 'medium' | 'long'): EngineInput {
-  return {
-    sector:        'MANUFACTURING',
-    currentRating: 'B',
-    targetRating:  'BB',
-    accountBalances: {
-      '102': 1_000_000,
-      '120': 5_000_000,
-      '153': 30_000_000,   // A06 için 153 gerekli (stok)
-      '300': 10_000_000,
-      '320': 8_000_000,
-      '500': totalAssets * 0.25,  // özkaynaklar
-    },
-    incomeStatement: {
-      netSales:         100_000_000,
-      costOfGoodsSold:   75_000_000,
-      grossProfit:       25_000_000,
-      operatingProfit:    8_000_000,
-      netIncome:          5_000_000,
-      interestExpense:    2_000_000,
-    },
-    _overrideTotalAssets: totalAssets,
-  } as any   // _overrideTotalAssets: engineV3 context hesabından farklı totalAssets test etmek için
-             // Not: Bu alan engineV3'te yoksa test context hesabına dayanır — K3 bakınız
-}
-
 // ─── T1–T5: getDynamicMaterialityFloor birim testleri ────────────────────────
 
 describe('T1-T5 — getDynamicMaterialityFloor hibrit floor mantığı (Faz 7.3.43D)', () => {

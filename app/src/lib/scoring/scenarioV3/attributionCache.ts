@@ -79,11 +79,14 @@ const SCORING_RELEVANT_FIELDS: (keyof FinancialInput)[] = [
 ]
 
 // JSON-safe normalize: bigint/Date/function/symbol türleri için güvenli çevirme
-function pickScoringRelevant(entity: any): Record<string, unknown> {
+/** Cache anahtarı için gevşek entity görünümü (FinancialInput dışı alanlar da gelebilir) */
+type LooseEntity = { ratios?: unknown; sector?: string | null; companyName?: string | null }
+
+function pickScoringRelevant(entity: unknown): Record<string, unknown> {
   if (!entity || typeof entity !== 'object') return {}
   const picked: Record<string, unknown> = {}
   for (const field of SCORING_RELEVANT_FIELDS) {
-    const val = (entity as any)[field]
+    const val = (entity as Record<string, unknown>)[field]
     if (val === undefined) continue
     if (typeof val === 'function' || typeof val === 'symbol') continue
     if (typeof val === 'bigint') { picked[field as string] = val.toString(); continue }
@@ -100,10 +103,11 @@ export class AttributionCache {
     if (entity?.id) return String(entity.id)
 
     // entity.ratios alanı YOKSA (FinancialInput flat) direkt pickScoringRelevant kullan
-    const corePayload = (entity as any)?.ratios &&
-      typeof (entity as any).ratios === 'object' &&
-      !Array.isArray((entity as any).ratios)
-        ? (entity as any).ratios
+    const loose = entity as LooseEntity
+    const corePayload: unknown = loose?.ratios &&
+      typeof loose.ratios === 'object' &&
+      !Array.isArray(loose.ratios)
+        ? loose.ratios
         : pickScoringRelevant(entity)
 
     let payloadKey: string
@@ -113,8 +117,8 @@ export class AttributionCache {
       payloadKey = `__non_object::${typeof corePayload}::${String(corePayload).slice(0, 50)}`
     }
 
-    const sectorPart = (entity as any)?.sector ?? '__no_sector__'
-    const namePart   = (entity as any)?.companyName ?? '__no_name__'
+    const sectorPart = loose?.sector ?? '__no_sector__'
+    const namePart   = loose?.companyName ?? '__no_name__'
     const fallback   = `${sectorPart}::${namePart}::${payloadKey}`
     return createHash('sha1').update(fallback).digest('hex').slice(0, 16)
   }

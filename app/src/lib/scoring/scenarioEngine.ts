@@ -13,7 +13,7 @@ import type { RatioResult }  from './ratios'
 import { scoreToRating }     from './score'
 import { ACTIONS, ACCOUNT_ACTIONS, type ActionId, type Difficulty, type TimeHorizon } from './actions'
 import type { AccountBalanceSheet } from './simulator'
-import { applyAccountMutation, balanceSheetToAccounts } from './simulator'
+import { applyAccountMutation } from './simulator'
 
 // ─── TİPLER ──────────────────────────────────────────────────────────────────
 

@@ -369,7 +369,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     // R8.4.3 BUG 1: MAX_RETRY=5 sınırı kaldırıldı.
     //   Önceki: 5 pop sonrası dur → A18/A19 portfolyonun ortasındaysa çıkmaz.
     //   Sonra: workingPortfolio boşalana veya feasible olana kadar pop (sonsuz döngü yok).
-    let workingPortfolio = [...fullPortfolio]
+    const workingPortfolio = [...fullPortfolio]
 
     while (workingPortfolio.length > 0) {
       const txsCheck = flattenTransactions(workingPortfolio)
@@ -564,7 +564,7 @@ export function selectTargetPackage(params: SelectTargetPackageParams): TargetPa
     'R8.4.3: NOT_REACHED — hedef rating ulaşılamadı, portföy kaynak guard ile filtreleniyor.',
   )
 
-  let safePortfolio = [...fullPortfolio]
+  const safePortfolio = [...fullPortfolio]
   while (safePortfolio.length > 0) {
     const txsNR   = flattenTransactions(safePortfolio)
     const guardNR = validatePortfolioResources(txsNR, params.initialBalances)

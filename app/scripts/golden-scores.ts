@@ -14,8 +14,8 @@ async function main() {
     let ratios: Record<string, unknown> = {}
     try { ratios = a.ratios ? JSON.parse(a.ratios) : {} } catch { /* bozuk JSON → boş */ }
     return {
-      entity: a.entity.name,
-      sector: a.entity.sector,
+      entity: a.entity?.name ?? '(silinmiş firma)',
+      sector: a.entity?.sector ?? null,
       year: a.year,
       period: a.period,
       mode: a.mode,

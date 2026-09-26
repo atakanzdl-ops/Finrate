@@ -440,10 +440,10 @@ export async function POST(req: NextRequest) {
     }
 
     // R12.2A-FIX: _filteredPortfolio API JSON'a sızmasın — response'tan strip et
-    delete (responsePayload.decisionAnswer as Record<string, unknown>)._filteredPortfolio
+    delete (responsePayload.decisionAnswer as unknown as Record<string, unknown>)._filteredPortfolio
     if (responsePayload.plans) {
       for (const plan of responsePayload.plans) {
-        delete (plan.decisionAnswer as Record<string, unknown>)?._filteredPortfolio
+        delete (plan.decisionAnswer as unknown as Record<string, unknown>)?._filteredPortfolio
       }
     }
 

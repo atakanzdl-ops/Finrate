@@ -64,7 +64,7 @@ import {
 
 import { ACTION_CATALOG_V3 } from './actionCatalogV3'
 
-import { buildRatioTransparency, buildActionRatioTransparency } from './ratioHelpers'
+import { buildActionRatioTransparency } from './ratioHelpers'
 
 import {
   applyTransactions,
@@ -426,12 +426,6 @@ function calculateDiversityPenalty(
 
 // ─── ACCOUNT HELPERS ──────────────────────────────────────────────────────────
 
-function sumByPrefix(balances: Record<string, number>, prefix: string): number {
-  return Object.entries(balances).reduce((sum, [code, amount]) => {
-    return code.startsWith(prefix) ? sum + Math.abs(amount) : sum
-  }, 0)
-}
-
 function sumByCodes(balances: Record<string, number>, codes: string[]): number {
   return codes.reduce((sum, code) => sum + Math.abs(balances[code] ?? 0), 0)
 }
@@ -668,7 +662,7 @@ function buildInitialFirmContext(input: EngineInput): FirmContext {
     costOfGoodsSold:  input.incomeStatement.costOfGoodsSold,   // YENİ
     interestExpense:  input.incomeStatement.interestExpense,
     operatingCashFlow: input.incomeStatement.operatingCashFlow ?? null,
-    period: input.period ?? (input as any).financialData?.period ?? 'ANNUAL',  // GÜNCELLE
+    period: input.period ?? (input as { financialData?: { period?: string } }).financialData?.period ?? 'ANNUAL',  // GÜNCELLE
     // R6 Hotfix 2 — frozen at analysis start, never mutated by greedy loop
     baselineAccountBalances: frozenBalances,
     baselineGrossProfit:     input.incomeStatement.grossProfit,
@@ -927,7 +921,6 @@ function computeSectorMetrics(ctx: FirmContext): Record<SectorMetricKey, number>
   const {
     currentAssets,
     stLiabilities,
-    ltLiabilities,
     totalLiabilities,
     cashBalance,
     inventory,

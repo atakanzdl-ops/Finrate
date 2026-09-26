@@ -14,12 +14,6 @@ interface Props {
   sector?: string | null
 }
 
-const RATING_COLOR: Record<string, string> = {
-  AAA: '#15803d', AA: '#16a34a', A: '#22c55e',
-  BBB: '#d97706', BB: '#dc2626', B: '#dc2626',
-  CCC: '#b91c1c', CC: '#b91c1c', C: '#991b1b', D: '#7f1d1d',
-}
-
 const CATEGORY_COLOR: Record<string, string> = {
   Likidite:  '#2EC4B6',
   Karlılık:  '#0B3C5D',

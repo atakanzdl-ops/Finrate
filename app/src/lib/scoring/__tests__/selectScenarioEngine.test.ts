@@ -168,7 +168,7 @@ describe('selectScenarioEngine — flag=false (v2 path)', () => {
     }))
 
     const { selectScenarioEngine } = await import('../selectScenarioEngine')
-    const result = await selectScenarioEngine({})
+    const result = await selectScenarioEngine({} as any)
     expect(result).toEqual(mockV2Result)
   })
 })
@@ -194,7 +194,7 @@ describe('selectScenarioEngine — PRIMARY fallback (v3 fail → v2)', () => {
     }))
 
     const { selectScenarioEngine } = await import('../selectScenarioEngine')
-    const result = await selectScenarioEngine({})
+    const result = await selectScenarioEngine({} as any)
 
     expect(result).toEqual(mockV2Result)
     expect(loggedEvents).toContain('engine_error')
@@ -227,7 +227,7 @@ describe('selectScenarioEngine — DOUBLE FAIL (v3 + v2 throw)', () => {
     const { selectScenarioEngine } = await import('../selectScenarioEngine')
 
     // ORIGINAL v3 error throw edilmeli
-    await expect(selectScenarioEngine({})).rejects.toThrow('v3 simulated failure')
+    await expect(selectScenarioEngine({} as any)).rejects.toThrow('v3 simulated failure')
 
     // 4 log event: engine_error(v3) + fallback + engine_error(v2) + engine_double_fail
     expect(loggedEvents).toHaveLength(4)

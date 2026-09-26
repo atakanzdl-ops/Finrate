@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function CompanyInfoPage({ data, sector }: Props) {
-  const { companyName, vkn, analysisPeriod, reportNo, validUntil, reportDate, companyInfo: ci } = data
+  const { companyName, vkn, analysisPeriod, reportNo, validUntil, companyInfo: ci } = data
   const { sectorBenchmarks, sectorWeightProfile: wp } = ci
 
   return (

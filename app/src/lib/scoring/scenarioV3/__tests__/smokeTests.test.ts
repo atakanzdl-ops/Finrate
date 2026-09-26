@@ -43,17 +43,6 @@ import {
 // ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
 /**
- * Tolerans bazlı miktar kontrolü.
- * tolerance = max(50_000, expected × 0.005)
- */
-function expectAmountClose(actual: number, expected: number, label = ''): void {
-  const tolerance = Math.max(50_000, expected * 0.005)
-  expect(actual).toBeGreaterThanOrEqual(expected - tolerance)
-  expect(actual).toBeLessThanOrEqual(expected + tolerance)
-  if (label) { /* label only for debug output */ }
-}
-
-/**
  * Universal smoke invariantları — 15 senaryonun tümünde çalışır.
  *
  * 1. A11 portfolyo dışı (R7B disable)

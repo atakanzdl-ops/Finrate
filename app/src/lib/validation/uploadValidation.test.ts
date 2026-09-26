@@ -244,7 +244,7 @@ describe('checkEntityIdentity (Faz 7.3.50A.3)', () => {
 
   // T20a — CASE 1 HARD: VKN mismatch → 422 ENTITY_TAX_NUMBER_MISMATCH
   test('T20a — VKN mismatch → ok:false, ENTITY_TAX_NUMBER_MISMATCH (HARD)', () => {
-    const result = checkEntityIdentity(
+    const _matchResult = checkEntityIdentity(   // eşleşen VKN: yalnızca çağrının patlamadığı doğrulanır
       { taxNumber: '1234567890', sourceConfidence: 'HIGH' },
       entityWithVkn,
       false,

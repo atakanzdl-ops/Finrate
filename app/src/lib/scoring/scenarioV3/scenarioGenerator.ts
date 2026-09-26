@@ -124,7 +124,7 @@ function buildAppliedAction(
 const MIN_CANDIDATES_FOR_TARGET_SCENARIOS = 3
 
 function ensureMinimumCandidates(
-  entity: any,
+  entity: (EntityInput & { sector?: string | null }) | null | undefined,
   initialCandidates: ActionId[],
   validation: { valid: boolean; errors: unknown[]; warnings: unknown[]; skipActions: ActionId[] },
   warnings: string[],

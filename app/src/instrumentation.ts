@@ -10,7 +10,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'edge')   await import('../sentry.edge.config')
 
   if (typeof globalThis.DOMMatrix === 'undefined') {
-    // @ts-ignore
+    // @ts-expect-error DOMMatrix polyfill: pdfjs için minimal yüzey, tam DOMMatrix tipiyle uyumsuz
     globalThis.DOMMatrix = class DOMMatrix {
       // pdfjs-dist'in ihtiyaç duyduğu minimal surface
       a = 1; b = 0; c = 0; d = 1; e = 0; f = 0

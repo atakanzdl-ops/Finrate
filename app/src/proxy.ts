@@ -1,8 +1,8 @@
 /**
- * middleware.ts — Next.js Edge Middleware (Faz 7.3.49)
+ * proxy.ts — Next.js istek ön işleyici (Next 16'da "middleware" adı kaldırıldı, "proxy" oldu)
  *
  * Auth redirect + Rate limit her request'te bu noktada devreye girer.
- * proxy.ts'ten taşındı — Faz 7.3.49 Hotfix (proxy.ts + middleware.ts çakışması).
+ * Eski adı middleware.ts idi; içerik aynı, yalnızca dosya ve fonksiyon adı değişti.
  *
  * Rate limit: In-memory (kapalı beta).
  * Açık lansman öncesi Vercel KV / Upstash migration gerekli — Faz 7.3.50+
@@ -82,9 +82,9 @@ function getRateLimitKey(
   return null
 }
 
-// ─── Middleware (Next.js default export) ─────────────────────────────────────
+// ─── Proxy (Next.js 16: middleware.ts → proxy.ts, default export) ────────────
 
-export default async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   const token = req.cookies.get('finrate_token')?.value
 

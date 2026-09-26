@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Dosya modul olsun: ayni isimli test yardimcilari diger test dosyalariyla cakismaz
+export {}
+
 /**
  * PATCH /api/entities/[id] — route handler testleri (Faz 7.3.18)
  *
@@ -54,10 +58,10 @@ function setupMocks(opts: {
   financialData?:    object[]
   analysisUpdateSpy?: jest.Mock
 }) {
-  const entityUpdateMock   = jest.fn(() => Promise.resolve(
+  const entityUpdateMock   = jest.fn((_args: any) => Promise.resolve(
     opts.updateResult ?? { id: 'e-1', name: 'Test Şirket', sector: 'Ticaret', entityType: 'STANDALONE' }
   ))
-  const analysisUpdateMock = opts.analysisUpdateSpy ?? jest.fn(() => Promise.resolve({}))
+  const analysisUpdateMock = opts.analysisUpdateSpy ?? jest.fn((_args: any) => Promise.resolve({}))
 
   jest.doMock('next/server', () => ({
     NextResponse: { json: jest.fn() },
@@ -78,19 +82,19 @@ function setupMocks(opts: {
   jest.doMock('@/lib/db', () => ({
     prisma: {
       entity: {
-        findFirst: jest.fn(() => Promise.resolve(
+        findFirst: jest.fn((_args: any) => Promise.resolve(
           opts.existing !== undefined ? opts.existing : makeExisting()
         )),
         update: entityUpdateMock,
       },
       financialData: {
-        findMany:  jest.fn(() => Promise.resolve(opts.financialData ?? [])),
-        findFirst: jest.fn(() => Promise.resolve(null)), // prevYear → null
+        findMany:  jest.fn((_args: any) => Promise.resolve(opts.financialData ?? [])),
+        findFirst: jest.fn((_args: any) => Promise.resolve(null)), // prevYear → null
       },
       analysis: {
         update:     analysisUpdateMock,
         // Faz 7.3.60.1: roadmapSnapshot invalidation
-        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
+        updateMany: jest.fn((_args: any) => Promise.resolve({ count: 0 })),
       },
     },
   }))
@@ -113,7 +117,7 @@ function setupMocks(opts: {
 
 function createMockRequest(body: unknown = {}) {
   return {
-    json:    jest.fn(() => Promise.resolve(body)),
+    json:    jest.fn((_args: any) => Promise.resolve(body)),
     cookies: { get: jest.fn(() => undefined) },
     headers: { get: jest.fn(() => null) },
   } as any
@@ -187,7 +191,7 @@ describe('PATCH /api/entities/[id]', () => {
   // ── Test Q: Sektör değişince recalc tetiklenir + __subjectiveTotal korunur
 
   test('Q — Sektör değişince her dönem ortak rescoreFinancialData ile yeniden skorlanır', async () => {
-    const analysisUpdateMock = jest.fn(() => Promise.resolve({}))
+    const analysisUpdateMock = jest.fn((_args: any) => Promise.resolve({}))
     const existingRatios = JSON.stringify({ someRatio: 1.2, __subjectiveTotal: 18 })
 
     setupMocks({
@@ -198,7 +202,7 @@ describe('PATCH /api/entities/[id]', () => {
       analysisUpdateSpy: analysisUpdateMock,
     })
     // Skorlama tek yol: yıllıklandırma + guardrail + subjektif birleşimi rescoreFinancialData içinde
-    const rescoreMock = jest.fn(() => Promise.resolve({ ratios: {}, score: MOCK_SCORE, resolved: { finalScore: 72, finalRating: 'B' }, analysisId: 'an-1' }))
+    const rescoreMock = jest.fn((_args: any) => Promise.resolve({ ratios: {}, score: MOCK_SCORE, resolved: { finalScore: 72, finalRating: 'B' }, analysisId: 'an-1' }))
     jest.doMock('@/lib/scoring/rescoreFinancialData', () => ({ rescoreFinancialData: rescoreMock }))
 
     const req = createMockRequest({ sector: 'Üretim' }) // Ticaret → Üretim
@@ -215,7 +219,7 @@ describe('PATCH /api/entities/[id]', () => {
   // ── Test R: Sektör değişmedi → recalc yok ────────────────────────────────
 
   test('R — Sektör değişmedi → analysis.update çağrılmaz', async () => {
-    const analysisUpdateMock = jest.fn(() => Promise.resolve({}))
+    const analysisUpdateMock = jest.fn((_args: any) => Promise.resolve({}))
 
     setupMocks({
       userId:            'user-1',

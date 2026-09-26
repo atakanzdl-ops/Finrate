@@ -12,9 +12,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api': ['./node_modules/pdf-parse/dist/**/*'],
   },
-  // Vercel build — TypeScript ve ESLint hatalarını build'i durdurmasın
+  // Vercel build — TypeScript hataları build'i durdurmasın (Next 16'da lint build'de çalışmaz)
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
   // Güvenlik header'ları
   async headers() {
     return [

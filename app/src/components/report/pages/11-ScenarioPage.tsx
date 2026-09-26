@@ -3,7 +3,6 @@ import React from 'react'
 import type {
   ScenarioDataV3,
   RoadmapHero,
-  RoadmapIssue,
   RoadmapConsultant,
   RoadmapPerspective,
   RoadmapIfNotDone,
@@ -50,7 +49,7 @@ export default function ScenarioPage({ data, sector }: Props) {
           gap: '16px',
           marginTop: '16px',
         }}>
-          <ConsultantBlock consultant={s.consultant} issues={s.issues} />
+          <ConsultantBlock consultant={s.consultant} />
           <PerspectiveBlock perspective={s.perspective} />
         </div>
 
@@ -128,14 +127,7 @@ function SubLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function severityBg(sev: string): string {
-  if (sev === 'KRİTİK') return '#dc2626'
-  if (sev === 'CİDDİ')  return '#f59e0b'
-  if (sev === 'ORTA')   return '#6b7280'
-  return '#9ca3af'
-}
-
-function ConsultantBlock({ consultant, issues }: { consultant: RoadmapConsultant; issues: RoadmapIssue[] }) {
+function ConsultantBlock({ consultant }: { consultant: RoadmapConsultant }) {
   return (
     <div style={{
       background:   '#ffffff',

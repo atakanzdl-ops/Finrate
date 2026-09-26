@@ -56,7 +56,7 @@ function getDeviationPhrase(deviation: number, direction: 'above' | 'below'): st
 export function buildStrengths(
   r: RatiosLike,
   bm: SectorBenchmark,
-  sector: string | null | undefined,
+  _sector: string | null | undefined,   // imza korunuyor (çağıranlar sektör geçer); metinler benchmark'a göre üretilir
 ): string[] {
   const candidates: Array<{ text: string; deviation: number }> = []
 
