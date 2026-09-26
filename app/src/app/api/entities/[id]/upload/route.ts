@@ -854,8 +854,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         index,
         year:     row.year,
         period:   row.period,
-        rating:   score.finalRating,
-        score:    score.finalScore,
+        // Nihai skor: guardrail + subjektif birleşimi sonrası (Kontrol Paneli ile aynı)
+        rating:   resolved.finalRating,
+        score:    resolved.finalScore,
         unmapped: row.unmapped,
         meta:     row.meta,
       })
