@@ -74,6 +74,9 @@ function getRateLimitKey(
     'unknown'
 
   if (pathname === '/api/auth/login')   return { key: `login:${ip}`,    config: RATE_CONFIGS.login    }
+  if (pathname === '/api/auth/forgot-password' || pathname === '/api/auth/reset-password') {
+    return { key: `pwreset:${ip}`, config: RATE_CONFIGS.login }
+  }
   if (pathname.includes('/upload'))     return { key: `upload:${ip}`,   config: RATE_CONFIGS.upload   }
   if (pathname === '/api/scenarios/v3') return { key: `scenario:${ip}`, config: RATE_CONFIGS.scenario }
   return null
@@ -132,6 +135,8 @@ export const config = {
     '/giris',
     '/kayit',
     '/api/auth/login',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/entities/:path*/upload',
     '/api/scenarios/v3',
   ],

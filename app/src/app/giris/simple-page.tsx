@@ -66,7 +66,12 @@ export default function GirisSimplePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Şifre</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-[#1E293B]">Şifre</label>
+                <Link href="/sifremi-unuttum" className="text-xs font-medium text-[#0B3C5D] hover:underline">
+                  Şifremi unuttum
+                </Link>
+              </div>
               <input
                 type="password"
                 value={password}
