@@ -4,7 +4,7 @@
  *   E2E_BASE=http://localhost:3005 E2E_EMAIL=... E2E_PASSWORD=... npx tsx scripts/e2e-free-plan.ts
  *
  * Tekno fixture dosyalarını kullanır (src/lib/parsers/__fixtures__/tekno). Hesap doğrulanmış olmalı.
- * Beklenen: 1 firma + 1 dönem serbest, senaryo serbest, PDF 402, 2. dönem 402, 2. firma 402.
+ * Beklenen: 14 günlük deneme süresinde her şey serbest (firma, dönem, senaryo, PDF).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -66,10 +66,10 @@ async function main() {
   const analysis = (list.body.analyses as Array<{ id: string; entity?: { id: string }; finalScore: number; finalRating: string; subjectiveMissing: boolean }> | undefined)?.find(a => a.entity?.id === entityId)
   log('analiz listede', !!analysis, `skor=${analysis?.finalScore} ${analysis?.finalRating} subjektifEksik=${analysis?.subjectiveMissing}`)
 
-  // 4. PDF subjektifsiz → 409 veya 402 (ücretsiz plan PDF yok: 402 önce gelir)
+  // 4. PDF: deneme süresinde açık; yol haritası/subjektif yokken 409 döner (402 değil)
   if (analysis) {
     const pdf0 = await api(`/api/analyses/${analysis.id}/pdf`)
-    log('PDF ücretsiz planda kilitli', pdf0.status === 402, `status=${pdf0.status} ${String(pdf0.body?.error ?? '').slice(0, 80)}`)
+    log('PDF deneme süresinde hak engeli yok', pdf0.status === 409, `status=${pdf0.status} ${String(pdf0.body?.error ?? '').slice(0, 80)}`)
   }
 
   // 5. Subjektif
@@ -87,11 +87,11 @@ async function main() {
   const a3 = (list3.body.analyses as Array<{ id: string; entity?: { id: string }; hasRoadmapSnapshot: boolean }> | undefined)?.find(a => a.entity?.id === entityId)
   log('yol haritası kaydedildi (rapor açılabilir)', !!a3?.hasRoadmapSnapshot)
 
-  // 7. Kilitler: 2. dönem ve 2. firma
+  // 7. Deneme süresinde sınır yok: 2. dönem ve 2. firma serbest
   const up3 = await api(`/api/entities/${entityId}/upload`, { method: 'POST', body: fileForm('2025-aralik-mizan.xlsx', 2025, 'ANNUAL', { confirmDetectionMissing: 'true', confirmEntityUnverified: 'true' }) })
-  log('2. dönem ücretsizde kilitli', up3.status === 402 && up3.body.error === 'FREE_PERIOD_LIMIT', `status=${up3.status} ${String(up3.body?.error ?? '')}`)
+  log('2. dönem deneme süresinde serbest', up3.status === 200, `status=${up3.status} ${String(up3.body?.error ?? '')}`)
   const ent2 = await api('/api/entities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'E2E İkinci Firma' }) })
-  log('2. firma ücretsizde kilitli', ent2.status === 402 && ent2.body.code === 'FREE_ENTITY_LIMIT', `status=${ent2.status} ${String(ent2.body?.code ?? '')}`)
+  log('2. firma deneme süresinde serbest', ent2.status === 201, `status=${ent2.status} ${String(ent2.body?.code ?? '')}`)
 
   console.log(`\n${results.filter(r => r.ok).length}/${results.length} adım geçti`)
   process.exit(results.every(r => r.ok) ? 0 : 1)

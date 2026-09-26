@@ -1,5 +1,6 @@
 /**
  * Hak sistemi — saf kural fonksiyonları (DB'ye dokunmaz)
+ * Kural: 14 gün ücretsiz deneme SINIRSIZ; süre bitince paket gerekir. Paket = kredi + 12 ay.
  */
 jest.mock('@/lib/db', () => ({ prisma: {} }))
 
@@ -16,27 +17,23 @@ function ent(over: Partial<Entitlements> = {}): Entitlements {
   }
 }
 
-describe('entitlements — ücretsiz plan', () => {
-  test('süre içinde ilk firma ve ilk dönem serbest', () => {
-    expect(canCreateEntity(ent())).toBeNull()
-    expect(canUploadNewPeriods(ent(), 1)).toBeNull()
+describe('entitlements — 14 gün ücretsiz deneme', () => {
+  test('süre içinde her şey sınırsız', () => {
+    const e = ent({ entityCount: 12, periodCount: 30 })
+    expect(canCreateEntity(e)).toBeNull()
+    expect(canUploadNewPeriods(e, 5)).toBeNull()
+    expect(canUsePaidFeature(e)).toBeNull()
+    expect(canUseScenario(e)).toBeNull()
   })
-  test('ikinci firma ve ikinci dönem engellenir', () => {
-    expect(canCreateEntity(ent({ entityCount: 1 }))?.code).toBe('FREE_ENTITY_LIMIT')
-    expect(canUploadNewPeriods(ent({ periodCount: 1 }), 1)?.code).toBe('FREE_PERIOD_LIMIT')
-  })
-  test('aynı dönemi yeniden yüklemek (yeni dönem = 0) serbest', () => {
-    expect(canUploadNewPeriods(ent({ periodCount: 1 }), 0)).toBeNull()
-  })
-  test('süre dolunca yeni yükleme ve firma yok', () => {
+  test('süre dolunca yeni firma, yükleme, PDF ve senaryo kapanır', () => {
     const e = ent({ freeActive: false, freeUntil: new Date(Date.now() - day) })
     expect(canCreateEntity(e)?.code).toBe('FREE_EXPIRED')
     expect(canUploadNewPeriods(e, 1)?.code).toBe('FREE_EXPIRED')
+    expect(canUsePaidFeature(e)?.code).toBe('FREE_EXPIRED')
+    expect(canUseScenario(e)?.code).toBe('FREE_EXPIRED')
   })
-  test('PDF indirme ücretli, senaryo deneme süresinde açık', () => {
-    expect(canUsePaidFeature(ent())?.code).toBe('PAID_FEATURE')
-    expect(canUseScenario(ent())).toBeNull()
-    expect(canUseScenario(ent({ freeActive: false }))?.code).toBe('FREE_EXPIRED')
+  test('aynı dönemi yeniden yüklemek (yeni dönem = 0) süre dolsa da serbest', () => {
+    expect(canUploadNewPeriods(ent({ freeActive: false }), 0)).toBeNull()
   })
 })
 

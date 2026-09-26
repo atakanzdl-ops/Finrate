@@ -120,7 +120,7 @@ export default function KayitSimplePage() {
 
             {/* Plan seçimi kaldırıldı: kayıt ücretsiz (Demo) açılır, paketler ödeme ile alınır */}
             <p className="text-xs text-slate-500">
-              Hesabınız ücretsiz analiz hakkıyla açılır. Paketleri dilediğiniz zaman{' '}
+              Hesabınız 14 gün boyunca tüm özellikleri kapsayan ücretsiz deneme ile açılır. Paketleri dilediğiniz zaman{' '}
               <Link href="/#fiyatlar" className="font-medium text-[#0B3C5D] hover:underline">fiyatlar</Link> bölümünden inceleyebilirsiniz.
             </p>
 
