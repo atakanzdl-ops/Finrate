@@ -163,7 +163,7 @@ export default function Page() {
           <div style={{ textAlign: 'center' }}>
             <div className="section-label">Fiyatlar</div>
             <div className="section-title outfit" style={{ maxWidth: 'none', marginBottom: 12 }}>İhtiyacınıza göre plan</div>
-            <p className="section-sub" style={{ margin: '0 auto 8px' }}>Kayıt ücretsizdir: 14 gün, 1 firma, 1 dönem, skor ve Hızlı Teşhis. Paketler analiz hakkı olarak tanımlanır ve 12 ay geçerlidir; ödeme sonrası hakkınız aynı gün hesabınıza işlenir.</p>
+            <p className="section-sub" style={{ margin: '0 auto 8px' }}>Kayıt ücretsizdir: 14 gün boyunca 1 firma, 1 dönem; skor, Hızlı Teşhis, senaryo ve ekran raporu dahil (PDF indirme hariç). Paketler analiz hakkı olarak tanımlanır ve 12 ay geçerlidir; ödeme sonrası hakkınız aynı gün hesabınıza işlenir.</p>
           </div>
           <div className="pricing-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', maxWidth: 'none' }}>
             {pricingItems.map((item) => (
