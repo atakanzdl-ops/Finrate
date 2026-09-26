@@ -6,6 +6,7 @@ import {
   Loader2, Check, X,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
+import PackagePurchase from '@/components/account/PackagePurchase'
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -400,8 +401,9 @@ export default function AyarlarPage() {
                   />
                 </>
               )}
-              <InfoRow label="Paket satın alma" value="info@finrate.com.tr" />
             </div>
+
+            {user.role !== 'ADMIN' && <PackagePurchase />}
 
             {user.subscription.cancelAtPeriodEnd && (
               <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
@@ -440,18 +442,15 @@ export default function AyarlarPage() {
         <SettingsCard title="Yasal & Gizlilik" icon={<Shield size={16} />}>
           <p className="text-sm text-[#5A7A96] mb-3">
             Verileriniz AB merkezli sunucularda (AWS Frankfurt) saklanmaktadır.
-            Kişisel verileriniz üçüncü taraflarla paylaşılmaz. KVKK uyumluluk
-            detayları için yakında yayınlanacak Aydınlatma Metni&apos;ne bakınız.
+            Kişisel verileriniz üçüncü taraflarla paylaşılmaz.
           </p>
           <div className="flex gap-6">
-            <span className="text-sm text-slate-400 cursor-not-allowed">
+            <a href="/yasal" className="text-sm font-medium text-[#0B3C5D] hover:underline">
               KVKK Aydınlatma Metni
-              <span className="ml-1 text-xs">(yakında)</span>
-            </span>
-            <span className="text-sm text-slate-400 cursor-not-allowed">
-              Gizlilik Politikası
-              <span className="ml-1 text-xs">(yakında)</span>
-            </span>
+            </a>
+            <a href="/yasal" className="text-sm font-medium text-[#0B3C5D] hover:underline">
+              Gizlilik ve Kullanım Koşulları
+            </a>
           </div>
         </SettingsCard>
 
