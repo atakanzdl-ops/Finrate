@@ -427,7 +427,7 @@ function buildExecutiveSummary(
     },
     strengths:  buildStrengths(ratios, defaultBm, sector),
     watchAreas: [...guardrailMessages(ratios), ...buildWatchAreas(ratios, defaultBm)],
-    conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma'),
+    conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma', ratios, defaultBm),
     riskClassification: buildRiskClassification(totalScore, liqScore, profScore, levScore, rawFinancialScore),
     missingFields: getMissingFields(fd),
   }
@@ -559,7 +559,7 @@ function buildFinancialDetail(
     ],
     strengths:  buildStrengths(ratios, defaultBm, sector),
     watchAreas: [...guardrailMessages(ratios), ...buildWatchAreas(ratios, defaultBm)],
-    conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma'),
+    conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma', ratios, defaultBm),
   }
 }
 

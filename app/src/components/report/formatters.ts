@@ -4,6 +4,7 @@
 
 import { periodLabelLong } from '@/lib/periods'
 import { RATING_LABEL } from '@/lib/ratingLabels'
+import { assessStatus } from '@/lib/scoring/assess'
 
 // ─── PARA BİRİMİ ──────────────────────────────────────────────────────────────
 
@@ -141,15 +142,9 @@ export function ratioStatus(
   sectorValue: number | null | undefined,
   direction: 'up' | 'down' = 'up',
 ): 'iyi' | 'uyari' | 'risk' {
-  if (value == null || sectorValue == null || sectorValue === 0) return 'uyari'
-
-  const ratio = direction === 'up'
-    ? value / sectorValue
-    : sectorValue / value   // ters — düşük değer için "ne kadar iyi"
-
-  if (ratio >= 1.10) return 'iyi'
-  if (ratio >= 0.75) return 'uyari'
-  return 'risk'
+  // Tek kaynak: lib/scoring/assess (eşikler orada); eksik veri tabloda "uyarı" bandında gösterilir
+  const { status } = assessStatus(value, sectorValue, direction)
+  return status === 'eksik' ? 'uyari' : status
 }
 
 // ─── BAR RENGİ ────────────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ import { getSectorBenchmark } from '@/lib/scoring/benchmarks'
 import { combineScores } from '@/lib/scoring/subjective'
 import { PERIOD_LABEL_SHORT, PERIOD_LABEL_AXIS } from '@/lib/periods'
 import { RATING_LABEL } from '@/lib/ratingLabels'
+import { assess } from '@/lib/scoring/assess'
 import { scoreToRating } from '@/lib/scoring/score'
 import { ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
 
@@ -595,38 +596,18 @@ function AnalizPageContent() {
   const cs  = selected ? combinedScore(selected) : 0
   const cr  = combinedRating(cs)
   const r   = selected?.ratios ?? {}
-  const whyItems = selected ? [
-    {
-      tone: r.currentRatio != null && r.currentRatio >= bm.currentRatio * 0.9 ? 'positive' : 'warning',
-      category: 'Likidite',
-      metric: 'Cari Oran:',
-      val: fmtN(r.currentRatio),
-      comment: r.currentRatio != null
-        ? (r.currentRatio >= bm.currentRatio * 0.9 ? 'Sektör ortalaması üzerinde, likidite güçlü.' : 'Sektör ortalaması altında, işletme sermaye açığı riski.')
-        : 'Veri eksik',
-    },
-    {
-      // Faz 7.3.33: sektör kıyasıyla değerlendir (>= 0 yetersizdi — pozitif ama düşük marjlar ZAYIF sayılıyordu)
-      tone: r.netProfitMargin != null && bm.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8 ? 'positive' : 'negative',
-      category: 'Karlılık',
-      metric: 'Net Marj:',
-      val: fmtPct(r.netProfitMargin),
-      comment: r.netProfitMargin != null
-        ? (bm.netProfitMargin != null && r.netProfitMargin >= bm.netProfitMargin * 0.8
-            ? 'Sektör ortalamasıyla uyumlu net marj, sürdürülebilir karlılık.'
-            : 'Net marj sektör ortalamasının altında, karlılık iyileştirme gerekli.')
-        : 'Veri eksik',
-    },
-    {
-      tone: r.debtToEquity != null && r.debtToEquity <= bm.debtToEquity * 1.2 ? 'positive' : 'negative',
-      category: 'Kaldıraç',
-      metric: 'Borç / Özkaynak:',
-      val: fmtN(r.debtToEquity),
-      comment: r.debtToEquity != null
-        ? (r.debtToEquity <= bm.debtToEquity * 1.2 ? 'Güvenli borçluluk aralığı, kredi genişlemesine uygun.' : 'Yüksek kaldıraç, riskli borçluluk yapısı.')
-        : 'Veri eksik',
-    },
-  ] : []
+  // Hızlı Teşhis: tablo ve raporla AYNI kural (lib/scoring/assess)
+  const toneOf = (s: string) => s === 'iyi' || s === 'na' ? 'positive' : s === 'risk' ? 'negative' : 'warning'
+  const whyItems = selected ? (
+    [
+      { category: 'Likidite', metric: 'Cari Oran:',       key: 'currentRatio' as const,    val: fmtN(r.currentRatio),      bmv: bm.currentRatio },
+      { category: 'Karlılık', metric: 'Net Marj:',        key: 'netProfitMargin' as const, val: fmtPct(r.netProfitMargin), bmv: bm.netProfitMargin },
+      { category: 'Kaldıraç', metric: 'Borç / Özkaynak:', key: 'debtToEquity' as const,    val: fmtN(r.debtToEquity),      bmv: bm.debtToEquity },
+    ].map(it => {
+      const a = assess(it.key, r[it.key], it.bmv)
+      return { tone: toneOf(a.status), category: it.category, metric: it.metric, val: it.val, comment: a.status === 'eksik' ? 'Veri eksik' : a.sentence }
+    })
+  ) : []
 
   // Aynı entity'nin tüm analizleri (yıl seçici için)
   const entityAnalyses = selected
