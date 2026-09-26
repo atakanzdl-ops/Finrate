@@ -45,6 +45,21 @@ interface ConsolidatedResult {
   consolidatedRatios:   Record<string, number | null>
 }
 
+/** /api/groups/[id]/elimination-entries satırı (+ düzenleme modalı geçici alanları) */
+interface EliminationEntryRow {
+  id:              string
+  year:            number
+  period:          string
+  fromEntityId:    string
+  fromAccountCode: string
+  toEntityId:      string
+  toAccountCode:   string
+  amount:          number
+  description?:    string | null
+  editAmount?:     string
+  editDescription?: string
+}
+
 interface EliminationsData {
   intercompanySales:            number
   intercompanyPurchases:        number
@@ -204,17 +219,6 @@ function fmtAsset(v: number | null | undefined): string {
   return new Intl.NumberFormat('tr-TR').format(Math.round(n))
 }
 
-function fmtSigned(v: number | null | undefined): { text: string; neg: boolean } {
-  const n = v ?? 0
-  const neg = n < 0
-  const abs = Math.abs(n)
-  let text = '—'
-  if (abs >= 1e9) text = `${(abs / 1e9).toFixed(1)} Mr`
-  else if (abs >= 1e6) text = `${(abs / 1e6).toFixed(1)} Mn`
-  else if (abs > 0) text = new Intl.NumberFormat('tr-TR').format(Math.round(abs))
-  return { text, neg }
-}
-
 function fmtTbl(v: number | null | undefined): { display: string; neg: boolean } {
   if (v == null || Math.abs(v) < 1) return { display: '—', neg: false }
   const neg = v < 0
@@ -287,24 +291,6 @@ function gradeColor(grade: string): string {
   return '#DC2626'
 }
 
-const DAY_KEYS = new Set([
-  'inventoryTurnoverDays', 'receivablesTurnoverDays', 'payablesTurnoverDays',
-  'cashConversionCycle', 'adjustedCashConversionCycle', 'customerAdvanceDays',
-])
-const PCT_KEYS = new Set([
-  'grossMargin','ebitdaMargin','ebitMargin','netProfitMargin',
-  'roa','roe','roic','revenueGrowth','realGrowth',
-  'debtToAssets','equityRatio','shortTermDebtRatio','operatingExpenseRatio',
-  'netWorkingCapitalRatio',
-])
-
-function fmtRatio(val: number | null | undefined, key: string): string {
-  if (val == null) return '—'
-  if (DAY_KEYS.has(key)) return `${Math.round(val)} gün`
-  if (key === 'netWorkingCapital') return fmtAsset(val)
-  if (PCT_KEYS.has(key)) return `${(val * 100).toFixed(1)}%`
-  return val.toFixed(2)
-}
 
 // Benchmark ile karşılaştırma: +N% veya -N%
 function benchmarkDelta(actual: number, bm: number, direction: RatioDir): {
@@ -383,11 +369,11 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
   }
 
   // ── Tenzilat — entry-based CRUD ──────────────────────────────────────────────
-  const [entries,         setEntries]         = useState<any[]>([])
+  const [entries,         setEntries]         = useState<EliminationEntryRow[]>([])
   const [filterYear,      setFilterYear]      = useState<number | null>(null)
   const [filterPeriod,    setFilterPeriod]    = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingEntry,    setEditingEntry]    = useState<any | null>(null)
+  const [editingEntry,    setEditingEntry]    = useState<EliminationEntryRow | null>(null)
   const [saving,          setSaving]          = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [newForm,         setNewForm]         = useState({
@@ -472,47 +458,6 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
     () => getSectorBenchmark(group?.sector),
     [group?.sector]
   )
-
-  const draggingFactors = useMemo(() => {
-    if (!consolidated) return []
-    const ratios = consolidated.consolidatedRatios
-
-    // 1) Kritik eşik ihlalleri
-    const critical = CRITICAL_CHECKS
-      .map(c => {
-        const v = ratios[c.key]
-        if (v == null || !c.check(v as number)) return null
-        return { label: c.label, impact: c.impact, isCritical: true, key: c.key }
-      })
-      .filter(Boolean) as { label: string; impact: number; isCritical: boolean; key: string }[]
-
-    // 2) Benchmark altındaki rasyolar
-    const belowBm = RATIO_GROUPS.flatMap(g =>
-      g.ratios
-        .filter(r => r.bmKey && r.direction !== 'none')
-        .map(r => {
-          const actual = ratios[r.key]
-          if (actual == null) return null
-          const bmVal = sectorBenchmark[r.bmKey!] as number | undefined
-          if (!bmVal) return null
-          const { good, pct } = benchmarkDelta(actual as number, bmVal, r.direction)
-          if (good) return null
-          const shortfall = Math.min(1, Math.abs(pct) / 100)
-          if (shortfall < 0.08) return null   // 8% altında önemsiz
-          const impact = Math.min(8, r.catWeight * shortfall)
-          const sign = pct >= 0 ? '+' : '−'
-          const absPct = Math.abs(pct).toFixed(0)
-          const label = `${r.label}: TCMB ortalamasının ${sign}${absPct}% ${r.direction === 'higher' ? 'altında' : 'üstünde'}`
-          return { label, impact, isCritical: false, key: r.key }
-        })
-        .filter(Boolean)
-    ) as { label: string; impact: number; isCritical: boolean; key: string }[]
-
-    // Kritik olanlar önce, sonra etki büyüklüğüne göre sırala; duplikasyonları kaldır
-    const criticalKeys = new Set(critical.map(c => c.key))
-    const uniqueBelowBm = belowBm.filter(b => !criticalKeys.has(b.key))
-    return [...critical, ...uniqueBelowBm].sort((a, b) => b.impact - a.impact).slice(0, 8)
-  }, [consolidated, sectorBenchmark])
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -1086,7 +1031,7 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   ))}
                 </div>
                 <div className="divide-y divide-[#F1F5F9]">
-                  {entries.map((entry: any) => (
+                  {entries.map((entry) => (
                     <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '72px 70px 1fr 1fr 120px 96px', gap: 8, padding: '10px 20px', alignItems: 'center' }}>
                       <span style={{ fontSize: 12, color: '#1E293B', fontVariantNumeric: 'tabular-nums' }}>{entry.year}</span>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96' }}>{periodLabel(entry.period)}</span>
@@ -1269,14 +1214,14 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>TUTAR (TL)</label>
                     <input type="number" min={0}
                       value={editingEntry.editAmount ?? String(editingEntry.amount)}
-                      onChange={e => setEditingEntry((prev: any) => ({ ...prev, editAmount: e.target.value }))}
+                      onChange={e => setEditingEntry((prev) => ({ ...(prev as EliminationEntryRow), editAmount: e.target.value }))}
                       className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
                   </div>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 600, color: '#5A7A96', display: 'block', marginBottom: 4 }}>AÇIKLAMA</label>
                     <input type="text"
                       value={editingEntry.editDescription ?? (editingEntry.description ?? '')}
-                      onChange={e => setEditingEntry((prev: any) => ({ ...prev, editDescription: e.target.value }))}
+                      onChange={e => setEditingEntry((prev) => ({ ...(prev as EliminationEntryRow), editDescription: e.target.value }))}
                       placeholder="Opsiyonel not..."
                       className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-[#1E293B] focus:outline-none focus:border-cyan-500" />
                   </div>

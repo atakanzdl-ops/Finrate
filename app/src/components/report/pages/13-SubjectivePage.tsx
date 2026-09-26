@@ -69,7 +69,7 @@ export default function SubjectivePage({ data, sector }: Props) {
             </div>
           </div>
           <div style={{ fontSize: '8.5px', color: '#94a3b8', maxWidth: '480px', lineHeight: 1.7 }}>
-            Subjektif skor; KKB kredi sicili, banka ilişkileri, kurumsal yapı ve uyum profili baz alınarak hesaplanmıştır. Toplam 30 puan üzerinden değerlendirilen bu faktörler nihai rating'e doğrudan etki eder.
+            Subjektif skor; KKB kredi sicili, banka ilişkileri, kurumsal yapı ve uyum profili baz alınarak hesaplanmıştır. Toplam 30 puan üzerinden değerlendirilen bu faktörler nihai rating&apos;e doğrudan etki eder.
           </div>
         </div>
 

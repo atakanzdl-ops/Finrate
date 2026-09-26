@@ -902,7 +902,7 @@ describe('T4 — SOURCE_MISMATCH banner: status kontrol (Faz 7.3.33 regresyon)',
   })
 
   test('targetPackageMeta undefined olduğunda banner gösterilmez', () => {
-    const meta: { status?: string } | undefined = undefined
+    const meta = undefined as { status?: string } | undefined
     expect(meta?.status === 'SOURCE_MISMATCH').toBe(false)
   })
 

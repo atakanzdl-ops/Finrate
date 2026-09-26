@@ -12,7 +12,7 @@ import { mapV3ToScenarioDataV3, mapV3ToActionPlanV3 } from '@/lib/scoring/scenar
 import { getNaceCode } from './naceMap'
 import {
   fmtCurrency, fmtPct, fmtPctSigned, fmtRatio, fmtDays,
-  fmtDate, fmtPeriod, fmtScore, addYears,
+  fmtDate, fmtPeriod, addYears,
   toBarFill, ratioStatus, BAR_COLOR,
   getScaleLabel, getEntityTypeLabel,
 } from './formatters'

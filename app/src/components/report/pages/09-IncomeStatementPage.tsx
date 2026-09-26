@@ -8,7 +8,7 @@ interface Props {
   sector?: string
 }
 
-function ISRow({ item, colCount, lastYear }: { item: IncomeStatementItem; colCount: number; lastYear: number }) {
+function ISRow({ item, colCount }: { item: IncomeStatementItem; colCount: number }) {
   const isTotal = item.isTotal
   const isMain  = item.isMain
   const trClass = isMain ? 'mr' : isTotal ? 'tr' : ''
@@ -71,7 +71,7 @@ export default function IncomeStatementPage({ data, sector }: Props) {
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <ISRow key={i} item={item} colCount={years.length} lastYear={lastYear} />
+              <ISRow key={i} item={item} colCount={years.length} />
             ))}
           </tbody>
         </table>

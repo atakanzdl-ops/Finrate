@@ -11,7 +11,7 @@
 
 import { ACTION_CATALOG_V3 } from '../actionCatalogV3'
 import { runEngineV3 } from '../engineV3'
-import type { FirmContext, ActionBuildContext } from '../contracts'
+import type { ActionBuildContext } from '../contracts'
 import type { EngineInput } from '../engineV3'
 
 const a13 = ACTION_CATALOG_V3['A13_OPEX_OPTIMIZATION']

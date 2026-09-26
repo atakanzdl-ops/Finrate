@@ -27,16 +27,6 @@ function toValidDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function formatDate(value?: string | null) {
-  const date = toValidDate(value)
-  if (!date) return '—'
-  return new Intl.DateTimeFormat('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date)
-}
-
 
 export default function DashboardHome() {
   const [analyses, setAnalyses] = useState<Analysis[]>([])

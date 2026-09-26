@@ -304,7 +304,7 @@ describe('Faz 7.3.6B2 — A19 çoklu bacak muhasebe doğrulaması', () => {
     expect(txs[0].legs[0]).toMatchObject({ accountCode: '340', side: 'DEBIT' })
     expect(txs[0].legs[1]).toMatchObject({ accountCode: '600', side: 'CREDIT' })
     // A19_PROFIT_TRANSFER tx yok
-    const profitTx = txs.find(tx => tx.id === 'A19_PROFIT_TRANSFER')
+    const profitTx = txs.find(tx => tx.transactionId === 'A19_PROFIT_TRANSFER')
     expect(profitTx).toBeUndefined()
   })
 

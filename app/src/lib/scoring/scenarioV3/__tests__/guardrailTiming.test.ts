@@ -30,7 +30,7 @@ function makeInventoryTx(amount: number): AccountingTransaction[] {
       { accountCode: '153', side: 'CREDIT' as const, amount },
       { accountCode: '102', side: 'DEBIT'  as const, amount },
     ],
-  }]
+  } as AccountingTransaction]   // transactionId/semanticType bilinçli boş: yalnızca bakiye etkisi test edilir
 }
 
 /** Minimal FirmContext — sadece ilgili alanlar dolu */
@@ -279,7 +279,7 @@ describe('T5 — CCC CEILING REGRESSION: DEKA-benzeri input', () => {
   test('DEKA-benzeri BB hedefi → bindingCeiling SEMANTIC_GUARDRAIL CCC OLMAMALI', () => {
     const result = runEngineV3(makeDekaLikeInput('BB'))
 
-    const bc = result.reasoning?.bindingCeiling
+    const bc = result.reasoning?.bindingCeiling as import("../ratingReasoning").CeilingConstraint | undefined
     if (bc) {
       // Eğer bir ceiling varsa, SEMANTIC_GUARDRAIL CCC olmamalı
       const isFalseGuardrailCCC =
@@ -306,7 +306,7 @@ describe('T5 — CCC CEILING REGRESSION: DEKA-benzeri input', () => {
     // Başka ceiling (Sustainability, Sector) nedeniyle CCC çıkabilir — bu kabul edilir.
     const result = runEngineV3(makeDekaLikeInput('BB'))
     if (result.finalTargetRating === 'CCC') {
-      const bc = result.reasoning?.bindingCeiling
+      const bc = result.reasoning?.bindingCeiling as import("../ratingReasoning").CeilingConstraint | undefined
       // CCC ise, SEMANTIC_GUARDRAIL nedeniyle OLMAMALI
       expect(bc?.source).not.toBe('SEMANTIC_GUARDRAIL')
     }

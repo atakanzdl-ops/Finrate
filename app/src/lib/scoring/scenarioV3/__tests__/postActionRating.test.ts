@@ -10,7 +10,6 @@
  */
 
 import { calculateActualPostActionRating } from '../postActionRating'
-import type { ActualRatingValidation }     from '../postActionRating'
 import type { AccountingTransaction }      from '../contracts'
 
 // ─── Yardımcılar ─────────────────────────────────────────────────────────────
@@ -20,7 +19,7 @@ function makeBalancedTx(amount = 5_000_000): AccountingTransaction {
   return {
     transactionId: 'tx-test-01',
     description:   'KV avans → UV (test)',
-    semanticType:  'RESTRUCTURE',
+    semanticType:  'RESTRUCTURE' as unknown as import('../contracts').SemanticType, // katalog dışı tip: nötr davranış test edilir
     legs: [
       { accountCode: '340', side: 'DEBIT',  amount },  // LIABILITY azalır
       { accountCode: '440', side: 'CREDIT', amount },  // LIABILITY artar
@@ -33,7 +32,7 @@ function makeUnbalancedTx(): AccountingTransaction {
   return {
     transactionId: 'tx-bad-01',
     description:   'Dengesiz kayıt (test)',
-    semanticType:  'RESTRUCTURE',
+    semanticType:  'RESTRUCTURE' as unknown as import('../contracts').SemanticType, // katalog dışı tip: nötr davranış test edilir
     legs: [
       { accountCode: '300', side: 'CREDIT', amount: 1_000_000 },
       { accountCode: '400', side: 'DEBIT',  amount: 2_000_000 },  // DEBIT ≠ CREDIT
@@ -264,7 +263,7 @@ describe('calculateActualPostActionRating — DEKAM fixture', () => {
   const A03_TX: AccountingTransaction = {
     transactionId: 'A03-dekam',
     description:   'KV alınan avans → UV (A03)',
-    semanticType:  'RESTRUCTURE',
+    semanticType:  'RESTRUCTURE' as unknown as import('../contracts').SemanticType, // katalog dışı tip: nötr davranış test edilir
     legs: [
       { accountCode: '340', side: 'DEBIT',  amount: 10_000_000 },
       { accountCode: '440', side: 'CREDIT', amount: 10_000_000 },

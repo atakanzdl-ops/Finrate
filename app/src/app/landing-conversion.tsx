@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, ShieldCheck, FileText, BarChart, Check, Shield, Lock } from 'lucide-react'
+import { ArrowRight, ShieldCheck, FileText, Check, Shield, Lock } from 'lucide-react'
 import RatiosTable from '@/components/analysis/RatiosTable'
 import { Logo } from '@/components/ui/Logo'
 

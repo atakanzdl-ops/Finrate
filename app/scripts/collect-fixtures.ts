@@ -17,8 +17,7 @@
 import path            from 'path'
 import fs              from 'fs/promises'
 import { readFileSync } from 'fs'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pg = require('pg') as { Pool: new (opts: { connectionString?: string }) => { end(): Promise<void> } }
+import { Pool }        from 'pg'
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg }    from '@prisma/adapter-pg'
 import { signToken }   from '../src/lib/auth'
@@ -234,7 +233,7 @@ async function main() {
   console.log('✓ Server aktif\n')
 
   // Prisma
-  const pool    = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+  const pool    = new Pool({ connectionString: process.env.DATABASE_URL })
   const adapter = new PrismaPg(pool)
   const prisma  = new PrismaClient({ adapter })
 

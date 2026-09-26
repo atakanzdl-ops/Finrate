@@ -29,18 +29,14 @@ import {
   getInventoryBalance,
   getCogs,
   computeDIO,
-  sumByCodesPrefix,
   sumByCodesPrefixNet,
   getNetFixedAssets,
   getGrossFixedAssets,
-  getConstructionSafeFixedAssets,
-  isIdleAssetCandidate,
   getFixedAssetRatioBenchmark,
   selectIdleAssetAccount,
   getCashBalance,
   getShortTermFinancialDebt,
   getShortTermTradeDebt,
-  getLongTermFinancialDebt,
   getTradeReceivables,
   getAccumulatedDepreciation,
   getRevaluationReserve,
@@ -103,28 +99,9 @@ function clampAmount(amount: number, min = 0, max = Infinity): number {
   return Math.min(amount, max)
 }
 
-/** İnşaat / proje bazlı sektör mü? */
-function isConstructionLike(sector: SectorCode): boolean {
-  return sector === 'CONSTRUCTION'
-}
-
-/** Ticaret ağırlıklı sektör mü? */
-function isTradeLike(sector: SectorCode): boolean {
-  return sector === 'TRADE' || sector === 'RETAIL'
-}
-
 /** Hizmet / bilişim sektörü mü? */
 function isServiceLike(sector: SectorCode): boolean {
   return sector === 'SERVICES' || sector === 'IT'
-}
-
-/** Analizde bu prefix'lerden herhangi birine sahip pozitif bakiyeli hesap var mı? */
-function hasAnyAccount(analysis: unknown, prefixes: string[]): boolean {
-  const a = analysis as AnalysisInput
-  if (!a?.accounts) return false
-  return a.accounts.some(
-    acc => prefixes.some(p => acc.accountCode.startsWith(p)) && acc.amount > 0
-  )
 }
 
 /** Bu prefix'lere sahip hesapların toplam bakiyesi */
@@ -646,7 +623,7 @@ const A06_INVENTORY_MONETIZATION: ActionTemplateV3 = {
     if (cogs == null || cogs <= 0) return null
 
     // 3. Period days (Türk muhasebe kümülatif: Q1=90, Q4=ANNUAL=365)
-    const periodDays = getPeriodDays({ period: (ctx as any).period ?? 'ANNUAL' }).days
+    const periodDays = getPeriodDays({ period: (ctx as { period?: string }).period ?? 'ANNUAL' }).days
 
     // 4. Mevcut DIO
     const currentDIO = computeDIO(stockBalance, cogs, periodDays)

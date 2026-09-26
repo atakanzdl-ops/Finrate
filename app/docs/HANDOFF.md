@@ -8,8 +8,14 @@ teknik değildir: her şeyi sen yaparsın, o onaylar. Türkçe konuş, kısa yaz
 - Uygulama: `app/` (Next.js 16, Prisma 7 + PostgreSQL/Neon, Jest). Canlı: https://www.finrate.com.tr (Vercel, proje `finrate`).
 - Ana dal `main` → canlıya otomatik deploy (Vercel build'de `prisma migrate deploy` çalışır).
   Geliştirme dalı: `feature/motor-aksiyon-v2` (main'e `--no-ff` merge edilir).
-- Testler: `cd app && npx jest --silent` (92 paket / ~1900 test, hepsi yeşil olmalı).
-  Tip kontrolü: `npx tsc --noEmit -p tsconfig.json` (test dosyalarında eski "duplicate function" hataları normaldir).
+- Testler: `cd app && npx jest --silent` (95 paket / ~1925 test, hepsi yeşil olmalı).
+  Tip kontrolü: `npx tsc --noEmit -p tsconfig.json` → 0 hata (testler dahil). Lint: `npm run lint` → 0 hata.
+  Bu üçü her push öncesi yeşil olmalı; yeni hata eklenmez.
+- Kod kalitesi kuralları (2026-09-26 temizliği): `any` üretim kodunda yasak (testlerde serbest); kullanılmayan
+  değişken/import yasak (`_` önekiyle bilinçli istisna). `score.ts`, `benchmarks.ts`, `ratios.ts`, `beyanname.ts`
+  dokunulmaz olduğu için lint'te "unused/prefer-const" bu dosyalarda kapalı.
+- Repoya girmeyen klasörler: `backups/`, `tmp/`, `src/tmp/` (.gitignore). Eski müşteri dosyaları ve yedekler
+  git geçmişinde durur ama artık takip edilmez. `middleware.ts` → `proxy.ts` (Next 16 adı), davranış aynı.
 - Uçtan uca test: `scripts/e2e-free-plan.ts` (E2E_BASE/E2E_EMAIL/E2E_PASSWORD; localhost + preview DB ile).
 - Yedek: `npm run backup:db`; yeniden skorlama: `scripts/rescore-entity.ts <entityId|ALL>`.
 

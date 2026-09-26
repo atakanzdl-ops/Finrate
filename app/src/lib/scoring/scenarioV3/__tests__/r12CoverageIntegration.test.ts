@@ -18,7 +18,6 @@
  */
 
 import { runEngineV3 }         from '../engineV3'
-import type { EngineResult }    from '../engineV3'
 import type { AccountingTransaction } from '../contracts'
 import { ISRA_INPUT }          from './fixtures/smoke/inputs'
 

@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Dosya modul olsun: ayni isimli test yardimcilari diger test dosyalariyla cakismaz
+export {}
+
 /**
  * POST /api/analyses/recalculate — route handler testleri (Faz 7.3.14)
  *

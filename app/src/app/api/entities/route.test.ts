@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Dosya modul olsun: ayni isimli test yardimcilari diger test dosyalariyla cakismaz
+export {}
+
 /**
  * POST /api/entities — route handler testleri (Faz 7.3.50A.3.3)
  *
@@ -16,7 +20,7 @@ function setupMocks(opts: {
   userId:       string | null
   createResult?: object
 }) {
-  const createMock = jest.fn(() => Promise.resolve(
+  const createMock = jest.fn((_args: any) => Promise.resolve(
     opts.createResult ?? { id: 'e-new', name: 'Test Şirket', taxNumber: null, sector: null }
   ))
 
@@ -36,7 +40,7 @@ function setupMocks(opts: {
     getUserIdFromRequest: jest.fn(() => opts.userId),
   }))
 
-  jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn(() => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUseScenario: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn(() => Promise.resolve()), listExistingAnalysisPeriods: jest.fn(() => Promise.resolve([])), isAdminUser: jest.fn(() => Promise.resolve(false)) }))
+  jest.doMock('@/lib/entitlements', () => ({ getEntitlements: jest.fn((_args: any) => Promise.resolve(null)), canCreateEntity: () => null, canUploadNewPeriods: () => null, canUseScenario: () => null, canUsePaidFeature: () => null, consumeCredits: jest.fn((_args: any) => Promise.resolve()), listExistingAnalysisPeriods: jest.fn((_args: any) => Promise.resolve([])), isAdminUser: jest.fn((_args: any) => Promise.resolve(false)) }))
 
   jest.doMock('@/lib/db', () => ({
     prisma: {
@@ -51,7 +55,7 @@ function setupMocks(opts: {
 
 function createMockRequest(body: unknown = {}) {
   return {
-    json:    jest.fn(() => Promise.resolve(body)),
+    json:    jest.fn((_args: any) => Promise.resolve(body)),
     cookies: { get: jest.fn(() => undefined) },
     headers: { get: jest.fn(() => null) },
   } as any

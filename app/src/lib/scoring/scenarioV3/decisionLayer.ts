@@ -52,7 +52,7 @@ import {
   RATING_ORDER,
   ratingToIndex,
 } from './ratingReasoning'
-import { ceilingTypeToDisplay, confidenceToDisplay, formatCeilingDisplay } from '../displayMaps'
+import { ceilingTypeToDisplay, formatCeilingDisplay } from '../displayMaps'
 import { getMandatoryActionsForFirm } from './criticalIssues'  // R7B
 import type {
   CeilingConstraint,
@@ -919,7 +919,6 @@ function buildWhyCapitalAloneNotEnough(engineResult: EngineResult): string {
   }
 
   const score   = productivity.productivityScore
-  const trapped = productivity.metrics.trappedAssetsShare
   const parts: string[] = []
 
   if (score < 0.30) {
@@ -983,8 +982,6 @@ function buildTargetFeasibilityExplanation(
     currentRating,
     finalTargetRating,
     notchesGained,
-    confidence,
-    confidenceModifier,
     feasibility,
   } = engineResult
 
@@ -1331,7 +1328,7 @@ function buildConsultantNarrative(
   }
 
   // ── bankerView — PATCH 1: portfolio capacity farkindaliği ──────────────────
-  const { confidence, confidenceModifier, finalTargetRating, notchesGained } = engineResult
+  const { confidence, finalTargetRating, notchesGained } = engineResult
 
   // RatingTransition'dan portfolio capacity bilgisi
   const transition = engineResult.reasoning.transition as {
@@ -1342,7 +1339,6 @@ function buildConsultantNarrative(
 
   const blockedByCapacity  = transition?.blockedByPortfolioCapacity ?? false
   const capacityNotches    = transition?.achievableByPortfolio ?? notchesGained
-  const rawCapacity        = transition?.portfolioNotchCapacity ?? Infinity
   let bankerView: string
 
   if (blockedByCapacity) {

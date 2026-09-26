@@ -134,8 +134,6 @@ export default function ScenarioPanel({
   const [targetGrade,    setTargetGrade]    = useState<string>(targetOptions[0] ?? '')
   const [loading,        setLoading]        = useState(false)
   const [scenarios,      setScenarios]      = useState<ScenarioResult[] | null>(null)
-  const [resolvedScore,  setResolvedScore]  = useState<number>(csProp ?? 0)
-  const [resolvedGrade,  setResolvedGrade]  = useState<string>(currentGrade)
   const [expandedCard,   setExpandedCard]   = useState<number | null>(null)
   const [expandedAction, setExpandedAction] = useState<number | null>(null)
   const [error,          setError]          = useState<string | null>(null)
@@ -173,8 +171,6 @@ export default function ScenarioPanel({
       if (!res.ok) { setError(data.error ?? 'Hata oluştu.'); return }
 
       setScenarios(data.scenarios)
-      setResolvedScore(data.currentScore)
-      setResolvedGrade(data.currentGrade)
     } catch {
       setError('Bağlantı hatası oluştu.')
     } finally {

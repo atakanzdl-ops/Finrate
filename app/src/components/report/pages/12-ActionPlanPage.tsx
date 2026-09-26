@@ -1,5 +1,5 @@
 'use client'
-import type { ReportData, ActionPlanV3, ActionPlanItemV3, AccountMovement, RatioImpact } from '@/types/report'
+import type { ReportData, ActionPlanItemV3, AccountMovement, RatioImpact } from '@/types/report'
 
 function formatTRYLocal(n: number): string {
   const abs = Math.abs(n)

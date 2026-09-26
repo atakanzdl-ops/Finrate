@@ -276,7 +276,8 @@ describe('T7 — engine authority: engine=B (B<BB), packageReached=true → engi
   //   → selectTargetPackage'de currentIdx(BB=5) >= targetIdx(BB=5) → reachedTarget=true
   // → packageReached=true (secondary, çelişki) → authority='engine', MEDIUM
   // → isFeasible = engineFeasible = false (semantic guardrail korunur)
-  const er = makeER({ currentRating: 'B-', finalTargetRating: 'B', notchesGained: 1 })
+  // 'B-' resmi ölçekte yok; motorun bilinmeyen notu nasıl ele aldığı test ediliyor (davranış korunur)
+  const er = makeER({ currentRating: 'B-' as unknown as import('../ratingReasoning').RatingGrade, finalTargetRating: 'B', notchesGained: 1 })
   const ctx = {
     sector:                'İMALAT',
     subjectiveTotal:       0,
