@@ -3,8 +3,8 @@ import { prisma } from '@/lib/db'
 /**
  * Hak sistemi (tek kaynak).
  *
- *  ÜCRETSİZ (DEMO): kayıtta 14 gün. 1 firma, 1 dönem, skor + Hızlı Teşhis.
- *                   PDF rapor ve senaryo yok. Süre bitince yeni yükleme yok, mevcut sonuçlar görünür.
+ *  ÜCRETSİZ (DEMO): kayıtta 14 gün. 1 firma, 1 dönem, skor + Hızlı Teşhis + senaryo/yol haritası + ekran raporu.
+ *                   PDF indirme yok. Süre bitince yeni yükleme ve senaryo yok, mevcut sonuçlar görünür.
  *  ÜCRETLİ:         analiz hakkı (kredi). Her yeni firma-dönem 1 hak yer; aynı dönemi yeniden yüklemek hak yemez.
  *                   Krediler creditsExpireAt'e kadar geçerli; bu süre içinde PDF, senaryo, trend açık.
  *  YÖNETİCİ (role ADMIN): sınırsız.
@@ -41,7 +41,7 @@ export const ENTITLEMENT_MESSAGES = {
   FREE_PERIOD_LIMIT: `Ücretsiz planda ${FREE_MAX_PERIODS} dönem analiz edilebilir. Yeni dönem için bir paket satın alın.`,
   NO_CREDITS:        'Analiz hakkınız kalmadı. Yeni dönem yüklemek için paket satın alın (info@finrate.com.tr).',
   CREDITS_EXPIRED:   'Paketinizin geçerlilik süresi doldu. Yeni dönem yüklemek için paket yenileyin.',
-  PAID_FEATURE:      'PDF rapor ve senaryo analizi ücretli paketlerde sunulur. Paketler için: info@finrate.com.tr',
+  PAID_FEATURE:      'PDF rapor indirme ücretli paketlerde sunulur. Paketler için: info@finrate.com.tr',
 } as const
 
 export async function getEntitlements(userId: string): Promise<Entitlements | null> {
@@ -103,10 +103,18 @@ export function canUploadNewPeriods(e: Entitlements, newPeriods: number): Denial
   return null
 }
 
-/** PDF rapor / senaryo gibi ücretli özellikler */
+/** PDF rapor indirme — ücretli paket özelliği */
 export function canUsePaidFeature(e: Entitlements): Denial | null {
   if (e.isAdmin) return null
   if (e.plan === 'DEMO') return deny('PAID_FEATURE')
+  if (!e.paidActive) return deny('CREDITS_EXPIRED')
+  return null
+}
+
+/** Senaryo / yol haritası — ücretsiz deneme süresi içinde de açık */
+export function canUseScenario(e: Entitlements): Denial | null {
+  if (e.isAdmin) return null
+  if (e.plan === 'DEMO') return e.freeActive ? null : deny('FREE_EXPIRED')
   if (!e.paidActive) return deny('CREDITS_EXPIRED')
   return null
 }

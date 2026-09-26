@@ -3,7 +3,7 @@
  */
 jest.mock('@/lib/db', () => ({ prisma: {} }))
 
-import { canCreateEntity, canUploadNewPeriods, canUsePaidFeature, type Entitlements } from './entitlements'
+import { canCreateEntity, canUploadNewPeriods, canUsePaidFeature, canUseScenario, type Entitlements } from './entitlements'
 
 const day = 24 * 60 * 60 * 1000
 function ent(over: Partial<Entitlements> = {}): Entitlements {
@@ -33,8 +33,10 @@ describe('entitlements — ücretsiz plan', () => {
     expect(canCreateEntity(e)?.code).toBe('FREE_EXPIRED')
     expect(canUploadNewPeriods(e, 1)?.code).toBe('FREE_EXPIRED')
   })
-  test('PDF / senaryo ücretli', () => {
+  test('PDF indirme ücretli, senaryo deneme süresinde açık', () => {
     expect(canUsePaidFeature(ent())?.code).toBe('PAID_FEATURE')
+    expect(canUseScenario(ent())).toBeNull()
+    expect(canUseScenario(ent({ freeActive: false }))?.code).toBe('FREE_EXPIRED')
   })
 })
 
