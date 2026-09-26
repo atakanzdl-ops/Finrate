@@ -149,11 +149,26 @@ export const CRITICAL_ISSUES: CriticalIssue[] = [
     severity: 'medium',
     condition: (ctx) => {
       const dte = ctx.ratios?.debtToEquity
-      const ortaklarBorcu = ctx.accountBalances?.['331'] ?? 0
+      const ortaklarBorcu = (ctx.accountBalances?.['331'] ?? 0) + (ctx.accountBalances?.['431'] ?? 0)
       return dte != null && dte > 3.0 && ortaklarBorcu > 0
     },
     mandatoryActionIds: ['A15_DEBT_TO_EQUITY_SWAP', 'A15B_SHAREHOLDER_DEBT_TO_LT'],
     reason: 'Borç/Özkaynak oranı aşırı yüksek — sermaye yapısı güçlendirme gerekiyor.',
+  },
+
+  // Kural 7 — SHAREHOLDER_LOANS_HIGH (Faz 7b)
+  // Ortaklara borçlar (331+431) özkaynağın %50'sini aşıyor: skorlama guardrail'i rating tavanını
+  // bir kademe düşürür; sermayeye ilave (A15) portföyde zorunlu.
+  {
+    id: 'SHAREHOLDER_LOANS_HIGH',
+    severity: 'medium',
+    condition: (ctx) => {
+      const loans = (ctx.accountBalances?.['331'] ?? 0) + (ctx.accountBalances?.['431'] ?? 0)
+      const equity = ctx.financialData?.totalEquity ?? null
+      return equity != null && equity > 0 && loans >= 1_000_000 && loans / equity > 0.50
+    },
+    mandatoryActionIds: ['A15_DEBT_TO_EQUITY_SWAP'],
+    reason: 'Ortaklara borçlar özkaynağın yarısını aşıyor — rating tavanı düşürüldü; sermayeye ilave ile giderilir.',
   },
 ]
 

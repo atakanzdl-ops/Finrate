@@ -1623,25 +1623,42 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   semanticType: 'DEBT_TO_EQUITY_SWAP',
   horizons: ['medium', 'long'],
 
+  // Faz 7b: 331 (KV) ve 431 (UV) ortaklara borçların ikisi de kaynaktır.
+  // Tutar önce 331'den, kalan 431'den düşülür; her ikisi de 500'e alacak yazılır.
   buildTransactions: (context) => {
     const amount = clampAmount(context.amount, 1_000_000)
     if (amount <= 0) return []
+    const bal331 = context.accountBalances?.['331'] ?? 0
+    const bal431 = context.accountBalances?.['431'] ?? 0
+    const from331 = bal331 > 0 || bal431 <= 0 ? Math.min(amount, bal331 > 0 ? bal331 : amount) : 0
+    const from431 = Math.min(amount - from331, bal431)
+    const legs: Array<{ accountCode: string; accountName: string; side: 'DEBIT' | 'CREDIT'; amount: number; description: string }> = []
+    if (from331 > 0) legs.push({ accountCode: '331', accountName: 'Ortaklara Borçlar (KV)', side: 'DEBIT', amount: from331, description: 'Ortak borcu kapatma (nakit çıkışı yok)' })
+    if (from431 > 0) legs.push({ accountCode: '431', accountName: 'Ortaklara Borçlar (UV)', side: 'DEBIT', amount: from431, description: 'Ortak borcu kapatma (nakit çıkışı yok)' })
+    const total = from331 + from431
+    if (total <= 0) return []
+    legs.push({ accountCode: '500', accountName: 'Sermaye', side: 'CREDIT', amount: total, description: 'Sermayeye dönüştürme' })
     return [
       makeBalancedTransaction(
         'A15_MAIN',
-        'Ortak cari hesabı sermayeye dönüştürülüyor (331 → 500)',
+        from431 > 0 && from331 > 0
+          ? 'Ortak cari hesapları sermayeye dönüştürülüyor (331 + 431 → 500)'
+          : from431 > 0 ? 'Ortaklara UV borç sermayeye dönüştürülüyor (431 → 500)' : 'Ortak cari hesabı sermayeye dönüştürülüyor (331 → 500)',
         'DEBT_TO_EQUITY_SWAP',
-        [
-          { accountCode: '331', accountName: 'Ortaklara Borçlar', side: 'DEBIT',  amount, description: 'Ortak borcu kapatma (nakit çıkışı yok)' },
-          { accountCode: '500', accountName: 'Sermaye',           side: 'CREDIT', amount, description: 'Sermayeye dönüştürme'                    },
-        ]
+        legs,
       ),
     ]
   },
 
   preconditions: {
-    requiredAccountCodes: ['331'],
+    // 331 + 431 toplamı ≥ 1M (grup-match yerine iki hesabın toplamı — biri sıfır olabilir)
     minSourceAmountTRY: 1_000_000,
+    customCheck: (analysis) => {
+      const total = sumAccountsByPrefix(analysis, ['331', '431'])
+      return total >= 1_000_000
+        ? { pass: true }
+        : { pass: false, reason: `Ortaklara borçlar (331+431) yetersiz: ${total.toFixed(0)} < 1.000.000` }
+    },
   },
 
   qualityCoefficient: 0.40,
@@ -1674,7 +1691,7 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   },
 
   description:
-    'Ortakların şirkete borç verdiği tutarların (331 Ortaklara Borçlar) sermayeye (500) dönüştürülmesi. Nakit hareketi yoktur — pasif içinde sınıf değişikliği.',
+    'Ortakların şirkete borç verdiği tutarların (331 KV ve 431 UV Ortaklara Borçlar) sermayeye (500) dönüştürülmesi. Nakit hareketi yoktur — pasif içinde sınıf değişikliği; borç/özkaynak ve özkaynak oranı birlikte iyileşir.',
   cfoRationale:
     'Ortak borçları yüksek şirketlerde en hızlı ve düşük maliyetli özkaynak artış yöntemi. Nakit gerektirmez, yalnızca ortakların kararı yeterlidir.',
   bankerPerspective:
@@ -1688,17 +1705,20 @@ const A15_DEBT_TO_EQUITY_SWAP: ActionTemplateV3 = {
   },
 
   // R8.5 — Rasyo bazlı tutar (getEquityInjectionTarget paylaşımı — A10/A10B ile aynı helper)
+  // Faz 7b: kaynak = 331 + 431. Ortaklara borçlar özkaynağın %50'sini aşıyorsa (skorlama
+  // guardrail'i rating tavanını düşürür) tamamının sermayeye ilavesi önerilir.
   useRatioBasedAmount: true,
   computeAmount: (ctx: FirmContext): number | null => {
-    // Özkaynak/aktif half-gap hedefi (A10 ile aynı formül, 331 kaynağı cap'ler)
-    const target = getEquityInjectionTarget(ctx, { halfGap: true })
-    if (!target) return null
-
-    // 331 bakiye cap — kaynak yetersizse önerilen tutarı kırp
-    const sourceBalance = ctx.accountBalances?.['331'] ?? 0
+    const sourceBalance = (ctx.accountBalances?.['331'] ?? 0) + (ctx.accountBalances?.['431'] ?? 0)
     if (sourceBalance <= 0) return null
 
-    return Math.min(target, sourceBalance)
+    const equity = ctx.totalEquity
+    if (equity > 0 && sourceBalance / equity > 0.50) return sourceBalance
+
+    const target = getEquityInjectionTarget(ctx, { halfGap: true })
+    if (target != null) return Math.min(target, sourceBalance)
+    // Özkaynak/aktif zaten hedef üstünde: yine de ortak borcu >%25 ise yarısının ilavesi önerilir
+    return equity > 0 && sourceBalance / equity > 0.25 ? sourceBalance * 0.5 : null
   },
 }
 
