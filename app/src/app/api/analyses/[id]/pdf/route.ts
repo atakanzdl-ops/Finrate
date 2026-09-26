@@ -28,6 +28,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const owned = await prisma.analysis.findFirst({ where: { id, userId }, select: { id: true } })
   if (!owned) return jsonUtf8({ error: 'Analiz bulunamadı.' }, { status: 404 })
 
+  // Hak kontrolü ÖNCE: PDF rapor ücretli paket özelliği (yönetici hariç) → 402
+  const ent = await getEntitlements(userId)
+  const denial = ent ? canUsePaidFeature(ent) : null
+  if (denial) return jsonUtf8({ error: denial.message, code: denial.code }, { status: 402 })
+
   // === YENİ — Snapshot validation (409 Conflict) ===
   const validation = await validateRoadmapSnapshot(id, userId)
   if (!validation.valid) {
@@ -36,11 +41,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const message  = isStale ? ROADMAP_MESSAGES.ROADMAP_STALE       : ROADMAP_MESSAGES.ROADMAP_REQUIRED
     return jsonUtf8({ error: message, code }, { status: 409 })
   }
-
-  // Hak kontrolü: PDF rapor ücretli paket özelliği (yönetici hariç)
-  const ent = await getEntitlements(userId)
-  const denial = ent ? canUsePaidFeature(ent) : null
-  if (denial) return jsonUtf8({ error: denial.message, code: denial.code }, { status: 402 })
 
   // Subjektif faktörler girilmeden rapor üretilmez (nihai skor 70+30 eksik kalır)
   const analysisRow = await prisma.analysis.findFirst({ where: { id, userId }, select: { entityId: true } })

@@ -188,7 +188,24 @@ function RaporContent() {
       <div className="pdf-download-bar no-print">
         <button
           className="pdf-download-btn"
-          onClick={() => window.open(pdfUrl, '_blank')}
+          onClick={async () => {
+            // Ücretsiz planda (402) veya eksik yol haritasında (409) JSON hata döner → kullanıcıya mesaj göster
+            try {
+              const res = await fetch(pdfUrl)
+              if (!res.ok) {
+                const body = await res.json().catch(() => ({}))
+                window.alert(body?.error ?? 'PDF oluşturulamadı.')
+                return
+              }
+              const blob = await res.blob()
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `Finrate_Rapor_${id}.pdf`; a.click()
+              setTimeout(() => URL.revokeObjectURL(url), 10_000)
+            } catch {
+              window.alert('PDF indirilemedi. Lütfen tekrar deneyin.')
+            }
+          }}
         >
           📄 PDF Olarak İndir
         </button>
