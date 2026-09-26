@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
-import { isAdminUser, PACKAGES, CREDIT_VALIDITY_MONTHS, type PackageKey } from '@/lib/entitlements'
+import { isAdminUser, isPackageKey, grantPackage, CREDIT_VALIDITY_MONTHS } from '@/lib/entitlements'
 
 /**
  * PATCH /api/admin/users/[id] — yönetici işlemleri
@@ -36,21 +36,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const plusMonths = (d: Date, m: number) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x }
 
   if (action === 'GRANT_PACKAGE') {
-    const key = String(body?.package ?? '') as PackageKey
-    const pkg = PACKAGES[key]
-    if (!pkg) return jsonUtf8({ error: 'Geçersiz paket.' }, { status: 400 })
-    // Süre: mevcut geçerlilik ileride ise ondan, değilse bugünden 12 ay
-    const base = sub.creditsExpireAt && sub.creditsExpireAt > now ? sub.creditsExpireAt : now
-    const updated = await prisma.subscription.update({
-      where: { id: sub.id },
-      data: {
-        plan: pkg.plan, status: 'ACTIVE',
-        analysisCredits: { increment: pkg.credits },
-        creditsExpireAt: plusMonths(base, CREDIT_VALIDITY_MONTHS),
-        currentPeriodStart: now, currentPeriodEnd: plusMonths(base, CREDIT_VALIDITY_MONTHS),
-        notes: appendNote(sub.notes, `${pkg.label} paketi (+${pkg.credits} hak)${body?.note ? ' — ' + String(body.note) : ''}`),
-      },
-    })
+    const key = body?.package
+    if (!isPackageKey(key)) return jsonUtf8({ error: 'Geçersiz paket.' }, { status: 400 })
+    // Tek yol: iyzico callback ile aynı fonksiyon (entitlements.grantPackage)
+    const updated = await grantPackage(id, key, body?.note ? String(body.note) : undefined)
     return jsonUtf8({ ok: true, subscription: updated })
   }
 

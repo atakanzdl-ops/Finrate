@@ -6,6 +6,7 @@ import {
   Loader2, Check, X,
 } from 'lucide-react'
 import DashboardShell from '@/components/layout/DashboardShell'
+import PackagePurchase from '@/components/account/PackagePurchase'
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ interface UserProfile {
   email:       string
   fullName:    string
   companyName: string | null
+  taxNumber?:  string | null
   role?:       string
   subscription: {
     plan:              string
@@ -52,6 +54,7 @@ export default function AyarlarPage() {
   // Profil formu
   const [fullName, setFullName]       = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [taxNumber, setTaxNumber]     = useState('')
   const [profileSaving, setProfileSaving]   = useState(false)
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [profileError, setProfileError]     = useState('')
@@ -89,6 +92,7 @@ export default function AyarlarPage() {
           setUser(d.user)
           setFullName(d.user.fullName ?? '')
           setCompanyName(d.user.companyName ?? '')
+          setTaxNumber(d.user.taxNumber ?? '')
         }
       })
       .finally(() => setPageLoading(false))
@@ -103,7 +107,7 @@ export default function AyarlarPage() {
       const res = await fetch('/api/user/profile', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ fullName: fullName.trim(), companyName: companyName.trim() || null }),
+        body:    JSON.stringify({ fullName: fullName.trim(), companyName: companyName.trim() || null, taxNumber: taxNumber.trim() || null }),
       })
       const d = await res.json()
       if (!res.ok) { setProfileError(d.error ?? 'Hata oluştu.'); return }
@@ -291,6 +295,16 @@ export default function AyarlarPage() {
                 className="w-full h-10 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D] bg-white"
               />
             </Field>
+            <Field label="Vergi No / TC Kimlik No (opsiyonel, fatura için)">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={taxNumber}
+                onChange={e => setTaxNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="10 haneli VKN veya 11 haneli TCKN"
+                className="w-full h-10 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D] bg-white"
+              />
+            </Field>
             <Field label="E-posta">
               <input
                 type="email"
@@ -400,8 +414,9 @@ export default function AyarlarPage() {
                   />
                 </>
               )}
-              <InfoRow label="Paket satın alma" value="info@finrate.com.tr" />
             </div>
+
+            {user.role !== 'ADMIN' && <PackagePurchase />}
 
             {user.subscription.cancelAtPeriodEnd && (
               <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
@@ -440,18 +455,15 @@ export default function AyarlarPage() {
         <SettingsCard title="Yasal & Gizlilik" icon={<Shield size={16} />}>
           <p className="text-sm text-[#5A7A96] mb-3">
             Verileriniz AB merkezli sunucularda (AWS Frankfurt) saklanmaktadır.
-            Kişisel verileriniz üçüncü taraflarla paylaşılmaz. KVKK uyumluluk
-            detayları için yakında yayınlanacak Aydınlatma Metni&apos;ne bakınız.
+            Kişisel verileriniz üçüncü taraflarla paylaşılmaz.
           </p>
           <div className="flex gap-6">
-            <span className="text-sm text-slate-400 cursor-not-allowed">
+            <a href="/yasal" className="text-sm font-medium text-[#0B3C5D] hover:underline">
               KVKK Aydınlatma Metni
-              <span className="ml-1 text-xs">(yakında)</span>
-            </span>
-            <span className="text-sm text-slate-400 cursor-not-allowed">
-              Gizlilik Politikası
-              <span className="ml-1 text-xs">(yakında)</span>
-            </span>
+            </a>
+            <a href="/yasal" className="text-sm font-medium text-[#0B3C5D] hover:underline">
+              Gizlilik ve Kullanım Koşulları
+            </a>
           </div>
         </SettingsCard>
 

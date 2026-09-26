@@ -11,6 +11,9 @@ import type { RatioResult } from '@/lib/scoring/ratios'
 import { calculateScore } from '@/lib/scoring/score'
 import { applyEliminationsAtAccountLevel, entriesToAggregateEliminations } from '@/lib/scoring/consolidationAccountLevel'
 import { rebuildAggregateFromAccounts, adaptAggregateForScoring } from '@/lib/scoring/accountMapper'
+import {
+  periodOrderNum, pickScoringPeriod, selectForPeriod, annualizeAggregated, periodLabel,
+} from '@/lib/scoring/consolidationPeriod'
 
 // GET /api/groups/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -50,15 +53,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       financialData:     true,
       financialAccounts: { select: { accountCode: true, amount: true } },
     },
-    orderBy: [{ year: 'desc' }, { period: 'desc' }],
   })
+  // Zaman sırası (yeni → eski). Not: DB'de period alfabetik sıralanırsa Q1, ANNUAL'ın önüne geçer;
+  // bu yüzden sıralama burada periodOrderNum ile yapılır.
+  allAnalyses.sort((a, b) => periodOrderNum(b.year, b.period) - periodOrderNum(a.year, a.period))
 
   // En son analizi entity başına tut (ilk eşleşme = en yeni)
   const latestByEntity = new Map<string, typeof allAnalyses[0]>()
+  const analysesByEntity = new Map<string, typeof allAnalyses>()
   for (const a of allAnalyses) {
-    if (a.entityId && !latestByEntity.has(a.entityId)) {
-      latestByEntity.set(a.entityId, a)
-    }
+    if (!a.entityId) continue
+    if (!latestByEntity.has(a.entityId)) latestByEntity.set(a.entityId, a)
+    const list = analysesByEntity.get(a.entityId) ?? []
+    list.push(a)
+    analysesByEntity.set(a.entityId, list)
   }
 
   // 3. UI'a dönecek entity listesi
@@ -78,17 +86,36 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   })
 
   // 4. Konsolidasyona girecek entity'ler (consolidationInclude = true)
-  const consolidationInputs = group.entities
-    .filter(e => e.consolidationInclude)
+  //    Skor dönemi: tüm konsolide şirketlerin ortak sahip olduğu en son dönem.
+  //    Bir şirketin o dönemi yoksa önceki en son verisi kullanılır ve uyarı verilir.
+  const consolidationEntitiesAll = group.entities.filter(e => e.consolidationInclude)
+  const scoringPeriod = pickScoringPeriod(new Map(
+    consolidationEntitiesAll.map(e => [e.id, (analysesByEntity.get(e.id) ?? []).filter(a => a.financialData)]),
+  ))
+  const consolidationWarnings: string[] = []
+  const consolidationScores: Array<{ finalScore: number; totalAssets: number }> = []
+
+  const consolidationInputs = consolidationEntitiesAll
     .flatMap(entity => {
-      const analysis = latestByEntity.get(entity.id)
-      if (!analysis?.financialData) return []
+      if (!scoringPeriod) return []
+      const candidates = (analysesByEntity.get(entity.id) ?? []).filter(a => a.financialData)
+      const pick = selectForPeriod(candidates, scoringPeriod)
+      if (!pick) {
+        if (candidates.length === 0) consolidationWarnings.push(`${entity.name}: analiz verisi yok, konsolide skora dahil edilmedi.`)
+        else consolidationWarnings.push(`${entity.name}: ${periodLabel(scoringPeriod)} öncesine ait veri yok, konsolide skora dahil edilmedi.`)
+        return []
+      }
+      const analysis = pick.item
+      if (!pick.exact) {
+        consolidationWarnings.push(`${entity.name}: ${periodLabel(scoringPeriod)} verisi yok, ${periodLabel(analysis)} verisi kullanıldı.`)
+      }
 
       let ratios: RatioResult | null = null
       try { ratios = analysis.ratios ? JSON.parse(analysis.ratios) : null } catch { /* skip */ }
       if (!ratios) return []
 
-      const fd = analysis.financialData
+      const fd = analysis.financialData!
+      consolidationScores.push({ finalScore: analysis.finalScore ?? 0, totalAssets: fd.totalAssets ?? 0 })
       // ownershipPct DB'de 0–1 → aggregateFinancials 0–100 bekler
       const ownershipPct100 = (entity.ownershipPct ?? 1) * 100
       return [{
@@ -136,11 +163,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       periodEntriesMap.set(pKey, { year: a.year, period: a.period, entityData: new Map() })
     const p = periodEntriesMap.get(pKey)!
     if (!p.entityData.has(a.entityId)) p.entityData.set(a.entityId, a)
-  }
-
-  function periodOrderNum(yr: number, per: string): number {
-    const m: Record<string, number> = { Q1: 1, H1: 2, Q2: 3, Q3: 6, H2: 9, Q4: 12, ANNUAL: 13 }
-    return yr * 100 + (m[per] ?? 5)
   }
 
   const consolidatedPeriods = [...periodEntriesMap.values()]
@@ -259,17 +281,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     })
 
-  // En son dönem — scoring bridge için
-  const latestYear   = consolidatedPeriods.at(-1)?.year   ?? new Date().getFullYear()
-  const latestPeriod = consolidatedPeriods.at(-1)?.period ?? 'ANNUAL'
+  // Skor dönemi — scoring bridge (eliminasyon) ve yıllıklandırma için
+  const latestYear   = scoringPeriod?.year   ?? consolidatedPeriods.at(-1)?.year   ?? new Date().getFullYear()
+  const latestPeriod = scoringPeriod?.period ?? consolidatedPeriods.at(-1)?.period ?? 'ANNUAL'
 
   // 8. Konsolide skor + kategori skorları
   let consolidated = null
-  if (consolidationInputs.length > 0) {
-    const aggregated = aggregateFinancials(consolidationInputs)
-    const individualScores = entitiesOut
-      .filter(e => e.latestAnalysis !== null)
-      .map(e => ({ finalScore: e.latestAnalysis!.finalScore, totalAssets: e.totalAssets }))
+  if (consolidationInputs.length > 0 && scoringPeriod) {
+    // Ara dönemde (Q1/Q2/Q3) akış kalemleri yıllıklandırılır — tek firma analiziyle aynı kural
+    const aggregated = annualizeAggregated(aggregateFinancials(consolidationInputs), latestPeriod)
+    // Ağırlıklı ortalama ve en zayıf halka: yalnızca konsolidasyona giren şirketler, aynı dönem
+    const individualScores = consolidationScores
 
     // Scoring bridge: yeni GroupEliminationEntry varsa kullan, yoksa eski singleton
     const newElimForScore    = entriesToAggregateEliminations(group.eliminationEntries, latestYear, latestPeriod)
@@ -284,6 +306,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const catScores = calculateScore(result.consolidatedRatios, sector)
 
     consolidated = {
+      period:               { year: latestYear, period: latestPeriod, label: periodLabel({ year: latestYear, period: latestPeriod }) },
+      annualized:           latestPeriod !== 'ANNUAL' && latestPeriod !== 'Q4',
+      warnings:             consolidationWarnings,
       consolidatedScore:    result.consolidatedScore,
       consolidatedGrade:    result.consolidatedGrade,
       weightedAverageScore: result.weightedAverageScore,

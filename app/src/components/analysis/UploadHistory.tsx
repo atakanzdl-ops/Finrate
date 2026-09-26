@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FileText, RefreshCw, Loader2 } from 'lucide-react'
 import { PERIOD_LABEL_SHORT } from '@/lib/periods'
+import { describeUploadError } from '@/lib/i18n/uploadErrorText'
 
 interface UploadRow {
   id: string; year: number; period: string; source: string; fileName: string
@@ -30,7 +31,7 @@ export function UploadHistory({ entityId, onReprocessed }: { entityId: string; o
     try {
       const res = await fetch(`/api/entities/${entityId}/uploads/${r.id}/reprocess`, { method: 'POST' })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) { setMsg({ id: r.id, ok: false, text: d.message ?? d.error ?? 'Yeniden işleme başarısız.' }); return }
+      if (!res.ok) { setMsg({ id: r.id, ok: false, text: describeUploadError(res.status, d) }); return }
       const first = (d.results ?? [])[0]
       setMsg({ id: r.id, ok: true, text: first ? `Yeniden işlendi: ${first.score} / ${first.rating}` : 'Yeniden işlendi.' })
       await load()

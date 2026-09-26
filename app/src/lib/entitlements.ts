@@ -13,12 +13,14 @@ import { prisma } from '@/lib/db'
 export const FREE_TRIAL_DAYS   = 14
 export const CREDIT_VALIDITY_MONTHS = 12
 
+// priceTRY: KDV dahil satış fiyatı (landing sayfasıyla aynı: ₺1.999 / ₺6.999 / ₺29.999)
 export const PACKAGES = {
-  BASLANGIC:   { label: 'Başlangıç',   credits: 4,   plan: 'STANDART' },
-  SMMM:        { label: 'S.M.M.M',     credits: 20,  plan: 'STANDART' },
-  PROFESYONEL: { label: 'Profesyonel', credits: 100, plan: 'PRO' },
+  BASLANGIC:   { label: 'Başlangıç',   credits: 4,   plan: 'STANDART', priceTRY: 1999 },
+  SMMM:        { label: 'S.M.M.M',     credits: 20,  plan: 'STANDART', priceTRY: 6999 },
+  PROFESYONEL: { label: 'Profesyonel', credits: 100, plan: 'PRO',      priceTRY: 29999 },
 } as const
 export type PackageKey = keyof typeof PACKAGES
+export const isPackageKey = (k: unknown): k is PackageKey => typeof k === 'string' && k in PACKAGES
 
 export interface Entitlements {
   userId: string
@@ -121,6 +123,40 @@ export async function listExistingAnalysisPeriods(
   return prisma.analysis.findMany({
     where: { entityId, OR: periods.map(p => ({ year: p.year, period: p.period })) },
     select: { year: true, period: true },
+  })
+}
+
+/**
+ * Paket tanımla (tek yol): kredi ekler, planı atar, geçerliliği 12 ay uzatır.
+ * Yönetici paneli (havale) ve iyzico callback'i (kart) aynı fonksiyonu kullanır.
+ * Abonelik kaydı yoksa oluşturur. `noteLine` yönetici notuna tarih damgasıyla eklenir.
+ */
+export async function grantPackage(userId: string, key: PackageKey, noteLine?: string) {
+  const pkg = PACKAGES[key]
+  const now = new Date()
+  const plusMonths = (d: Date, m: number) => { const x = new Date(d); x.setMonth(x.getMonth() + m); return x }
+
+  const sub = await prisma.subscription.findUnique({ where: { userId }, select: { id: true, creditsExpireAt: true, notes: true } })
+    ?? await prisma.subscription.create({
+      data: { userId, plan: 'DEMO', billingCycle: 'MONTHLY', status: 'ACTIVE', currentPeriodStart: now, currentPeriodEnd: now },
+      select: { id: true, creditsExpireAt: true, notes: true },
+    })
+
+  // Süre: mevcut geçerlilik ileride ise ondan, değilse bugünden 12 ay
+  const base = sub.creditsExpireAt && sub.creditsExpireAt > now ? sub.creditsExpireAt : now
+  const expires = plusMonths(base, CREDIT_VALIDITY_MONTHS)
+  const stamp = now.toLocaleDateString('tr-TR')
+  const line = `${stamp}: ${pkg.label} paketi (+${pkg.credits} hak)${noteLine ? ' — ' + noteLine : ''}`
+
+  return prisma.subscription.update({
+    where: { id: sub.id },
+    data: {
+      plan: pkg.plan, status: 'ACTIVE',
+      analysisCredits: { increment: pkg.credits },
+      creditsExpireAt: expires,
+      currentPeriodStart: now, currentPeriodEnd: expires,
+      notes: [sub.notes, line].filter(Boolean).join('\n'),
+    },
   })
 }
 

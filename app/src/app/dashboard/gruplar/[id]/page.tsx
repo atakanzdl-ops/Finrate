@@ -30,6 +30,9 @@ interface EntityInfo {
 }
 
 interface ConsolidatedResult {
+  period?:              { year: number; period: string; label: string }
+  annualized?:          boolean
+  warnings?:            string[]
   consolidatedScore:    number
   consolidatedGrade:    string
   weightedAverageScore: number
@@ -939,6 +942,23 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
                   4. KONSOLİDE SKOR + KATEGORİ SKORLARI (tek kart)
               ──────────────────────────────────────────────────────────── */}
 
+              {/* Dönem hizalama uyarıları (şirketlerin verisi farklı dönemlerden geliyorsa) */}
+              {(consolidated.warnings?.length ?? 0) > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  padding: '10px 16px', borderRadius: 12,
+                  background: '#F8FAFC', border: '1px solid #E2E8F0',
+                }}>
+                  <AlertTriangle size={15} style={{ color: '#5A7A96', flexShrink: 0, marginTop: 1 }} />
+                  <div style={{ fontSize: 12, color: '#475569' }}>
+                    <strong>Dönem uyarısı</strong> — konsolide skor {consolidated.period?.label ?? ''} dönemine göre hesaplandı.
+                    <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                      {consolidated.warnings!.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               {/* En zayıf halka uyarısı */}
               {consolidated.weakestLinkApplied === true && (
                 <div style={{
@@ -956,7 +976,8 @@ export default function GrupDetayPage({ params }: { params: Promise<{ id: string
               <div className="card overflow-hidden">
                 <div className="card-head" style={{ background: '#F8FAFC' }}>
                   <h2 className="card-title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0B3C5D' }}>
-                    KONSOLİDE GRUP SKORU
+                    KONSOLİDE GRUP SKORU{consolidated.period ? ` · ${consolidated.period.label}` : ''}
+                    {consolidated.annualized ? ' · oranlar yıllıklandırılmış' : ''}
                   </h2>
                 </div>
                 <div className="card-body">

@@ -16,6 +16,7 @@ model User {
   passwordHash  String
   fullName      String
   companyName   String?
+  taxNumber     String?   // VKN (10) / TCKN (11) — fatura ve iyzico alıcı bilgisi için, isteğe bağlı
   role          String   @default("USER")
   isVerified    Boolean  @default(false)
   isActive           Boolean   @default(true)
@@ -64,12 +65,20 @@ model Payment {
   subscriptionId  String
   amount          Float
   currency        String   @default("TRY")
-  status          String
+  status          String   // PENDING | PAID | FAILED
   iyzicoPaymentId String?
+  // iyzico Checkout Form akışı (nullable — geriye uyumlu)
+  packageKey      String?   // BASLANGIC | SMMM | PROFESYONEL
+  credits         Int?      // ödeme başarılı olunca yüklenen analiz hakkı
+  iyzicoToken     String?   // checkout form token (callback'te eşleştirme için)
+  conversationId  String?   // iyzico'ya gönderilen bizim referansımız (= payment.id)
+  errorMessage    String?   // iyzico hata mesajı (başarısız ödeme)
+  paidAt          DateTime?
   createdAt       DateTime @default(now())
 
   subscription    Subscription @relation(fields: [subscriptionId], references: [id])
 
+  @@index([iyzicoToken])
   @@map("payments")
 }
 

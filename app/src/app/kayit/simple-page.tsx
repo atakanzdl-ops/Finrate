@@ -9,6 +9,7 @@ export default function KayitSimplePage() {
     email: '',
     password: '',
     company: '',
+    taxNumber: '',
     kvkk: false,
   })
   const [loading, setLoading] = useState(false)
@@ -37,6 +38,7 @@ export default function KayitSimplePage() {
           password: form.password,
           fullName: form.name.normalize('NFC'),
           companyName: form.company ? form.company.normalize('NFC') : null,
+          taxNumber: form.taxNumber.trim() || null,
           plan: 'DEMO',
         }),
       })
@@ -91,6 +93,20 @@ export default function KayitSimplePage() {
                   className="w-full h-11 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D]"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">
+                Vergi No / TC Kimlik No <span className="font-normal text-slate-400">(isteğe bağlı, fatura için)</span>
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.taxNumber}
+                onChange={(e) => update('taxNumber', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="10 haneli VKN veya 11 haneli TCKN"
+                className="w-full h-11 rounded-lg border border-[#E5E9F0] px-3 text-sm text-[#1E293B] placeholder:text-slate-400 outline-none focus:border-[#0B3C5D]"
+              />
             </div>
 
             <div>
