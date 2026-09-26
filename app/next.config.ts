@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withSentryConfig } from '@sentry/nextjs/config'
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -30,4 +31,13 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+// Sentry: sadece hata yakalama. Source map yükleme kapalı (auth token gerekmez),
+// telemetri kapalı; DSN yoksa SDK zaten devre dışı.
+export default withSentryConfig(nextConfig, {
+  org: 'finrate',
+  project: 'javascript-nextjsfinrate-web',
+  silent: true,
+  telemetry: false,
+  sourcemaps: { disable: true },
+  widenClientFileUpload: false,
+})
