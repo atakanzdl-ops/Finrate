@@ -287,6 +287,10 @@ model FinancialDataUpload {
   unmapped         String?
   parseWarnings    String?
   createdAt        DateTime @default(now())
+  // Yüklenen dosyanın saklandığı yer (Vercel Blob, private). Yoksa yeniden işleme yapılamaz.
+  fileUrl          String?
+  fileSize         Int?
+  mimeType         String?
 
   entity           Entity        @relation(fields: [entityId], references: [id], onDelete: Cascade)
   financialData    FinancialData @relation(fields: [financialDataId], references: [id], onDelete: Cascade)

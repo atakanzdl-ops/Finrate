@@ -3,6 +3,7 @@ import { jsonUtf8 } from '@/lib/http/jsonUtf8'
 import { prisma } from '@/lib/db'
 import { getUserIdFromRequest } from '@/lib/auth'
 import { rescoreFinancialData } from '@/lib/scoring/rescoreFinancialData'
+import { deleteStoredFiles } from '@/lib/fileStorage'
 
 // PATCH /api/entities/[id]/financial-data/[fdId] — tekil alan güncelle (TdhpSpreadsheet inline düzenleme)
 export async function PATCH(
@@ -63,6 +64,12 @@ export async function DELETE(
   // Mali verinin bu şirkete ait olduğunu doğrula
   const fd = await prisma.financialData.findFirst({ where: { id: fdId, entityId } })
   if (!fd) return jsonUtf8({ error: 'Mali veri bulunamadı.' }, { status: 404 })
+
+  // Saklanan dosyaları da temizle (kayıtlar cascade ile silinir)
+  try {
+    const ups = await prisma.financialDataUpload.findMany({ where: { financialDataId: fdId }, select: { fileUrl: true } })
+    await deleteStoredFiles(ups.map(u => u.fileUrl))
+  } catch { /* depolama temizliği isteğe bağlı */ }
 
   // İlişkili analizi de sil, sonra mali veriyi sil
   await prisma.analysis.deleteMany({ where: { financialDataId: fdId } })

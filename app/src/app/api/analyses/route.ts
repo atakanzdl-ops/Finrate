@@ -7,10 +7,18 @@ import {
   hasBalanceAccounts,
   hasIncomeAccounts,
 } from '@/lib/analysis/missingDataDetection'
+import { getAccountFlags } from '@/lib/analysis/accountFlags'
 
 export async function GET(req: NextRequest) {
   const userId = getUserIdFromRequest(req)
   if (!userId) return jsonUtf8({ error: 'Yetkisiz.' }, { status: 401 })
+
+  // Sayfalama (isteğe bağlı): ?limit=50&offset=0 — verilmezse eski davranış (ilk 1000)
+  const sp = req.nextUrl?.searchParams
+  const limitParam  = Number(sp?.get('limit') ?? '')
+  const offsetParam = Number(sp?.get('offset') ?? '')
+  const take = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 1000) : 1000
+  const skip = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0
 
   const raw = await prisma.analysis.findMany({
     where: { userId, mode: 'SOLO', entity: { isActive: true } },
@@ -29,8 +37,11 @@ export async function GET(req: NextRequest) {
       ratios: true,
       roadmapSnapshot: true,   // YENİ — boolean olarak expose edilecek
       entity: { select: { id: true, name: true, sector: true, taxNumber: true } },
+      // Hesap satırları listeye taşınmaz; bayraklar tek GROUP BY sorgusuyla hesaplanır (getAccountFlags).
+      // financialAccounts yalnızca yedek yol (sorgu başarısızsa) için 1 kayıtla sınırlı DEĞİL — eski mock'lar için korunur.
       financialAccounts: {
         select: { accountCode: true },
+        take: 0,
       },
       financialData: {
         select: {
@@ -47,8 +58,11 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    take: 1000,
+    take,
+    skip,
   })
+
+  const flags = await getAccountFlags(raw.map(a => a.id))
 
   const analyses = raw.map((a: (typeof raw)[number]) => {
     const { financialAccounts, roadmapSnapshot, ...rest } = a
@@ -57,7 +71,12 @@ export async function GET(req: NextRequest) {
     const overallCoverage: number | null = parsedRatios?.__overallCoverage ?? null
     const insufficientCategories: string[] = parsedRatios?.__insufficientCategories ?? []
 
+    // Bayraklar: toplu sorgudan; yoksa (yedek) satır listesinden
+    const f = flags.get(a.id)
     const accountCodes = (financialAccounts ?? []).map(fa => fa.accountCode)
+    const hasBal = f ? f.hasBalance : hasBalanceAccounts(accountCodes)
+    const hasInc = f ? f.hasIncome  : hasIncomeAccounts(accountCodes)
+    const pseudoCodes = f ? [...(hasBal ? ['1'] : []), ...(hasInc ? ['6'] : [])] : accountCodes
 
     return {
       ...rest,
@@ -65,9 +84,9 @@ export async function GET(req: NextRequest) {
       overallCoverage,
       insufficientCategories,
       subjectiveMissing: parsedRatios?.__subjectiveTotal == null,
-      hasBalanceAccounts:              hasBalanceAccounts(accountCodes),
-      hasIncomeAccounts:               hasIncomeAccounts(accountCodes),
-      missingQuarterlySourceWarning:   detectMissingQuarterlySource(a.period, accountCodes),
+      hasBalanceAccounts:              hasBal,
+      hasIncomeAccounts:               hasInc,
+      missingQuarterlySourceWarning:   detectMissingQuarterlySource(a.period, pseudoCodes),
       // YENİ — boolean (frontend tüm JSON'a ihtiyacı yok, performans)
       hasRoadmapSnapshot:              roadmapSnapshot != null,
     }
