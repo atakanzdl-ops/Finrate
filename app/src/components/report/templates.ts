@@ -3,6 +3,7 @@
 // Sayfa 2, 4 ve özet kutuları için kullanılır.
 
 import type { SectorBenchmark } from '@/lib/scoring/benchmarks'
+import { GOOD_RELATIVE, summarizeAssessments, type MetricKey } from '@/lib/scoring/assess'
 
 // ─── TİP ─────────────────────────────────────────────────────────────────────
 
@@ -118,9 +119,9 @@ export function buildStrengths(
     candidates.push({ deviation: dev, text: `Alacak tahsil süresi ${Math.round(r.receivablesTurnoverDays)} gün ile sektör (${Math.round(bm.receivablesDays)} gün) ${getDeviationPhrase(dev, 'below')} — nakit dönüşüm hızlı.` })
   }
 
-  // Pozitif sapmaya göre büyükten küçüğe sırala, en güçlü 4'ü döndür
+  // Tek kural (assess): yalnızca sektörün en az %10 üzerindekiler "güçlü yön" sayılır
   candidates.sort((a, b) => b.deviation - a.deviation)
-  return candidates.slice(0, 4).map(c => c.text)
+  return candidates.filter(c => c.deviation >= GOOD_RELATIVE - 1).slice(0, 4).map(c => c.text)
 }
 
 // ─── DİKKAT ALANLARI ──────────────────────────────────────────────────────────
@@ -185,9 +186,9 @@ export function buildWatchAreas(
     candidates.push({ deviation: dev, text: `Nakit dönüşüm çevrimi ${Math.round(r.cashConversionCycle)} gün — sektör (${Math.round(bm.cashConversionCycle)} gün) ${getDeviationPhrase(dev, 'above')}; çalışma sermayesi yönetimi izlenmeli.` })
   }
 
-  // En büyük negatif sapmadan küçüğe sırala, en zayıf 4'ü döndür
+  // Tek kural (assess): sektörün en az %10 altındakiler izleme alanıdır (tabloda "iyi" olan buraya düşmez)
   candidates.sort((a, b) => b.deviation - a.deviation)
-  return candidates.slice(0, 4).map(c => c.text)
+  return candidates.filter(c => c.deviation >= GOOD_RELATIVE - 1).slice(0, 4).map(c => c.text)
 }
 
 // ─── GENEL DEĞERLENDİRME ──────────────────────────────────────────────────────
@@ -197,23 +198,50 @@ export function buildConclusion(
   score: number,
   sector: string | null | undefined,
   companyName: string,
+  ratios?: RatiosLike,
+  bm?: SectorBenchmark,
 ): string {
   const sectorLabel = sector ?? 'genel'
   const band = getRatingBand(rating)
 
   const intros: Record<string, string> = {
-    investment: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} derecelendirmesiyle yatırım yapılabilir segment içinde yer almaktadır.`,
-    speculative: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} derecelendirmesiyle spekülatif segmentte konumlanmaktadır.`,
-    high_risk: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} derecelendirmesiyle yüksek risk segmentindedir.`,
+    investment: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla yatırım yapılabilir segment içinde yer almaktadır.`,
+    speculative: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla spekülatif segmentte konumlanmaktadır.`,
+    high_risk: `${companyName}, ${sectorLabel} sektöründe ${score} puan ve ${rating} notuyla yüksek risk segmentindedir.`,
   }
 
-  const middles: Record<string, string> = {
-    investment: 'Finansal yapı temel göstergelerde sektör ortalamalarıyla uyum içindedir. Mevcut koşullar devam ettiği sürece kredi kullanımı ve banka ilişkileri sürdürülebilir görünmektedir.',
-    speculative: 'Belirli finansal göstergelerde iyileştirme potansiyeli bulunmakta; senaryo planı kapsamındaki aksiyonlarla bir sonraki derecelendirme notuna ulaşmak 6–12 ay içinde mümkündür.',
-    high_risk: 'Finansal göstergeler güçlü iyileştirme aksiyonları gerektirmektedir. Kredi kullanımı için teminat yapısının ve yönetim planının banka ile paylaşılması önerilmektedir.',
+  // Orta cümle kalıp değil, gerçek durum dağılımından üretilir (tablo/özet ile aynı hüküm)
+  let middle: string
+  const s = ratios && bm ? summarizeAssessments(ratios as Partial<Record<MetricKey, number | null>>, bm as unknown as Partial<Record<string, number | null>>) : null
+  if (s && s.total > 0) {
+    const parts: string[] = []
+    parts.push(`Değerlendirilen ${s.total} temel göstergenin ${s.good}'${suffixI(s.good)} sektör ortalamasının üzerinde, ${s.warn}'${suffixI(s.warn)} sektör düzeyinde, ${s.risk}'${suffixI(s.risk)} sektörün altındadır.`)
+    if (s.strongest.length) parts.push(`En güçlü alanlar: ${s.strongest.join(', ').toLowerCase()}.`)
+    if (s.weakest.length)   parts.push(`Öncelikli iyileştirme alanları: ${s.weakest.join(', ').toLowerCase()}.`)
+    if (s.notApplicable.length) parts.push(`${s.notApplicable.join(' ve ')} finansal borç bulunmadığından uygulanamaz.`)
+    middle = parts.join(' ')
+  } else {
+    const fallback: Record<string, string> = {
+      investment: 'Finansal yapı temel göstergelerde sektör ortalamalarıyla büyük ölçüde uyumludur.',
+      speculative: 'Belirli göstergelerde iyileştirme potansiyeli bulunmaktadır.',
+      high_risk: 'Finansal göstergeler güçlü iyileştirme aksiyonları gerektirmektedir.',
+    }
+    middle = fallback[band] ?? fallback.speculative
   }
 
-  return `${intros[band]} ${middles[band]}`
+  const closing: Record<string, string> = {
+    investment: 'Mevcut koşullar devam ettiği sürece kredi kullanımı ve banka ilişkileri sürdürülebilir görünmektedir.',
+    speculative: 'Senaryo planı kapsamındaki aksiyonlarla bir sonraki nota ulaşmak 6–12 ay içinde mümkündür.',
+    high_risk: 'Kredi kullanımı için teminat yapısının ve yönetim planının banka ile paylaşılması önerilmektedir.',
+  }
+
+  return `${intros[band]} ${middle} ${closing[band]}`
+}
+
+// Türkçe sayı eki: 3'ü, 4'ü, 5'i, 6'sı, 0'ı, 1'i, 2'si, 7'si, 8'i, 9'u, 10'u
+function suffixI(n: number): string {
+  const map: Record<number, string> = { 0: 'ı', 1: 'i', 2: 'si', 3: 'ü', 4: 'ü', 5: 'i', 6: 'sı', 7: 'si', 8: 'i', 9: 'u', 10: 'u', 11: 'i' }
+  return map[n] ?? 'i'
 }
 
 function getRatingBand(rating: string): string {
