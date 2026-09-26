@@ -4,6 +4,7 @@ import { calculateScore } from '@/lib/scoring/score'
 import { createOptimizerSnapshot } from '@/lib/scoring/optimizerSnapshot'
 import { resolveFinalScore } from '@/lib/scoring/persistScore'
 import { buildRatioInput } from '@/lib/scoring/ratioInput'
+import { applyGuardrails } from '@/lib/scoring/guardrails'
 
 /**
  * Bir FinancialData kaydını yükleme yoluyla BİREBİR aynı adımlarla yeniden skorlar:
@@ -28,8 +29,12 @@ export async function rescoreFinancialData(fdId: string) {
   const enriched = await buildRatioInput(fields, { entityId: fd.entityId, year: fd.year, period: fd.period, sector: entity.sector })
   const ratios = calculateRatios(enriched as Parameters<typeof calculateRatios>[0])
   const score  = calculateScore(ratios, entity.sector)
-  const optimizerSnapshot = createOptimizerSnapshot(ratios, score.finalScore, entity.sector)
-  const resolved = await resolveFinalScore(fd.entityId, score.finalScore)
+  const accounts = analysis
+    ? await prisma.financialAccount.findMany({ where: { analysisId: analysis.id }, select: { accountCode: true, amount: true } })
+    : []
+  const guard = applyGuardrails(score.finalScore, { accounts, totalEquity: fields.totalEquity })
+  const optimizerSnapshot = createOptimizerSnapshot(ratios, guard.financialScore, entity.sector)
+  const resolved = await resolveFinalScore(fd.entityId, guard.financialScore)
 
   if (analysis) {
     await prisma.analysis.update({
@@ -41,7 +46,10 @@ export async function rescoreFinancialData(fdId: string) {
         profitabilityScore: score.profitabilityScore,
         leverageScore:      score.leverageScore,
         activityScore:      score.activityScore,
-        ratios:             JSON.stringify({ ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta }),
+        ratios:             JSON.stringify({
+          ...ratios, __overallCoverage: score.overallCoverage ?? null, ...resolved.meta,
+          __guardrails: guard.notes, __shareholderLoans: guard.shareholderLoans, __shareholderLoanToEquity: guard.shareholderLoanToEquity,
+        }),
         optimizerSnapshot:  JSON.stringify(optimizerSnapshot),
         roadmapSnapshot:    null,
         updatedAt:          new Date(),

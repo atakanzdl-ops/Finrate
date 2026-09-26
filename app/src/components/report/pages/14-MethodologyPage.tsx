@@ -1,6 +1,8 @@
 'use client'
 import type { ReportData } from '@/types/report'
-import { RATING_LABEL } from '@/lib/ratingLabels'
+import { RATING_BAND_TABLE, WEIGHT_RANGES, SUBJECTIVE_POINTS, SHAREHOLDER_LOAN_WARN_RATIO, SHAREHOLDER_LOAN_CAP_RATIO, fmtWeightRange } from '@/config/methodology'
+
+const RATIO_COUNT: Record<string, number> = { liquidity: 6, profitability: 9, leverage: 6, activity: 6 }
 
 interface Props {
   data: Pick<ReportData, 'companyName' | 'reportNo'>
@@ -36,11 +38,10 @@ export default function MethodologyPage({ data, sector }: Props) {
                   <tr><th>Kategori</th><th>Ağırlık</th><th>Oran Sayısı</th></tr>
                 </thead>
                 <tbody>
-                  <tr><td>Likidite</td><td>%25–35</td><td>6 oran</td></tr>
-                  <tr><td>Kârlılık</td><td>%20–35</td><td>9 oran</td></tr>
-                  <tr><td>Kaldıraç</td><td>%25–40</td><td>6 oran</td></tr>
-                  <tr><td>Faaliyet</td><td>%15–20</td><td>6 oran</td></tr>
-                  <tr><td>Subjektif</td><td>Sabit 30p</td><td>13 faktör</td></tr>
+                  {WEIGHT_RANGES.map(r => (
+                    <tr key={r.key}><td>{r.label}</td><td>{fmtWeightRange(r)}</td><td>{RATIO_COUNT[r.key]} oran</td></tr>
+                  ))}
+                  <tr><td>Subjektif</td><td>Sabit {SUBJECTIVE_POINTS}p</td><td>13 faktör</td></tr>
                 </tbody>
               </table>
             </div>
@@ -50,22 +51,18 @@ export default function MethodologyPage({ data, sector }: Props) {
               <table className="stb">
                 <thead><tr><th>Rating</th><th>Puan Aralığı</th><th>Segment</th></tr></thead>
                 <tbody>
-                  {[
-                    ['AAA', '93–100'],
-                    ['AA',  '84–92'],
-                    ['A',   '76–83'],
-                    ['BBB', '68–75'],
-                    ['BB',  '60–67'],
-                    ['B',   '52–59'],
-                    ['CCC', '44–51'],
-                    ['CC',  '36–43'],
-                    ['C',   '30–35'],
-                    ['D',   '0–29'],
-                  ].map(([r, p]) => [r, p, RATING_LABEL[r]]).map(([r, p, s]) => (
+                  {RATING_BAND_TABLE.map(b => [b.rating, `${b.min}–${b.max}`, b.label]).map(([r, p, s]) => (
                     <tr key={r}><td style={{ fontWeight: 700 }}>{r}</td><td>{p}</td><td>{s}</td></tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="st" style={{ marginTop: '14px', marginBottom: '8px' }}>Koruyucu Kurallar (Guardrail)</div>
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '11px', padding: '10px 12px', fontSize: '8px', color: '#78350f', lineHeight: 1.5 }}>
+              Ortaklara borçlar (331 + 431) yabancı kaynaktır, özkaynak sayılmaz. Özkaynağa oranı %{Math.round(SHAREHOLDER_LOAN_WARN_RATIO * 100)}&#39;i aşarsa İzleme Alanı&#39;na uyarı yazılır;
+              %{Math.round(SHAREHOLDER_LOAN_CAP_RATIO * 100)}&#39;yi aşarsa rating tavanı bir kademe düşürülür ve gerekçesi raporda belirtilir.
+              Ara dönem (3/6/9 aylık) verilerinde akış kalemleri yıllıklandırılır. Finansal borcu olmayan firmada faiz karşılama oranı &quot;uygulanamaz&quot; sayılır ve ceza puanı üretmez.
             </div>
           </div>
 

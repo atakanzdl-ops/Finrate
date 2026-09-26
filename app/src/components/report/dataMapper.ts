@@ -420,13 +420,13 @@ function buildExecutiveSummary(
       sectorCurrentRatio:     defaultBm.currentRatio,
       debtToEquity:           (ratios.debtToEquity as number | null) ?? 0,
       sectorDebtToEquity:     defaultBm.debtToEquity,
-      interestCoverage:       (ratios.interestCoverage as number | null) ?? 0,
+      interestCoverage:       (ratios.interestCoverage as number | null) ?? null,
       sectorInterestCoverage: defaultBm.interestCoverage,
       equity:                 fd?.totalEquity ?? 0,
       equityYoY,
     },
     strengths:  buildStrengths(ratios, defaultBm, sector),
-    watchAreas: buildWatchAreas(ratios, defaultBm),
+    watchAreas: [...guardrailMessages(ratios), ...buildWatchAreas(ratios, defaultBm)],
     conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma'),
     riskClassification: buildRiskClassification(totalScore, liqScore, profScore, levScore, rawFinancialScore),
     missingFields: getMissingFields(fd),
@@ -558,7 +558,7 @@ function buildFinancialDetail(
       },
     ],
     strengths:  buildStrengths(ratios, defaultBm, sector),
-    watchAreas: buildWatchAreas(ratios, defaultBm),
+    watchAreas: [...guardrailMessages(ratios), ...buildWatchAreas(ratios, defaultBm)],
     conclusion: buildConclusion(rating, totalScore, sector, api.entity?.name ?? 'Firma'),
   }
 }
@@ -595,7 +595,7 @@ function buildLiquidityRatioRows(
     }
   }
 
-  return [
+  const rows: RatioRow[] = [
     // ── Likidite ─────────────────────────────────────────────────────────────
     ratioRow('Likidite', 'Cari Oran',
       ratios.currentRatio as number | null, b.currentRatio ?? null, 3, 'up', v => fmtRatio(v)),
@@ -622,6 +622,19 @@ function buildLiquidityRatioRows(
     ratioRow('Borçlanma', 'KV Borç / Toplam Borç',
       ratios.shortTermDebtRatio as number | null, b.shortTermDebtRatio ?? null, 1, 'down', v => fmtPct(v)),
   ]
+
+  // Uygulanamaz durumlar: eksik veri ya da risk gibi gösterilmez
+  const ic = ratios.interestCoverage as number | null
+  const de = ratios.debtToEbitda as number | null
+  for (const row of rows) {
+    if (row.name === 'Faiz Karşılama Oranı' && ic != null && ic >= 9999) {
+      row.companyValue = 'Uygulanamaz — finansal borç yok'; row.status = 'iyi'; row.barColor = BAR_COLOR.iyi; row.barFill = 100
+    }
+    if (row.name === 'Net Borç / FAVÖK' && de != null && de < 0) {
+      row.companyValue = 'Net nakit pozisyonu'; row.status = 'iyi'; row.barColor = BAR_COLOR.iyi; row.barFill = 100
+    }
+  }
+  return rows
 }
 
 // ─── SAYFA 6: KÂRLILIK & FAALİYET ORANLARI ───────────────────────────────────
@@ -1226,4 +1239,13 @@ function auditColor(level: string): string {
     yok: '#ef4444', smmm: '#f59e0b', ymm: '#2dd4bf',
     tam_tasdik: '#22c55e', bagimsiz: '#22c55e',
   }[level] ?? '#94a3b8'
+}
+
+/** Skorlama guardrail notları (ratios JSON meta: __guardrails) → İzleme Alanı'nın başına. */
+function guardrailMessages(ratios: Record<string, unknown>): string[] {
+  const g = ratios.__guardrails
+  if (!Array.isArray(g)) return []
+  return g
+    .map(n => (n && typeof n === 'object' && typeof (n as { message?: unknown }).message === 'string') ? (n as { message: string }).message : null)
+    .filter((m): m is string => !!m)
 }

@@ -137,7 +137,9 @@ export default function ExecutiveSummaryPage({ data, sector }: Props) {
               </div>
               <div className="kpi">
                 <div className="kpi-l">Faiz Karşılama</div>
-                <div className="kpi-v">{fmtRatio(kpis.interestCoverage)}</div>
+                <div className="kpi-v" style={kpis.interestCoverage != null && kpis.interestCoverage >= 9999 ? { fontSize: '11px' } : undefined}>
+                  {kpis.interestCoverage == null ? '—' : kpis.interestCoverage >= 9999 ? 'Uygulanamaz (faiz yok)' : fmtRatio(kpis.interestCoverage)}
+                </div>
                 <div className="kpi-s">Sektör: {fmtRatio(kpis.sectorInterestCoverage)}</div>
               </div>
               <div className="kpi">
