@@ -229,7 +229,7 @@ export const ACTION_DEPENDENCY_GRAPH: Record<string, ActionDependencySpec> = {
     allowComputedSource: true,
   },
   A15_DEBT_TO_EQUITY_SWAP: {
-    sourceAccountRequirements: ['331'],
+    sourceAccountRequirements: ['331', '431'],   // Faz 7b: KV + UV ortaklara borçlar (toplanır)
     minSourceBalance: 1_000_000,
     liquidityImpactRatio: 0,  // Genelde nakit yok, sadece reclass
   },
