@@ -6,6 +6,7 @@ import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 import { validateRoadmapSnapshot } from '@/lib/scoring/scenarioV3/hasValidRoadmapSnapshot'
 import { ROADMAP_ERROR_CODES, ROADMAP_ERROR_CODES_EXT, ROADMAP_MESSAGES } from '@/lib/constants/roadmapMessages'
+import { getEntitlements, canUsePaidFeature } from '@/lib/entitlements'
 
 export const runtime = 'nodejs'
 // Vercel serverless fonksiyon timeout (saniye) — PDF render ~20-40s sürer
@@ -35,6 +36,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const message  = isStale ? ROADMAP_MESSAGES.ROADMAP_STALE       : ROADMAP_MESSAGES.ROADMAP_REQUIRED
     return jsonUtf8({ error: message, code }, { status: 409 })
   }
+
+  // Hak kontrolü: PDF rapor ücretli paket özelliği (yönetici hariç)
+  const ent = await getEntitlements(userId)
+  const denial = ent ? canUsePaidFeature(ent) : null
+  if (denial) return jsonUtf8({ error: denial.message, code: denial.code }, { status: 402 })
 
   // Subjektif faktörler girilmeden rapor üretilmez (nihai skor 70+30 eksik kalır)
   const analysisRow = await prisma.analysis.findFirst({ where: { id, userId }, select: { entityId: true } })

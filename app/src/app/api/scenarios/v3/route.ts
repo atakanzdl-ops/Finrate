@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma }                    from '@/lib/db'
 import { getUserIdFromRequest }      from '@/lib/auth'
+import { getEntitlements, canUsePaidFeature } from '@/lib/entitlements'
 import { selectScenarioEngineWithScenarios } from '@/lib/scoring/selectScenarioEngine'
 import { formatScenariosForResponse, buildEngineResultDto } from '@/lib/scoring/scenarioV3/responseMapper'
 import { buildDecisionAnswer }              from '@/lib/scoring/scenarioV3/decisionLayer'
@@ -123,6 +124,13 @@ export async function POST(req: NextRequest) {
     const userId = getUserIdFromRequest(req)
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 1b. HAK KONTROLÜ — senaryo/yol haritası ücretli paket özelliği (yönetici hariç)
+    const ent = await getEntitlements(userId)
+    const denial = ent ? canUsePaidFeature(ent) : null
+    if (denial) {
+      return NextResponse.json({ error: denial.message, code: denial.code }, { status: 402 })
     }
 
     // 2. BODY PARSE

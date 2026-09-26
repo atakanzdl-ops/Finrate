@@ -14,12 +14,15 @@ interface UserProfile {
   email:       string
   fullName:    string
   companyName: string | null
+  role?:       string
   subscription: {
     plan:              string
     status:            string
     currentPeriodEnd:  string
     billingCycle:      string
     cancelAtPeriodEnd: boolean
+    analysisCredits?:  number
+    creditsExpireAt?:  string | null
   } | null
 }
 
@@ -28,9 +31,9 @@ interface UserProfile {
 const CODE_LENGTH = 6
 
 const PLAN_LABELS: Record<string, string> = {
-  DEMO:     'Demo (Ücretsiz)',
-  STANDART: 'Standart',
-  PRO:      'Pro',
+  DEMO:     'Ücretsiz Deneme',
+  STANDART: 'Analiz Paketi',
+  PRO:      'Profesyonel Paket',
 }
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE:   'Aktif',
@@ -376,16 +379,28 @@ export default function AyarlarPage() {
                 label="Durum"
                 value={STATUS_LABELS[user.subscription.status] ?? user.subscription.status}
               />
-              <InfoRow
-                label="Faturalama"
-                value={user.subscription.billingCycle === 'MONTHLY' ? 'Aylık' : 'Yıllık'}
-              />
-              <InfoRow
-                label="Dönem Sonu"
-                value={new Date(user.subscription.currentPeriodEnd).toLocaleDateString('tr-TR', {
-                  day: 'numeric', month: 'long', year: 'numeric',
-                })}
-              />
+              {user.role === 'ADMIN' ? (
+                <InfoRow label="Analiz hakkı" value="Sınırsız (yönetici)" />
+              ) : user.subscription.plan === 'DEMO' ? (
+                <>
+                  <InfoRow label="Kapsam" value="1 firma · 1 dönem · skor ve Hızlı Teşhis" />
+                  <InfoRow
+                    label="Ücretsiz süre bitişi"
+                    value={new Date(user.subscription.currentPeriodEnd).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  />
+                </>
+              ) : (
+                <>
+                  <InfoRow label="Kalan analiz hakkı" value={String(user.subscription.analysisCredits ?? 0)} />
+                  <InfoRow
+                    label="Paket geçerlilik"
+                    value={user.subscription.creditsExpireAt
+                      ? new Date(user.subscription.creditsExpireAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : '—'}
+                  />
+                </>
+              )}
+              <InfoRow label="Paket satın alma" value="info@finrate.com.tr" />
             </div>
 
             {user.subscription.cancelAtPeriodEnd && (

@@ -165,7 +165,8 @@ export default function MultiYearUploadPage() {
         setYearUpload(year, {
           status:   'error',
           uploaded: false,
-          error:    data.error ?? 'Yükleme başarısız.',
+          // 402 (hak yok / süre doldu) gibi durumlarda okunur mesaj döner
+          error:    data.message ?? data.error ?? 'Yükleme başarısız.',
         })
         return
       }
