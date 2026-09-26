@@ -57,12 +57,12 @@ export function applyGuardrails(
     score = capOneNotch(score)
     notes.push({
       code: 'SHAREHOLDER_LOANS', level: 'CAP', ratio, amount: shareholderLoans,
-      message: `Ortaklara borçlar ${fmtMn(shareholderLoans)}, özkaynağın %${Math.round(ratio * 100)}'i. Özkaynağın yarısını aştığı için rating tavanı bir kademe düşürüldü. Ortak tarafından çekilmesi halinde likidite ve kaldıraç bozulur; sermayeye ilavesi önerilir.`,
+      message: `Ortaklara borçlar ${fmtMn(shareholderLoans)}; özkaynağa oranı %${Math.round(ratio * 100)}. Özkaynağın yarısını aştığı için rating tavanı bir kademe düşürüldü. Ortak tarafından çekilmesi halinde likidite ve kaldıraç bozulur; sermayeye ilavesi önerilir.`,
     })
   } else if (ratio != null && ratio > SHAREHOLDER_LOAN_WARN_RATIO) {
     notes.push({
       code: 'SHAREHOLDER_LOANS', level: 'WARN', ratio, amount: shareholderLoans,
-      message: `Ortaklara borçlar ${fmtMn(shareholderLoans)}, özkaynağın %${Math.round(ratio * 100)}'i. Ortak tarafından çekilmesi halinde likidite ve kaldıraç bozulur; sermayeye ilavesi önerilir.`,
+      message: `Ortaklara borçlar ${fmtMn(shareholderLoans)}; özkaynağa oranı %${Math.round(ratio * 100)}. Ortak tarafından çekilmesi halinde likidite ve kaldıraç bozulur; sermayeye ilavesi önerilir.`,
     })
   }
 

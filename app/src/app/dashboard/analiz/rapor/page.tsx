@@ -47,6 +47,7 @@ function RaporContent() {
   const compareIds = params.get('compareIds')
 
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [subjectiveMissing, setSubjectiveMissing] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
   const [regenerating, setRegenerating] = useState(false)
@@ -93,6 +94,7 @@ function RaporContent() {
           throw new Error(body?.error ?? `HTTP ${res.status}`)
         }
         const api: AnalysisApiResponse = await res.json()
+        setSubjectiveMissing(api.subjectiveInput == null)
         setReportData(mapToReportData(api))
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Bilinmeyen hata')
@@ -104,6 +106,28 @@ function RaporContent() {
 
   if (loading)        return <LoadingScreen />
   if (error || !reportData) return <ErrorScreen message={error ?? 'Veri alınamadı.'} />
+
+  // Subjektif faktörler girilmeden rapor oluşmaz (nihai skor 70 finansal + 30 subjektif)
+  if (subjectiveMissing) {
+    return (
+      <div style={{ maxWidth: '600px', margin: '60px auto', padding: '32px', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+        <h2 style={{ marginBottom: '14px', color: '#1f2937' }}>Rapor Görüntülenemiyor</h2>
+        <p style={{ color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
+          {ROADMAP_MESSAGES.SUBJECTIVE_REQUIRED}
+        </p>
+        <button
+          onClick={() => { window.location.href = '/dashboard/analiz' }}
+          style={{
+            background: '#0B3C5D', color: '#fff', padding: '10px 24px', borderRadius: '6px',
+            fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer',
+          }}
+        >
+          Analiz Sayfasına Dön
+        </button>
+      </div>
+    )
+  }
 
   // === YENİ — Snapshot yoksa SAYFA İÇERİĞİNİ BLOKLA (Codex D12) ===
   const hasRoadmap = reportData.scenario != null

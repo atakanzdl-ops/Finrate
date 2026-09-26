@@ -215,7 +215,12 @@ export function buildConclusion(
   const s = ratios && bm ? summarizeAssessments(ratios as Partial<Record<MetricKey, number | null>>, bm as unknown as Partial<Record<string, number | null>>) : null
   if (s && s.total > 0) {
     const parts: string[] = []
-    parts.push(`Değerlendirilen ${s.total} temel göstergenin ${s.good}'${suffixI(s.good)} sektör ortalamasının üzerinde, ${s.warn}'${suffixI(s.warn)} sektör düzeyinde, ${s.risk}'${suffixI(s.risk)} sektörün altındadır.`)
+    // Sıfır sayılı gruplar cümleye girmez ("0'ı sektör düzeyinde" yazılmaz)
+    const dist: string[] = []
+    if (s.good > 0) dist.push(`${s.good}'${suffixI(s.good)} sektör ortalamasının üzerinde`)
+    if (s.warn > 0) dist.push(`${s.warn}'${suffixI(s.warn)} sektör düzeyinde`)
+    if (s.risk > 0) dist.push(`${s.risk}'${suffixI(s.risk)} sektörün altında`)
+    if (dist.length) parts.push(`Değerlendirilen ${s.total} temel göstergenin ${dist.join(', ')}dır.`)
     if (s.strongest.length) parts.push(`En güçlü alanlar: ${s.strongest.join(', ').toLowerCase()}.`)
     if (s.weakest.length)   parts.push(`Öncelikli iyileştirme alanları: ${s.weakest.join(', ').toLowerCase()}.`)
     if (s.notApplicable.length) parts.push(`${s.notApplicable.join(' ve ')} finansal borç bulunmadığından uygulanamaz.`)

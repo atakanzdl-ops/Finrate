@@ -40,7 +40,7 @@ export interface AnalysisApiResponse {
   optimizerSnapshot: OptimizerSnapshotRaw | null
   // YENİ — parse edilmiş wrapper (detail endpoint JSON.parse yaptı, Codex D7)
   roadmapSnapshot:   RoadmapSnapshotWrapper | null
-  entity: { id: string; name: string; sector: string | null; taxNumber: string | null; entityType: string | null } | null
+  entity: { id: string; name: string; sector: string | null; taxNumber: string | null; entityType: string | null; naceCode?: string | null } | null
   financialData: FinancialDataRaw | null
   subjectiveInput: SubjectiveInputRaw | null
   trendAnalyses: TrendAnalysisRaw[]
@@ -266,7 +266,7 @@ export function mapToReportData(api: AnalysisApiResponse): ReportData {
     financialDetail: buildFinancialDetail(api, ratios, fd, bm, sector, rating, totalScore, sectorScores),
 
     // ── Sayfa 5: Likidite & Borçlanma Oranları ────────────────────────────────
-    liquidityRatios: buildLiquidityRatioRows(ratios, bm),
+    liquidityRatios: buildLiquidityRatioRows(ratios, bm, fd),
 
     // ── Sayfa 6: Kârlılık & Faaliyet Oranları ─────────────────────────────────
     profitabilityRatios: buildProfitabilityRatioRows(ratios, bm),
@@ -352,14 +352,27 @@ function buildRiskClassification(
 // ─── HELPER: EKSİK ALAN TESPİTİ (Ö8) ────────────────────────────────────────
 // Sadece null/undefined kontrolü — 0 geçerli finansal değer
 
+/** Finansal borcu olmayan firma: KV+UV finansal borç sıfır (boş alan sıfır sayılır) ve faiz gideri yok. */
+function hasNoFinancialDebt(fd: FinancialDataRaw | null | undefined): boolean {
+  if (!fd) return false
+  const st = fd.shortTermFinancialDebt ?? 0
+  const lt = fd.longTermFinancialDebt ?? 0
+  const ie = fd.interestExpense ?? 0
+  return st === 0 && lt === 0 && ie === 0
+}
+
 function getMissingFields(fd: FinancialDataRaw | null | undefined): string[] {
   if (!fd) return ['Tüm finansal veriler']
   const missing: string[] = []
   if (fd.tradeReceivables == null)       missing.push('Ticari Alacaklar')
   if (fd.inventory == null)              missing.push('Stoklar')
-  if (fd.shortTermFinancialDebt == null) missing.push('Kısa Vadeli Finansal Borçlar')
-  if (fd.longTermFinancialDebt == null)  missing.push('Uzun Vadeli Finansal Borçlar')
-  if (fd.interestExpense == null)        missing.push('Faiz Giderleri')
+  // Finansal borcu olmayan firmada borç/faiz alanlarının boş olması "eksik veri" değildir
+  const noDebt = hasNoFinancialDebt(fd)
+  if (!noDebt) {
+    if (fd.shortTermFinancialDebt == null) missing.push('Kısa Vadeli Finansal Borçlar')
+    if (fd.longTermFinancialDebt == null)  missing.push('Uzun Vadeli Finansal Borçlar')
+    if (fd.interestExpense == null)        missing.push('Faiz Giderleri')
+  }
   if (fd.depreciation == null)           missing.push('Amortisman')
   return missing
 }
@@ -420,7 +433,8 @@ function buildExecutiveSummary(
       sectorCurrentRatio:     defaultBm.currentRatio,
       debtToEquity:           (ratios.debtToEquity as number | null) ?? 0,
       sectorDebtToEquity:     defaultBm.debtToEquity,
-      interestCoverage:       (ratios.interestCoverage as number | null) ?? null,
+      // Faiz gideri boş ama finansal borç yoksa → 9999 (rapor "Uygulanamaz" gösterir)
+      interestCoverage:       (ratios.interestCoverage as number | null) ?? (hasNoFinancialDebt(fd) ? 9999 : null),
       sectorInterestCoverage: defaultBm.interestCoverage,
       equity:                 fd?.totalEquity ?? 0,
       equityYoY,
@@ -473,7 +487,8 @@ function buildCompanyInfo(
   return {
     vkn:         entity?.taxNumber ?? '—',
     sector:      sector ?? '—',
-    naceCode:    getNaceCode(sector),
+    // Firmanın kayıtlı NACE kodu varsa o gösterilir; yoksa sektörden türetilen genel kod
+    naceCode:    entity?.naceCode ? `${entity.naceCode} — ${sector ?? 'Sektör'}` : getNaceCode(sector),
     entityType:  getEntityTypeLabel(entity?.entityType),
     foundedYear,
     activityYears: companyAgeYears,
@@ -568,6 +583,7 @@ function buildFinancialDetail(
 function buildLiquidityRatioRows(
   ratios: Record<string, number | null>,
   bm: typeof SECTOR_BENCHMARKS[string] | null,
+  fd: FinancialDataRaw | null = null,
 ): RatioRow[] {
   const b = bm ?? {} as typeof SECTOR_BENCHMARKS[string]
 
@@ -626,8 +642,12 @@ function buildLiquidityRatioRows(
   // Uygulanamaz durumlar: eksik veri ya da risk gibi gösterilmez
   const ic = ratios.interestCoverage as number | null
   const de = ratios.debtToEbitda as number | null
+  const noFinancialDebt = hasNoFinancialDebt(fd)
   for (const row of rows) {
-    if (row.name === 'Faiz Karşılama Oranı' && ic != null && ic >= 9999) {
+    if (row.name === 'Faiz Karşılama Oranı' && ((ic != null && ic >= 9999) || (ic == null && noFinancialDebt))) {
+      row.companyValue = 'Uygulanamaz — finansal borç yok'; row.status = 'iyi'; row.barColor = BAR_COLOR.iyi; row.barFill = 100
+    }
+    if (row.name === 'KV Borç / Toplam Borç' && (ratios.shortTermDebtRatio == null) && noFinancialDebt) {
       row.companyValue = 'Uygulanamaz — finansal borç yok'; row.status = 'iyi'; row.barColor = BAR_COLOR.iyi; row.barFill = 100
     }
     if (row.name === 'Net Borç / FAVÖK' && de != null && de < 0) {
@@ -932,11 +952,11 @@ function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
     const currentAssetRatio = (lastFd.totalCurrentAssets / lastFd.totalAssets) * 100
     const pct = Math.round(currentAssetRatio)
     if (currentAssetRatio > 70) {
-      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Yüksek likidite konumu nakit yönetimi için olumlu, ancak duran varlık yatırımının düşük olması uzun vadeli büyüme kapasitesini sorgulatır.`
+      part1 = `Dönen varlıkların toplam varlıklar içindeki payı %${pct}. Yüksek likidite konumu nakit yönetimi için olumlu, ancak duran varlık yatırımının düşük olması uzun vadeli büyüme kapasitesini sorgulatır.`
     } else if (currentAssetRatio > 40) {
-      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Dönen/duran varlık dengesi makul seviyede.`
+      part1 = `Dönen varlıkların toplam varlıklar içindeki payı %${pct}. Dönen/duran varlık dengesi makul seviyede.`
     } else {
-      part1 = `Dönen varlıklar toplam varlıkların %${pct}'sini oluşturuyor. Duran varlık ağırlıklı yapı uzun vadeli yatırım kapasitesini gösteriyor ancak kısa vadeli ödeme gücünü sorgulatır.`
+      part1 = `Dönen varlıkların toplam varlıklar içindeki payı %${pct}. Duran varlık ağırlıklı yapı uzun vadeli yatırım kapasitesini gösteriyor ancak kısa vadeli ödeme gücünü sorgulatır.`
     }
   }
 
@@ -961,11 +981,11 @@ function buildBalanceSheet(tableYears: YearEntry[], currentId: string) {
     const inventoryShare = (lastFd.inventory / lastFd.totalCurrentAssets) * 100
     const pct = Math.round(inventoryShare)
     if (inventoryShare > 60) {
-      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Yüksek stok yoğunluğu nakde dönüşüm hızını yavaşlatabilir.`
+      part3 = `Stokların dönen varlıklar içindeki payı %${pct}. Yüksek stok yoğunluğu nakde dönüşüm hızını yavaşlatabilir.`
     } else if (inventoryShare > 30) {
-      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Sektör için makul seviyede.`
+      part3 = `Stokların dönen varlıklar içindeki payı %${pct}. Sektör için makul seviyede.`
     } else if (inventoryShare > 0) {
-      part3 = `Stoklar dönen varlıkların %${pct}'ini oluşturuyor. Düşük stok yoğunluğu hızlı nakit dönüşümü sağlıyor.`
+      part3 = `Stokların dönen varlıklar içindeki payı %${pct}. Düşük stok yoğunluğu hızlı nakit dönüşümü sağlıyor.`
     }
   }
 
